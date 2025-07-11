@@ -1,0 +1,288 @@
+# Next.js Best Practices & Development Rules
+
+## 🎯 Project Context
+This is a budget management application built with Next.js 14+, TypeScript, Tailwind CSS, and shadcn/ui components.
+
+## 📁 Project Structure & Organization
+
+### File Naming Conventions
+- Use **PascalCase** for React components: `BudgetTable.tsx`, `FinancialChart.tsx`
+- Use **camelCase** for utilities and hooks: `formatCurrency.ts`, `useLocalStorage.ts`
+- Use **kebab-case** for pages and routes: `budget-overview.tsx`, `debt-management.tsx`
+- Use **lowercase** for configuration files: `next.config.js`, `tailwind.config.js`
+
+### Folder Structure
+```
+src/
+├── app/                    # App Router (Next.js 13+)
+│   ├── (dashboard)/       # Route groups
+│   ├── globals.css        # Global styles
+│   └── layout.tsx         # Root layout
+├── components/
+│   ├── ui/                # shadcn/ui components
+│   ├── budget/            # Feature-specific components
+│   ├── debts/             # Feature-specific components
+│   └── common/            # Shared components
+├── lib/                   # Utilities and configurations
+├── hooks/                 # Custom React hooks
+├── types/                 # TypeScript type definitions
+├── constants/             # Application constants
+└── utils/                 # Helper functions
+```
+
+## 🚀 Next.js Specific Rules
+
+### App Router (Next.js 13+)
+- **ALWAYS** use App Router over Pages Router for new projects
+- Use `layout.tsx` for shared layouts between routes
+- Use `page.tsx` for route components
+- Use `loading.tsx` for loading states
+- Use `error.tsx` for error boundaries
+- Use `not-found.tsx` for 404 pages
+
+### Server vs Client Components
+- **DEFAULT** to Server Components unless client interactivity is needed
+- Use `"use client"` directive ONLY when necessary:
+  - Event handlers (onClick, onChange)
+  - State management (useState, useReducer)
+  - Browser APIs (localStorage, window)
+  - Custom hooks that use client-side features
+- Keep Client Components as **leaf components** when possible
+
+### Data Fetching
+- Use `fetch()` with caching strategies in Server Components
+- Use React Query/SWR for client-side data fetching
+- Implement proper error handling with try-catch blocks
+- Use TypeScript interfaces for API responses
+
+```typescript
+// ✅ Good: Server Component data fetching
+async function BudgetPage() {
+  const data = await fetch('/api/budget', {
+    cache: 'revalidate',
+    next: { revalidate: 3600 }
+  });
+  return <BudgetTable data={data} />;
+}
+
+// ✅ Good: Client Component with React Query
+"use client";
+function TransactionsList() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['transactions'],
+    queryFn: fetchTransactions
+  });
+}
+```
+
+## 🎨 Component Development Rules
+
+### Component Structure
+```typescript
+// ✅ Perfect component structure
+interface ComponentNameProps {
+  // Props interface first
+  title: string;
+  optional?: boolean;
+}
+
+export default function ComponentName({ title, optional = false }: ComponentNameProps) {
+  // 1. Hooks at the top
+  const [state, setState] = useState<string>('');
+  
+  // 2. Early returns for loading/error states
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage error={error} />;
+  
+  // 3. Event handlers
+  const handleClick = (e: React.MouseEvent) => {
+    // Handler logic
+  };
+  
+  // 4. Render logic
+  return (
+    <div className="component-container">
+      {/* JSX content */}
+    </div>
+  );
+}
+```
+
+### Component Best Practices
+- **ALWAYS** define TypeScript interfaces for props
+- Use **default parameters** for optional props
+- Keep components **small and focused** (<200 lines)
+- Use **descriptive names** that explain the component's purpose
+- Implement **proper error boundaries** for complex components
+- Use **React.memo()** for expensive pure components
+
+### Event Handling
+- Use **proper TypeScript types** for event handlers
+- Implement **debouncing** for search inputs
+- Use **useCallback** for event handlers passed to child components
+- Always handle **loading and error states**
+
+## 🎨 Styling & UI Rules
+
+### Tailwind CSS Best Practices
+- Use **utility-first** approach with Tailwind classes
+- Create **custom components** for repeated patterns
+- Use **semantic class names** for complex layouts
+- Implement **responsive design** with mobile-first approach
+- Use **CSS variables** for theme customization
+
+```typescript
+// ✅ Good: Responsive utility classes
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+  <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+    {/* Card content */}
+  </Card>
+</div>
+```
+
+### shadcn/ui Integration
+- **ALWAYS** use shadcn/ui components over custom implementations
+- Customize components through **CSS variables** and Tailwind classes
+- Follow **shadcn/ui naming conventions**
+- Use **component composition** patterns
+
+## 🔧 Performance & Optimization
+
+### Image Optimization
+- **ALWAYS** use `next/image` for images
+- Provide **proper alt text** for accessibility
+- Use **appropriate sizes** and **priority** props
+- Implement **lazy loading** for below-the-fold images
+
+### Bundle Optimization
+- Use **dynamic imports** for heavy components
+- Implement **code splitting** at route level
+- Use **next/dynamic** for client-only components
+- Minimize **client-side JavaScript**
+
+```typescript
+// ✅ Good: Dynamic import for heavy components
+const HeavyChart = dynamic(() => import('./HeavyChart'), {
+  loading: () => <ChartSkeleton />,
+  ssr: false
+});
+```
+
+## 🔐 Security & Best Practices
+
+### API Routes & Security
+- **ALWAYS** validate input data using Zod or similar
+- Implement **proper authentication** checks
+- Use **environment variables** for sensitive data
+- Implement **rate limiting** for API routes
+- Use **HTTPS** in production
+
+### Error Handling
+- Implement **global error boundaries**
+- Use **proper error messages** for users
+- Log **detailed errors** for debugging
+- Implement **graceful degradation**
+
+## 📊 State Management
+
+### Local State
+- Use **useState** for simple component state
+- Use **useReducer** for complex state logic
+- Implement **custom hooks** for reusable stateful logic
+- Use **Context** sparingly for truly global state
+
+### Global State
+- Use **Zustand** or **React Query** for global state
+- Implement **proper state normalization**
+- Use **selectors** to optimize re-renders
+- Keep **state as flat as possible**
+
+## 🧪 Testing & Quality
+
+### Testing Strategy
+- Write **unit tests** for utility functions
+- Write **integration tests** for API routes
+- Use **React Testing Library** for component tests
+- Implement **end-to-end tests** for critical flows
+
+### Code Quality
+- Use **ESLint** and **Prettier** for code formatting
+- Implement **strict TypeScript** configuration
+- Use **meaningful commit messages**
+- Follow **semantic versioning**
+
+## 📱 Accessibility Rules
+
+### WCAG Compliance
+- Use **semantic HTML** elements
+- Implement **proper ARIA labels**
+- Ensure **keyboard navigation** support
+- Maintain **sufficient color contrast**
+- Provide **focus indicators**
+
+### Implementation
+```typescript
+// ✅ Good: Accessible form component
+<form onSubmit={handleSubmit}>
+  <label htmlFor="budget-amount" className="sr-only">
+    Budget Amount
+  </label>
+  <input
+    id="budget-amount"
+    type="number"
+    aria-describedby="budget-help"
+    className="focus:ring-2 focus:ring-blue-500"
+  />
+  <div id="budget-help" className="text-sm text-gray-600">
+    Enter your monthly budget amount
+  </div>
+</form>
+```
+
+## 🚀 Deployment & Environment
+
+### Production Readiness
+- Use **environment-specific configurations**
+- Implement **proper logging** and monitoring
+- Use **CDN** for static assets
+- Implement **proper caching** strategies
+- Use **analytics** and **error tracking**
+
+### Performance Monitoring
+- Monitor **Core Web Vitals**
+- Implement **performance budgets**
+- Use **Lighthouse** for auditing
+- Monitor **bundle size** regularly
+
+## 🔄 Development Workflow
+
+### Git Workflow
+- Use **conventional commits** format
+- Create **feature branches** for development
+- Use **pull requests** for code review
+- Implement **automated testing** in CI/CD
+
+### Code Review Checklist
+- [ ] TypeScript types are properly defined
+- [ ] Components are properly sized (<200 lines)
+- [ ] Error handling is implemented
+- [ ] Accessibility requirements are met
+- [ ] Performance considerations are addressed
+- [ ] Tests are included for new features
+
+## 📝 Documentation Rules
+
+### Code Documentation
+- Write **clear, concise comments** for complex logic
+- Document **API interfaces** and **component props**
+- Use **JSDoc** for function documentation
+- Keep **README** files updated
+- Document **environment variables** and **configuration**
+
+### Comments Style
+- Use **single-line comments** for brief explanations
+- Use **multi-line comments** for complex logic
+- Write comments in **clear, simple English**
+- Explain **why**, not just **what**
+
+Remember: **Think thoroughly before coding. Write 2-3 reasoning paragraphs. Always write simple, clean and modular code.** 
