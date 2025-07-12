@@ -6,7 +6,6 @@
  * 
  * @param items - Array of budget items
  * @param onItemUpdate - Callback when item is updated
- * @param onItemDelete - Callback when item is deleted
  * @param onItemEdit - Callback when item edit is requested
  * @param loading - Whether the table is in loading state
  * @param className - Additional CSS classes
@@ -15,7 +14,6 @@
  * <BudgetTable 
  *   items={budgetItems}
  *   onItemUpdate={(id, value) => updateBudgetItem(id, value)}
- *   onItemDelete={(id) => deleteBudgetItem(id)}
  *   onItemEdit={(id) => openEditDialog(id)}
  *   loading={isLoading}
  * />
@@ -41,7 +39,6 @@ interface BudgetItemData {
 interface BudgetTableProps {
   items: BudgetItemData[];
   onItemUpdate: (id: string, value: number) => void;
-  onItemDelete: (id: string) => void;
   onItemEdit: (id: string) => void;
   loading?: boolean;
   className?: string;
@@ -53,7 +50,6 @@ type FilterStatus = 'all' | 'on-track' | 'over-budget' | 'under-budget';
 export default function BudgetTable({ 
   items, 
   onItemUpdate, 
-  onItemDelete, 
   onItemEdit, 
   loading = false,
   className = "" 
@@ -207,7 +203,6 @@ export default function BudgetTable({
               key={item.id}
               item={item}
               onEdit={onItemEdit}
-              onDelete={onItemDelete}
             />
           ))}
         </div>

@@ -6,14 +6,12 @@
  * 
  * @param item - Budget item data
  * @param onEdit - Callback when edit button is clicked
- * @param onDelete - Callback when delete button is clicked
  * @param className - Additional CSS classes
  * 
  * @example
  * <BudgetItem 
  *   item={budgetItem}
  *   onEdit={() => handleEdit(item.id)}
- *   onDelete={() => handleDelete(item.id)}
  * />
  */
 "use client";
@@ -22,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import Button from "@/components/atoms/Button/Button";
 import Card, { CardContent, CardHeader, CardTitle } from "@/components/atoms/Card/Card";
 import { cn } from "@/lib/utils";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit } from "lucide-react";
 
 interface BudgetItemData {
   id: string;
@@ -36,14 +34,12 @@ interface BudgetItemData {
 interface BudgetItemProps {
   item: BudgetItemData;
   onEdit: (id: string) => void;
-  onDelete: (id: string) => void;
   className?: string;
 }
 
 export default function BudgetItem({ 
   item, 
   onEdit, 
-  onDelete, 
   className = "" 
 }: BudgetItemProps) {
   // Calculate percentage spent
@@ -67,9 +63,21 @@ export default function BudgetItem({
         <CardTitle className="text-lg font-semibold text-white">
           {item.category}
         </CardTitle>
-        <Badge variant={getStatusVariant()}>
-          {item.status.replace('-', ' ')}
-        </Badge>
+        {/* Badge and edit button container */}
+        <div className="flex items-center gap-2">
+          <Badge variant={getStatusVariant()}>
+            {item.status.replace('-', ' ')}
+          </Badge>
+          {/* Edit button icon */}
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => onEdit(item.id)}
+            className="p-1 h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
+        </div>
       </CardHeader>
       
       <CardContent className="p-0 space-y-3">
@@ -105,27 +113,6 @@ export default function BudgetItem({
           )}>
             ${item.remaining.toFixed(2)}
           </span>
-        </div>
-        
-        {/* Action buttons */}
-        <div className="flex gap-2 pt-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => onEdit(item.id)}
-            className="flex-1 text-white border-slate-600 hover:bg-slate-700"
-          >
-            <Edit className="w-4 h-4 mr-1" />
-            Edit
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => onDelete(item.id)}
-            className="text-red-400 hover:text-red-300 border-red-600 hover:bg-red-500/10"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
         </div>
       </CardContent>
     </Card>

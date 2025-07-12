@@ -137,10 +137,10 @@ export default function DashboardPage() {
     );
   };
 
-  // Handle budget item deletion
-  const handleItemDelete = (id: string) => {
-    setBudgetItems(prev => prev.filter(item => item.id !== id));
-  };
+  // Handle budget item deletion (removed - no longer needed)
+  // const handleItemDelete = (id: string) => {
+  //   setBudgetItems(prev => prev.filter(item => item.id !== id));
+  // };
 
   // Handle budget item edit (placeholder for modal/dialog)
   const handleItemEdit = (id: string) => {
@@ -252,7 +252,6 @@ export default function DashboardPage() {
         <BudgetTable
           items={budgetItems}
           onItemUpdate={handleItemUpdate}
-          onItemDelete={handleItemDelete}
           onItemEdit={handleItemEdit}
           loading={isLoading}
         />
