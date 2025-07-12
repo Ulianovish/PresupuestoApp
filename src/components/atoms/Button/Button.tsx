@@ -27,7 +27,7 @@ interface ButtonProps {
   loading?: boolean;
   children?: ReactNode;
   className?: string;
-  onClick?: () => void;
+  onClick?: (e?: React.MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
   type?: 'button' | 'submit' | 'reset';
 }

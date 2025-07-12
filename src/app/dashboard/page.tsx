@@ -257,6 +257,7 @@ export default function DashboardPage() {
 
   return (
     <BudgetPageLayout
+      header={<PageHeader />}
       mainContent={
         <BudgetTable
           items={budgetItems}
