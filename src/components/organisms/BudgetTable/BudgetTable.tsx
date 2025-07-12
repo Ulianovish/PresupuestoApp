@@ -59,6 +59,15 @@ export default function BudgetTable({
   const [sortBy, setSortBy] = useState<SortOption>('category');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
 
+  // Función para formatear moneda consistente con otras páginas
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
   // Filter and sort items
   const filteredAndSortedItems = useMemo(() => {
     let filtered = items.filter(item => {
@@ -163,19 +172,19 @@ export default function BudgetTable({
         <div className="p-4 bg-blue-500/10 backdrop-blur-sm rounded-lg border border-blue-500/20">
           <div className="text-sm text-blue-400">Presupuesto Total</div>
           <div className="text-2xl font-bold text-blue-300">
-            ${summary.totalBudget.toFixed(2)}
+            {formatCurrency(summary.totalBudget)}
           </div>
         </div>
         <div className="p-4 bg-green-500/10 backdrop-blur-sm rounded-lg border border-green-500/20">
           <div className="text-sm text-green-400">Gastado</div>
           <div className="text-2xl font-bold text-green-300">
-            ${summary.totalSpent.toFixed(2)}
+            {formatCurrency(summary.totalSpent)}
           </div>
         </div>
         <div className="p-4 bg-purple-500/10 backdrop-blur-sm rounded-lg border border-purple-500/20">
           <div className="text-sm text-purple-400">Restante</div>
           <div className="text-2xl font-bold text-purple-300">
-            ${summary.totalRemaining.toFixed(2)}
+            {formatCurrency(summary.totalRemaining)}
           </div>
         </div>
         <div className="p-4 bg-orange-500/10 backdrop-blur-sm rounded-lg border border-orange-500/20">

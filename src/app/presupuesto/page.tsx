@@ -7,7 +7,10 @@
 import { useState } from "react";
 import Card, { CardContent, CardHeader, CardTitle } from "@/components/atoms/Card/Card";
 import Button from "@/components/atoms/Button/Button";
-import { ChevronDown, ChevronRight, Edit } from "lucide-react";
+import { ChevronDown, ChevronRight, Edit, Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // Tipos para los datos del presupuesto
 interface PresupuestoItem {
@@ -27,6 +30,14 @@ interface PresupuestoCategoria {
   totalReal: number;
   items: PresupuestoItem[];
   expanded: boolean;
+}
+
+// Estado del modal para agregar/editar detalles
+interface ModalState {
+  isOpen: boolean;
+  mode: 'add' | 'edit';
+  categoriaId: string;
+  item?: PresupuestoItem;
 }
 
 // Datos mockeados basados en las imágenes de referencia
@@ -1142,6 +1153,20 @@ const presupuestoMock: PresupuestoCategoria[] = [
 
 export default function PresupuestoPage() {
   const [categorias, setCategorias] = useState<PresupuestoCategoria[]>(presupuestoMock);
+  const [modalState, setModalState] = useState<ModalState>({
+    isOpen: false,
+    mode: 'add',
+    categoriaId: '',
+    item: undefined
+  });
+  const [formData, setFormData] = useState({
+    descripcion: '',
+    fecha: '',
+    clasificacion: 'Fijo' as const,
+    control: 'Necesario' as const,
+    presupuestado: 0,
+    real: 0
+  });
 
   // Función para expandir/contraer categorías
   const toggleCategoria = (categoriaId: string) => {
@@ -1150,6 +1175,110 @@ export default function PresupuestoPage() {
         cat.id === categoriaId ? { ...cat, expanded: !cat.expanded } : cat
       )
     );
+  };
+
+  // Función para abrir el modal de agregar detalle
+  const openAddModal = (categoriaId: string) => {
+    setModalState({
+      isOpen: true,
+      mode: 'add',
+      categoriaId,
+      item: undefined
+    });
+    setFormData({
+      descripcion: '',
+      fecha: '',
+      clasificacion: 'Fijo',
+      control: 'Necesario',
+      presupuestado: 0,
+      real: 0
+    });
+  };
+
+  // Función para abrir el modal de editar detalle
+  const openEditModal = (categoriaId: string, item: PresupuestoItem) => {
+    setModalState({
+      isOpen: true,
+      mode: 'edit',
+      categoriaId,
+      item
+    });
+    setFormData({
+      descripcion: item.descripcion,
+      fecha: item.fecha,
+      clasificacion: item.clasificacion,
+      control: item.control,
+      presupuestado: item.presupuestado,
+      real: item.real
+    });
+  };
+
+  // Función para cerrar el modal
+  const closeModal = () => {
+    setModalState({
+      isOpen: false,
+      mode: 'add',
+      categoriaId: '',
+      item: undefined
+    });
+    setFormData({
+      descripcion: '',
+      fecha: '',
+      clasificacion: 'Fijo',
+      control: 'Necesario',
+      presupuestado: 0,
+      real: 0
+    });
+  };
+
+  // Función para guardar los cambios
+  const handleSave = () => {
+    if (modalState.mode === 'add') {
+      // Agregar nuevo detalle
+      const newItem: PresupuestoItem = {
+        id: `${modalState.categoriaId}-${Date.now()}`,
+        descripcion: formData.descripcion,
+        fecha: formData.fecha,
+        clasificacion: formData.clasificacion,
+        control: formData.control,
+        presupuestado: formData.presupuestado,
+        real: formData.real
+      };
+
+      setCategorias(prev => 
+        prev.map(cat => 
+          cat.id === modalState.categoriaId 
+            ? { 
+                ...cat, 
+                items: [...cat.items, newItem],
+                totalPresupuestado: cat.totalPresupuestado + newItem.presupuestado,
+                totalReal: cat.totalReal + newItem.real
+              }
+            : cat
+        )
+      );
+    } else if (modalState.mode === 'edit' && modalState.item) {
+      // Editar detalle existente
+      const oldItem = modalState.item;
+      setCategorias(prev => 
+        prev.map(cat => 
+          cat.id === modalState.categoriaId 
+            ? { 
+                ...cat, 
+                items: cat.items.map(item => 
+                  item.id === oldItem.id 
+                    ? { ...item, ...formData }
+                    : item
+                ),
+                totalPresupuestado: cat.totalPresupuestado - oldItem.presupuestado + formData.presupuestado,
+                totalReal: cat.totalReal - oldItem.real + formData.real
+              }
+            : cat
+        )
+      );
+    }
+
+    closeModal();
   };
 
   // Función para obtener el color de la clasificación
@@ -1262,9 +1391,29 @@ export default function PresupuestoPage() {
                           {formatCurrency(categoria.totalReal)}
                         </td>
                         <td className="px-4 py-4">
-                          <Button variant="ghost" size="sm">
-                            <Edit className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openAddModal(categoria.id);
+                              }}
+                              className="text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Funcionalidad para editar categoría (opcional)
+                              }}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
 
@@ -1306,7 +1455,11 @@ export default function PresupuestoPage() {
                               {item.real > 0 ? formatCurrency(item.real) : "—"}
                             </td>
                             <td className="px-4 py-3">
-                              <Button variant="ghost" size="sm">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => openEditModal(categoria.id, item)}
+                              >
                                 <Edit className="w-4 h-4" />
                               </Button>
                             </td>
@@ -1319,6 +1472,132 @@ export default function PresupuestoPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Modal para agregar/editar detalles */}
+        <Dialog open={modalState.isOpen} onOpenChange={closeModal}>
+          <DialogContent className="sm:max-w-[425px] bg-slate-800/95 border-slate-700">
+            <DialogHeader>
+              <DialogTitle className="text-white">
+                {modalState.mode === 'add' ? 'Agregar Nuevo Detalle' : 'Editar Detalle'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {/* Descripción */}
+              <div className="space-y-2">
+                <Label htmlFor="descripcion" className="text-white">
+                  Descripción
+                </Label>
+                <Input
+                  id="descripcion"
+                  value={formData.descripcion}
+                  onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                  placeholder="Ingrese la descripción"
+                />
+              </div>
+
+              {/* Fecha */}
+              <div className="space-y-2">
+                <Label htmlFor="fecha" className="text-white">
+                  Fecha
+                </Label>
+                <Input
+                  id="fecha"
+                  value={formData.fecha}
+                  onChange={(e) => setFormData(prev => ({ ...prev, fecha: e.target.value }))}
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                  placeholder="ej: 15/mes"
+                />
+              </div>
+
+              {/* Clasificación */}
+              <div className="space-y-2">
+                <Label className="text-white">Clasificación</Label>
+                <div className="flex gap-4">
+                  {['Fijo', 'Variable', 'Discrecional'].map((tipo) => (
+                    <label key={tipo} className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        name="clasificacion"
+                        value={tipo}
+                        checked={formData.clasificacion === tipo}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          clasificacion: e.target.value as 'Fijo' | 'Variable' | 'Discrecional'
+                        }))}
+                        className="text-blue-500"
+                      />
+                      <span className="text-white text-sm">{tipo}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Control */}
+              <div className="space-y-2">
+                <Label className="text-white">Control</Label>
+                <div className="flex gap-4">
+                  {['Necesario', 'Discrecional'].map((tipo) => (
+                    <label key={tipo} className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        name="control"
+                        value={tipo}
+                        checked={formData.control === tipo}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          control: e.target.value as 'Necesario' | 'Discrecional'
+                        }))}
+                        className="text-blue-500"
+                      />
+                      <span className="text-white text-sm">{tipo}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Presupuestado */}
+              <div className="space-y-2">
+                <Label htmlFor="presupuestado" className="text-white">
+                  Presupuestado
+                </Label>
+                <Input
+                  id="presupuestado"
+                  type="number"
+                  value={formData.presupuestado}
+                  onChange={(e) => setFormData(prev => ({ ...prev, presupuestado: Number(e.target.value) }))}
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                  placeholder="0"
+                />
+              </div>
+
+              {/* Real */}
+              <div className="space-y-2">
+                <Label htmlFor="real" className="text-white">
+                  Real
+                </Label>
+                <Input
+                  id="real"
+                  type="number"
+                  value={formData.real}
+                  onChange={(e) => setFormData(prev => ({ ...prev, real: Number(e.target.value) }))}
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                  placeholder="0"
+                />
+              </div>
+
+              {/* Botones */}
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button variant="outline" onClick={closeModal}>
+                  Cancelar
+                </Button>
+                <Button variant="gradient" onClick={handleSave}>
+                  {modalState.mode === 'add' ? 'Agregar' : 'Guardar'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

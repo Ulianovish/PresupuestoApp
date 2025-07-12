@@ -43,7 +43,11 @@ export default function TestPage() {
           <CardContent className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2 text-white">
-                Amount: ${amount.toFixed(2)}
+                Amount: {new Intl.NumberFormat('es-CO', {
+                  style: 'currency',
+                  currency: 'COP',
+                  minimumFractionDigits: 0,
+                }).format(amount)}
               </label>
               <CurrencyInput 
                 value={amount}

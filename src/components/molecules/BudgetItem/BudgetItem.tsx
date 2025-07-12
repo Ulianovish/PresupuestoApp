@@ -45,6 +45,15 @@ export default function BudgetItem({
   // Calculate percentage spent
   const percentageSpent = item.amount > 0 ? (item.spent / item.amount) * 100 : 0;
   
+  // Función para formatear moneda consistente con otras páginas
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+  
   // Determine status badge variant
   const getStatusVariant = () => {
     switch (item.status) {
@@ -84,13 +93,13 @@ export default function BudgetItem({
         {/* Amount display */}
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Budget</span>
-          <span className="text-lg font-bold text-white">${item.amount.toFixed(2)}</span>
+          <span className="text-lg font-bold text-white">{formatCurrency(item.amount)}</span>
         </div>
         
         {/* Progress bar */}
         <div className="space-y-1">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Spent: ${item.spent.toFixed(2)}</span>
+            <span className="text-muted-foreground">Spent: {formatCurrency(item.spent)}</span>
             <span className="text-muted-foreground">{percentageSpent.toFixed(1)}%</span>
           </div>
           <div className="w-full bg-slate-700 rounded-full h-2">
@@ -111,7 +120,7 @@ export default function BudgetItem({
             "font-semibold",
             item.remaining < 0 ? "text-red-400" : "text-green-400"
           )}>
-            ${item.remaining.toFixed(2)}
+            {formatCurrency(item.remaining)}
           </span>
         </div>
       </CardContent>

@@ -148,6 +148,15 @@ export default function DashboardPage() {
     // In a real app, this would open an edit dialog
   };
 
+  // Función para formatear moneda consistente con otras páginas
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
   // Header component
   const PageHeader = () => (
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -182,16 +191,16 @@ export default function DashboardPage() {
         <CardContent className="p-0 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Total Presupuesto</span>
-            <span className="font-semibold text-white">${totalBudget.toLocaleString()}</span>
+            <span className="font-semibold text-white">{formatCurrency(totalBudget)}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Gastado</span>
-            <span className="font-semibold text-green-400">${totalSpent.toLocaleString()}</span>
+            <span className="font-semibold text-green-400">{formatCurrency(totalSpent)}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Restante</span>
             <span className={`font-semibold ${totalRemaining >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
-              ${totalRemaining.toLocaleString()}
+              {formatCurrency(totalRemaining)}
             </span>
           </div>
         </CardContent>
