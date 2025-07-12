@@ -2,13 +2,13 @@
  * Header - Organism Level
  * 
  * Header principal con navegación para la app de presupuesto.
- * Incluye enlaces a Dashboard, Gastos y Test, con iconos y glassmorphism.
+ * Incluye enlaces a Dashboard, Presupuesto, Gastos y Test, con iconos y glassmorphism.
  * Es fixed y semitransparente al hacer scroll.
  */
 "use client";
 
 import Link from "next/link";
-import { LayoutDashboard, ReceiptText, FlaskConical } from "lucide-react";
+import { LayoutDashboard, PieChart, ReceiptText, FlaskConical } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function Header() {
@@ -39,6 +39,12 @@ export default function Header() {
             <Link href="/dashboard" className="flex items-center gap-1 text-white hover:text-blue-400 transition-colors">
               <LayoutDashboard size={18} />
               Dashboard
+            </Link>
+          </li>
+          <li>
+            <Link href="/presupuesto" className="flex items-center gap-1 text-white hover:text-blue-400 transition-colors">
+              <PieChart size={18} />
+              Presupuesto
             </Link>
           </li>
           <li>

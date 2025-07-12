@@ -26,34 +26,98 @@ import { Plus, TrendingUp, AlertTriangle, CheckCircle } from "lucide-react";
 const mockBudgetItems = [
   {
     id: "1",
-    category: "Alimentación",
-    amount: 500,
-    spent: 320,
-    remaining: 180,
-    status: "on-track" as const,
+    category: "Vivienda",
+    amount: 7904114,
+    spent: 8009845,
+    remaining: -105731,
+    status: "over-budget" as const,
   },
   {
     id: "2",
-    category: "Transporte",
-    amount: 200,
-    spent: 250,
-    remaining: -50,
+    category: "Deudas",
+    amount: 6337850,
+    spent: 9887850,
+    remaining: -3550000,
     status: "over-budget" as const,
   },
   {
     id: "3",
-    category: "Entretenimiento",
-    amount: 150,
-    spent: 80,
-    remaining: 70,
-    status: "under-budget" as const,
+    category: "Transporte",
+    amount: 875000,
+    spent: 719910,
+    remaining: 155090,
+    status: "on-track" as const,
   },
   {
     id: "4",
-    category: "Servicios",
-    amount: 300,
-    spent: 280,
-    remaining: 20,
+    category: "Mercado",
+    amount: 1210000,
+    spent: 312507,
+    remaining: 897493,
+    status: "under-budget" as const,
+  },
+  {
+    id: "5",
+    category: "Salud",
+    amount: 729000,
+    spent: 25735,
+    remaining: 703265,
+    status: "under-budget" as const,
+  },
+  {
+    id: "6",
+    category: "Alice",
+    amount: 2305323,
+    spent: 0,
+    remaining: 2305323,
+    status: "under-budget" as const,
+  },
+  {
+    id: "7",
+    category: "Gastos Personales",
+    amount: 250000,
+    spent: 157446,
+    remaining: 92554,
+    status: "on-track" as const,
+  },
+  {
+    id: "8",
+    category: "Comunicaciones",
+    amount: 46751,
+    spent: 0,
+    remaining: 46751,
+    status: "under-budget" as const,
+  },
+  {
+    id: "9",
+    category: "Educación",
+    amount: 379000,
+    spent: 0,
+    remaining: 379000,
+    status: "under-budget" as const,
+  },
+  {
+    id: "10",
+    category: "Mascotas",
+    amount: 62000,
+    spent: 0,
+    remaining: 62000,
+    status: "under-budget" as const,
+  },
+  {
+    id: "11",
+    category: "Ahorros",
+    amount: 5000000,
+    spent: 0,
+    remaining: 5000000,
+    status: "under-budget" as const,
+  },
+  {
+    id: "12",
+    category: "Impuestos",
+    amount: 0,
+    spent: 0,
+    remaining: 0,
     status: "on-track" as const,
   },
 ];
@@ -102,6 +166,11 @@ export default function DashboardPage() {
     </div>
   );
 
+  // Quick Stats calculation
+  const totalBudget = budgetItems.reduce((sum, item) => sum + item.amount, 0);
+  const totalSpent = budgetItems.reduce((sum, item) => sum + item.spent, 0);
+  const totalRemaining = totalBudget - totalSpent;
+
   // Sidebar component with quick actions
   const QuickActions = () => (
     <div className="space-y-6">
@@ -113,15 +182,17 @@ export default function DashboardPage() {
         <CardContent className="p-0 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Total Presupuesto</span>
-            <span className="font-semibold text-white">$1,150.00</span>
+            <span className="font-semibold text-white">${totalBudget.toLocaleString()}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Gastado</span>
-            <span className="font-semibold text-green-400">$930.00</span>
+            <span className="font-semibold text-green-400">${totalSpent.toLocaleString()}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Restante</span>
-            <span className="font-semibold text-blue-400">$220.00</span>
+            <span className={`font-semibold ${totalRemaining >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+              ${totalRemaining.toLocaleString()}
+            </span>
           </div>
         </CardContent>
       </Card>
