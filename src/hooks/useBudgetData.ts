@@ -4,8 +4,10 @@
  * Hook personalizado para manejar los datos del presupuesto
  * Proporciona valores de presupuesto total, gastado y restante
  * de manera consistente en toda la aplicación
+ * Incluye integración con datos de ingresos de Supabase
  */
 import { useState, useEffect } from 'react';
+import { obtenerResumenFinanciero } from '@/lib/services/ingresos-deudas';
 
 export interface BudgetItem {
   id: string;
@@ -137,6 +139,7 @@ const mockIncomeData = {
 export const useBudgetData = () => {
   const [budgetItems, setBudgetItems] = useState<BudgetItem[]>(mockBudgetItems);
   const [isLoading, setIsLoading] = useState(false);
+  const [realIncomeTotal, setRealIncomeTotal] = useState<number | undefined>(undefined);
 
   // Función para formatear moneda de manera consistente
   const formatCurrency = (amount: number): string => {
@@ -147,15 +150,28 @@ export const useBudgetData = () => {
     }).format(amount);
   };
 
+  // Función para cargar ingresos reales de Supabase
+  const loadRealIncomeData = async () => {
+    try {
+      const resumen = await obtenerResumenFinanciero();
+      setRealIncomeTotal(resumen.totalIngresos);
+    } catch (error) {
+      console.log('No se pudieron cargar ingresos de Supabase, usando datos mock');
+      setRealIncomeTotal(undefined);
+    }
+  };
+
   // Calcular resumen del presupuesto
-  const calculateSummary = (): BudgetSummary => {
+  const calculateSummary = (realIncomeFromSupabase?: number): BudgetSummary => {
     const totalBudget = budgetItems.reduce((sum, item) => sum + item.amount, 0);
     const totalSpent = budgetItems.reduce((sum, item) => sum + item.spent, 0);
     const totalRemaining = totalBudget - totalSpent;
     const overBudgetCount = budgetItems.filter(item => item.status === 'over-budget').length;
     
-    // Calcular ingresos totales sumando todas las fuentes de ingreso
-    const totalIncome = Object.values(mockIncomeData).reduce((sum, income) => sum + income, 0);
+    // Usar ingresos reales de Supabase si están disponibles, sino usar datos mock
+    const totalIncome = realIncomeFromSupabase !== undefined 
+      ? realIncomeFromSupabase 
+      : Object.values(mockIncomeData).reduce((sum, income) => sum + income, 0);
 
     return {
       totalBudget,
@@ -166,18 +182,24 @@ export const useBudgetData = () => {
     };
   };
 
-  // En una aplicación real, aquí se haría la llamada a la API
+  // Cargar datos del presupuesto e ingresos reales
   useEffect(() => {
-    // Simular carga de datos
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 100);
+    const loadData = async () => {
+      setIsLoading(true);
+      
+      // Cargar ingresos reales de Supabase en paralelo
+      await loadRealIncomeData();
+      
+      // Simular carga de datos de presupuesto
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 100);
+    };
 
-    return () => clearTimeout(timer);
+    loadData();
   }, []);
 
-  const summary = calculateSummary();
+  const summary = calculateSummary(realIncomeTotal);
 
   return {
     budgetItems,

@@ -7,6 +7,8 @@
  * - Lista de ingresos existentes
  * - Lista de deudas existentes
  * - Resumen financiero con balance neto
+ * 
+ * Conectado con Supabase para persistencia de datos
  */
 "use client";
 
@@ -28,38 +30,34 @@ import {
   CreditCard, 
   DollarSign, 
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
+import { useIngresosDeudas } from '@/hooks/useIngresosDeudas';
 
 interface IngresosDeudasProps {
   user: User;
 }
 
-// Interfaces para tipos de datos
-interface Ingreso {
-  id: string;
-  descripcion: string;
-  fuente: string; // Cambiado de categoría a fuente
-  monto: number;
-  fecha: string;
-  tipo: 'ingreso';
-}
-
-interface Deuda {
-  id: string;
-  descripcion: string;
-  acreedor: string;
-  monto: number;
-  fechaVencimiento: string;
-  tipo: 'deuda';
-  pagada: boolean;
-}
-
 export default function IngresosDeudas({ user }: IngresosDeudasProps) {
-  // Estados para formularios
+  // Usar el hook personalizado para manejar el estado
+  const {
+    ingresos,
+    deudas,
+    resumen,
+    loading,
+    error,
+    agregarIngreso,
+    agregarDeuda,
+    recargarDatos,
+    formatCurrency
+  } = useIngresosDeudas();
+
+  // Estados para formularios locales
   const [nuevoIngreso, setNuevoIngreso] = useState({
     descripcion: '',
-    fuente: '', // Cambiado de categoría a fuente
+    fuente: '',
     monto: '',
     fecha: new Date().toISOString().split('T')[0]
   });
@@ -71,114 +69,34 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
     fechaVencimiento: ''
   });
 
-  // Data mockeada inicial para ingresos basada en la imagen
-  const ingresosIniciales: Ingreso[] = [
-    {
-      id: "1",
-      descripcion: "Salario mensual",
-      fuente: "Phi Dimension",
-      monto: 16000000,
-      fecha: "2025-01-01",
-      tipo: "ingreso"
-    },
-    {
-      id: "2", 
-      descripcion: "Proyecto freelance",
-      fuente: "Hactch Works",
-      monto: 16400000,
-      fecha: "2025-01-01",
-      tipo: "ingreso"
-    },
-    {
-      id: "3",
-      descripcion: "Consultoría",
-      fuente: "Hasugue",
-      monto: 0,
-      fecha: "2025-01-01", 
-      tipo: "ingreso"
-    },
-    {
-      id: "4",
-      descripcion: "Inversión MOF",
-      fuente: "MOF",
-      monto: 0,
-      fecha: "2025-01-01",
-      tipo: "ingreso"
-    },
-    {
-      id: "5",
-      descripcion: "Arriendo apartamento",
-      fuente: "Apto 216", 
-      monto: 0,
-      fecha: "2025-01-01",
-      tipo: "ingreso"
-    },
-    {
-      id: "6",
-      descripcion: "Arriendo parqueadero",
-      fuente: "Parking",
-      monto: 100000,
-      fecha: "2025-01-01",
-      tipo: "ingreso"
-    }
-  ];
-
-  // Data mockeada inicial para deudas
-  const deudasIniciales: Deuda[] = [
-    {
-      id: "1",
-      descripcion: "Crédito vehículo",
-      acreedor: "Banco Davivienda",
-      monto: 25000000,
-      fechaVencimiento: "2025-02-15",
-      tipo: "deuda",
-      pagada: false
-    },
-    {
-      id: "2", 
-      descripcion: "Hipoteca casa",
-      acreedor: "Banco de Bogotá",
-      monto: 45000000,
-      fechaVencimiento: "2025-02-01",
-      tipo: "deuda",
-      pagada: false
-    }
-  ];
-
-  // Estados para listas de datos
-  const [ingresos, setIngresos] = useState<Ingreso[]>(ingresosIniciales);
-  const [deudas, setDeudas] = useState<Deuda[]>(deudasIniciales);
-  const [loading, setLoading] = useState(false);
-  
   // Estados para modales
   const [modalIngresoAbierto, setModalIngresoAbierto] = useState(false);
   const [modalDeudaAbierto, setModalDeudaAbierto] = useState(false);
-
-  // Función para formatear moneda
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
+  const [submitting, setSubmitting] = useState(false);
 
   // Manejar envío del formulario de ingresos
   const handleSubmitIngreso = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
 
     try {
-      const ingreso: Ingreso = {
-        id: Date.now().toString(),
-        descripcion: nuevoIngreso.descripcion,
-        fuente: nuevoIngreso.fuente,
-        monto: parseFloat(nuevoIngreso.monto),
-        fecha: nuevoIngreso.fecha,
-        tipo: 'ingreso'
-      };
+      // Validar datos
+      if (!nuevoIngreso.descripcion.trim() || !nuevoIngreso.fuente.trim()) {
+        throw new Error('Todos los campos son obligatorios');
+      }
 
-      setIngresos(prev => [ingreso, ...prev]);
+      const monto = parseFloat(nuevoIngreso.monto);
+      if (isNaN(monto) || monto < 0) {
+        throw new Error('El monto debe ser un número válido mayor o igual a 0');
+      }
+
+      // Crear el ingreso usando el hook
+      await agregarIngreso({
+        descripcion: nuevoIngreso.descripcion.trim(),
+        fuente: nuevoIngreso.fuente.trim(),
+        monto: monto,
+        fecha: nuevoIngreso.fecha
+      });
       
       // Limpiar formulario
       setNuevoIngreso({
@@ -190,30 +108,38 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
       
       // Cerrar modal
       setModalIngresoAbierto(false);
+
     } catch (error) {
       console.error('Error al agregar ingreso:', error);
+      // El hook ya maneja el error en su estado
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   // Manejar envío del formulario de deudas
   const handleSubmitDeuda = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
 
     try {
-      const deuda: Deuda = {
-        id: Date.now().toString(),
-        descripcion: nuevaDeuda.descripcion,
-        acreedor: nuevaDeuda.acreedor,
-        monto: parseFloat(nuevaDeuda.monto),
-        fechaVencimiento: nuevaDeuda.fechaVencimiento,
-        tipo: 'deuda',
-        pagada: false
-      };
+      // Validar datos
+      if (!nuevaDeuda.descripcion.trim() || !nuevaDeuda.acreedor.trim()) {
+        throw new Error('Todos los campos son obligatorios');
+      }
 
-      setDeudas(prev => [deuda, ...prev]);
+      const monto = parseFloat(nuevaDeuda.monto);
+      if (isNaN(monto) || monto <= 0) {
+        throw new Error('El monto debe ser un número válido mayor a 0');
+      }
+
+      // Crear la deuda usando el hook
+      await agregarDeuda({
+        descripcion: nuevaDeuda.descripcion.trim(),
+        acreedor: nuevaDeuda.acreedor.trim(),
+        monto: monto,
+        fecha_vencimiento: nuevaDeuda.fechaVencimiento
+      });
       
       // Limpiar formulario
       setNuevaDeuda({
@@ -225,29 +151,53 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
       
       // Cerrar modal
       setModalDeudaAbierto(false);
+
     } catch (error) {
       console.error('Error al agregar deuda:', error);
+      // El hook ya maneja el error en su estado
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
-
-  // Calcular totales
-  const totalIngresos = ingresos.reduce((sum, ingreso) => sum + ingreso.monto, 0);
-  const totalDeudas = deudas.reduce((sum, deuda) => sum + deuda.monto, 0);
-  const deudasPendientes = deudas.filter(deuda => !deuda.pagada).length;
 
   return (
     <div className="min-h-screen bg-slate-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-blue-400 bg-clip-text text-transparent mb-2">
-            Gestión de Ingresos y Deudas
-          </h1>
-          <p className="text-gray-300 text-lg">
-            Administra tus gastos y deudas de manera eficiente
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-blue-400 bg-clip-text text-transparent mb-2">
+                Gestión de Ingresos y Deudas
+              </h1>
+              <p className="text-gray-300 text-lg">
+                Administra tus ingresos y deudas con Supabase
+              </p>
+            </div>
+            
+            {/* Botón de recarga */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={recargarDatos}
+              disabled={loading}
+              className="text-white border-slate-600 hover:bg-slate-700"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+          
+          {/* Mostrar errores */}
+          {error && (
+            <div className="mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              <AlertCircle className="w-4 h-4 inline mr-2" />
+              {error}
+            </div>
+          )}
         </div>
 
         {/* Tarjetas de resumen */}
@@ -263,9 +213,9 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Total Ingresos</p>
                   <p className="text-2xl font-bold text-white">
-                    {formatCurrency(totalIngresos)}
+                    {loading ? "..." : formatCurrency(resumen.totalIngresos)}
                   </p>
-                  <p className="text-xs text-gray-400">{ingresos.length} registros</p>
+                  <p className="text-xs text-gray-400">{resumen.cantidadIngresos} registros</p>
                 </div>
               </div>
             </CardContent>
@@ -282,9 +232,9 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Total Deudas</p>
                   <p className="text-2xl font-bold text-white">
-                    {formatCurrency(totalDeudas)}
+                    {loading ? "..." : formatCurrency(resumen.totalDeudas)}
                   </p>
-                  <p className="text-xs text-gray-400">{deudasPendientes} pendientes</p>
+                  <p className="text-xs text-gray-400">{resumen.deudasPendientes} pendientes</p>
                 </div>
               </div>
             </CardContent>
@@ -300,8 +250,8 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Balance Neto</p>
-                  <p className={`text-2xl font-bold ${totalIngresos - totalDeudas < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                    {formatCurrency(totalIngresos - totalDeudas)}
+                  <p className={`text-2xl font-bold ${resumen.balanceNeto < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {loading ? "..." : formatCurrency(resumen.balanceNeto)}
                   </p>
                   <p className="text-xs text-gray-400">Ingresos - Deudas</p>
                 </div>
@@ -376,6 +326,7 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                     variant="outline"
                     className="flex-1"
                     onClick={() => setModalIngresoAbierto(false)}
+                    disabled={submitting}
                   >
                     Cancelar
                   </Button>
@@ -383,7 +334,7 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                     type="submit"
                     variant="gradient"
                     className="flex-1"
-                    loading={loading}
+                    loading={submitting}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Agregar
@@ -457,6 +408,7 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                     variant="outline"
                     className="flex-1"
                     onClick={() => setModalDeudaAbierto(false)}
+                    disabled={submitting}
                   >
                     Cancelar
                   </Button>
@@ -464,7 +416,7 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                     type="submit"
                     variant="gradient"
                     className="flex-1"
-                    loading={loading}
+                    loading={submitting}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Agregar
@@ -524,17 +476,21 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                   <p className="text-gray-400">No hay deudas registradas</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {deudas.slice(0, 5).map((deuda) => (
-                    <div key={deuda.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                      <div>
-                        <p className="text-white font-medium">{deuda.descripcion}</p>
-                        <p className="text-sm text-gray-400">{deuda.acreedor} • Vence: {deuda.fechaVencimiento}</p>
+                                  <div className="space-y-3">
+                    {deudas.slice(0, 5).map((deuda) => (
+                      <div key={deuda.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                        <div>
+                          <p className="text-white font-medium">{deuda.descripcion}</p>
+                          <p className="text-sm text-gray-400">
+                            {deuda.acreedor} • Vence: {new Date(deuda.fecha_vencimiento).toLocaleDateString('es-CO')}
+                          </p>
+                        </div>
+                        <p className={`font-bold ${deuda.pagada ? 'text-green-400' : 'text-orange-400'}`}>
+                          {formatCurrency(deuda.monto)}
+                        </p>
                       </div>
-                      <p className="text-orange-400 font-bold">{formatCurrency(deuda.monto)}</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
               )}
             </CardContent>
           </Card>
