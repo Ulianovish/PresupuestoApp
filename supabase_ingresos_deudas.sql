@@ -216,4 +216,4 @@ FROM information_schema.routines
 WHERE routine_schema = 'public'
     AND routine_name IN ('get_total_ingresos', 'get_total_deudas', 'get_balance_neto');
 
-SELECT 'Extensión de ingresos y deudas instalada exitosamente' AS status; 
+SELECT 'Extensión de ingresos y deudas instalada exitosamente' AS status;
