@@ -25,6 +25,7 @@ import {
   PieChart, 
   ReceiptText, 
   FlaskConical, 
+  TrendingUp,
   X,
   Home
 } from "lucide-react";
@@ -54,6 +55,12 @@ const navigationLinks = [
     label: "Gastos",
     icon: ReceiptText,
     description: "Seguimiento de gastos"
+  },
+  {
+    href: "/ingresos-deudas",
+    label: "Ingresos/Deudas",
+    icon: TrendingUp,
+    description: "Gestión de ingresos y deudas"
   },
   {
     href: "/test",

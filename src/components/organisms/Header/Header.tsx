@@ -131,6 +131,12 @@ export default function Header() {
               </Link>
             </li>
             <li>
+              <Link href="/ingresos-deudas" className="flex items-center gap-1 text-white hover:text-blue-400 transition-colors">
+                <TrendingUp size={18} />
+                <span>Ingresos/Deudas</span>
+              </Link>
+            </li>
+            <li>
               <Link href="/test" className="flex items-center gap-1 text-white hover:text-blue-400 transition-colors">
                 <FlaskConical size={18} />
                 <span>Test</span>

@@ -19,7 +19,6 @@ import Card, { CardContent, CardHeader, CardTitle } from '@/components/atoms/Car
 import { 
   Wallet, 
   TrendingUp, 
-  AlertTriangle, 
   PieChart, 
   Plus, 
   Edit3,
@@ -46,10 +45,6 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   const spentPercentage = summary.totalBudget > 0 
     ? (summary.totalSpent / summary.totalBudget) * 100 
     : 0;
-
-  // Contar categorías on-track y under-budget  
-  const onTrackCount = budgetItems.filter(item => item.status === 'on-track').length;
-  const underBudgetCount = budgetItems.filter(item => item.status === 'under-budget').length;
 
   // Funciones para manejar actualizaciones de items
   const handleItemUpdate = (id: string, value: number) => {
@@ -152,23 +147,23 @@ export default function DashboardContent({ user }: DashboardContentProps) {
             </CardContent>
           </Card>
 
-          {/* Categorías sobre presupuesto */}
+          {/* Ingresos Totales */}
           <Card variant="glass" className="p-6 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 to-red-600/10"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-green-600/10"></div>
             <CardContent className="relative">
               <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-orange-500/20 rounded-lg">
-                  <AlertTriangle className="w-6 h-6 text-orange-400" />
+                <div className="p-3 bg-emerald-500/20 rounded-lg">
+                  <TrendingUp className="w-6 h-6 text-emerald-400" />
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-400">Sobre Presupuesto</p>
+                  <p className="text-sm text-gray-400">Ingresos Totales</p>
                   <p className="text-2xl font-bold text-white">
-                    {summary.overBudgetCount}
+                    {isLoading ? "..." : formatCurrency(summary.totalIncome)}
                   </p>
                 </div>
               </div>
               <p className="text-xs text-gray-400">
-                {onTrackCount} en objetivo, {underBudgetCount} por debajo
+                Balance: {formatCurrency(summary.totalIncome - summary.totalSpent)}
               </p>
             </CardContent>
           </Card>

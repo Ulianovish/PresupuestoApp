@@ -21,6 +21,7 @@ export interface BudgetSummary {
   totalSpent: number;
   totalRemaining: number;
   overBudgetCount: number;
+  totalIncome: number; // Nuevo campo para ingresos totales
 }
 
 // Datos mock basados en los datos del dashboard
@@ -124,6 +125,15 @@ const mockBudgetItems: BudgetItem[] = [
   },
 ];
 
+// Datos mock de ingresos
+// En una aplicación real, estos datos vendrían de la base de datos
+const mockIncomeData = {
+  salary: 25000000, // Salario principal
+  freelance: 3500000, // Trabajos freelance
+  investments: 850000, // Inversiones y dividendos
+  other: 650000, // Otros ingresos
+};
+
 export const useBudgetData = () => {
   const [budgetItems, setBudgetItems] = useState<BudgetItem[]>(mockBudgetItems);
   const [isLoading, setIsLoading] = useState(false);
@@ -143,12 +153,16 @@ export const useBudgetData = () => {
     const totalSpent = budgetItems.reduce((sum, item) => sum + item.spent, 0);
     const totalRemaining = totalBudget - totalSpent;
     const overBudgetCount = budgetItems.filter(item => item.status === 'over-budget').length;
+    
+    // Calcular ingresos totales sumando todas las fuentes de ingreso
+    const totalIncome = Object.values(mockIncomeData).reduce((sum, income) => sum + income, 0);
 
     return {
       totalBudget,
       totalSpent,
       totalRemaining,
       overBudgetCount,
+      totalIncome,
     };
   };
 
