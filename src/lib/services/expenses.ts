@@ -168,74 +168,68 @@ export async function createExpenseTransaction(expenseData: ExpenseFormData): Pr
 }
 
 /**
- * Actualiza un gasto existente
+ * Actualiza un gasto existente usando la API proxy
  */
 export async function updateExpenseTransaction(
   transactionId: string, 
   expenseData: Partial<ExpenseFormData>
 ): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    throw new Error('Usuario no autenticado');
-  }
+  try {
+    // Usar la API proxy para evitar problemas de CORS
+    const response = await fetch(`/api/expenses/${transactionId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(expenseData),
+    });
 
-  // Primero obtener la cuenta si se está actualizando
-  let accountId: string | undefined;
-  if (expenseData.account_name) {
-    const { data: accounts } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('name', expenseData.account_name)
-      .single();
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error actualizando gasto');
+    }
+
+    const result = await response.json();
     
-    accountId = accounts?.id;
-  }
+    if (!result.success) {
+      throw new Error(result.error || 'Error actualizando gasto');
+    }
 
-  // Preparar datos de actualización
-  const updateData: any = {};
-  if (expenseData.description !== undefined) updateData.description = expenseData.description;
-  if (expenseData.amount !== undefined) updateData.amount = expenseData.amount;
-  if (expenseData.transaction_date !== undefined) {
-    updateData.transaction_date = expenseData.transaction_date;
-    updateData.month_year = expenseData.transaction_date.slice(0, 7); // YYYY-MM
-  }
-  if (expenseData.category_name !== undefined) updateData.category_name = expenseData.category_name;
-  if (expenseData.place !== undefined) updateData.place = expenseData.place;
-  if (accountId) updateData.account_id = accountId;
-
-  const { error } = await supabase
-    .from('transactions')
-    .update(updateData)
-    .eq('id', transactionId)
-    .eq('user_id', user.id);
-
-  if (error) {
+    console.log('Gasto actualizado exitosamente:', result.message);
+  } catch (error) {
     console.error('Error actualizando gasto:', error);
-    throw new Error(`Error actualizando gasto: ${error.message}`);
+    throw new Error(`Error actualizando gasto: ${error instanceof Error ? error.message : 'Error desconocido'}`);
   }
 }
 
 /**
- * Elimina un gasto
+ * Elimina un gasto usando la API proxy
  */
 export async function deleteExpenseTransaction(transactionId: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    throw new Error('Usuario no autenticado');
-  }
+  try {
+    // Usar la API proxy para evitar problemas de CORS
+    const response = await fetch(`/api/expenses/${transactionId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-  const { error } = await supabase
-    .from('transactions')
-    .delete()
-    .eq('id', transactionId)
-    .eq('user_id', user.id);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error eliminando gasto');
+    }
 
-  if (error) {
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Error eliminando gasto');
+    }
+
+    console.log('Gasto eliminado exitosamente:', result.message);
+  } catch (error) {
     console.error('Error eliminando gasto:', error);
-    throw new Error(`Error eliminando gasto: ${error.message}`);
+    throw new Error(`Error eliminando gasto: ${error instanceof Error ? error.message : 'Error desconocido'}`);
   }
 }
 

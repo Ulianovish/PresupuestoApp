@@ -287,41 +287,37 @@ export async function createBudgetItem(
 }
 
 /**
- * Actualiza un item de presupuesto existente
+ * Actualiza un item de presupuesto existente usando la API proxy
  */
 export async function updateBudgetItem(
   itemId: string,
   updates: Partial<Omit<BudgetItem, 'id'>>
 ): Promise<BudgetItem | null> {
   try {
-    const updateData: any = {};
-    
-    if (updates.descripcion) updateData.name = updates.descripcion;
-    if (updates.fecha !== undefined) updateData.due_date = updates.fecha;
-    if (updates.presupuestado !== undefined) updateData.budgeted_amount = updates.presupuestado;
-    if (updates.real !== undefined) updateData.real_amount = updates.real;
+    // Usar la API proxy para evitar problemas de CORS
+    const response = await fetch(`/api/budget/${itemId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
 
-    const { data, error } = await supabase
-      .from('budget_items')
-      .update(updateData)
-      .eq('id', itemId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error actualizando item de presupuesto:', error);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Error actualizando item de presupuesto:', errorData.error);
       return null;
     }
 
-    return {
-      id: data.id,
-      descripcion: data.name,
-      fecha: data.due_date || '',
-      clasificacion: updates.clasificacion || '',
-      control: updates.control || '',
-      presupuestado: parseFloat(data.budgeted_amount) || 0,
-      real: parseFloat(data.real_amount) || 0
-    };
+    const result = await response.json();
+    
+    if (!result.success) {
+      console.error('Error actualizando item de presupuesto:', result.error);
+      return null;
+    }
+
+    console.log('Item de presupuesto actualizado exitosamente:', result.message);
+    return result.data;
 
   } catch (error) {
     console.error('Error en updateBudgetItem:', error);
