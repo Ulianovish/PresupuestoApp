@@ -1,10 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+
 import Button from '@/components/atoms/Button/Button';
-import Card, { CardContent, CardHeader, CardTitle } from '@/components/atoms/Card/Card';
+import Card, {
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/atoms/Card/Card';
 import Input from '@/components/atoms/Input/Input';
 import { loginAction } from '@/lib/actions/auth';
 
@@ -22,7 +28,7 @@ export default function LoginPage() {
   useEffect(() => {
     const errorParam = searchParams.get('error');
     const messageParam = searchParams.get('message');
-    
+
     setError(errorParam);
     setMessage(messageParam);
   }, [searchParams]);
@@ -48,7 +54,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       {/* Fondo con efecto glassmorphism */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/5 to-emerald-500/10" />
-      
+
       <div className="relative w-full max-w-md">
         <Card variant="glass" className="p-8">
           <CardHeader className="text-center">
@@ -59,12 +65,15 @@ export default function LoginPage() {
               Accede a tu cuenta de presupuesto
             </p>
           </CardHeader>
-          
+
           <CardContent>
             <form action={handleSubmit} className="space-y-6">
               {/* Campo Email */}
               <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-medium text-white">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-white"
+                >
                   Email
                 </label>
                 <Input
@@ -81,7 +90,10 @@ export default function LoginPage() {
 
               {/* Campo Contraseña */}
               <div className="space-y-2">
-                <label htmlFor="password" className="block text-sm font-medium text-white">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-white"
+                >
                   Contraseña
                 </label>
                 <Input
@@ -124,17 +136,17 @@ export default function LoginPage() {
 
               {/* Enlaces adicionales */}
               <div className="space-y-3 text-center">
-                <Link 
-                  href="/auth/forgot-password" 
+                <Link
+                  href="/auth/forgot-password"
                   className="text-sm text-blue-400 hover:text-blue-300 hover:underline transition-colors"
                 >
                   ¿Olvidaste tu contraseña?
                 </Link>
-                
+
                 <div className="flex items-center justify-center space-x-1 text-sm">
                   <span className="text-gray-300">¿No tienes cuenta?</span>
-                  <Link 
-                    href="/auth/register" 
+                  <Link
+                    href="/auth/register"
                     className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors"
                   >
                     Regístrate
@@ -147,8 +159,8 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center">
-          <Link 
-            href="/" 
+          <Link
+            href="/"
             className="text-gray-400 hover:text-white text-sm transition-colors"
           >
             ← Volver al inicio
@@ -157,4 +169,4 @@ export default function LoginPage() {
       </div>
     </div>
   );
-} 
+}

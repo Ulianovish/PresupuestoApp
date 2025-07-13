@@ -1,26 +1,31 @@
 /**
  * BudgetItem - Molecule Level
- * 
+ *
  * Displays a single budget item with amount, category, and edit functionality.
  * Combines Card, Button, and Badge atoms.
- * 
+ *
  * @param item - Budget item data
  * @param onEdit - Callback when edit button is clicked
  * @param className - Additional CSS classes
- * 
+ *
  * @example
- * <BudgetItem 
+ * <BudgetItem
  *   item={budgetItem}
  *   onEdit={() => handleEdit(item.id)}
  * />
  */
-"use client";
+'use client';
 
-import { Badge } from "@/components/ui/badge";
-import Button from "@/components/atoms/Button/Button";
-import Card, { CardContent, CardHeader, CardTitle } from "@/components/atoms/Card/Card";
-import { cn } from "@/lib/utils";
-import { Edit } from "lucide-react";
+import { Edit } from 'lucide-react';
+
+import Button from '@/components/atoms/Button/Button';
+import Card, {
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/atoms/Card/Card';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface BudgetItemData {
   id: string;
@@ -37,14 +42,15 @@ interface BudgetItemProps {
   className?: string;
 }
 
-export default function BudgetItem({ 
-  item, 
-  onEdit, 
-  className = "" 
+export default function BudgetItem({
+  item,
+  onEdit,
+  className = '',
 }: BudgetItemProps) {
   // Calculate percentage spent
-  const percentageSpent = item.amount > 0 ? (item.spent / item.amount) * 100 : 0;
-  
+  const percentageSpent =
+    item.amount > 0 ? (item.spent / item.amount) * 100 : 0;
+
   // Función para formatear moneda consistente con otras páginas
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -53,7 +59,7 @@ export default function BudgetItem({
       minimumFractionDigits: 0,
     }).format(amount);
   };
-  
+
   // Determine status badge variant
   const getStatusVariant = () => {
     switch (item.status) {
@@ -67,7 +73,7 @@ export default function BudgetItem({
   };
 
   return (
-    <Card variant="glass" hover className={cn("p-4", className)}>
+    <Card variant="glass" hover className={cn('p-4', className)}>
       <CardHeader className="flex flex-row items-center justify-between p-0 pb-3">
         <CardTitle className="text-lg font-semibold text-white">
           {item.category}
@@ -78,8 +84,8 @@ export default function BudgetItem({
             {item.status.replace('-', ' ')}
           </Badge>
           {/* Edit button icon */}
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="sm"
             onClick={() => onEdit(item.id)}
             className="p-1 h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
@@ -88,42 +94,50 @@ export default function BudgetItem({
           </Button>
         </div>
       </CardHeader>
-      
+
       <CardContent className="p-0 space-y-3">
         {/* Amount display */}
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Budget</span>
-          <span className="text-lg font-bold text-white">{formatCurrency(item.amount)}</span>
+          <span className="text-lg font-bold text-white">
+            {formatCurrency(item.amount)}
+          </span>
         </div>
-        
+
         {/* Progress bar */}
         <div className="space-y-1">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Spent: {formatCurrency(item.spent)}</span>
-            <span className="text-muted-foreground">{percentageSpent.toFixed(1)}%</span>
+            <span className="text-muted-foreground">
+              Spent: {formatCurrency(item.spent)}
+            </span>
+            <span className="text-muted-foreground">
+              {percentageSpent.toFixed(1)}%
+            </span>
           </div>
           <div className="w-full bg-slate-700 rounded-full h-2">
-            <div 
+            <div
               className={cn(
-                "h-2 rounded-full transition-all duration-300",
-                percentageSpent > 100 ? "bg-red-500" : "bg-blue-500"
+                'h-2 rounded-full transition-all duration-300',
+                percentageSpent > 100 ? 'bg-red-500' : 'bg-blue-500'
               )}
               style={{ width: `${Math.min(percentageSpent, 100)}%` }}
             />
           </div>
         </div>
-        
+
         {/* Remaining amount */}
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Remaining</span>
-          <span className={cn(
-            "font-semibold",
-            item.remaining < 0 ? "text-red-400" : "text-green-400"
-          )}>
+          <span
+            className={cn(
+              'font-semibold',
+              item.remaining < 0 ? 'text-red-400' : 'text-green-400'
+            )}
+          >
             {formatCurrency(item.remaining)}
           </span>
         </div>
       </CardContent>
     </Card>
   );
-} 
+}

@@ -1,28 +1,29 @@
 /**
  * CurrencyInput - Atom Level
- * 
+ *
  * A specialized input component for entering monetary values.
  * Handles currency formatting and validation.
- * 
+ *
  * @param value - The current monetary value
  * @param onChange - Callback when value changes
  * @param placeholder - Placeholder text (default: "0.00")
  * @param disabled - Whether the input is disabled
  * @param error - Whether to show error styling
  * @param className - Additional CSS classes
- * 
+ *
  * @example
- * <CurrencyInput 
+ * <CurrencyInput
  *   value={amount}
  *   onChange={setAmount}
  *   placeholder="Enter amount"
  * />
  */
-"use client";
+'use client';
 
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
+
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 interface CurrencyInputProps {
   value: number;
@@ -33,13 +34,13 @@ interface CurrencyInputProps {
   className?: string;
 }
 
-export default function CurrencyInput({ 
-  value, 
-  onChange, 
-  placeholder = "0.00",
+export default function CurrencyInput({
+  value,
+  onChange,
+  placeholder = '0.00',
   disabled = false,
   error = false,
-  className = ""
+  className = '',
 }: CurrencyInputProps) {
   // Internal state for display formatting
   const [displayValue, setDisplayValue] = useState(value.toString());
@@ -52,17 +53,17 @@ export default function CurrencyInput({
   // Handle input change with proper formatting
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
-    
+
     // Allow empty string for better UX
-    if (inputValue === "") {
-      setDisplayValue("");
+    if (inputValue === '') {
+      setDisplayValue('');
       onChange(0);
       return;
     }
 
     // Parse numeric value
     const numValue = parseFloat(inputValue);
-    
+
     // Only update if it's a valid number
     if (!isNaN(numValue)) {
       setDisplayValue(inputValue);
@@ -88,11 +89,11 @@ export default function CurrencyInput({
       placeholder={placeholder}
       disabled={disabled}
       className={cn(
-        "w-full bg-slate-800 border-slate-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500/20",
-        error && "border-red-500 focus:border-red-500 focus:ring-red-500/20",
+        'w-full bg-slate-800 border-slate-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500/20',
+        error && 'border-red-500 focus:border-red-500 focus:ring-red-500/20',
         className
       )}
-      aria-describedby={error ? "currency-error" : undefined}
+      aria-describedby={error ? 'currency-error' : undefined}
     />
   );
-} 
+}

@@ -4,9 +4,24 @@
  */
 
 import { createClient } from '@/lib/supabase/client';
-import { Database } from '@/types/database';
 
 // Tipos para el servicio de presupuesto
+
+// Tipo para resultados de consulta SQL de presupuesto
+interface BudgetQueryRow {
+  template_id: string;
+  template_name: string;
+  category_id: string;
+  category_name: string;
+  item_id: string;
+  item_name: string;
+  due_date: string;
+  classification_name: string;
+  control_name: string;
+  budgeted_amount: string | number;
+  real_amount: string | number;
+}
+
 export interface BudgetItem {
   id: string;
   descripcion: string;
@@ -47,7 +62,7 @@ export async function getBudgetByMonth(
     // Obtener datos usando la función SQL
     const { data, error } = await supabase.rpc('get_budget_by_month', {
       p_user_id: (await supabase.auth.getUser()).data.user?.id,
-      p_month_year: monthYear
+      p_month_year: monthYear,
     });
 
     if (error) {
@@ -66,7 +81,7 @@ export async function getBudgetByMonth(
     let totalPresupuestado = 0;
     let totalReal = 0;
 
-    data.forEach((row: any) => {
+    data.forEach((row: BudgetQueryRow) => {
       if (!templateId) {
         templateId = row.template_id;
         templateName = row.template_name;
@@ -74,7 +89,7 @@ export async function getBudgetByMonth(
 
       if (row.category_id) {
         const categoryKey = row.category_id;
-        
+
         if (!categoriesMap.has(categoryKey)) {
           categoriesMap.set(categoryKey, {
             id: row.category_id,
@@ -82,12 +97,12 @@ export async function getBudgetByMonth(
             totalPresupuestado: 0,
             totalReal: 0,
             items: [],
-            expanded: false
+            expanded: false,
           });
         }
 
         const category = categoriesMap.get(categoryKey)!;
-        
+
         if (row.item_id) {
           const item: BudgetItem = {
             id: row.item_id,
@@ -95,14 +110,14 @@ export async function getBudgetByMonth(
             fecha: row.due_date || '',
             clasificacion: row.classification_name,
             control: row.control_name,
-            presupuestado: parseFloat(row.budgeted_amount) || 0,
-            real: parseFloat(row.real_amount) || 0
+            presupuestado: Number(row.budgeted_amount) || 0,
+            real: Number(row.real_amount) || 0,
           };
 
           category.items.push(item);
           category.totalPresupuestado += item.presupuestado;
           category.totalReal += item.real;
-          
+
           totalPresupuestado += item.presupuestado;
           totalReal += item.real;
         }
@@ -114,9 +129,8 @@ export async function getBudgetByMonth(
       template_name: templateName,
       categories: Array.from(categoriesMap.values()),
       total_presupuestado: totalPresupuestado,
-      total_real: totalReal
+      total_real: totalReal,
     };
-
   } catch (error) {
     console.error('Error en getBudgetByMonth:', error);
     return null;
@@ -139,7 +153,7 @@ export async function createMonthlyBudget(
     const { data, error } = await supabase.rpc('upsert_monthly_budget', {
       p_user_id: user.user.id,
       p_month_year: monthYear,
-      p_template_name: templateName
+      p_template_name: templateName,
     });
 
     if (error) {
@@ -239,12 +253,19 @@ export async function createBudgetItem(
 
     // Buscar IDs de clasificación y control por nombre
     const [classificationResult, controlResult] = await Promise.all([
-      supabase.from('classifications').select('id').eq('name', item.clasificacion).single(),
-      supabase.from('controls').select('id').eq('name', item.control).single()
+      supabase
+        .from('classifications')
+        .select('id')
+        .eq('name', item.clasificacion)
+        .single(),
+      supabase.from('controls').select('id').eq('name', item.control).single(),
     ]);
 
     if (classificationResult.error || controlResult.error) {
-      console.error('Error obteniendo IDs:', { classificationResult, controlResult });
+      console.error('Error obteniendo IDs:', {
+        classificationResult,
+        controlResult,
+      });
       return null;
     }
 
@@ -260,7 +281,7 @@ export async function createBudgetItem(
         name: item.descripcion,
         budgeted_amount: item.presupuestado,
         real_amount: item.real,
-        due_date: item.fecha
+        due_date: item.fecha,
       })
       .select()
       .single();
@@ -277,9 +298,8 @@ export async function createBudgetItem(
       clasificacion: item.clasificacion,
       control: item.control,
       presupuestado: parseFloat(data.budgeted_amount) || 0,
-      real: parseFloat(data.real_amount) || 0
+      real: parseFloat(data.real_amount) || 0,
     };
-
   } catch (error) {
     console.error('Error en createBudgetItem:', error);
     return null;
@@ -310,15 +330,17 @@ export async function updateBudgetItem(
     }
 
     const result = await response.json();
-    
+
     if (!result.success) {
       console.error('Error actualizando item de presupuesto:', result.error);
       return null;
     }
 
-    console.log('Item de presupuesto actualizado exitosamente:', result.message);
+    console.log(
+      'Item de presupuesto actualizado exitosamente:',
+      result.message
+    );
     return result.data;
-
   } catch (error) {
     console.error('Error en updateBudgetItem:', error);
     return null;
@@ -354,6 +376,6 @@ export function getAvailableMonths(): Array<{ value: string; label: string }> {
     { value: '2025-11', label: 'Noviembre 2025' },
     { value: '2025-12', label: 'Diciembre 2025' },
   ];
-  
+
   return months;
-} 
+}

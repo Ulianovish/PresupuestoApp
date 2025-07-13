@@ -8,20 +8,20 @@ import { z } from 'zod';
 export const CLASSIFICATION_IDS = {
   FIJO: 'fijo',
   VARIABLE: 'variable',
-  DISCRECIONAL: 'discrecional'
+  DISCRECIONAL: 'discrecional',
 } as const;
 
 // IDs de controles (deben coincidir con la base de datos)
 export const CONTROL_IDS = {
   NECESARIO: 'necesario',
-  DISCRECIONAL: 'discrecional'
+  DISCRECIONAL: 'discrecional',
 } as const;
 
 // IDs de tipos de transacción (deben coincidir con la base de datos)
 export const TRANSACTION_TYPE_IDS = {
   INGRESO: 'ingreso',
   GASTO: 'gasto',
-  TRANSFERENCIA: 'transferencia'
+  TRANSFERENCIA: 'transferencia',
 } as const;
 
 // IDs de estados de presupuesto (deben coincidir con la base de datos)
@@ -29,7 +29,7 @@ export const BUDGET_STATUS_IDS = {
   ACTIVO: 'activo',
   INACTIVO: 'inactivo',
   COMPLETADO: 'completado',
-  CANCELADO: 'cancelado'
+  CANCELADO: 'cancelado',
 } as const;
 
 // ============================================
@@ -37,26 +37,33 @@ export const BUDGET_STATUS_IDS = {
 // ============================================
 
 // Esquema para UUID
-export const UUIDSchema = z.string().uuid({ message: 'Debe ser un UUID válido' });
+export const UUIDSchema = z
+  .string()
+  .uuid({ message: 'Debe ser un UUID válido' });
 
 // Esquema para montos monetarios
-export const MoneySchema = z.number()
+export const MoneySchema = z
+  .number()
   .nonnegative({ message: 'El monto debe ser positivo' })
   .finite({ message: 'El monto debe ser un número válido' })
-  .refine((val) => val <= 999999999.99, {
-    message: 'El monto no puede exceder $999,999,999.99'
+  .refine(val => val <= 999999999.99, {
+    message: 'El monto no puede exceder $999,999,999.99',
   });
 
 // Esquema para fechas
-export const DateSchema = z.string().refine((date) => {
-  const parsedDate = new Date(date);
-  return !isNaN(parsedDate.getTime());
-}, { message: 'Debe ser una fecha válida' });
+export const DateSchema = z.string().refine(
+  date => {
+    const parsedDate = new Date(date);
+    return !isNaN(parsedDate.getTime());
+  },
+  { message: 'Debe ser una fecha válida' }
+);
 
 // Esquema para colores hexadecimales
-export const ColorSchema = z.string()
+export const ColorSchema = z
+  .string()
   .regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, {
-    message: 'Debe ser un color hexadecimal válido (#RRGGBB o #RGB)'
+    message: 'Debe ser un color hexadecimal válido (#RRGGBB o #RGB)',
   });
 
 // ============================================
@@ -66,62 +73,83 @@ export const ColorSchema = z.string()
 // Esquema para estados de presupuesto
 export const BudgetStatusSchema = z.object({
   id: UUIDSchema,
-  name: z.string().min(1, 'El nombre es requerido').max(50, 'Máximo 50 caracteres'),
+  name: z
+    .string()
+    .min(1, 'El nombre es requerido')
+    .max(50, 'Máximo 50 caracteres'),
   description: z.string().max(500, 'Máximo 500 caracteres').nullable(),
   color: ColorSchema.nullable(),
   is_active: z.boolean().default(true),
-  created_at: z.string().datetime()
+  created_at: z.string().datetime(),
 });
 
 // Esquema para clasificaciones
 export const ClassificationSchema = z.object({
   id: UUIDSchema,
-  name: z.string().min(1, 'El nombre es requerido').max(50, 'Máximo 50 caracteres'),
+  name: z
+    .string()
+    .min(1, 'El nombre es requerido')
+    .max(50, 'Máximo 50 caracteres'),
   description: z.string().max(500, 'Máximo 500 caracteres').nullable(),
   color: ColorSchema.nullable(),
   is_active: z.boolean().default(true),
-  created_at: z.string().datetime()
+  created_at: z.string().datetime(),
 });
 
 // Esquema para controles
 export const ControlSchema = z.object({
   id: UUIDSchema,
-  name: z.string().min(1, 'El nombre es requerido').max(50, 'Máximo 50 caracteres'),
+  name: z
+    .string()
+    .min(1, 'El nombre es requerido')
+    .max(50, 'Máximo 50 caracteres'),
   description: z.string().max(500, 'Máximo 500 caracteres').nullable(),
   color: ColorSchema.nullable(),
   is_active: z.boolean().default(true),
-  created_at: z.string().datetime()
+  created_at: z.string().datetime(),
 });
 
 // Esquema para tipos de transacción
 export const TransactionTypeSchema = z.object({
   id: UUIDSchema,
-  name: z.string().min(1, 'El nombre es requerido').max(50, 'Máximo 50 caracteres'),
+  name: z
+    .string()
+    .min(1, 'El nombre es requerido')
+    .max(50, 'Máximo 50 caracteres'),
   description: z.string().max(500, 'Máximo 500 caracteres').nullable(),
   color: ColorSchema.nullable(),
   is_active: z.boolean().default(true),
-  created_at: z.string().datetime()
+  created_at: z.string().datetime(),
 });
 
 // Esquema para monedas
 export const CurrencySchema = z.object({
   id: UUIDSchema,
-  name: z.string().min(1, 'El nombre es requerido').max(100, 'Máximo 100 caracteres'),
+  name: z
+    .string()
+    .min(1, 'El nombre es requerido')
+    .max(100, 'Máximo 100 caracteres'),
   code: z.string().length(3, 'El código debe tener 3 caracteres').toUpperCase(),
-  symbol: z.string().min(1, 'El símbolo es requerido').max(10, 'Máximo 10 caracteres'),
+  symbol: z
+    .string()
+    .min(1, 'El símbolo es requerido')
+    .max(10, 'Máximo 10 caracteres'),
   is_active: z.boolean().default(true),
-  created_at: z.string().datetime()
+  created_at: z.string().datetime(),
 });
 
 // Esquema para categorías
 export const CategorySchema = z.object({
   id: UUIDSchema,
-  name: z.string().min(1, 'El nombre es requerido').max(100, 'Máximo 100 caracteres'),
+  name: z
+    .string()
+    .min(1, 'El nombre es requerido')
+    .max(100, 'Máximo 100 caracteres'),
   description: z.string().max(500, 'Máximo 500 caracteres').nullable(),
   color: ColorSchema.nullable(),
   icon: z.string().max(50, 'Máximo 50 caracteres').nullable(),
   is_active: z.boolean().default(true),
-  created_at: z.string().datetime()
+  created_at: z.string().datetime(),
 });
 
 // ============================================
@@ -131,22 +159,32 @@ export const CategorySchema = z.object({
 // Esquema para perfil de usuario
 export const ProfileSchema = z.object({
   id: UUIDSchema,
-  email: z.string().email('Debe ser un email válido').max(255, 'Máximo 255 caracteres'),
+  email: z
+    .string()
+    .email('Debe ser un email válido')
+    .max(255, 'Máximo 255 caracteres'),
   full_name: z.string().max(255, 'Máximo 255 caracteres').nullable(),
-  avatar_url: z.string().url('Debe ser una URL válida').max(500, 'Máximo 500 caracteres').nullable(),
+  avatar_url: z
+    .string()
+    .url('Debe ser una URL válida')
+    .max(500, 'Máximo 500 caracteres')
+    .nullable(),
   created_at: z.string().datetime(),
-  updated_at: z.string().datetime()
+  updated_at: z.string().datetime(),
 });
 
 // Esquema para plantillas de presupuesto
 export const BudgetTemplateSchema = z.object({
   id: UUIDSchema,
   user_id: UUIDSchema,
-  name: z.string().min(1, 'El nombre es requerido').max(255, 'Máximo 255 caracteres'),
+  name: z
+    .string()
+    .min(1, 'El nombre es requerido')
+    .max(255, 'Máximo 255 caracteres'),
   description: z.string().max(1000, 'Máximo 1000 caracteres').nullable(),
   is_active: z.boolean().default(true),
   created_at: z.string().datetime(),
-  updated_at: z.string().datetime()
+  updated_at: z.string().datetime(),
 });
 
 // Esquema para elementos de presupuesto
@@ -158,13 +196,16 @@ export const BudgetItemSchema = z.object({
   classification_id: UUIDSchema,
   control_id: UUIDSchema,
   status_id: UUIDSchema,
-  name: z.string().min(1, 'El nombre es requerido').max(255, 'Máximo 255 caracteres'),
+  name: z
+    .string()
+    .min(1, 'El nombre es requerido')
+    .max(255, 'Máximo 255 caracteres'),
   description: z.string().max(1000, 'Máximo 1000 caracteres').nullable(),
   budgeted_amount: MoneySchema,
   spent_amount: MoneySchema.default(0),
   is_active: z.boolean().default(true),
   created_at: z.string().datetime(),
-  updated_at: z.string().datetime()
+  updated_at: z.string().datetime(),
 });
 
 // Esquema para transacciones
@@ -177,7 +218,7 @@ export const TransactionSchema = z.object({
   description: z.string().max(1000, 'Máximo 1000 caracteres').nullable(),
   transaction_date: DateSchema,
   created_at: z.string().datetime(),
-  updated_at: z.string().datetime()
+  updated_at: z.string().datetime(),
 });
 
 // ============================================
@@ -186,34 +227,42 @@ export const TransactionSchema = z.object({
 
 // Esquema para login
 export const loginSchema = z.object({
-  email: z.string()
+  email: z
+    .string()
     .min(1, 'El email es requerido')
     .email('Debe ser un email válido')
     .max(255, 'Máximo 255 caracteres'),
-  password: z.string()
+  password: z
+    .string()
     .min(6, 'La contraseña debe tener al menos 6 caracteres')
-    .max(128, 'Máximo 128 caracteres')
+    .max(128, 'Máximo 128 caracteres'),
 });
 
 // Esquema para registro
-export const registerSchema = z.object({
-  email: z.string()
-    .min(1, 'El email es requerido')
-    .email('Debe ser un email válido')
-    .max(255, 'Máximo 255 caracteres'),
-  password: z.string()
-    .min(6, 'La contraseña debe tener al menos 6 caracteres')
-    .max(128, 'Máximo 128 caracteres'),
-  confirmPassword: z.string()
-    .min(6, 'Confirma tu contraseña')
-    .max(128, 'Máximo 128 caracteres'),
-  fullName: z.string()
-    .min(2, 'El nombre debe tener al menos 2 caracteres')
-    .max(255, 'Máximo 255 caracteres')
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Las contraseñas no coinciden',
-  path: ['confirmPassword']
-});
+export const registerSchema = z
+  .object({
+    email: z
+      .string()
+      .min(1, 'El email es requerido')
+      .email('Debe ser un email válido')
+      .max(255, 'Máximo 255 caracteres'),
+    password: z
+      .string()
+      .min(6, 'La contraseña debe tener al menos 6 caracteres')
+      .max(128, 'Máximo 128 caracteres'),
+    confirmPassword: z
+      .string()
+      .min(6, 'Confirma tu contraseña')
+      .max(128, 'Máximo 128 caracteres'),
+    fullName: z
+      .string()
+      .min(2, 'El nombre debe tener al menos 2 caracteres')
+      .max(255, 'Máximo 255 caracteres'),
+  })
+  .refine(data => data.password === data.confirmPassword, {
+    message: 'Las contraseñas no coinciden',
+    path: ['confirmPassword'],
+  });
 
 // ============================================
 // ESQUEMAS PARA FORMULARIOS (INSERT/UPDATE)
@@ -223,23 +272,23 @@ export const registerSchema = z.object({
 export const CreateProfileSchema = ProfileSchema.omit({
   id: true,
   created_at: true,
-  updated_at: true
+  updated_at: true,
 }).extend({
-  id: UUIDSchema // ID viene del auth de Supabase
+  id: UUIDSchema, // ID viene del auth de Supabase
 });
 
 // Esquema para actualizar perfil
 export const UpdateProfileSchema = ProfileSchema.omit({
   id: true,
   created_at: true,
-  updated_at: true
+  updated_at: true,
 }).partial();
 
 // Esquema para crear plantilla de presupuesto
 export const CreateBudgetTemplateSchema = BudgetTemplateSchema.omit({
   id: true,
   created_at: true,
-  updated_at: true
+  updated_at: true,
 });
 
 // Esquema para actualizar plantilla de presupuesto
@@ -247,19 +296,19 @@ export const UpdateBudgetTemplateSchema = BudgetTemplateSchema.omit({
   id: true,
   user_id: true,
   created_at: true,
-  updated_at: true
+  updated_at: true,
 }).partial();
 
 // Esquema para crear elemento de presupuesto
 export const CreateBudgetItemSchema = BudgetItemSchema.omit({
   id: true,
   created_at: true,
-  updated_at: true
+  updated_at: true,
 }).extend({
   // Validaciones personalizadas
-  budgeted_amount: MoneySchema.refine((val) => val > 0, {
-    message: 'El monto presupuestado debe ser mayor a cero'
-  })
+  budgeted_amount: MoneySchema.refine(val => val > 0, {
+    message: 'El monto presupuestado debe ser mayor a cero',
+  }),
 });
 
 // Esquema para actualizar elemento de presupuesto
@@ -267,30 +316,36 @@ export const UpdateBudgetItemSchema = BudgetItemSchema.omit({
   id: true,
   user_id: true,
   created_at: true,
-  updated_at: true
-}).partial().extend({
-  // Validar que el monto gastado no supere el presupuestado
-  spent_amount: MoneySchema.optional()
-}).refine((data) => {
-  if (data.spent_amount && data.budgeted_amount) {
-    return data.spent_amount <= data.budgeted_amount;
-  }
-  return true;
-}, {
-  message: 'El monto gastado no puede superar el presupuestado',
-  path: ['spent_amount']
-});
+  updated_at: true,
+})
+  .partial()
+  .extend({
+    // Validar que el monto gastado no supere el presupuestado
+    spent_amount: MoneySchema.optional(),
+  })
+  .refine(
+    data => {
+      if (data.spent_amount && data.budgeted_amount) {
+        return data.spent_amount <= data.budgeted_amount;
+      }
+      return true;
+    },
+    {
+      message: 'El monto gastado no puede superar el presupuestado',
+      path: ['spent_amount'],
+    }
+  );
 
 // Esquema para crear transacción
 export const CreateTransactionSchema = TransactionSchema.omit({
   id: true,
   created_at: true,
-  updated_at: true
+  updated_at: true,
 }).extend({
   // Validaciones personalizadas
-  amount: MoneySchema.refine((val) => val > 0, {
-    message: 'El monto debe ser mayor a cero'
-  })
+  amount: MoneySchema.refine(val => val > 0, {
+    message: 'El monto debe ser mayor a cero',
+  }),
 });
 
 // Esquema para actualizar transacción
@@ -298,7 +353,7 @@ export const UpdateTransactionSchema = TransactionSchema.omit({
   id: true,
   user_id: true,
   created_at: true,
-  updated_at: true
+  updated_at: true,
 }).partial();
 
 // ============================================
@@ -312,13 +367,13 @@ export const BudgetItemWithRelationsSchema = BudgetItemSchema.extend({
   control: ControlSchema,
   status: BudgetStatusSchema,
   template: BudgetTemplateSchema.nullable(),
-  transactions: z.array(TransactionSchema).default([])
+  transactions: z.array(TransactionSchema).default([]),
 });
 
 // Esquema para transacción con relaciones
 export const TransactionWithRelationsSchema = TransactionSchema.extend({
   budget_item: BudgetItemSchema,
-  type: TransactionTypeSchema
+  type: TransactionTypeSchema,
 });
 
 // ============================================
@@ -335,7 +390,7 @@ export const BudgetItemFiltersSchema = z.object({
   is_active: z.boolean().optional(),
   min_amount: MoneySchema.optional(),
   max_amount: MoneySchema.optional(),
-  search: z.string().max(255).optional()
+  search: z.string().max(255).optional(),
 });
 
 // Esquema para filtros de transacciones
@@ -346,7 +401,7 @@ export const TransactionFiltersSchema = z.object({
   max_amount: MoneySchema.optional(),
   start_date: DateSchema.optional(),
   end_date: DateSchema.optional(),
-  search: z.string().max(255).optional()
+  search: z.string().max(255).optional(),
 });
 
 // Esquema para paginación
@@ -354,7 +409,7 @@ export const PaginationSchema = z.object({
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(100).default(10),
   sort_by: z.string().optional(),
-  sort_order: z.enum(['asc', 'desc']).default('desc')
+  sort_order: z.enum(['asc', 'desc']).default('desc'),
 });
 
 // ============================================
@@ -367,27 +422,33 @@ export const BudgetSummarySchema = z.object({
   total_spent: MoneySchema,
   total_remaining: MoneySchema,
   percentage_spent: z.number().min(0).max(100),
-  by_category: z.array(z.object({
-    category_id: UUIDSchema,
-    category_name: z.string(),
-    budgeted: MoneySchema,
-    spent: MoneySchema,
-    remaining: MoneySchema
-  })),
-  by_classification: z.array(z.object({
-    classification_id: UUIDSchema,
-    classification_name: z.string(),
-    budgeted: MoneySchema,
-    spent: MoneySchema,
-    remaining: MoneySchema
-  })),
-  by_control: z.array(z.object({
-    control_id: UUIDSchema,
-    control_name: z.string(),
-    budgeted: MoneySchema,
-    spent: MoneySchema,
-    remaining: MoneySchema
-  }))
+  by_category: z.array(
+    z.object({
+      category_id: UUIDSchema,
+      category_name: z.string(),
+      budgeted: MoneySchema,
+      spent: MoneySchema,
+      remaining: MoneySchema,
+    })
+  ),
+  by_classification: z.array(
+    z.object({
+      classification_id: UUIDSchema,
+      classification_name: z.string(),
+      budgeted: MoneySchema,
+      spent: MoneySchema,
+      remaining: MoneySchema,
+    })
+  ),
+  by_control: z.array(
+    z.object({
+      control_id: UUIDSchema,
+      control_name: z.string(),
+      budgeted: MoneySchema,
+      spent: MoneySchema,
+      remaining: MoneySchema,
+    })
+  ),
 });
 
 // ============================================
@@ -419,8 +480,12 @@ export type CreateTransaction = z.infer<typeof CreateTransactionSchema>;
 export type UpdateTransaction = z.infer<typeof UpdateTransactionSchema>;
 
 // Tipos para respuestas con relaciones
-export type BudgetItemWithRelations = z.infer<typeof BudgetItemWithRelationsSchema>;
-export type TransactionWithRelations = z.infer<typeof TransactionWithRelationsSchema>;
+export type BudgetItemWithRelations = z.infer<
+  typeof BudgetItemWithRelationsSchema
+>;
+export type TransactionWithRelations = z.infer<
+  typeof TransactionWithRelationsSchema
+>;
 
 // Tipos para filtros y consultas
 export type BudgetItemFilters = z.infer<typeof BudgetItemFiltersSchema>;
@@ -432,4 +497,4 @@ export type BudgetSummary = z.infer<typeof BudgetSummarySchema>;
 
 // Tipos para autenticación
 export type LoginFormData = z.infer<typeof loginSchema>;
-export type RegisterFormData = z.infer<typeof registerSchema>; 
+export type RegisterFormData = z.infer<typeof registerSchema>;

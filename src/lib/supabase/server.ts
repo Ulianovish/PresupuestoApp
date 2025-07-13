@@ -1,5 +1,7 @@
-import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+
+import { createServerClient } from '@supabase/ssr';
+
 import { Database } from '@/types/database';
 
 /**
@@ -17,18 +19,18 @@ export const createClient = () => {
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
-        set(name: string, value: string, options: any) {
+        set(name: string, value: string, options: unknown) {
           try {
             cookieStore.set({ name, value, ...options });
-          } catch (error) {
+          } catch {
             // La llamada a `set` falla en middleware
             // Esto es esperado y no es un error
           }
         },
-        remove(name: string, options: any) {
+        remove(name: string, options: unknown) {
           try {
             cookieStore.set({ name, value: '', ...options });
-          } catch (error) {
+          } catch {
             // La llamada a `remove` falla en middleware
             // Esto es esperado y no es un error
           }
@@ -48,10 +50,12 @@ export const createAdminClient = () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
       cookies: {
-        get() { return undefined; },
-        set() { },
-        remove() { },
+        get() {
+          return undefined;
+        },
+        set() {},
+        remove() {},
       },
     }
   );
-}; 
+};

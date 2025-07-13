@@ -1,5 +1,7 @@
 import { Suspense } from 'react';
+
 import { redirect } from 'next/navigation';
+
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -15,8 +17,10 @@ export default async function AuthCallbackPage({
 
   // Si hay un código de autenticación, intercambiarlo por sesión
   if (searchParams.code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(searchParams.code);
-    
+    const { error } = await supabase.auth.exchangeCodeForSession(
+      searchParams.code
+    );
+
     if (error) {
       console.error('Error en callback de autenticación:', error);
       redirect('/auth/login?error=Authentication failed');
@@ -54,10 +58,12 @@ function LoadingComponent() {
 /**
  * Wrapper con Suspense para el callback
  */
-export function CallbackPageWithSuspense(props: any) {
+export function CallbackPageWithSuspense(props: {
+  searchParams: { code?: string; error?: string; redirectTo?: string };
+}) {
   return (
     <Suspense fallback={<LoadingComponent />}>
       <AuthCallbackPage {...props} />
     </Suspense>
   );
-} 
+}

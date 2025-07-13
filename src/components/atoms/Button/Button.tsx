@@ -1,28 +1,37 @@
 /**
  * EnhancedButton - Atom Level
- * 
+ *
  * Enhanced shadcn/ui Button with SIRME design system integration.
  * Supports glassmorphism, gradients, and loading states.
- * 
+ *
  * @param variant - Button style variant including custom 'gradient' and 'glass'
  * @param size - Button size (default, sm, lg, icon)
  * @param loading - Shows loading spinner when true
  * @param children - Button content
  * @param className - Additional CSS classes
- * 
+ *
  * @example
  * <Button variant="gradient" size="lg" loading={isSubmitting}>
  *   Create Budget
  * </Button>
  */
-"use client";
+'use client';
 
-import { Button as ShadcnButton } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { ReactNode } from "react";
+import { ReactNode } from 'react';
+
+import { Button as ShadcnButton } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface ButtonProps {
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' | 'gradient' | 'glass';
+  variant?:
+    | 'default'
+    | 'destructive'
+    | 'outline'
+    | 'secondary'
+    | 'ghost'
+    | 'link'
+    | 'gradient'
+    | 'glass';
   size?: 'default' | 'sm' | 'lg' | 'icon';
   loading?: boolean;
   children?: ReactNode;
@@ -32,16 +41,16 @@ interface ButtonProps {
   type?: 'button' | 'submit' | 'reset';
 }
 
-export default function Button({ 
-  className, 
-  variant = 'default', 
+export default function Button({
+  className,
+  variant = 'default',
   size = 'default',
   loading = false,
   children,
   disabled,
   onClick,
   type = 'button',
-  ...props 
+  ...props
 }: ButtonProps) {
   const variants = {
     gradient: `
@@ -72,7 +81,7 @@ export default function Button({
     <ShadcnButton
       className={cn(
         // Base styles for all variants
-        "relative transition-all duration-200 ease-in-out",
+        'relative transition-all duration-200 ease-in-out',
         // Custom variant styles
         variant === 'gradient' && variants.gradient,
         variant === 'glass' && variants.glass,
@@ -82,7 +91,9 @@ export default function Button({
         disabled && 'opacity-50 cursor-not-allowed hover:scale-100',
         className
       )}
-      variant={variant === 'gradient' || variant === 'glass' ? 'default' : variant}
+      variant={
+        variant === 'gradient' || variant === 'glass' ? 'default' : variant
+      }
       size={size}
       disabled={disabled || loading}
       onClick={onClick}
@@ -95,19 +106,16 @@ export default function Button({
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
         </div>
       )}
-      
+
       {/* Button content */}
-      <span className={cn(
-        "flex items-center gap-2",
-        loading && "invisible"
-      )}>
+      <span className={cn('flex items-center gap-2', loading && 'invisible')}>
         {children}
       </span>
-      
+
       {/* Gradient overlay for extra shine effect */}
       {variant === 'gradient' && (
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       )}
     </ShadcnButton>
   );
-} 
+}

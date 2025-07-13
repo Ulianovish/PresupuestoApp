@@ -1,34 +1,37 @@
 /**
  * MobileSidebar - Molecule Level
- * 
+ *
  * Menú lateral deslizable para navegación en dispositivos móviles.
  * Incluye animaciones, overlay de fondo, y accesibilidad completa.
- * 
+ *
  * @param isOpen - Estado de apertura/cierre del menú
  * @param onClose - Función para cerrar el menú
  * @param className - Clases CSS adicionales
- * 
+ *
  * @example
- * <MobileSidebar 
+ * <MobileSidebar
  *   isOpen={isMenuOpen}
  *   onClose={() => setIsMenuOpen(false)}
  * />
  */
-"use client";
+'use client';
 
-import { useEffect, useRef } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { 
-  LayoutDashboard, 
-  PieChart, 
-  ReceiptText, 
-  FlaskConical, 
+import { useEffect, useRef } from 'react';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+import {
+  LayoutDashboard,
+  PieChart,
+  ReceiptText,
+  FlaskConical,
   TrendingUp,
   X,
-  Home
-} from "lucide-react";
+  Home,
+} from 'lucide-react';
+
+import { cn } from '@/lib/utils';
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -39,41 +42,41 @@ interface MobileSidebarProps {
 // Enlaces de navegación
 const navigationLinks = [
   {
-    href: "/dashboard",
-    label: "Dashboard",
+    href: '/dashboard',
+    label: 'Dashboard',
     icon: LayoutDashboard,
-    description: "Panel principal de control"
+    description: 'Panel principal de control',
   },
   {
-    href: "/presupuesto",
-    label: "Presupuesto",
+    href: '/presupuesto',
+    label: 'Presupuesto',
     icon: PieChart,
-    description: "Gestión de presupuesto mensual"
+    description: 'Gestión de presupuesto mensual',
   },
   {
-    href: "/gastos",
-    label: "Gastos",
+    href: '/gastos',
+    label: 'Gastos',
     icon: ReceiptText,
-    description: "Seguimiento de gastos"
+    description: 'Seguimiento de gastos',
   },
   {
-    href: "/ingresos-deudas",
-    label: "Ingresos/Deudas",
+    href: '/ingresos-deudas',
+    label: 'Ingresos/Deudas',
     icon: TrendingUp,
-    description: "Gestión de ingresos y deudas"
+    description: 'Gestión de ingresos y deudas',
   },
   {
-    href: "/test",
-    label: "Test",
+    href: '/test',
+    label: 'Test',
     icon: FlaskConical,
-    description: "Página de pruebas"
-  }
+    description: 'Página de pruebas',
+  },
 ];
 
-export default function MobileSidebar({ 
-  isOpen, 
-  onClose, 
-  className = "" 
+export default function MobileSidebar({
+  isOpen,
+  onClose,
+  className = '',
 }: MobileSidebarProps) {
   const pathname = usePathname();
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -81,22 +84,22 @@ export default function MobileSidebar({
   // Manejo de tecla ESC para cerrar
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isOpen) {
+      if (event.key === 'Escape' && isOpen) {
         onClose();
       }
     };
 
     if (isOpen) {
-      document.addEventListener("keydown", handleKeyDown);
+      document.addEventListener('keydown', handleKeyDown);
       // Prevenir scroll del body cuando el menú está abierto
-      document.body.style.overflow = "hidden";
+      document.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = 'unset';
     }
 
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "unset";
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'unset';
     };
   }, [isOpen, onClose]);
 
@@ -106,7 +109,7 @@ export default function MobileSidebar({
       const firstFocusableElement = sidebarRef.current.querySelector(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       ) as HTMLElement;
-      
+
       if (firstFocusableElement) {
         firstFocusableElement.focus();
       }
@@ -117,14 +120,14 @@ export default function MobileSidebar({
   if (!isOpen) return null;
 
   return (
-    <div className={cn("fixed inset-0 z-50 lg:hidden", className)}>
+    <div className={cn('fixed inset-0 z-50 lg:hidden', className)}>
       {/* Overlay de fondo */}
-      <div 
+      <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
-      
+
       {/* Menú lateral */}
       <div
         ref={sidebarRef}
@@ -137,15 +140,13 @@ export default function MobileSidebar({
           {/* Header del menú */}
           <div className="flex items-center justify-between p-6 border-b border-white/20">
             <div>
-              <h2 
-                id="mobile-menu-title" 
+              <h2
+                id="mobile-menu-title"
                 className="text-xl font-bold text-blue-400 tracking-tight"
               >
                 Presupuesto
               </h2>
-              <p className="text-sm text-gray-400 mt-1">
-                Navegación principal
-              </p>
+              <p className="text-sm text-gray-400 mt-1">Navegación principal</p>
             </div>
             <button
               onClick={onClose}
@@ -159,27 +160,29 @@ export default function MobileSidebar({
           {/* Lista de navegación */}
           <nav className="flex-1 p-6">
             <ul className="space-y-2">
-              {navigationLinks.map((link) => {
+              {navigationLinks.map(link => {
                 const isActive = pathname === link.href;
                 const Icon = link.icon;
-                
+
                 return (
                   <li key={link.href}>
                     <Link
                       href={link.href}
                       onClick={onClose}
                       className={cn(
-                        "flex items-center gap-3 p-3 rounded-lg transition-all duration-200 group",
-                        isActive 
-                          ? "bg-blue-500/20 text-blue-300 border border-blue-500/30" 
-                          : "text-gray-300 hover:text-white hover:bg-white/10 hover:border-white/20 border border-transparent"
+                        'flex items-center gap-3 p-3 rounded-lg transition-all duration-200 group',
+                        isActive
+                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                          : 'text-gray-300 hover:text-white hover:bg-white/10 hover:border-white/20 border border-transparent'
                       )}
                     >
-                      <Icon 
-                        size={20} 
+                      <Icon
+                        size={20}
                         className={cn(
-                          "transition-colors",
-                          isActive ? "text-blue-400" : "text-gray-400 group-hover:text-white"
+                          'transition-colors',
+                          isActive
+                            ? 'text-blue-400'
+                            : 'text-gray-400 group-hover:text-white'
                         )}
                       />
                       <div>
@@ -209,4 +212,4 @@ export default function MobileSidebar({
       </div>
     </div>
   );
-} 
+}

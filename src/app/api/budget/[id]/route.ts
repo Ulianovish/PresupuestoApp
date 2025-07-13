@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+
 import { z } from 'zod';
+
+import { createClient } from '@/lib/supabase/server';
 
 // Schema para validar datos de actualización de presupuesto
 const UpdateBudgetItemSchema = z.object({
@@ -23,10 +25,13 @@ export async function PATCH(
   try {
     // Crear cliente de Supabase para server-side
     const supabase = createClient();
-    
+
     // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Usuario no autenticado' },
@@ -39,8 +44,13 @@ export async function PATCH(
     const validatedData = UpdateBudgetItemSchema.parse(body);
 
     // Preparar datos de actualización
-    const updateData: any = {};
-    
+    const updateData: {
+      name?: string;
+      due_date?: string;
+      budgeted_amount?: number;
+      real_amount?: number;
+    } = {};
+
     if (validatedData.descripcion !== undefined) {
       updateData.name = validatedData.descripcion;
     }
@@ -79,18 +89,17 @@ export async function PATCH(
       clasificacion: validatedData.clasificacion || '',
       control: validatedData.control || '',
       presupuestado: parseFloat(data.budgeted_amount) || 0,
-      real: parseFloat(data.real_amount) || 0
+      real: parseFloat(data.real_amount) || 0,
     };
 
     return NextResponse.json({
       success: true,
       data: transformedData,
-      message: 'Item de presupuesto actualizado exitosamente'
+      message: 'Item de presupuesto actualizado exitosamente',
     });
-
   } catch (error) {
     console.error('Error en PATCH /api/budget/[id]:', error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Datos inválidos', details: error.errors },
@@ -116,10 +125,13 @@ export async function DELETE(
   try {
     // Crear cliente de Supabase para server-side
     const supabase = createClient();
-    
+
     // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Usuario no autenticado' },
@@ -144,9 +156,8 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: 'Item de presupuesto eliminado exitosamente'
+      message: 'Item de presupuesto eliminado exitosamente',
     });
-
   } catch (error) {
     console.error('Error en DELETE /api/budget/[id]:', error);
     return NextResponse.json(
@@ -154,4 +165,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-} 
+}

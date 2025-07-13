@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+
 import { cn } from '@/lib/utils';
 
 // Props interface para el componente Input
@@ -10,15 +11,15 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 /**
  * Input - Atom Level Component
- * 
+ *
  * Enhanced input component with glassmorphism support and error states.
  * Built with SIRME design system principles.
- * 
+ *
  * @param variant - Input style variant ('default', 'glass', 'gradient-focus')
  * @param error - Whether the input has an error state
  * @param className - Additional CSS classes
  * @param props - Standard HTML input props
- * 
+ *
  * @example
  * <Input
  *   variant="glass"
@@ -62,11 +63,13 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     };
 
     // Estilos de error
-    const errorStyles = error ? [
-      'border-red-500 focus:border-red-500',
-      'focus:ring-red-500/20',
-      'dark:border-red-500 dark:focus:border-red-500',
-    ] : [];
+    const errorStyles = error
+      ? [
+          'border-red-500 focus:border-red-500',
+          'focus:ring-red-500/20',
+          'dark:border-red-500 dark:focus:border-red-500',
+        ]
+      : [];
 
     // Combinar todas las clases
     const inputClasses = cn(
@@ -76,17 +79,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       className
     );
 
-    return (
-      <input
-        ref={ref}
-        className={inputClasses}
-        {...props}
-      />
-    );
+    return <input ref={ref} className={inputClasses} {...props} />;
   }
 );
 
 // Establecer nombre de display para debugging
 Input.displayName = 'Input';
 
-export default Input; 
+export default Input;

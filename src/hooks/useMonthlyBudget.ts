@@ -4,14 +4,15 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  getBudgetByMonth, 
+
+import {
+  getBudgetByMonth,
   createMonthlyBudget,
   createBudgetItem,
   updateBudgetItem,
   BudgetCategory,
   BudgetItem,
-  MonthlyBudgetData
+  MonthlyBudgetData,
 } from '@/lib/services/budget';
 
 export interface UseMonthlyBudgetReturn {
@@ -26,15 +27,23 @@ export interface UseMonthlyBudgetReturn {
   setSelectedMonth: (month: string) => void;
   refreshBudget: () => Promise<void>;
   toggleCategory: (categoryId: string) => void;
-  addBudgetItem: (categoryId: string, item: Omit<BudgetItem, 'id'>) => Promise<boolean>;
-  editBudgetItem: (itemId: string, updates: Partial<Omit<BudgetItem, 'id'>>) => Promise<boolean>;
+  addBudgetItem: (
+    categoryId: string,
+    item: Omit<BudgetItem, 'id'>
+  ) => Promise<boolean>;
+  editBudgetItem: (
+    itemId: string,
+    updates: Partial<Omit<BudgetItem, 'id'>>
+  ) => Promise<boolean>;
   initializeMonth: (monthYear: string) => Promise<boolean>;
 }
 
 /**
  * Hook para manejar presupuestos mensuales
  */
-export function useMonthlyBudget(initialMonth: string = '2025-07'): UseMonthlyBudgetReturn {
+export function useMonthlyBudget(
+  initialMonth: string = '2025-07'
+): UseMonthlyBudgetReturn {
   // Estado del hook
   const [budgetData, setBudgetData] = useState<MonthlyBudgetData | null>(null);
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
@@ -51,7 +60,7 @@ export function useMonthlyBudget(initialMonth: string = '2025-07'): UseMonthlyBu
 
     try {
       const data = await getBudgetByMonth(monthYear);
-      
+
       if (data) {
         setBudgetData(data);
         setCategories(data.categories);
@@ -73,28 +82,31 @@ export function useMonthlyBudget(initialMonth: string = '2025-07'): UseMonthlyBu
   /**
    * Inicializa un nuevo mes de presupuesto
    */
-  const initializeMonth = useCallback(async (monthYear: string): Promise<boolean> => {
-    setIsLoading(true);
-    setError(null);
+  const initializeMonth = useCallback(
+    async (monthYear: string): Promise<boolean> => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      const templateId = await createMonthlyBudget(monthYear);
-      
-      if (templateId) {
-        await loadBudgetData(monthYear);
-        return true;
-      } else {
-        setError('Error al crear el presupuesto mensual');
+      try {
+        const templateId = await createMonthlyBudget(monthYear);
+
+        if (templateId) {
+          await loadBudgetData(monthYear);
+          return true;
+        } else {
+          setError('Error al crear el presupuesto mensual');
+          return false;
+        }
+      } catch (err) {
+        console.error('Error inicializando mes:', err);
+        setError('Error al inicializar el presupuesto mensual');
         return false;
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err) {
-      console.error('Error inicializando mes:', err);
-      setError('Error al inicializar el presupuesto mensual');
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [loadBudgetData]);
+    },
+    [loadBudgetData]
+  );
 
   /**
    * Refresca los datos del presupuesto
@@ -114,7 +126,7 @@ export function useMonthlyBudget(initialMonth: string = '2025-07'): UseMonthlyBu
    * Expande o contrae una categoría
    */
   const toggleCategory = useCallback((categoryId: string) => {
-    setCategories(prev => 
+    setCategories(prev =>
       prev.map(cat =>
         cat.id === categoryId ? { ...cat, expanded: !cat.expanded } : cat
       )
@@ -124,106 +136,126 @@ export function useMonthlyBudget(initialMonth: string = '2025-07'): UseMonthlyBu
   /**
    * Agrega un nuevo item a una categoría
    */
-  const addBudgetItem = useCallback(async (
-    categoryId: string, 
-    item: Omit<BudgetItem, 'id'>
-  ): Promise<boolean> => {
-    if (!budgetData?.template_id) {
-      setError('No hay un template de presupuesto activo');
-      return false;
-    }
-
-    setError(null);
-
-    try {
-      const newItem = await createBudgetItem(budgetData.template_id, categoryId, item);
-      
-      if (newItem) {
-        // Actualizar el estado local
-        setCategories(prev => 
-          prev.map(cat => {
-            if (cat.id === categoryId) {
-              const updatedItems = [...cat.items, newItem];
-              return {
-                ...cat,
-                items: updatedItems,
-                totalPresupuestado: cat.totalPresupuestado + newItem.presupuestado,
-                totalReal: cat.totalReal + newItem.real
-              };
-            }
-            return cat;
-          })
-        );
-
-        // Actualizar totales del presupuesto
-        setBudgetData(prev => prev ? {
-          ...prev,
-          total_presupuestado: prev.total_presupuestado + newItem.presupuestado,
-          total_real: prev.total_real + newItem.real
-        } : null);
-
-        return true;
-      } else {
-        setError('Error al crear el item del presupuesto');
+  const addBudgetItem = useCallback(
+    async (
+      categoryId: string,
+      item: Omit<BudgetItem, 'id'>
+    ): Promise<boolean> => {
+      if (!budgetData?.template_id) {
+        setError('No hay un template de presupuesto activo');
         return false;
       }
-    } catch (err) {
-      console.error('Error agregando item:', err);
-      setError('Error al agregar el item del presupuesto');
-      return false;
-    }
-  }, [budgetData?.template_id]);
+
+      setError(null);
+
+      try {
+        const newItem = await createBudgetItem(
+          budgetData.template_id,
+          categoryId,
+          item
+        );
+
+        if (newItem) {
+          // Actualizar el estado local
+          setCategories(prev =>
+            prev.map(cat => {
+              if (cat.id === categoryId) {
+                const updatedItems = [...cat.items, newItem];
+                return {
+                  ...cat,
+                  items: updatedItems,
+                  totalPresupuestado:
+                    cat.totalPresupuestado + newItem.presupuestado,
+                  totalReal: cat.totalReal + newItem.real,
+                };
+              }
+              return cat;
+            })
+          );
+
+          // Actualizar totales del presupuesto
+          setBudgetData(prev =>
+            prev
+              ? {
+                  ...prev,
+                  total_presupuestado:
+                    prev.total_presupuestado + newItem.presupuestado,
+                  total_real: prev.total_real + newItem.real,
+                }
+              : null
+          );
+
+          return true;
+        } else {
+          setError('Error al crear el item del presupuesto');
+          return false;
+        }
+      } catch (err) {
+        console.error('Error agregando item:', err);
+        setError('Error al agregar el item del presupuesto');
+        return false;
+      }
+    },
+    [budgetData?.template_id]
+  );
 
   /**
    * Edita un item existente
    */
-  const editBudgetItem = useCallback(async (
-    itemId: string, 
-    updates: Partial<Omit<BudgetItem, 'id'>>
-  ): Promise<boolean> => {
-    setError(null);
+  const editBudgetItem = useCallback(
+    async (
+      itemId: string,
+      updates: Partial<Omit<BudgetItem, 'id'>>
+    ): Promise<boolean> => {
+      setError(null);
 
-    try {
-      const updatedItem = await updateBudgetItem(itemId, updates);
-      
-      if (updatedItem) {
-        // Actualizar el estado local
-        setCategories(prev => 
-          prev.map(cat => {
-            const itemIndex = cat.items.findIndex(item => item.id === itemId);
-            if (itemIndex !== -1) {
-              const oldItem = cat.items[itemIndex];
-              const newItems = [...cat.items];
-              newItems[itemIndex] = updatedItem;
-              
-              // Recalcular totales de la categoría
-              const totalPresupuestado = cat.totalPresupuestado - oldItem.presupuestado + updatedItem.presupuestado;
-              const totalReal = cat.totalReal - oldItem.real + updatedItem.real;
-              
-              return {
-                ...cat,
-                items: newItems,
-                totalPresupuestado,
-                totalReal
-              };
-            }
-            return cat;
-          })
-        );
+      try {
+        const updatedItem = await updateBudgetItem(itemId, updates);
 
-        // Recargar datos para asegurar consistencia
-        await refreshBudget();
-        return true;
-      } else {
-        setError('Error al actualizar el item del presupuesto');
+        if (updatedItem) {
+          // Actualizar el estado local
+          setCategories(prev =>
+            prev.map(cat => {
+              const itemIndex = cat.items.findIndex(item => item.id === itemId);
+              if (itemIndex !== -1) {
+                const oldItem = cat.items[itemIndex];
+                const newItems = [...cat.items];
+                newItems[itemIndex] = updatedItem;
+
+                // Recalcular totales de la categoría
+                const totalPresupuestado =
+                  cat.totalPresupuestado -
+                  oldItem.presupuestado +
+                  updatedItem.presupuestado;
+                const totalReal =
+                  cat.totalReal - oldItem.real + updatedItem.real;
+
+                return {
+                  ...cat,
+                  items: newItems,
+                  totalPresupuestado,
+                  totalReal,
+                };
+              }
+              return cat;
+            })
+          );
+
+          // Recargar datos para asegurar consistencia
+          await refreshBudget();
+          return true;
+        } else {
+          setError('Error al actualizar el item del presupuesto');
+          return false;
+        }
+      } catch (err) {
+        console.error('Error editando item:', err);
+        setError('Error al editar el item del presupuesto');
         return false;
       }
-    } catch (err) {
-      console.error('Error editando item:', err);
-      setError('Error al editar el item del presupuesto');
-      return false;
-    }
-  }, [refreshBudget]);
+    },
+    [refreshBudget]
+  );
 
   // Efecto para cargar datos cuando cambia el mes seleccionado
   useEffect(() => {
@@ -244,6 +276,6 @@ export function useMonthlyBudget(initialMonth: string = '2025-07'): UseMonthlyBu
     toggleCategory,
     addBudgetItem,
     editBudgetItem,
-    initializeMonth
+    initializeMonth,
   };
-} 
+}

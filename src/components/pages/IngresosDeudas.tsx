@@ -1,21 +1,45 @@
 /**
  * IngresosDeudas - Page Level Component
- * 
+ *
  * Componente principal para gestionar ingresos y deudas:
  * - Formulario para agregar nuevos ingresos
  * - Formulario para agregar nuevas deudas
  * - Lista de ingresos existentes
  * - Lista de deudas existentes
  * - Resumen financiero con balance neto
- * 
+ *
  * Conectado con Supabase para persistencia de datos
  */
-"use client";
+'use client';
 
 import { useState } from 'react';
-import { User } from '@supabase/supabase-js';
-import Card, { CardContent, CardHeader, CardTitle } from '@/components/atoms/Card/Card';
+
+// Tipo User definido localmente basado en la estructura de Supabase
+interface User {
+  id: string;
+  email?: string;
+  phone?: string;
+  created_at: string;
+  updated_at: string;
+  user_metadata?: Record<string, unknown>;
+  app_metadata?: Record<string, unknown>;
+}
+import {
+  Plus,
+  CreditCard,
+  DollarSign,
+  TrendingUp,
+  AlertCircle,
+  RefreshCw,
+  Loader2,
+} from 'lucide-react';
+
 import Button from '@/components/atoms/Button/Button';
+import Card, {
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/atoms/Card/Card';
 import Input from '@/components/atoms/Input/Input';
 import FormField from '@/components/molecules/FormField/FormField';
 import {
@@ -24,23 +48,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { 
-  Plus, 
-  CreditCard, 
-  DollarSign, 
-  TrendingUp,
-  AlertCircle,
-  RefreshCw,
-  Loader2
-} from 'lucide-react';
+} from '@/components/ui/dialog';
 import { useIngresosDeudas } from '@/hooks/useIngresosDeudas';
 
 interface IngresosDeudasProps {
   user: User;
 }
 
-export default function IngresosDeudas({ user }: IngresosDeudasProps) {
+export default function IngresosDeudas({ user: _user }: IngresosDeudasProps) {
   // Usar el hook personalizado para manejar el estado
   const {
     ingresos,
@@ -51,7 +66,7 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
     agregarIngreso,
     agregarDeuda,
     recargarDatos,
-    formatCurrency
+    formatCurrency,
   } = useIngresosDeudas();
 
   // Estados para formularios locales
@@ -59,14 +74,14 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
     descripcion: '',
     fuente: '',
     monto: '',
-    fecha: new Date().toISOString().split('T')[0]
+    fecha: new Date().toISOString().split('T')[0],
   });
 
   const [nuevaDeuda, setNuevaDeuda] = useState({
     descripcion: '',
     acreedor: '',
     monto: '',
-    fechaVencimiento: ''
+    fechaVencimiento: '',
   });
 
   // Estados para modales
@@ -94,21 +109,20 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
       await agregarIngreso({
         descripcion: nuevoIngreso.descripcion.trim(),
         fuente: nuevoIngreso.fuente.trim(),
-        monto: monto,
-        fecha: nuevoIngreso.fecha
+        monto,
+        fecha: nuevoIngreso.fecha,
       });
-      
+
       // Limpiar formulario
       setNuevoIngreso({
         descripcion: '',
         fuente: '',
         monto: '',
-        fecha: new Date().toISOString().split('T')[0]
+        fecha: new Date().toISOString().split('T')[0],
       });
-      
+
       // Cerrar modal
       setModalIngresoAbierto(false);
-
     } catch (error) {
       console.error('Error al agregar ingreso:', error);
       // El hook ya maneja el error en su estado
@@ -137,21 +151,20 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
       await agregarDeuda({
         descripcion: nuevaDeuda.descripcion.trim(),
         acreedor: nuevaDeuda.acreedor.trim(),
-        monto: monto,
-        fecha_vencimiento: nuevaDeuda.fechaVencimiento
+        monto,
+        fecha_vencimiento: nuevaDeuda.fechaVencimiento,
       });
-      
+
       // Limpiar formulario
       setNuevaDeuda({
         descripcion: '',
         acreedor: '',
         monto: '',
-        fechaVencimiento: ''
+        fechaVencimiento: '',
       });
-      
+
       // Cerrar modal
       setModalDeudaAbierto(false);
-
     } catch (error) {
       console.error('Error al agregar deuda:', error);
       // El hook ya maneja el error en su estado
@@ -174,7 +187,7 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                 Administra tus ingresos y deudas con Supabase
               </p>
             </div>
-            
+
             {/* Botón de recarga */}
             <Button
               variant="outline"
@@ -190,7 +203,7 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
               )}
             </Button>
           </div>
-          
+
           {/* Mostrar errores */}
           {error && (
             <div className="mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 text-sm">
@@ -213,9 +226,11 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Total Ingresos</p>
                   <p className="text-2xl font-bold text-white">
-                    {loading ? "..." : formatCurrency(resumen.totalIngresos)}
+                    {loading ? '...' : formatCurrency(resumen.totalIngresos)}
                   </p>
-                  <p className="text-xs text-gray-400">{resumen.cantidadIngresos} registros</p>
+                  <p className="text-xs text-gray-400">
+                    {resumen.cantidadIngresos} registros
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -232,9 +247,11 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Total Deudas</p>
                   <p className="text-2xl font-bold text-white">
-                    {loading ? "..." : formatCurrency(resumen.totalDeudas)}
+                    {loading ? '...' : formatCurrency(resumen.totalDeudas)}
                   </p>
-                  <p className="text-xs text-gray-400">{resumen.deudasPendientes} pendientes</p>
+                  <p className="text-xs text-gray-400">
+                    {resumen.deudasPendientes} pendientes
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -250,8 +267,10 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Balance Neto</p>
-                  <p className={`text-2xl font-bold ${resumen.balanceNeto < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                    {loading ? "..." : formatCurrency(resumen.balanceNeto)}
+                  <p
+                    className={`text-2xl font-bold ${resumen.balanceNeto < 0 ? 'text-red-400' : 'text-emerald-400'}`}
+                  >
+                    {loading ? '...' : formatCurrency(resumen.balanceNeto)}
                   </p>
                   <p className="text-xs text-gray-400">Ingresos - Deudas</p>
                 </div>
@@ -263,9 +282,16 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
         {/* Botones de Acción */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8 justify-center">
           {/* Botón para Modal de Ingresos */}
-          <Dialog open={modalIngresoAbierto} onOpenChange={setModalIngresoAbierto}>
+          <Dialog
+            open={modalIngresoAbierto}
+            onOpenChange={setModalIngresoAbierto}
+          >
             <DialogTrigger asChild>
-              <Button variant="gradient" size="lg" className="flex-1 sm:flex-none">
+              <Button
+                variant="gradient"
+                size="lg"
+                className="flex-1 sm:flex-none"
+              >
                 <TrendingUp className="w-5 h-5 mr-2" />
                 Agregar Ingreso
               </Button>
@@ -283,7 +309,12 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                     variant="glass"
                     placeholder="Ej: Salario mensual"
                     value={nuevoIngreso.descripcion}
-                    onChange={(e) => setNuevoIngreso(prev => ({ ...prev, descripcion: e.target.value }))}
+                    onChange={e =>
+                      setNuevoIngreso(prev => ({
+                        ...prev,
+                        descripcion: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </FormField>
@@ -293,7 +324,12 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                     variant="glass"
                     placeholder="Ej: Empresa XYZ"
                     value={nuevoIngreso.fuente}
-                    onChange={(e) => setNuevoIngreso(prev => ({ ...prev, fuente: e.target.value }))}
+                    onChange={e =>
+                      setNuevoIngreso(prev => ({
+                        ...prev,
+                        fuente: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </FormField>
@@ -305,7 +341,12 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                     step="0.01"
                     placeholder="0.00"
                     value={nuevoIngreso.monto}
-                    onChange={(e) => setNuevoIngreso(prev => ({ ...prev, monto: e.target.value }))}
+                    onChange={e =>
+                      setNuevoIngreso(prev => ({
+                        ...prev,
+                        monto: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </FormField>
@@ -315,7 +356,12 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                     variant="glass"
                     type="date"
                     value={nuevoIngreso.fecha}
-                    onChange={(e) => setNuevoIngreso(prev => ({ ...prev, fecha: e.target.value }))}
+                    onChange={e =>
+                      setNuevoIngreso(prev => ({
+                        ...prev,
+                        fecha: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </FormField>
@@ -365,7 +411,12 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                     variant="glass"
                     placeholder="Ej: Préstamo personal"
                     value={nuevaDeuda.descripcion}
-                    onChange={(e) => setNuevaDeuda(prev => ({ ...prev, descripcion: e.target.value }))}
+                    onChange={e =>
+                      setNuevaDeuda(prev => ({
+                        ...prev,
+                        descripcion: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </FormField>
@@ -375,7 +426,12 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                     variant="glass"
                     placeholder="Ej: Banco XYZ"
                     value={nuevaDeuda.acreedor}
-                    onChange={(e) => setNuevaDeuda(prev => ({ ...prev, acreedor: e.target.value }))}
+                    onChange={e =>
+                      setNuevaDeuda(prev => ({
+                        ...prev,
+                        acreedor: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </FormField>
@@ -387,7 +443,12 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                     step="0.01"
                     placeholder="0.00"
                     value={nuevaDeuda.monto}
-                    onChange={(e) => setNuevaDeuda(prev => ({ ...prev, monto: e.target.value }))}
+                    onChange={e =>
+                      setNuevaDeuda(prev => ({
+                        ...prev,
+                        monto: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </FormField>
@@ -397,7 +458,12 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                     variant="glass"
                     type="date"
                     value={nuevaDeuda.fechaVencimiento}
-                    onChange={(e) => setNuevaDeuda(prev => ({ ...prev, fechaVencimiento: e.target.value }))}
+                    onChange={e =>
+                      setNuevaDeuda(prev => ({
+                        ...prev,
+                        fechaVencimiento: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </FormField>
@@ -444,19 +510,30 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                   <p className="text-gray-400">No hay ingresos registrados</p>
                 </div>
               ) : (
-                                  <div className="space-y-3">
-                    {ingresos.slice(0, 5).map((ingreso) => (
-                      <div key={ingreso.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                        <div>
-                          <p className="text-white font-medium">{ingreso.descripcion}</p>
-                          <p className="text-sm text-gray-400">{ingreso.fuente} • {ingreso.fecha}</p>
-                        </div>
-                        <p className={`font-bold ${ingreso.monto > 0 ? 'text-emerald-400' : 'text-gray-500'}`}>
-                          {ingreso.monto > 0 ? formatCurrency(ingreso.monto) : 'Pendiente'}
+                <div className="space-y-3">
+                  {ingresos.slice(0, 5).map(ingreso => (
+                    <div
+                      key={ingreso.id}
+                      className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+                    >
+                      <div>
+                        <p className="text-white font-medium">
+                          {ingreso.descripcion}
+                        </p>
+                        <p className="text-sm text-gray-400">
+                          {ingreso.fuente} • {ingreso.fecha}
                         </p>
                       </div>
-                    ))}
-                  </div>
+                      <p
+                        className={`font-bold ${ingreso.monto > 0 ? 'text-emerald-400' : 'text-gray-500'}`}
+                      >
+                        {ingreso.monto > 0
+                          ? formatCurrency(ingreso.monto)
+                          : 'Pendiente'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -476,21 +553,31 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
                   <p className="text-gray-400">No hay deudas registradas</p>
                 </div>
               ) : (
-                                  <div className="space-y-3">
-                    {deudas.slice(0, 5).map((deuda) => (
-                      <div key={deuda.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                        <div>
-                          <p className="text-white font-medium">{deuda.descripcion}</p>
-                          <p className="text-sm text-gray-400">
-                            {deuda.acreedor} • Vence: {new Date(deuda.fecha_vencimiento).toLocaleDateString('es-CO')}
-                          </p>
-                        </div>
-                        <p className={`font-bold ${deuda.pagada ? 'text-green-400' : 'text-orange-400'}`}>
-                          {formatCurrency(deuda.monto)}
+                <div className="space-y-3">
+                  {deudas.slice(0, 5).map(deuda => (
+                    <div
+                      key={deuda.id}
+                      className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+                    >
+                      <div>
+                        <p className="text-white font-medium">
+                          {deuda.descripcion}
+                        </p>
+                        <p className="text-sm text-gray-400">
+                          {deuda.acreedor} • Vence:{' '}
+                          {new Date(deuda.fecha_vencimiento).toLocaleDateString(
+                            'es-CO'
+                          )}
                         </p>
                       </div>
-                    ))}
-                  </div>
+                      <p
+                        className={`font-bold ${deuda.pagada ? 'text-green-400' : 'text-orange-400'}`}
+                      >
+                        {formatCurrency(deuda.monto)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -498,4 +585,4 @@ export default function IngresosDeudas({ user }: IngresosDeudasProps) {
       </div>
     </div>
   );
-} 
+}

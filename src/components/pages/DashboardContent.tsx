@@ -1,6 +1,6 @@
 /**
  * DashboardContent - Page Level Component
- * 
+ *
  * Componente principal del dashboard que muestra:
  * - Saludo personalizado al usuario
  * - Selector de mes para dashboard mensual
@@ -8,28 +8,40 @@
  * - Tabla completa de elementos de presupuesto
  * - Acciones rápidas y navegación
  */
-"use client";
+'use client';
 
 import { useMemo } from 'react';
+
 import Link from 'next/link';
-import { User } from '@supabase/supabase-js';
-import { useDashboardData } from '@/hooks/useDashboardData';
-import { BudgetCategory, BudgetItem } from '@/lib/services/budget';
-import BudgetTable from '@/components/organisms/BudgetTable/BudgetTable';
-import MonthSelector from '@/components/atoms/MonthSelector/MonthSelector';
-import Button from '@/components/atoms/Button/Button';
-import Card, { CardContent, CardHeader, CardTitle } from '@/components/atoms/Card/Card';
-import { 
-  Wallet, 
-  TrendingUp, 
-  PieChart, 
-  Plus, 
+
+// Tipo User definido localmente basado en la estructura de Supabase
+interface User {
+  id: string;
+  email?: string;
+  phone?: string;
+  created_at: string;
+  updated_at: string;
+  user_metadata?: Record<string, unknown>;
+  app_metadata?: Record<string, unknown>;
+}
+import {
+  Wallet,
+  TrendingUp,
+  PieChart,
+  Plus,
   Edit3,
   Target,
   DollarSign,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
+
+import Button from '@/components/atoms/Button/Button';
+import Card, { CardContent } from '@/components/atoms/Card/Card';
+import MonthSelector from '@/components/atoms/MonthSelector/MonthSelector';
+import BudgetTable from '@/components/organisms/BudgetTable/BudgetTable';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { BudgetCategory } from '@/lib/services/budget';
 
 interface DashboardContentProps {
   user: User;
@@ -45,7 +57,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
     selectedMonth,
     availableMonths,
     setSelectedMonth,
-    refreshData
+    refreshData,
   } = useDashboardData();
 
   // Función para formatear moneda
@@ -74,13 +86,13 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   // Convertir categorías de presupuesto a resumen consolidado por categoría
   const budgetItems = useMemo(() => {
     if (!budgetData?.categories) return [];
-    
+
     return budgetData.categories.map((category: BudgetCategory) => {
       // Consolidar totales por categoría
       const totalPresupuestado = category.totalPresupuestado;
       const totalReal = category.totalReal;
       const totalRemaining = totalPresupuestado - totalReal;
-      
+
       // Determinar estado basado en el total de la categoría
       let status: 'on-track' | 'over-budget' | 'under-budget';
       if (totalReal > totalPresupuestado) {
@@ -90,14 +102,14 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       } else {
         status = 'under-budget';
       }
-      
+
       return {
         id: category.id,
         category: category.nombre,
         amount: totalPresupuestado,
         spent: totalReal,
         remaining: totalRemaining,
-        status
+        status,
       };
     });
   }, [budgetData?.categories]);
@@ -144,7 +156,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
               Resumen financiero de {getCurrentMonthName()}
             </p>
           </div>
-          
+
           {/* Controles de mes y actualización */}
           <div className="flex flex-wrap gap-4 items-center">
             <MonthSelector
@@ -153,7 +165,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
               options={availableMonths}
               disabled={isLoading}
             />
-            
+
             <Button
               variant="outline"
               size="sm"
@@ -161,7 +173,9 @@ export default function DashboardContent({ user }: DashboardContentProps) {
               disabled={isLoading}
               className="border-slate-600 text-slate-300 hover:bg-slate-700"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`}
+              />
               Actualizar
             </Button>
           </div>
@@ -180,7 +194,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Presupuesto Total</p>
                   <p className="text-2xl font-bold text-white">
-                    {isLoading ? "..." : formatCurrency(summary.totalBudget)}
+                    {isLoading ? '...' : formatCurrency(summary.totalBudget)}
                   </p>
                 </div>
               </div>
@@ -198,18 +212,22 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Total Gastado</p>
                   <p className="text-2xl font-bold text-white">
-                    {isLoading ? "..." : formatCurrency(summary.totalSpent)}
+                    {isLoading ? '...' : formatCurrency(summary.totalSpent)}
                   </p>
                 </div>
               </div>
               <div className="w-full bg-slate-700 rounded-full h-2">
-                <div 
+                <div
                   className={`h-2 rounded-full transition-all duration-300 ${
-                    summary.spentPercentage > 100 ? 'bg-red-500' : 
-                    summary.spentPercentage > 80 ? 'bg-amber-500' : 
-                    'bg-green-500'
+                    summary.spentPercentage > 100
+                      ? 'bg-red-500'
+                      : summary.spentPercentage > 80
+                        ? 'bg-amber-500'
+                        : 'bg-green-500'
                   }`}
-                  style={{ width: `${Math.min(summary.spentPercentage, 100)}%` }}
+                  style={{
+                    width: `${Math.min(summary.spentPercentage, 100)}%`,
+                  }}
                 />
               </div>
               <p className="text-xs text-gray-400 mt-2">
@@ -228,8 +246,10 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Disponible</p>
-                  <p className={`text-2xl font-bold ${summary.totalRemaining < 0 ? 'text-red-400' : 'text-white'}`}>
-                    {isLoading ? "..." : formatCurrency(summary.totalRemaining)}
+                  <p
+                    className={`text-2xl font-bold ${summary.totalRemaining < 0 ? 'text-red-400' : 'text-white'}`}
+                  >
+                    {isLoading ? '...' : formatCurrency(summary.totalRemaining)}
                   </p>
                 </div>
               </div>
@@ -253,12 +273,13 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Ingresos Totales</p>
                   <p className="text-2xl font-bold text-white">
-                    {isLoading ? "..." : formatCurrency(summary.totalIncome)}
+                    {isLoading ? '...' : formatCurrency(summary.totalIncome)}
                   </p>
                 </div>
               </div>
               <p className="text-xs text-gray-400">
-                Balance: {formatCurrency(summary.totalIncome - summary.totalSpent)}
+                Balance:{' '}
+                {formatCurrency(summary.totalIncome - summary.totalSpent)}
               </p>
             </CardContent>
           </Card>
@@ -277,7 +298,11 @@ export default function DashboardContent({ user }: DashboardContentProps) {
             </Button>
           </Link>
           <Link href="/gastos" className="flex-1">
-            <Button variant="outline" size="lg" className="w-full text-white border-slate-600 hover:bg-slate-700">
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full text-white border-slate-600 hover:bg-slate-700"
+            >
               <PieChart className="w-5 h-5 mr-2" />
               Ver Gastos
             </Button>
@@ -286,17 +311,20 @@ export default function DashboardContent({ user }: DashboardContentProps) {
 
         {/* Tabla de presupuesto con datos reales */}
         <Card variant="glass" className="p-6">
-
           <CardContent className="px-0">
             {/* Mostrar mensaje si no hay datos de presupuesto */}
-            {!isLoading && (!budgetData || !budgetData.categories || budgetData.categories.length === 0) ? (
+            {!isLoading &&
+            (!budgetData ||
+              !budgetData.categories ||
+              budgetData.categories.length === 0) ? (
               <div className="text-center py-8">
                 <Target className="w-16 h-16 text-gray-600 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-300 mb-2">
                   No hay presupuesto para este mes
                 </h3>
                 <p className="text-gray-400 mb-4">
-                  Crea tu presupuesto mensual para comenzar a gestionar tus finanzas
+                  Crea tu presupuesto mensual para comenzar a gestionar tus
+                  finanzas
                 </p>
                 <Link href="/presupuesto">
                   <Button variant="gradient">
@@ -318,4 +346,4 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       </div>
     </div>
   );
-} 
+}

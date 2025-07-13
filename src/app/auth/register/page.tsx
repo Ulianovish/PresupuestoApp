@@ -1,10 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+
 import Button from '@/components/atoms/Button/Button';
-import Card, { CardContent, CardHeader, CardTitle } from '@/components/atoms/Card/Card';
+import Card, {
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/atoms/Card/Card';
 import Input from '@/components/atoms/Input/Input';
 import { registerAction } from '@/lib/actions/auth';
 
@@ -22,7 +28,7 @@ export default function RegisterPage() {
   useEffect(() => {
     const errorParam = searchParams.get('error');
     const messageParam = searchParams.get('message');
-    
+
     setError(errorParam);
     setMessage(messageParam);
   }, [searchParams]);
@@ -48,7 +54,7 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       {/* Fondo con efecto glassmorphism */}
       <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-blue-500/5 to-emerald-500/10" />
-      
+
       <div className="relative w-full max-w-md">
         <Card variant="glass" className="p-8">
           <CardHeader className="text-center">
@@ -59,12 +65,15 @@ export default function RegisterPage() {
               Únete y comienza a gestionar tu presupuesto
             </p>
           </CardHeader>
-          
+
           <CardContent>
             <form action={handleSubmit} className="space-y-6">
               {/* Campo Nombre Completo */}
               <div className="space-y-2">
-                <label htmlFor="fullName" className="block text-sm font-medium text-white">
+                <label
+                  htmlFor="fullName"
+                  className="block text-sm font-medium text-white"
+                >
                   Nombre Completo
                 </label>
                 <Input
@@ -81,7 +90,10 @@ export default function RegisterPage() {
 
               {/* Campo Email */}
               <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-medium text-white">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-white"
+                >
                   Email
                 </label>
                 <Input
@@ -98,7 +110,10 @@ export default function RegisterPage() {
 
               {/* Campo Contraseña */}
               <div className="space-y-2">
-                <label htmlFor="password" className="block text-sm font-medium text-white">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-white"
+                >
                   Contraseña
                 </label>
                 <Input
@@ -118,7 +133,10 @@ export default function RegisterPage() {
 
               {/* Campo Confirmar Contraseña */}
               <div className="space-y-2">
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-white">
+                <label
+                  htmlFor="confirmPassword"
+                  className="block text-sm font-medium text-white"
+                >
                   Confirmar Contraseña
                 </label>
                 <Input
@@ -159,11 +177,17 @@ export default function RegisterPage() {
                 />
                 <label htmlFor="terms" className="text-sm text-gray-300">
                   Acepto los{' '}
-                  <Link href="/terms" className="text-blue-400 hover:text-blue-300 hover:underline">
+                  <Link
+                    href="/terms"
+                    className="text-blue-400 hover:text-blue-300 hover:underline"
+                  >
                     términos y condiciones
                   </Link>{' '}
                   y la{' '}
-                  <Link href="/privacy" className="text-blue-400 hover:text-blue-300 hover:underline">
+                  <Link
+                    href="/privacy"
+                    className="text-blue-400 hover:text-blue-300 hover:underline"
+                  >
                     política de privacidad
                   </Link>
                 </label>
@@ -185,8 +209,8 @@ export default function RegisterPage() {
               <div className="text-center">
                 <div className="flex items-center justify-center space-x-1 text-sm">
                   <span className="text-gray-300">¿Ya tienes cuenta?</span>
-                  <Link 
-                    href="/auth/login" 
+                  <Link
+                    href="/auth/login"
                     className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors"
                   >
                     Inicia sesión
@@ -199,8 +223,8 @@ export default function RegisterPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center">
-          <Link 
-            href="/" 
+          <Link
+            href="/"
             className="text-gray-400 hover:text-white text-sm transition-colors"
           >
             ← Volver al inicio
@@ -209,4 +233,4 @@ export default function RegisterPage() {
       </div>
     </div>
   );
-} 
+}

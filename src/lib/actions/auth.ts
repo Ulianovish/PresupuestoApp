@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+
 import { createClient } from '@/lib/supabase/server';
 import { loginSchema, registerSchema } from '@/lib/validations/schemas';
 
@@ -19,7 +20,7 @@ export async function loginAction(formData: FormData) {
 
     // Validar datos con Zod
     const validatedData = loginSchema.parse(rawData);
-    
+
     // Crear cliente de Supabase
     const supabase = createClient();
 
@@ -32,12 +33,14 @@ export async function loginAction(formData: FormData) {
     if (error) {
       console.error('Error de login:', error);
       // Redirigir con error en query params
-      redirect(`/auth/login?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`);
+      redirect(
+        `/auth/login?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`
+      );
     }
 
     if (data.user) {
       console.log('✅ Login exitoso para:', validatedData.email);
-      
+
       // Revalidar y redireccionar
       revalidatePath('/', 'layout');
       redirect('/dashboard');
@@ -45,15 +48,14 @@ export async function loginAction(formData: FormData) {
 
     // Si llegamos aquí, algo salió mal
     redirect('/auth/login?error=Error de autenticación');
-
   } catch (error) {
     console.error('Error en loginAction:', error);
-    
+
     if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
       // Re-throw redirect errors
       throw error;
     }
-    
+
     // Para errores de validación u otros
     redirect('/auth/login?error=Datos inválidos');
   }
@@ -75,7 +77,7 @@ export async function registerAction(formData: FormData) {
 
     // Validar datos con Zod
     const validatedData = registerSchema.parse(rawData);
-    
+
     // Crear cliente de Supabase
     const supabase = createClient();
 
@@ -92,7 +94,9 @@ export async function registerAction(formData: FormData) {
 
     if (error) {
       console.error('Error de registro:', error);
-      redirect(`/auth/register?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`);
+      redirect(
+        `/auth/register?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`
+      );
     }
 
     if (data.user) {
@@ -100,7 +104,9 @@ export async function registerAction(formData: FormData) {
 
       // Si el registro fue exitoso pero requiere confirmación
       if (!data.session) {
-        redirect('/auth/login?message=Revisa tu email para confirmar tu cuenta');
+        redirect(
+          '/auth/login?message=Revisa tu email para confirmar tu cuenta'
+        );
       }
 
       // Si el registro fue exitoso y hay sesión activa
@@ -110,15 +116,14 @@ export async function registerAction(formData: FormData) {
 
     // Si llegamos aquí, algo salió mal
     redirect('/auth/register?error=Error de registro');
-
   } catch (error) {
     console.error('Error en registerAction:', error);
-    
+
     if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
       // Re-throw redirect errors
       throw error;
     }
-    
+
     // Para errores de validación u otros
     redirect('/auth/register?error=Datos inválidos');
   }
@@ -131,27 +136,26 @@ export async function registerAction(formData: FormData) {
 export async function logoutAction() {
   try {
     const supabase = createClient();
-    
+
     const { error } = await supabase.auth.signOut();
-    
+
     if (error) {
       console.error('Error de logout:', error);
       redirect('/?error=Error al cerrar sesión');
     }
 
     console.log('✅ Logout exitoso');
-    
+
     revalidatePath('/', 'layout');
     redirect('/');
-
   } catch (error) {
     console.error('Error en logoutAction:', error);
-    
+
     if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
       // Re-throw redirect errors
       throw error;
     }
-    
+
     redirect('/?error=Error al cerrar sesión');
   }
 }
@@ -163,9 +167,12 @@ export async function logoutAction() {
 export async function getCurrentUser() {
   try {
     const supabase = createClient();
-    
-    const { data: { user }, error } = await supabase.auth.getUser();
-    
+
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
     if (error) {
       console.error('Error obteniendo usuario:', error);
       return null;
@@ -195,10 +202,14 @@ function getAuthErrorMessage(errorMessage: string): string {
     'Invalid login credentials': 'Email o contraseña incorrectos',
     'Email not confirmed': 'Debes confirmar tu email antes de iniciar sesión',
     'User already registered': 'Este email ya está registrado',
-    'Password should be at least 6 characters': 'La contraseña debe tener al menos 6 caracteres',
-    'Unable to validate email address: invalid format': 'Formato de email inválido',
-    'signup_disabled': 'El registro está deshabilitado temporalmente',
+    'Password should be at least 6 characters':
+      'La contraseña debe tener al menos 6 caracteres',
+    'Unable to validate email address: invalid format':
+      'Formato de email inválido',
+    signup_disabled: 'El registro está deshabilitado temporalmente',
   };
 
-  return errorMap[errorMessage] || 'Error de autenticación. Intenta nuevamente.';
-} 
+  return (
+    errorMap[errorMessage] || 'Error de autenticación. Intenta nuevamente.'
+  );
+}

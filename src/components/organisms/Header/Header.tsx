@@ -1,6 +1,6 @@
 /**
  * Header - Organism Level
- * 
+ *
  * Header principal con navegación para la app de presupuesto.
  * Incluye enlaces a Dashboard, Presupuesto, Gastos y Test, con iconos y glassmorphism.
  * Es fixed y semitransparente al hacer scroll.
@@ -8,15 +8,30 @@
  * En móviles, usa un menú lateral deslizable con icono de hamburguesa.
  * Incluye menú de usuario con email y logout.
  */
-"use client";
+'use client';
 
-import Link from "next/link";
-import { LayoutDashboard, PieChart, ReceiptText, FlaskConical, Wallet, TrendingUp, Menu, User, LogOut, ChevronDown } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useBudgetData } from "@/hooks/useBudgetData";
-import MobileSidebar from "@/components/molecules/MobileSidebar/MobileSidebar";
-import { supabase } from "@/lib/supabase/client";
-import { logoutAction } from "@/lib/actions/auth";
+import { useEffect, useState } from 'react';
+
+import Link from 'next/link';
+
+import {
+  LayoutDashboard,
+  PieChart,
+  ReceiptText,
+  FlaskConical,
+  Wallet,
+  TrendingUp,
+  Menu,
+  User,
+  LogOut,
+  ChevronDown,
+} from 'lucide-react';
+
+import MobileSidebar from '@/components/molecules/MobileSidebar/MobileSidebar';
+import { useBudgetData } from '@/hooks/useBudgetData';
+import { logoutAction } from '@/lib/actions/auth';
+import { supabase } from '@/lib/supabase/client';
+
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 export default function Header() {
@@ -28,15 +43,17 @@ export default function Header() {
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   // Verificar autenticación y obtener usuario
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         setUser(session?.user ?? null);
       } catch (error) {
         console.error('Error verificando autenticación:', error);
@@ -46,11 +63,11 @@ export default function Header() {
     checkAuth();
 
     // Escuchar cambios en la autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-      }
-    );
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -66,7 +83,7 @@ export default function Header() {
   };
 
   // Función para logout
-  const handleLogout = async () => {
+  const _handleLogout = async () => {
     try {
       await logoutAction();
     } catch (error) {
@@ -79,8 +96,8 @@ export default function Header() {
       <header
         className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
           scrolled
-            ? "bg-slate-900/80 backdrop-blur-md shadow-lg border-b border-white/20"
-            : "bg-white/10 dark:bg-slate-800/30 backdrop-blur-md border-b border-white/20"
+            ? 'bg-slate-900/80 backdrop-blur-md shadow-lg border-b border-white/20'
+            : 'bg-white/10 dark:bg-slate-800/30 backdrop-blur-md border-b border-white/20'
         }`}
       >
         <nav className="max-w-7xl mx-auto flex items-center justify-between px-6 sm:px-8 py-3 gap-4">
@@ -97,7 +114,7 @@ export default function Header() {
               <Wallet className="w-4 h-4 text-blue-400" />
               <span className="text-sm text-gray-300">Total:</span>
               <span className="font-semibold text-white">
-                {isLoading ? "..." : formatCurrency(summary.totalBudget)}
+                {isLoading ? '...' : formatCurrency(summary.totalBudget)}
               </span>
             </div>
             <div className="w-px h-4 bg-white/20"></div>
@@ -105,7 +122,7 @@ export default function Header() {
               <TrendingUp className="w-4 h-4 text-green-400" />
               <span className="text-sm text-gray-300">Gastado:</span>
               <span className="font-semibold text-white">
-                {isLoading ? "..." : formatCurrency(summary.totalSpent)}
+                {isLoading ? '...' : formatCurrency(summary.totalSpent)}
               </span>
             </div>
           </div>
@@ -113,31 +130,46 @@ export default function Header() {
           {/* Navegación desktop */}
           <ul className="hidden lg:flex text-md font-medium">
             <li>
-              <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all">
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all"
+              >
                 <LayoutDashboard size={18} />
                 <span>Dashboard</span>
               </Link>
             </li>
             <li>
-              <Link href="/presupuesto" className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all">
+              <Link
+                href="/presupuesto"
+                className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all"
+              >
                 <PieChart size={18} />
                 <span>Presupuesto</span>
               </Link>
             </li>
             <li>
-              <Link href="/gastos" className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all">
+              <Link
+                href="/gastos"
+                className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all"
+              >
                 <ReceiptText size={18} />
                 <span>Gastos</span>
               </Link>
             </li>
             <li>
-              <Link href="/ingresos-deudas" className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all">
+              <Link
+                href="/ingresos-deudas"
+                className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all"
+              >
                 <TrendingUp size={18} />
                 <span>Ingresos/Deudas</span>
               </Link>
             </li>
             <li>
-              <Link href="/test" className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all">
+              <Link
+                href="/test"
+                className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all"
+              >
                 <FlaskConical size={18} />
                 <span>Test</span>
               </Link>
@@ -161,7 +193,10 @@ export default function Header() {
                   <span className="text-sm font-medium truncate max-w-32">
                     {user.email?.split('@')[0]}
                   </span>
-                  <ChevronDown size={16} className={`transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown
+                    size={16}
+                    className={`transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`}
+                  />
                 </button>
 
                 {/* Dropdown del menú de usuario */}
@@ -173,7 +208,9 @@ export default function Header() {
                           <User size={20} className="text-white" />
                         </div>
                         <div>
-                          <p className="text-white font-medium">{user.email?.split('@')[0]}</p>
+                          <p className="text-white font-medium">
+                            {user.email?.split('@')[0]}
+                          </p>
                           <p className="text-gray-400 text-sm">{user.email}</p>
                         </div>
                       </div>
@@ -208,18 +245,18 @@ export default function Header() {
       </header>
 
       {/* Menú lateral móvil */}
-      <MobileSidebar 
-        isOpen={isMobileMenuOpen} 
-        onClose={() => setIsMobileMenuOpen(false)} 
+      <MobileSidebar
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
       />
 
       {/* Overlay para cerrar menú de usuario al hacer clic fuera */}
       {isUserMenuOpen && (
-        <div 
-          className="fixed inset-0 z-30" 
+        <div
+          className="fixed inset-0 z-30"
           onClick={() => setIsUserMenuOpen(false)}
         />
       )}
     </>
   );
-} 
+}

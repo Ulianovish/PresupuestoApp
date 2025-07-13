@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
-import { getCurrentUser } from '@/lib/actions/auth';
+
 import DashboardContent from '@/components/pages/DashboardContent';
+import { getCurrentUser } from '@/lib/actions/auth';
 
 /**
  * DashboardPage - Página principal del dashboard
@@ -10,11 +11,11 @@ import DashboardContent from '@/components/pages/DashboardContent';
 export default async function DashboardPage() {
   // Verificar autenticación en el servidor
   const user = await getCurrentUser();
-  
+
   if (!user) {
     redirect('/auth/login');
   }
 
   // Pasar datos del usuario al componente cliente
   return <DashboardContent user={user} />;
-} 
+}

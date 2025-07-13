@@ -49,22 +49,22 @@ export interface Account {
 // Categorías predefinidas para gastos
 export const EXPENSE_CATEGORIES = [
   'VIVIENDA',
-  'DEUDAS', 
+  'DEUDAS',
   'TRANSPORTE',
   'MERCADO',
-  'OTROS'
+  'OTROS',
 ] as const;
 
 // Tipos de cuenta predefinidos
 export const ACCOUNT_TYPES = [
   'Nequi',
-  'TC Falabella', 
+  'TC Falabella',
   'Efectivo',
-  'Banco Santander'
+  'Banco Santander',
 ] as const;
 
-export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number];
-export type AccountType = typeof ACCOUNT_TYPES[number];
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+export type AccountType = (typeof ACCOUNT_TYPES)[number];
 
 // Cliente de Supabase
 const supabase = createClient();
@@ -72,16 +72,20 @@ const supabase = createClient();
 /**
  * Obtiene los gastos de un mes específico para el usuario actual
  */
-export async function getExpensesByMonth(monthYear: string): Promise<ExpenseTransaction[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+export async function getExpensesByMonth(
+  monthYear: string
+): Promise<ExpenseTransaction[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Usuario no autenticado');
   }
 
   const { data, error } = await supabase.rpc('get_expenses_by_month', {
     p_user_id: user.id,
-    p_month_year: monthYear
+    p_month_year: monthYear,
   });
 
   if (error) {
@@ -95,16 +99,20 @@ export async function getExpensesByMonth(monthYear: string): Promise<ExpenseTran
 /**
  * Obtiene el resumen de gastos por categoría para un mes específico
  */
-export async function getExpensesSummaryByMonth(monthYear: string): Promise<ExpenseSummary[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+export async function getExpensesSummaryByMonth(
+  monthYear: string
+): Promise<ExpenseSummary[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Usuario no autenticado');
   }
 
   const { data, error } = await supabase.rpc('get_expenses_summary_by_month', {
     p_user_id: user.id,
-    p_month_year: monthYear
+    p_month_year: monthYear,
   });
 
   if (error) {
@@ -118,20 +126,25 @@ export async function getExpensesSummaryByMonth(monthYear: string): Promise<Expe
 /**
  * Obtiene los datos completos de gastos para un mes (transacciones + resumen)
  */
-export async function getMonthlyExpenseData(monthYear: string): Promise<MonthlyExpenseData> {
+export async function getMonthlyExpenseData(
+  monthYear: string
+): Promise<MonthlyExpenseData> {
   try {
     const [transactions, summary] = await Promise.all([
       getExpensesByMonth(monthYear),
-      getExpensesSummaryByMonth(monthYear)
+      getExpensesSummaryByMonth(monthYear),
     ]);
 
-    const totalAmount = summary.reduce((total, item) => total + item.total_amount, 0);
+    const totalAmount = summary.reduce(
+      (total, item) => total + item.total_amount,
+      0
+    );
 
     return {
       month_year: monthYear,
       transactions,
       summary,
-      total_amount: totalAmount
+      total_amount: totalAmount,
     };
   } catch (error) {
     console.error('Error obteniendo datos mensuales de gastos:', error);
@@ -142,9 +155,13 @@ export async function getMonthlyExpenseData(monthYear: string): Promise<MonthlyE
 /**
  * Crea un nuevo gasto
  */
-export async function createExpenseTransaction(expenseData: ExpenseFormData): Promise<string> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+export async function createExpenseTransaction(
+  expenseData: ExpenseFormData
+): Promise<string> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Usuario no autenticado');
   }
@@ -156,7 +173,7 @@ export async function createExpenseTransaction(expenseData: ExpenseFormData): Pr
     p_transaction_date: expenseData.transaction_date,
     p_category_name: expenseData.category_name,
     p_account_name: expenseData.account_name,
-    p_place: expenseData.place || null
+    p_place: expenseData.place || null,
   });
 
   if (error) {
@@ -171,7 +188,7 @@ export async function createExpenseTransaction(expenseData: ExpenseFormData): Pr
  * Actualiza un gasto existente usando la API proxy
  */
 export async function updateExpenseTransaction(
-  transactionId: string, 
+  transactionId: string,
   expenseData: Partial<ExpenseFormData>
 ): Promise<void> {
   try {
@@ -190,7 +207,7 @@ export async function updateExpenseTransaction(
     }
 
     const result = await response.json();
-    
+
     if (!result.success) {
       throw new Error(result.error || 'Error actualizando gasto');
     }
@@ -198,14 +215,18 @@ export async function updateExpenseTransaction(
     console.log('Gasto actualizado exitosamente:', result.message);
   } catch (error) {
     console.error('Error actualizando gasto:', error);
-    throw new Error(`Error actualizando gasto: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    throw new Error(
+      `Error actualizando gasto: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    );
   }
 }
 
 /**
  * Elimina un gasto usando la API proxy
  */
-export async function deleteExpenseTransaction(transactionId: string): Promise<void> {
+export async function deleteExpenseTransaction(
+  transactionId: string
+): Promise<void> {
   try {
     // Usar la API proxy para evitar problemas de CORS
     const response = await fetch(`/api/expenses/${transactionId}`, {
@@ -221,7 +242,7 @@ export async function deleteExpenseTransaction(transactionId: string): Promise<v
     }
 
     const result = await response.json();
-    
+
     if (!result.success) {
       throw new Error(result.error || 'Error eliminando gasto');
     }
@@ -229,7 +250,9 @@ export async function deleteExpenseTransaction(transactionId: string): Promise<v
     console.log('Gasto eliminado exitosamente:', result.message);
   } catch (error) {
     console.error('Error eliminando gasto:', error);
-    throw new Error(`Error eliminando gasto: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    throw new Error(
+      `Error eliminando gasto: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    );
   }
 }
 
@@ -237,8 +260,10 @@ export async function deleteExpenseTransaction(transactionId: string): Promise<v
  * Obtiene las cuentas del usuario
  */
 export async function getUserAccounts(): Promise<Account[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Usuario no autenticado');
   }
@@ -262,14 +287,16 @@ export async function getUserAccounts(): Promise<Account[]> {
  * Obtiene los meses disponibles con gastos
  */
 export async function getAvailableExpenseMonths(): Promise<string[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Usuario no autenticado');
   }
 
   const { data, error } = await supabase.rpc('get_available_expense_months', {
-    p_user_id: user.id
+    p_user_id: user.id,
   });
 
   if (error) {
@@ -277,7 +304,7 @@ export async function getAvailableExpenseMonths(): Promise<string[]> {
     throw new Error(`Error obteniendo meses: ${error.message}`);
   }
 
-  return data?.map((item: any) => item.month_year) || [];
+  return data?.map((item: { month_year: string }) => item.month_year) || [];
 }
 
 /**
@@ -309,8 +336,18 @@ export function formatCurrency(amount: number): string {
 export function formatMonthName(monthYear: string): string {
   const [year, month] = monthYear.split('-');
   const monthNames = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
   ];
   return `${monthNames[parseInt(month) - 1]} ${year}`;
 }
@@ -318,7 +355,9 @@ export function formatMonthName(monthYear: string): string {
 /**
  * Verifica si un mes tiene datos de gastos
  */
-export async function hasExpenseDataForMonth(monthYear: string): Promise<boolean> {
+export async function hasExpenseDataForMonth(
+  monthYear: string
+): Promise<boolean> {
   try {
     const transactions = await getExpensesByMonth(monthYear);
     return transactions.length > 0;
@@ -326,4 +365,4 @@ export async function hasExpenseDataForMonth(monthYear: string): Promise<boolean
     console.error('Error verificando datos del mes:', error);
     return false;
   }
-} 
+}

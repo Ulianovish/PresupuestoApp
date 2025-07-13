@@ -1,18 +1,35 @@
 /**
  * HomePage - Page Level
- * 
+ *
  * Landing page that introduces the budget application
  * and provides navigation to main features and authentication.
  */
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import Button from "@/components/atoms/Button/Button";
-import Card, { CardContent, CardHeader, CardTitle } from "@/components/atoms/Card/Card";
-import { supabase } from "@/lib/supabase/client";
-import { Wallet, TrendingUp, Target, BarChart3, User, LogIn, UserPlus, TestTube } from "lucide-react";
+import { useEffect, useState } from 'react';
+
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+import {
+  Wallet,
+  TrendingUp,
+  Target,
+  BarChart3,
+  User,
+  LogIn,
+  UserPlus,
+  TestTube,
+} from 'lucide-react';
+
+import Button from '@/components/atoms/Button/Button';
+import Card, {
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/atoms/Card/Card';
+import { supabase } from '@/lib/supabase/client';
+
 import type { User } from '@supabase/supabase-js';
 
 export default function HomePage() {
@@ -24,7 +41,9 @@ export default function HomePage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         setUser(session?.user ?? null);
       } catch (error) {
         console.error('Error verificando autenticación:', error);
@@ -36,11 +55,11 @@ export default function HomePage() {
     checkAuth();
 
     // Escuchar cambios en la autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-      }
-    );
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -54,10 +73,10 @@ export default function HomePage() {
             Presupuesto 2025
           </h1>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Gestiona tu presupuesto de manera inteligente con nuestra aplicación 
+            Gestiona tu presupuesto de manera inteligente con nuestra aplicación
             construida con Next.js, Supabase, shadcn/ui y Atomic Design.
           </p>
-          
+
           {/* Navegación basada en autenticación */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {loading ? (
@@ -67,16 +86,16 @@ export default function HomePage() {
             ) : user ? (
               // Usuario autenticado
               <>
-                <Button 
-                  variant="gradient" 
+                <Button
+                  variant="gradient"
                   size="lg"
                   onClick={() => router.push('/dashboard')}
                 >
                   <Wallet className="w-5 h-5 mr-2" />
                   Ir al Dashboard
                 </Button>
-                <Button 
-                  variant="glass" 
+                <Button
+                  variant="glass"
                   size="lg"
                   onClick={() => router.push('/presupuesto')}
                 >
@@ -87,16 +106,16 @@ export default function HomePage() {
             ) : (
               // Usuario no autenticado
               <>
-                <Button 
-                  variant="gradient" 
+                <Button
+                  variant="gradient"
                   size="lg"
                   onClick={() => router.push('/auth/login')}
                 >
                   <LogIn className="w-5 h-5 mr-2" />
                   Iniciar Sesión
                 </Button>
-                <Button 
-                  variant="glass" 
+                <Button
+                  variant="glass"
                   size="lg"
                   onClick={() => router.push('/auth/register')}
                 >
@@ -130,12 +149,14 @@ export default function HomePage() {
               <Wallet className="w-6 h-6 text-blue-400" />
             </div>
             <CardHeader className="p-0 pb-4">
-              <CardTitle className="text-xl text-white">Gestión de Presupuesto</CardTitle>
+              <CardTitle className="text-xl text-white">
+                Gestión de Presupuesto
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <p className="text-gray-300">
-                Crea y gestiona tu presupuesto mensual con categorías personalizables 
-                y seguimiento en tiempo real con Supabase.
+                Crea y gestiona tu presupuesto mensual con categorías
+                personalizables y seguimiento en tiempo real con Supabase.
               </p>
             </CardContent>
           </Card>
@@ -145,12 +166,14 @@ export default function HomePage() {
               <TrendingUp className="w-6 h-6 text-green-400" />
             </div>
             <CardHeader className="p-0 pb-4">
-              <CardTitle className="text-xl text-white">Análisis Inteligente</CardTitle>
+              <CardTitle className="text-xl text-white">
+                Análisis Inteligente
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <p className="text-gray-300">
-                Visualiza tus gastos con gráficos interactivos y recibe 
-                alertas cuando te acerques a tu límite de presupuesto.
+                Visualiza tus gastos con gráficos interactivos y recibe alertas
+                cuando te acerques a tu límite de presupuesto.
               </p>
             </CardContent>
           </Card>
@@ -160,11 +183,13 @@ export default function HomePage() {
               <Target className="w-6 h-6 text-purple-400" />
             </div>
             <CardHeader className="p-0 pb-4">
-              <CardTitle className="text-xl text-white">Metas Financieras</CardTitle>
+              <CardTitle className="text-xl text-white">
+                Metas Financieras
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <p className="text-gray-300">
-                Establece metas de ahorro y recibe recomendaciones 
+                Establece metas de ahorro y recibe recomendaciones
                 personalizadas para alcanzar tus objetivos financieros.
               </p>
             </CardContent>
@@ -173,7 +198,9 @@ export default function HomePage() {
 
         {/* Technology Stack */}
         <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold mb-8 text-white">Tecnologías Utilizadas</h2>
+          <h2 className="text-3xl font-bold mb-8 text-white">
+            Tecnologías Utilizadas
+          </h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
             <div className="p-4 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
               <div className="text-2xl font-bold text-blue-400">Next.js</div>
@@ -184,15 +211,21 @@ export default function HomePage() {
               <div className="text-sm text-gray-400">Backend & DB</div>
             </div>
             <div className="p-4 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
-              <div className="text-2xl font-bold text-purple-400">shadcn/ui</div>
+              <div className="text-2xl font-bold text-purple-400">
+                shadcn/ui
+              </div>
               <div className="text-sm text-gray-400">Componentes UI</div>
             </div>
             <div className="p-4 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
-              <div className="text-2xl font-bold text-emerald-400">Atomic Design</div>
+              <div className="text-2xl font-bold text-emerald-400">
+                Atomic Design
+              </div>
               <div className="text-sm text-gray-400">Metodología</div>
             </div>
             <div className="p-4 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
-              <div className="text-2xl font-bold text-orange-400">TypeScript</div>
+              <div className="text-2xl font-bold text-orange-400">
+                TypeScript
+              </div>
               <div className="text-sm text-gray-400">Tipado Estático</div>
             </div>
           </div>
@@ -200,28 +233,46 @@ export default function HomePage() {
 
         {/* Navegación rápida */}
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-6 text-white">Enlaces Rápidos</h2>
+          <h2 className="text-2xl font-bold mb-6 text-white">
+            Enlaces Rápidos
+          </h2>
           <div className="flex flex-wrap gap-4 justify-center">
             <Link href="/test">
-              <Button variant="outline" size="sm" className="text-white border-slate-600 hover:bg-slate-700">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-white border-slate-600 hover:bg-slate-700"
+              >
                 <TestTube className="w-4 h-4 mr-2" />
                 Página de Prueba
               </Button>
             </Link>
             <Link href="/dashboard">
-              <Button variant="outline" size="sm" className="text-white border-slate-600 hover:bg-slate-700">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-white border-slate-600 hover:bg-slate-700"
+              >
                 <BarChart3 className="w-4 h-4 mr-2" />
                 Dashboard
               </Button>
             </Link>
             <Link href="/presupuesto">
-              <Button variant="outline" size="sm" className="text-white border-slate-600 hover:bg-slate-700">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-white border-slate-600 hover:bg-slate-700"
+              >
                 <Wallet className="w-4 h-4 mr-2" />
                 Presupuesto
               </Button>
             </Link>
             <Link href="/gastos">
-              <Button variant="outline" size="sm" className="text-white border-slate-600 hover:bg-slate-700">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-white border-slate-600 hover:bg-slate-700"
+              >
                 <TrendingUp className="w-4 h-4 mr-2" />
                 Gastos
               </Button>

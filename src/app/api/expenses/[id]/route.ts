@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+
 import { z } from 'zod';
+
+import { createClient } from '@/lib/supabase/server';
 
 // Schema para validar datos de actualización de gastos
 const UpdateExpenseSchema = z.object({
@@ -23,10 +25,13 @@ export async function PATCH(
   try {
     // Crear cliente de Supabase para server-side
     const supabase = createClient();
-    
+
     // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Usuario no autenticado' },
@@ -47,19 +52,27 @@ export async function PATCH(
         .eq('user_id', user.id)
         .eq('name', validatedData.account_name)
         .single();
-      
+
       if (accountError) {
         return NextResponse.json(
           { error: 'Cuenta no encontrada' },
           { status: 400 }
         );
       }
-      
+
       accountId = accounts?.id;
     }
 
     // Preparar datos de actualización
-    const updateData: any = {};
+    const updateData: {
+      description?: string;
+      amount?: number;
+      transaction_date?: string;
+      month_year?: string;
+      category_name?: string;
+      place?: string;
+      account_id?: string;
+    } = {};
     if (validatedData.description !== undefined) {
       updateData.description = validatedData.description;
     }
@@ -99,13 +112,12 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      data: data,
-      message: 'Gasto actualizado exitosamente'
+      data,
+      message: 'Gasto actualizado exitosamente',
     });
-
   } catch (error) {
     console.error('Error en PATCH /api/expenses/[id]:', error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Datos inválidos', details: error.errors },
@@ -131,10 +143,13 @@ export async function DELETE(
   try {
     // Crear cliente de Supabase para server-side
     const supabase = createClient();
-    
+
     // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Usuario no autenticado' },
@@ -159,9 +174,8 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: 'Gasto eliminado exitosamente'
+      message: 'Gasto eliminado exitosamente',
     });
-
   } catch (error) {
     console.error('Error en DELETE /api/expenses/[id]:', error);
     return NextResponse.json(
@@ -169,4 +183,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-} 
+}

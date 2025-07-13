@@ -1,6 +1,6 @@
 /**
  * Servicios para gestionar ingresos y deudas con Supabase
- * 
+ *
  * Este archivo contiene todas las funciones para realizar operaciones CRUD
  * sobre las tablas de ingresos y deudas en Supabase.
  */
@@ -93,25 +93,31 @@ export async function obtenerIngresos(): Promise<Ingreso[]> {
 /**
  * Crear un nuevo ingreso
  */
-export async function crearIngreso(nuevoIngreso: NuevoIngreso): Promise<Ingreso> {
+export async function crearIngreso(
+  nuevoIngreso: NuevoIngreso
+): Promise<Ingreso> {
   try {
     // Verificar que el usuario esté autenticado
-    const { data: { user } } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     if (!user) {
       throw new Error('Usuario no autenticado');
     }
 
     const { data, error } = await supabase
       .from('ingresos')
-      .insert([{
-        user_id: user.id,
-        descripcion: nuevoIngreso.descripcion,
-        fuente: nuevoIngreso.fuente,
-        monto: nuevoIngreso.monto,
-        fecha: nuevoIngreso.fecha,
-        tipo: 'ingreso'
-      }])
+      .insert([
+        {
+          user_id: user.id,
+          descripcion: nuevoIngreso.descripcion,
+          fuente: nuevoIngreso.fuente,
+          monto: nuevoIngreso.monto,
+          fecha: nuevoIngreso.fecha,
+          tipo: 'ingreso',
+        },
+      ])
       .select()
       .single();
 
@@ -130,7 +136,10 @@ export async function crearIngreso(nuevoIngreso: NuevoIngreso): Promise<Ingreso>
 /**
  * Actualizar un ingreso existente
  */
-export async function actualizarIngreso(id: string, datosActualizados: Partial<NuevoIngreso>): Promise<Ingreso> {
+export async function actualizarIngreso(
+  id: string,
+  datosActualizados: Partial<NuevoIngreso>
+): Promise<Ingreso> {
   try {
     const { data, error } = await supabase
       .from('ingresos')
@@ -204,23 +213,27 @@ export async function obtenerDeudas(): Promise<Deuda[]> {
 export async function crearDeuda(nuevaDeuda: NuevaDeuda): Promise<Deuda> {
   try {
     // Verificar que el usuario esté autenticado
-    const { data: { user } } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     if (!user) {
       throw new Error('Usuario no autenticado');
     }
 
     const { data, error } = await supabase
       .from('deudas')
-      .insert([{
-        user_id: user.id,
-        descripcion: nuevaDeuda.descripcion,
-        acreedor: nuevaDeuda.acreedor,
-        monto: nuevaDeuda.monto,
-        fecha_vencimiento: nuevaDeuda.fecha_vencimiento,
-        tipo: 'deuda',
-        pagada: false
-      }])
+      .insert([
+        {
+          user_id: user.id,
+          descripcion: nuevaDeuda.descripcion,
+          acreedor: nuevaDeuda.acreedor,
+          monto: nuevaDeuda.monto,
+          fecha_vencimiento: nuevaDeuda.fecha_vencimiento,
+          tipo: 'deuda',
+          pagada: false,
+        },
+      ])
       .select()
       .single();
 
@@ -239,7 +252,10 @@ export async function crearDeuda(nuevaDeuda: NuevaDeuda): Promise<Deuda> {
 /**
  * Actualizar una deuda existente
  */
-export async function actualizarDeuda(id: string, datosActualizados: Partial<NuevaDeuda> & { pagada?: boolean }): Promise<Deuda> {
+export async function actualizarDeuda(
+  id: string,
+  datosActualizados: Partial<NuevaDeuda> & { pagada?: boolean }
+): Promise<Deuda> {
   try {
     const { data, error } = await supabase
       .from('deudas')
@@ -299,7 +315,7 @@ export async function obtenerResumenFinanciero(): Promise<ResumenFinanciero> {
     // Obtener ingresos y deudas en paralelo
     const [ingresos, deudas] = await Promise.all([
       obtenerIngresos(),
-      obtenerDeudas()
+      obtenerDeudas(),
     ]);
 
     // Calcular totales
@@ -322,7 +338,7 @@ export async function obtenerResumenFinanciero(): Promise<ResumenFinanciero> {
       balanceNeto,
       cantidadIngresos,
       cantidadDeudas,
-      deudasPendientes
+      deudasPendientes,
     };
   } catch (error) {
     console.error('Error en obtenerResumenFinanciero:', error);
@@ -335,8 +351,10 @@ export async function obtenerResumenFinanciero(): Promise<ResumenFinanciero> {
  */
 export async function inicializarDatosEjemplo(): Promise<void> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     if (!user) {
       throw new Error('Usuario no autenticado');
     }
@@ -344,31 +362,71 @@ export async function inicializarDatosEjemplo(): Promise<void> {
     // Verificar si ya tiene datos
     const [ingresosExistentes, deudasExistentes] = await Promise.all([
       obtenerIngresos(),
-      obtenerDeudas()
+      obtenerDeudas(),
     ]);
 
     // Solo crear datos de ejemplo si no tiene ningún dato
     if (ingresosExistentes.length === 0 && deudasExistentes.length === 0) {
       // Crear ingresos de ejemplo
       const ingresosEjemplo = [
-        { descripcion: 'Salario mensual', fuente: 'Phi Dimension', monto: 16000000, fecha: '2025-01-01' },
-        { descripcion: 'Proyecto freelance', fuente: 'Hactch Works', monto: 16400000, fecha: '2025-01-01' },
-        { descripcion: 'Consultoría', fuente: 'Hasugue', monto: 0, fecha: '2025-01-01' },
-        { descripcion: 'Inversión MOF', fuente: 'MOF', monto: 0, fecha: '2025-01-01' },
-        { descripcion: 'Arriendo apartamento', fuente: 'Apto 216', monto: 0, fecha: '2025-01-01' },
-        { descripcion: 'Arriendo parqueadero', fuente: 'Parking', monto: 100000, fecha: '2025-01-01' }
+        {
+          descripcion: 'Salario mensual',
+          fuente: 'Phi Dimension',
+          monto: 16000000,
+          fecha: '2025-01-01',
+        },
+        {
+          descripcion: 'Proyecto freelance',
+          fuente: 'Hactch Works',
+          monto: 16400000,
+          fecha: '2025-01-01',
+        },
+        {
+          descripcion: 'Consultoría',
+          fuente: 'Hasugue',
+          monto: 0,
+          fecha: '2025-01-01',
+        },
+        {
+          descripcion: 'Inversión MOF',
+          fuente: 'MOF',
+          monto: 0,
+          fecha: '2025-01-01',
+        },
+        {
+          descripcion: 'Arriendo apartamento',
+          fuente: 'Apto 216',
+          monto: 0,
+          fecha: '2025-01-01',
+        },
+        {
+          descripcion: 'Arriendo parqueadero',
+          fuente: 'Parking',
+          monto: 100000,
+          fecha: '2025-01-01',
+        },
       ];
 
       // Crear deudas de ejemplo
       const deudasEjemplo = [
-        { descripcion: 'Crédito vehículo', acreedor: 'Banco Davivienda', monto: 25000000, fecha_vencimiento: '2025-02-15' },
-        { descripcion: 'Hipoteca casa', acreedor: 'Banco de Bogotá', monto: 45000000, fecha_vencimiento: '2025-02-01' }
+        {
+          descripcion: 'Crédito vehículo',
+          acreedor: 'Banco Davivienda',
+          monto: 25000000,
+          fecha_vencimiento: '2025-02-15',
+        },
+        {
+          descripcion: 'Hipoteca casa',
+          acreedor: 'Banco de Bogotá',
+          monto: 45000000,
+          fecha_vencimiento: '2025-02-01',
+        },
       ];
 
       // Insertar en paralelo
       await Promise.all([
         ...ingresosEjemplo.map(ingreso => crearIngreso(ingreso)),
-        ...deudasEjemplo.map(deuda => crearDeuda(deuda))
+        ...deudasEjemplo.map(deuda => crearDeuda(deuda)),
       ]);
 
       console.log('Datos de ejemplo inicializados correctamente');
@@ -400,15 +458,20 @@ export function formatearMoneda(amount: number): string {
 export function estaProximaAVencer(fechaVencimiento: string): boolean {
   const hoy = new Date();
   const vencimiento = new Date(fechaVencimiento);
-  const diferenciaDias = Math.ceil((vencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-  
+  const diferenciaDias = Math.ceil(
+    (vencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
   return diferenciaDias <= 7 && diferenciaDias >= 0;
 }
 
 /**
  * Obtener el color para mostrar un monto según el contexto
  */
-export function obtenerColorMonto(monto: number, esIngreso: boolean = true): string {
+export function obtenerColorMonto(
+  monto: number,
+  esIngreso: boolean = true
+): string {
   if (monto === 0) return 'text-gray-500';
   return esIngreso ? 'text-emerald-400' : 'text-orange-400';
-} 
+}

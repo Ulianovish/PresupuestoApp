@@ -2,19 +2,41 @@
  * PresupuestoPage - Página de presupuesto mensual con Supabase
  * Permite seleccionar mes y muestra datos reales de la base de datos
  */
-"use client";
+'use client';
 
-import React, { useState, useEffect } from "react";
-import Card, { CardContent, CardHeader, CardTitle } from "@/components/atoms/Card/Card";
-import Button from "@/components/atoms/Button/Button";
-import MonthSelector from "@/components/atoms/MonthSelector/MonthSelector";
-import { ChevronDown, ChevronRight, Edit, Plus, Database, AlertCircle, RefreshCw } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useMonthlyBudget } from "@/hooks/useMonthlyBudget";
-import { getAvailableMonths, formatCurrency } from "@/lib/services/budget";
-import { migrateJulyData, checkMigrationStatus } from "@/scripts/migrate-july-data";
+import React, { useState, useEffect } from 'react';
+
+import {
+  ChevronDown,
+  ChevronRight,
+  Edit,
+  Plus,
+  Database,
+  AlertCircle,
+  RefreshCw,
+} from 'lucide-react';
+
+import Button from '@/components/atoms/Button/Button';
+import Card, {
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/atoms/Card/Card';
+import MonthSelector from '@/components/atoms/MonthSelector/MonthSelector';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useMonthlyBudget } from '@/hooks/useMonthlyBudget';
+import { getAvailableMonths, formatCurrency } from '@/lib/services/budget';
+import {
+  migrateJulyData,
+  checkMigrationStatus,
+} from '@/scripts/migrate-july-data';
 
 // Estado del modal
 interface ModalState {
@@ -55,7 +77,7 @@ export default function PresupuestoPage() {
     toggleCategory,
     addBudgetItem,
     editBudgetItem,
-    initializeMonth
+    initializeMonth,
   } = useMonthlyBudget('2025-07');
 
   // Estado del modal
@@ -63,7 +85,7 @@ export default function PresupuestoPage() {
     isOpen: false,
     mode: 'add',
     categoriaId: '',
-    item: undefined
+    item: undefined,
   });
 
   // Estado del formulario
@@ -73,7 +95,7 @@ export default function PresupuestoPage() {
     clasificacion: 'Fijo',
     control: 'Necesario',
     presupuestado: 0,
-    real: 0
+    real: 0,
   });
 
   // Estado de migración
@@ -84,7 +106,7 @@ export default function PresupuestoPage() {
   }>({
     checking: true,
     migrated: false,
-    migrating: false
+    migrating: false,
   });
 
   // Verificar estado de migración al cargar
@@ -97,20 +119,20 @@ export default function PresupuestoPage() {
    */
   const checkMigration = async () => {
     setMigrationStatus(prev => ({ ...prev, checking: true }));
-    
+
     try {
       const status = await checkMigrationStatus();
       setMigrationStatus(prev => ({
         ...prev,
         checking: false,
-        migrated: status.migrated
+        migrated: status.migrated,
       }));
     } catch (error) {
       console.error('Error verificando migración:', error);
       setMigrationStatus(prev => ({
         ...prev,
         checking: false,
-        migrated: false
+        migrated: false,
       }));
     }
   };
@@ -120,17 +142,17 @@ export default function PresupuestoPage() {
    */
   const handleMigration = async () => {
     setMigrationStatus(prev => ({ ...prev, migrating: true }));
-    
+
     try {
       const result = await migrateJulyData();
-      
+
       if (result.success) {
         setMigrationStatus(prev => ({
           ...prev,
           migrating: false,
-          migrated: true
+          migrated: true,
         }));
-        
+
         // Refrescar los datos después de la migración
         await refreshBudget();
       } else {
@@ -147,11 +169,13 @@ export default function PresupuestoPage() {
    */
   const handleMonthChange = async (newMonth: string) => {
     setSelectedMonth(newMonth);
-    
+
     // Si el mes no tiene datos, ofrecer crearlo
     if (!categories.length && !isLoading) {
-      const shouldCreate = confirm(`No hay datos para ${getAvailableMonths().find(m => m.value === newMonth)?.label}. ¿Deseas crear un presupuesto para este mes?`);
-      
+      const shouldCreate = confirm(
+        `No hay datos para ${getAvailableMonths().find(m => m.value === newMonth)?.label}. ¿Deseas crear un presupuesto para este mes?`
+      );
+
       if (shouldCreate) {
         await initializeMonth(newMonth);
       }
@@ -166,7 +190,7 @@ export default function PresupuestoPage() {
       isOpen: true,
       mode: 'add',
       categoriaId,
-      item: undefined
+      item: undefined,
     });
     setFormData({
       descripcion: '',
@@ -174,27 +198,38 @@ export default function PresupuestoPage() {
       clasificacion: 'Fijo',
       control: 'Necesario',
       presupuestado: 0,
-      real: 0
+      real: 0,
     });
   };
 
   /**
    * Abre el modal para editar un item
    */
-  const openEditModal = (categoriaId: string, item: any) => {
+  const openEditModal = (
+    categoriaId: string,
+    item: {
+      id: string;
+      descripcion: string;
+      fecha: string;
+      clasificacion: string;
+      control: string;
+      presupuestado: number;
+      real: number;
+    }
+  ) => {
     setModalState({
       isOpen: true,
       mode: 'edit',
       categoriaId,
-      item
+      item,
     });
     setFormData({
       descripcion: item.descripcion,
       fecha: item.fecha,
-      clasificacion: item.clasificacion,
-      control: item.control,
+      clasificacion: item.clasificacion as 'Fijo' | 'Variable' | 'Discrecional',
+      control: item.control as 'Necesario' | 'Discrecional',
       presupuestado: item.presupuestado,
-      real: item.real
+      real: item.real,
     });
   };
 
@@ -206,7 +241,7 @@ export default function PresupuestoPage() {
       isOpen: false,
       mode: 'add',
       categoriaId: '',
-      item: undefined
+      item: undefined,
     });
     setFormData({
       descripcion: '',
@@ -214,7 +249,7 @@ export default function PresupuestoPage() {
       clasificacion: 'Fijo',
       control: 'Necesario',
       presupuestado: 0,
-      real: 0
+      real: 0,
     });
   };
 
@@ -236,7 +271,7 @@ export default function PresupuestoPage() {
           return;
         }
       }
-      
+
       closeModal();
     } catch (error) {
       console.error('Error guardando:', error);
@@ -249,14 +284,14 @@ export default function PresupuestoPage() {
    */
   const getClasificacionColor = (clasificacion: string) => {
     switch (clasificacion) {
-      case "Fijo":
-        return "bg-blue-900/30 text-blue-300";
-      case "Variable":
-        return "bg-purple-900/30 text-purple-300";
-      case "Discrecional":
-        return "bg-amber-900/30 text-amber-300";
+      case 'Fijo':
+        return 'bg-blue-900/30 text-blue-300';
+      case 'Variable':
+        return 'bg-purple-900/30 text-purple-300';
+      case 'Discrecional':
+        return 'bg-amber-900/30 text-amber-300';
       default:
-        return "bg-gray-900/30 text-gray-300";
+        return 'bg-gray-900/30 text-gray-300';
     }
   };
 
@@ -265,18 +300,19 @@ export default function PresupuestoPage() {
    */
   const getControlColor = (control: string) => {
     switch (control) {
-      case "Necesario":
-        return "bg-emerald-900/30 text-emerald-300";
-      case "Discrecional":
-        return "bg-amber-900/30 text-amber-300";
+      case 'Necesario':
+        return 'bg-emerald-900/30 text-emerald-300';
+      case 'Discrecional':
+        return 'bg-amber-900/30 text-amber-300';
       default:
-        return "bg-gray-900/30 text-gray-300";
+        return 'bg-gray-900/30 text-gray-300';
     }
   };
 
   // Opciones para el selector de mes
   const monthOptions = getAvailableMonths();
-  const selectedMonthLabel = monthOptions.find(m => m.value === selectedMonth)?.label || selectedMonth;
+  const selectedMonthLabel =
+    monthOptions.find(m => m.value === selectedMonth)?.label || selectedMonth;
 
   return (
     <div className="min-h-screen bg-slate-900 p-8">
@@ -310,7 +346,9 @@ export default function PresupuestoPage() {
               disabled={isLoading}
               className="flex items-center gap-2"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`}
+              />
               Actualizar
             </Button>
           </div>
@@ -333,8 +371,9 @@ export default function PresupuestoPage() {
                   Migrar Datos Iniciales
                 </h3>
                 <p className="text-gray-300 mb-4">
-                  Para empezar con datos reales de julio 2025, puedes migrar los datos de ejemplo a Supabase.
-                  Esto creará todas las categorías y elementos del presupuesto en la base de datos.
+                  Para empezar con datos reales de julio 2025, puedes migrar los
+                  datos de ejemplo a Supabase. Esto creará todas las categorías
+                  y elementos del presupuesto en la base de datos.
                 </p>
                 <Button
                   variant="gradient"
@@ -365,7 +404,9 @@ export default function PresupuestoPage() {
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-400 mt-1" />
               <div>
-                <h3 className="text-lg font-semibold text-red-400 mb-1">Error</h3>
+                <h3 className="text-lg font-semibold text-red-400 mb-1">
+                  Error
+                </h3>
                 <p className="text-gray-300">{error}</p>
               </div>
             </div>
@@ -377,7 +418,9 @@ export default function PresupuestoPage() {
           <Card variant="glass" className="p-8">
             <div className="flex items-center justify-center gap-3">
               <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
-              <span className="text-gray-300 text-lg">Cargando presupuesto...</span>
+              <span className="text-gray-300 text-lg">
+                Cargando presupuesto...
+              </span>
             </div>
           </Card>
         )}
@@ -389,7 +432,8 @@ export default function PresupuestoPage() {
               <CardTitle className="flex items-center justify-between">
                 <span>Categorías de Presupuesto</span>
                 <div className="text-sm text-gray-400">
-                  Total: {formatCurrency(budgetData?.total_presupuestado || 0)} / {formatCurrency(budgetData?.total_real || 0)}
+                  Total: {formatCurrency(budgetData?.total_presupuestado || 0)}{' '}
+                  / {formatCurrency(budgetData?.total_real || 0)}
                 </div>
               </CardTitle>
             </CardHeader>
@@ -422,7 +466,7 @@ export default function PresupuestoPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/10">
-                    {categories.map((categoria) => (
+                    {categories.map(categoria => (
                       <React.Fragment key={categoria.id}>
                         {/* Fila de categoría principal */}
                         <tr
@@ -454,7 +498,7 @@ export default function PresupuestoPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={(e) => {
+                              onClick={e => {
                                 e?.stopPropagation();
                                 openAddModal(categoria.id);
                               }}
@@ -468,7 +512,7 @@ export default function PresupuestoPage() {
 
                         {/* Items de la categoría */}
                         {categoria.expanded &&
-                          categoria.items.map((item) => (
+                          categoria.items.map(item => (
                             <tr
                               key={item.id}
                               className="hover:bg-white/5 transition-colors bg-slate-900/30"
@@ -501,13 +545,17 @@ export default function PresupuestoPage() {
                                 {formatCurrency(item.presupuestado)}
                               </td>
                               <td className="px-4 py-3 text-emerald-300">
-                                {item.real > 0 ? formatCurrency(item.real) : "—"}
+                                {item.real > 0
+                                  ? formatCurrency(item.real)
+                                  : '—'}
                               </td>
                               <td className="px-4 py-3">
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => openEditModal(categoria.id, item)}
+                                  onClick={() =>
+                                    openEditModal(categoria.id, item)
+                                  }
                                   className="flex items-center gap-1"
                                 >
                                   <Edit className="w-3 h-3" />
@@ -530,12 +578,13 @@ export default function PresupuestoPage() {
           <Card variant="glass" className="p-8 text-center">
             <div className="text-gray-400 mb-4">
               <Database className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">No hay datos para este mes</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                No hay datos para este mes
+              </h3>
               <p className="text-sm">
-                {selectedMonth === '2025-07' 
+                {selectedMonth === '2025-07'
                   ? 'Usa el botón "Migrar Datos de Julio" para empezar con datos de ejemplo.'
-                  : `No hay presupuesto creado para ${selectedMonthLabel}. Puedes crear uno nuevo.`
-                }
+                  : `No hay presupuesto creado para ${selectedMonthLabel}. Puedes crear uno nuevo.`}
               </p>
             </div>
             {selectedMonth !== '2025-07' && (
@@ -555,10 +604,12 @@ export default function PresupuestoPage() {
           <DialogContent className="sm:max-w-md bg-slate-800 border-slate-700">
             <DialogHeader>
               <DialogTitle className="text-white">
-                {modalState.mode === 'add' ? 'Agregar Detalle' : 'Editar Detalle'}
+                {modalState.mode === 'add'
+                  ? 'Agregar Detalle'
+                  : 'Editar Detalle'}
               </DialogTitle>
             </DialogHeader>
-            
+
             <div className="space-y-4 py-4">
               {/* Descripción */}
               <div className="space-y-2">
@@ -568,7 +619,12 @@ export default function PresupuestoPage() {
                 <Input
                   id="descripcion"
                   value={formData.descripcion}
-                  onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
+                  onChange={e =>
+                    setFormData(prev => ({
+                      ...prev,
+                      descripcion: e.target.value,
+                    }))
+                  }
                   className="bg-slate-700/50 border-slate-600 text-white"
                   placeholder="Nombre del item"
                 />
@@ -582,7 +638,9 @@ export default function PresupuestoPage() {
                 <Input
                   id="fecha"
                   value={formData.fecha}
-                  onChange={(e) => setFormData(prev => ({ ...prev, fecha: e.target.value }))}
+                  onChange={e =>
+                    setFormData(prev => ({ ...prev, fecha: e.target.value }))
+                  }
                   className="bg-slate-700/50 border-slate-600 text-white"
                   placeholder="Ej: 5/mes, 15/mes"
                 />
@@ -592,17 +650,22 @@ export default function PresupuestoPage() {
               <div className="space-y-2">
                 <Label className="text-white">Clasificación</Label>
                 <div className="flex gap-4">
-                  {['Fijo', 'Variable', 'Discrecional'].map((tipo) => (
+                  {['Fijo', 'Variable', 'Discrecional'].map(tipo => (
                     <label key={tipo} className="flex items-center space-x-2">
                       <input
                         type="radio"
                         name="clasificacion"
                         value={tipo}
                         checked={formData.clasificacion === tipo}
-                        onChange={(e) => setFormData(prev => ({ 
-                          ...prev, 
-                          clasificacion: e.target.value as 'Fijo' | 'Variable' | 'Discrecional'
-                        }))}
+                        onChange={e =>
+                          setFormData(prev => ({
+                            ...prev,
+                            clasificacion: e.target.value as
+                              | 'Fijo'
+                              | 'Variable'
+                              | 'Discrecional',
+                          }))
+                        }
                         className="text-blue-500"
                       />
                       <span className="text-white text-sm">{tipo}</span>
@@ -615,17 +678,21 @@ export default function PresupuestoPage() {
               <div className="space-y-2">
                 <Label className="text-white">Control</Label>
                 <div className="flex gap-4">
-                  {['Necesario', 'Discrecional'].map((tipo) => (
+                  {['Necesario', 'Discrecional'].map(tipo => (
                     <label key={tipo} className="flex items-center space-x-2">
                       <input
                         type="radio"
                         name="control"
                         value={tipo}
                         checked={formData.control === tipo}
-                        onChange={(e) => setFormData(prev => ({ 
-                          ...prev, 
-                          control: e.target.value as 'Necesario' | 'Discrecional'
-                        }))}
+                        onChange={e =>
+                          setFormData(prev => ({
+                            ...prev,
+                            control: e.target.value as
+                              | 'Necesario'
+                              | 'Discrecional',
+                          }))
+                        }
                         className="text-blue-500"
                       />
                       <span className="text-white text-sm">{tipo}</span>
@@ -643,7 +710,12 @@ export default function PresupuestoPage() {
                   id="presupuestado"
                   type="number"
                   value={formData.presupuestado}
-                  onChange={(e) => setFormData(prev => ({ ...prev, presupuestado: Number(e.target.value) }))}
+                  onChange={e =>
+                    setFormData(prev => ({
+                      ...prev,
+                      presupuestado: Number(e.target.value),
+                    }))
+                  }
                   className="bg-slate-700/50 border-slate-600 text-white"
                   placeholder="0"
                 />
@@ -658,7 +730,12 @@ export default function PresupuestoPage() {
                   id="real"
                   type="number"
                   value={formData.real}
-                  onChange={(e) => setFormData(prev => ({ ...prev, real: Number(e.target.value) }))}
+                  onChange={e =>
+                    setFormData(prev => ({
+                      ...prev,
+                      real: Number(e.target.value),
+                    }))
+                  }
                   className="bg-slate-700/50 border-slate-600 text-white"
                   placeholder="0"
                 />
@@ -679,4 +756,4 @@ export default function PresupuestoPage() {
       </div>
     </div>
   );
-} 
+}
