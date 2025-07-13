@@ -167,34 +167,6 @@ export default function BudgetTable({
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 bg-blue-500/10 backdrop-blur-sm rounded-lg border border-blue-500/20">
-          <div className="text-sm text-blue-400">Presupuesto Total</div>
-          <div className="text-2xl font-bold text-blue-300">
-            {formatCurrency(summary.totalBudget)}
-          </div>
-        </div>
-        <div className="p-4 bg-green-500/10 backdrop-blur-sm rounded-lg border border-green-500/20">
-          <div className="text-sm text-green-400">Gastado</div>
-          <div className="text-2xl font-bold text-green-300">
-            {formatCurrency(summary.totalSpent)}
-          </div>
-        </div>
-        <div className="p-4 bg-purple-500/10 backdrop-blur-sm rounded-lg border border-purple-500/20">
-          <div className="text-sm text-purple-400">Restante</div>
-          <div className="text-2xl font-bold text-purple-300">
-            {formatCurrency(summary.totalRemaining)}
-          </div>
-        </div>
-        <div className="p-4 bg-orange-500/10 backdrop-blur-sm rounded-lg border border-orange-500/20">
-          <div className="text-sm text-orange-400">Sobre Presupuesto</div>
-          <div className="text-2xl font-bold text-orange-300">
-            {summary.overBudgetCount}
-          </div>
-        </div>
-      </div>
-
       {/* Budget Items Grid */}
       {filteredAndSortedItems.length === 0 ? (
         <div className="text-center py-12">
