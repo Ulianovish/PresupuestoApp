@@ -83,7 +83,7 @@ export default function Header() {
             : "bg-white/10 dark:bg-slate-800/30 backdrop-blur-md border-b border-white/20"
         }`}
       >
-        <nav className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 py-3">
+        <nav className="max-w-7xl mx-auto flex items-center justify-between px-6 sm:px-8 py-3 gap-4">
           {/* Logo y título */}
           <div className="flex items-center gap-3">
             <span className="text-xl sm:text-2xl font-bold text-blue-400 tracking-tight select-none">
@@ -111,33 +111,33 @@ export default function Header() {
           </div>
 
           {/* Navegación desktop */}
-          <ul className="hidden lg:flex gap-6 text-md font-medium">
+          <ul className="hidden lg:flex text-md font-medium">
             <li>
-              <Link href="/dashboard" className="flex items-center gap-1 text-white hover:text-blue-400 transition-colors">
+              <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all">
                 <LayoutDashboard size={18} />
                 <span>Dashboard</span>
               </Link>
             </li>
             <li>
-              <Link href="/presupuesto" className="flex items-center gap-1 text-white hover:text-blue-400 transition-colors">
+              <Link href="/presupuesto" className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all">
                 <PieChart size={18} />
                 <span>Presupuesto</span>
               </Link>
             </li>
             <li>
-              <Link href="/gastos" className="flex items-center gap-1 text-white hover:text-blue-400 transition-colors">
+              <Link href="/gastos" className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all">
                 <ReceiptText size={18} />
                 <span>Gastos</span>
               </Link>
             </li>
             <li>
-              <Link href="/ingresos-deudas" className="flex items-center gap-1 text-white hover:text-blue-400 transition-colors">
+              <Link href="/ingresos-deudas" className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all">
                 <TrendingUp size={18} />
                 <span>Ingresos/Deudas</span>
               </Link>
             </li>
             <li>
-              <Link href="/test" className="flex items-center gap-1 text-white hover:text-blue-400 transition-colors">
+              <Link href="/test" className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all">
                 <FlaskConical size={18} />
                 <span>Test</span>
               </Link>
@@ -145,7 +145,7 @@ export default function Header() {
           </ul>
 
           {/* Menú de usuario y menú móvil */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             {/* Menú de usuario - visible cuando está logueado */}
             {user && (
               <div className="relative">

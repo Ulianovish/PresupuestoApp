@@ -20,12 +20,8 @@
  */
 "use client";
 
-import { useState, useMemo } from "react";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import BudgetItem from "@/components/molecules/BudgetItem/BudgetItem";
 import { cn } from "@/lib/utils";
-import { Search, Filter, SortAsc } from "lucide-react";
 
 interface BudgetItemData {
   id: string;
@@ -44,8 +40,7 @@ interface BudgetTableProps {
   className?: string;
 }
 
-type SortOption = 'category' | 'amount' | 'spent' | 'remaining' | 'status';
-type FilterStatus = 'all' | 'on-track' | 'over-budget' | 'under-budget';
+
 
 export default function BudgetTable({ 
   items, 
@@ -54,63 +49,7 @@ export default function BudgetTable({
   loading = false,
   className = "" 
 }: BudgetTableProps) {
-  // State for filtering and sorting
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<SortOption>('category');
-  const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
 
-  // Función para formatear moneda consistente con otras páginas
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  // Filter and sort items
-  const filteredAndSortedItems = useMemo(() => {
-    let filtered = items.filter(item => {
-      // Search filter
-      const matchesSearch = item.category.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Status filter
-      const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
-      
-      return matchesSearch && matchesStatus;
-    });
-
-    // Sort items
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'category':
-          return a.category.localeCompare(b.category);
-        case 'amount':
-          return b.amount - a.amount;
-        case 'spent':
-          return b.spent - a.spent;
-        case 'remaining':
-          return b.remaining - a.remaining;
-        case 'status':
-          return a.status.localeCompare(b.status);
-        default:
-          return 0;
-      }
-    });
-
-    return filtered;
-  }, [items, searchTerm, sortBy, statusFilter]);
-
-  // Calculate summary statistics
-  const summary = useMemo(() => {
-    return {
-      totalBudget: items.reduce((sum, item) => sum + item.amount, 0),
-      totalSpent: items.reduce((sum, item) => sum + item.spent, 0),
-      totalRemaining: items.reduce((sum, item) => sum + item.remaining, 0),
-      overBudgetCount: items.filter(item => item.status === 'over-budget').length,
-      onTrackCount: items.filter(item => item.status === 'on-track').length,
-    };
-  }, [items]);
 
   if (loading) {
     return (
@@ -129,57 +68,19 @@ export default function BudgetTable({
 
   return (
     <div className={cn("space-y-6", className)}>
-      {/* Search and Filter Controls */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            placeholder="Buscar categoría..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-slate-800 border-slate-600 text-white placeholder-gray-400"
-          />
-        </div>
-        
-        <div className="flex gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as FilterStatus)}
-            className="px-3 py-2 border border-slate-600 rounded-md text-sm bg-slate-800 text-white"
-          >
-            <option value="all">Todos</option>
-            <option value="on-track">En curso</option>
-            <option value="over-budget">Sobre presupuesto</option>
-            <option value="under-budget">Bajo presupuesto</option>
-          </select>
-          
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="px-3 py-2 border border-slate-600 rounded-md text-sm bg-slate-800 text-white"
-          >
-            <option value="category">Categoría</option>
-            <option value="amount">Presupuesto</option>
-            <option value="spent">Gastado</option>
-            <option value="remaining">Restante</option>
-            <option value="status">Estado</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Budget Items Grid */}
-      {filteredAndSortedItems.length === 0 ? (
+      {/* Budget Items Grid - Solo los widgets de categorías */}
+      {items.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-gray-400 text-lg">
             No se encontraron elementos de presupuesto
           </div>
           <div className="text-gray-500 text-sm mt-2">
-            {searchTerm ? 'Intenta con otros términos de búsqueda' : 'Agrega tu primer elemento de presupuesto'}
+            Agrega tu primer elemento de presupuesto
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAndSortedItems.map((item) => (
+          {items.map((item) => (
             <BudgetItem
               key={item.id}
               item={item}
