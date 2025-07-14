@@ -1,86 +1,159 @@
 /**
  * BudgetTable - Organism Level
  *
- * Complex component that manages budget items with filtering, sorting, and CRUD operations.
- * Combines multiple molecules and atoms for complete budget management functionality.
+ * Tabla principal del presupuesto que muestra categorías y sus items.
+ * Incluye funcionalidad de expandir/contraer categorías y editar items.
  *
- * @param items - Array of budget items
- * @param onItemUpdate - Callback when item is updated
- * @param onItemEdit - Callback when item edit is requested
- * @param loading - Whether the table is in loading state
- * @param className - Additional CSS classes
+ * @param categories - Lista de categorías con sus items
+ * @param budgetData - Datos del presupuesto (totales)
+ * @param onToggleCategory - Función para expandir/contraer categorías
+ * @param onAddItem - Función para agregar un item a una categoría
+ * @param onEditItem - Función para editar un item
+ * @param formatCurrency - Función para formatear moneda
+ * @param getClasificacionColor - Función para obtener color de clasificación
+ * @param getControlColor - Función para obtener color de control
  *
  * @example
  * <BudgetTable
- *   items={budgetItems}
- *   onItemUpdate={(id, value) => updateBudgetItem(id, value)}
- *   onItemEdit={(id) => openEditDialog(id)}
- *   loading={isLoading}
+ *   categories={categories}
+ *   budgetData={budgetData}
+ *   onToggleCategory={toggleCategory}
+ *   onAddItem={openAddModal}
+ *   onEditItem={openEditModal}
+ *   formatCurrency={formatCurrency}
+ *   getClasificacionColor={getClasificacionColor}
+ *   getControlColor={getControlColor}
  * />
  */
-'use client';
 
-import BudgetItem from '@/components/molecules/BudgetItem/BudgetItem';
-import { cn } from '@/lib/utils';
+import React from 'react';
 
-interface BudgetItemData {
+import Card, {
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/atoms/Card/Card';
+import BudgetCategoryRow from '@/components/molecules/BudgetCategoryRow/BudgetCategoryRow';
+import BudgetItemRow from '@/components/molecules/BudgetItemRow/BudgetItemRow';
+
+interface BudgetItem {
   id: string;
-  category: string;
-  amount: number;
-  spent: number;
-  remaining: number;
-  status: 'on-track' | 'over-budget' | 'under-budget';
+  descripcion: string;
+  fecha: string;
+  clasificacion: string;
+  control: string;
+  presupuestado: number;
+  real: number;
+}
+
+interface BudgetCategory {
+  id: string;
+  nombre: string;
+  expanded: boolean;
+  totalPresupuestado: number;
+  totalReal: number;
+  items: BudgetItem[];
+}
+
+interface BudgetData {
+  total_presupuestado: number;
+  total_real: number;
 }
 
 interface BudgetTableProps {
-  items: BudgetItemData[];
-  onItemUpdate: (id: string, value: number) => void;
-  onItemEdit: (id: string) => void;
-  loading?: boolean;
-  className?: string;
+  categories: BudgetCategory[];
+  budgetData: BudgetData | null;
+  onToggleCategory: (categoryId: string) => void;
+  onAddItem: (categoryId: string) => void;
+  onEditItem: (categoryId: string, item: BudgetItem) => void;
+  formatCurrency: (amount: number) => string;
+  getClasificacionColor: (clasificacion: string) => string;
+  getControlColor: (control: string) => string;
 }
 
 export default function BudgetTable({
-  items,
-  onItemUpdate: _onItemUpdate,
-  onItemEdit,
-  loading = false,
-  className = '',
+  categories,
+  budgetData,
+  onToggleCategory,
+  onAddItem,
+  onEditItem,
+  formatCurrency,
+  getClasificacionColor,
+  getControlColor,
 }: BudgetTableProps) {
-  if (loading) {
-    return (
-      <div className={cn('space-y-4', className)}>
-        <div className="animate-pulse">
-          <div className="h-10 bg-slate-700 rounded mb-4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-32 bg-slate-700 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className={cn('space-y-6', className)}>
-      {/* Budget Items Grid - Solo los widgets de categorías */}
-      {items.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="text-gray-400 text-lg">
-            No se encontraron elementos de presupuesto
+    <Card variant="glass" className="p-6">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>Categorías de Presupuesto</span>
+          <div className="text-sm text-gray-400">
+            Total: {formatCurrency(budgetData?.total_presupuestado || 0)} /{' '}
+            {formatCurrency(budgetData?.total_real || 0)}
           </div>
-          <div className="text-gray-500 text-sm mt-2">
-            Agrega tu primer elemento de presupuesto
-          </div>
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            {/* Cabecera de la tabla */}
+            <thead>
+              <tr className="border-b border-white/10">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  Descripción
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  Fecha
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  Clasificación
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  Control
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  Presupuestado
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  Real
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  Acción
+                </th>
+              </tr>
+            </thead>
+
+            {/* Cuerpo de la tabla */}
+            <tbody className="divide-y divide-white/10">
+              {categories.map(categoria => (
+                <React.Fragment key={categoria.id}>
+                  {/* Fila de categoría */}
+                  <BudgetCategoryRow
+                    category={categoria}
+                    onToggle={onToggleCategory}
+                    onAddItem={onAddItem}
+                    formatCurrency={formatCurrency}
+                  />
+
+                  {/* Items de la categoría (solo si está expandida) */}
+                  {categoria.expanded &&
+                    categoria.items.map(item => (
+                      <BudgetItemRow
+                        key={item.id}
+                        item={item}
+                        categoryId={categoria.id}
+                        onEdit={onEditItem}
+                        formatCurrency={formatCurrency}
+                        getClasificacionColor={getClasificacionColor}
+                        getControlColor={getControlColor}
+                      />
+                    ))}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map(item => (
-            <BudgetItem key={item.id} item={item} onEdit={onItemEdit} />
-          ))}
-        </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }
