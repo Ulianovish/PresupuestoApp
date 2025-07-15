@@ -20,9 +20,12 @@ const UpdateExpenseSchema = z.object({
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Extraer params de forma async (Next.js 15)
+    const { id } = await params;
+
     // Crear cliente de Supabase para server-side
     const supabase = await createClient();
 
@@ -97,7 +100,7 @@ export async function PATCH(
     const { data, error } = await supabase
       .from('transactions')
       .update(updateData)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id)
       .select()
       .single();
@@ -138,9 +141,12 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Extraer params de forma async (Next.js 15)
+    const { id } = await params;
+
     // Crear cliente de Supabase para server-side
     const supabase = await createClient();
 
@@ -161,7 +167,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('transactions')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id);
 
     if (error) {

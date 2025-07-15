@@ -5,24 +5,24 @@ Este checklist te guía paso a paso para hacer el deployment de tu aplicación.
 ## 🚀 Opción Rápida - Deploy con Vercel (Recomendado)
 
 ### ✅ Pre-requisitos
-- [ ] Cuenta en [GitHub](https://github.com)
-- [ ] Cuenta en [Vercel](https://vercel.com)
-- [ ] Cuenta en [Supabase](https://supabase.com)
-- [ ] Código commiteado en GitHub
+- [x] Cuenta en [GitHub](https://github.com)
+- [x] Cuenta en [Vercel](https://vercel.com)
+- [x] Cuenta en [Supabase](https://supabase.com)
+- [x] Código commiteado en GitHub
 
 ### ✅ Configuración de Supabase (5 min)
 
 1. **Crear proyecto en Supabase:**
-   - [ ] Ve a [supabase.com](https://supabase.com)
-   - [ ] Crear nuevo proyecto
+   - [x] Ve a [supabase.com](https://supabase.com)
+   - [x] Crear nuevo proyecto
    - [ ] Anota la **Project URL** y **Anon Key**
 
 2. **Ejecutar migraciones SQL:**
-   - [ ] Ve al **SQL Editor** en Supabase
-   - [ ] Ejecuta en orden: `supabase_schema.sql`
-   - [ ] Ejecuta: `supabase_monthly_budget_migration.sql`
-   - [ ] Ejecuta: `supabase_expenses_monthly_migration.sql`
-   - [ ] Ejecuta: `supabase_ingresos_deudas.sql`
+   - [x] Ve al **SQL Editor** en Supabase
+   - [x] Ejecuta en orden: `supabase_schema.sql`
+   - [x] Ejecuta: `supabase_monthly_budget_migration.sql`
+   - [x] Ejecuta: `supabase_expenses_monthly_migration.sql`
+   - [x] Ejecuta: `supabase_ingresos_deudas.sql`
 
 3. **Configurar autenticación:**
    - [ ] Ve a **Authentication > Settings**
@@ -32,9 +32,9 @@ Este checklist te guía paso a paso para hacer el deployment de tu aplicación.
 ### ✅ Deploy en Vercel (3 min)
 
 1. **Conectar repositorio:**
-   - [ ] Ve a [vercel.com](https://vercel.com)
-   - [ ] Click "Import Project"
-   - [ ] Conecta tu repositorio GitHub
+   - [x] Ve a [vercel.com](https://vercel.com)
+   - [x] Click "Import Project"
+   - [x] Conecta tu repositorio GitHub
 
 2. **Configurar variables de entorno:**
    ```

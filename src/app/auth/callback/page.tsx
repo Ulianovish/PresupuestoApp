@@ -9,15 +9,16 @@ import { createClient } from '@/lib/supabase/server';
 export default async function CallbackPage({
   searchParams,
 }: {
-  searchParams: { code?: string; error?: string; redirectTo?: string };
+  searchParams: Promise<{ code?: string; error?: string; redirectTo?: string }>;
 }) {
+  // Extraer searchParams de forma async (Next.js 15)
+  const params = await searchParams;
+
   const supabase = await createClient();
 
   // Si hay un código de autenticación, intercambiarlo por sesión
-  if (searchParams.code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(
-      searchParams.code
-    );
+  if (params.code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(params.code);
 
     if (error) {
       console.error('Error en callback de autenticación:', error);
@@ -25,14 +26,14 @@ export default async function CallbackPage({
     }
 
     // Redirigir al destino solicitado o al dashboard por defecto
-    const redirectTo = searchParams.redirectTo || '/dashboard';
+    const redirectTo = params.redirectTo || '/dashboard';
     redirect(redirectTo);
   }
 
   // Si hay un error, redirigir al login con el error
-  if (searchParams.error) {
-    console.error('Error en callback:', searchParams.error);
-    redirect(`/auth/login?error=${encodeURIComponent(searchParams.error)}`);
+  if (params.error) {
+    console.error('Error en callback:', params.error);
+    redirect(`/auth/login?error=${encodeURIComponent(params.error)}`);
   }
 
   // Fallback: redirigir al login

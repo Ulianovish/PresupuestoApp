@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -15,10 +15,9 @@ import Input from '@/components/atoms/Input/Input';
 import { registerAction } from '@/lib/actions/auth';
 
 /**
- * RegisterPage - Página de registro de usuarios
- * Componente de página (Pages level en Atomic Design)
+ * RegisterForm - Formulario de registro que usa useSearchParams
  */
-export default function RegisterPage() {
+function RegisterForm() {
   const searchParams = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -232,5 +231,33 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * RegisterPage - Página de registro de usuario
+ * Componente de página (Pages level en Atomic Design) con Suspense boundary
+ */
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/5 to-emerald-500/10" />
+          <div className="relative">
+            <Card variant="glass" className="p-8">
+              <CardContent>
+                <div className="text-center text-white">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+                  <p>Cargando...</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }
