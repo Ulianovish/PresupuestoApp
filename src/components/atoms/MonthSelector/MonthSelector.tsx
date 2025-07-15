@@ -69,7 +69,7 @@ export default function MonthSelector({
             disabled && 'opacity-50 cursor-not-allowed',
 
             // Efecto de glassmorphism
-            'shadow-lg backdrop-filter'
+            'shadow-lg backdrop-filter',
           )}
         >
           {options.map(option => (
@@ -88,7 +88,7 @@ export default function MonthSelector({
           <ChevronDown
             className={cn(
               'w-4 h-4 text-gray-400 transition-transform duration-200',
-              disabled && 'opacity-50'
+              disabled && 'opacity-50',
             )}
           />
         </div>

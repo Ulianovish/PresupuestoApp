@@ -66,7 +66,7 @@ function Card({
         hover &&
           'hover:shadow-xl hover:scale-[1.02] transition-all duration-300',
         blur && 'backdrop-blur-sm',
-        className
+        className,
       )}
       {...props}
     >

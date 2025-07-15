@@ -54,7 +54,7 @@ interface ExpenseModalProps {
   expenseCategories: string[];
   accountTypes: string[];
   onFormChange: (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => void;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;

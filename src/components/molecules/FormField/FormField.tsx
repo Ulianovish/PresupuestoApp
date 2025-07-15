@@ -49,7 +49,7 @@ export default function FormField({
         htmlFor={htmlFor}
         className={cn(
           'text-sm font-medium',
-          required && "after:content-['*'] after:ml-1 after:text-red-500"
+          required && "after:content-['*'] after:ml-1 after:text-red-500",
         )}
       >
         {label}

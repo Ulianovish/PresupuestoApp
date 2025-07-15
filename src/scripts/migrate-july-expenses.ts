@@ -104,11 +104,11 @@ async function checkExistingJulyData(userId: string): Promise<boolean> {
  */
 async function migrateExpense(
   userId: string,
-  expense: ExpenseFormData
+  expense: ExpenseFormData,
 ): Promise<string | null> {
   try {
     console.log(
-      `💰 Migrando: ${expense.description} - ${expense.amount.toLocaleString('es-CO')}`
+      `💰 Migrando: ${expense.description} - ${expense.amount.toLocaleString('es-CO')}`,
     );
 
     const { data, error } = await supabase.rpc('upsert_monthly_expense', {
@@ -132,7 +132,7 @@ async function migrateExpense(
   } catch (error) {
     console.error(
       `❌ Error inesperado migrando ${expense.description}:`,
-      error
+      error,
     );
     return null;
   }
@@ -202,7 +202,7 @@ export async function migrateJulyExpenses(): Promise<{
     if (success) {
       console.log('\n🎉 ¡Migración completada exitosamente!');
       console.log(
-        'Los gastos de julio 2025 están ahora disponibles en Supabase.'
+        'Los gastos de julio 2025 están ahora disponibles en Supabase.',
       );
     } else if (migratedCount > 0) {
       console.log('\n⚠️ Migración completada con algunos errores.');
@@ -254,7 +254,7 @@ export async function checkMigrationStatus(): Promise<{
     const totalAmount =
       data?.reduce(
         (sum: number, expense: { amount: number }) => sum + expense.amount,
-        0
+        0,
       ) || 0;
 
     return {

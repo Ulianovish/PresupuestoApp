@@ -56,7 +56,7 @@ const supabase = createClient();
  * Obtiene el presupuesto de un mes específico
  */
 export async function getBudgetByMonth(
-  monthYear: string
+  monthYear: string,
 ): Promise<MonthlyBudgetData | null> {
   try {
     // Obtener datos usando la función SQL
@@ -142,7 +142,7 @@ export async function getBudgetByMonth(
  */
 export async function createMonthlyBudget(
   monthYear: string,
-  templateName?: string
+  templateName?: string,
 ): Promise<string | null> {
   try {
     const { data: user } = await supabase.auth.getUser();
@@ -243,7 +243,7 @@ export async function getControls() {
 export async function createBudgetItem(
   templateId: string,
   categoryId: string,
-  item: Omit<BudgetItem, 'id'>
+  item: Omit<BudgetItem, 'id'>,
 ): Promise<BudgetItem | null> {
   try {
     // Usar la API proxy para evitar problemas de CORS
@@ -291,7 +291,7 @@ export async function createBudgetItem(
  */
 export async function updateBudgetItem(
   itemId: string,
-  updates: Partial<Omit<BudgetItem, 'id'>>
+  updates: Partial<Omit<BudgetItem, 'id'>>,
 ): Promise<BudgetItem | null> {
   try {
     // Usar la API proxy para evitar problemas de CORS

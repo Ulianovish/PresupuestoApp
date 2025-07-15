@@ -34,7 +34,7 @@ export async function loginAction(formData: FormData) {
       console.error('Error de login:', error);
       // Redirigir con error en query params
       redirect(
-        `/auth/login?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`
+        `/auth/login?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`,
       );
     }
 
@@ -95,7 +95,7 @@ export async function registerAction(formData: FormData) {
     if (error) {
       console.error('Error de registro:', error);
       redirect(
-        `/auth/register?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`
+        `/auth/register?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`,
       );
     }
 
@@ -105,7 +105,7 @@ export async function registerAction(formData: FormData) {
       // Si el registro fue exitoso pero requiere confirmación
       if (!data.session) {
         redirect(
-          '/auth/login?message=Revisa tu email para confirmar tu cuenta'
+          '/auth/login?message=Revisa tu email para confirmar tu cuenta',
         );
       }
 

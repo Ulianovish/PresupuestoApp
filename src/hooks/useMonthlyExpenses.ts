@@ -46,7 +46,7 @@ interface UseMonthlyExpensesState {
   editExpense: (transaction: ExpenseTransaction) => void;
   updateExpense: (
     transactionId: string,
-    expenseData: Partial<ExpenseFormData>
+    expenseData: Partial<ExpenseFormData>,
   ) => Promise<void>;
   deleteExpense: (transactionId: string) => Promise<void>;
 
@@ -57,11 +57,11 @@ interface UseMonthlyExpensesState {
 }
 
 export function useMonthlyExpenses(
-  initialMonth?: string
+  initialMonth?: string,
 ): UseMonthlyExpensesState {
   // Estado principal
   const [expenseData, setExpenseData] = useState<MonthlyExpenseData | null>(
-    null
+    null,
   );
   const [accounts, setAccounts] = useState<Account[]>([]);
 
@@ -69,7 +69,7 @@ export function useMonthlyExpenses(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonthState] = useState(
-    initialMonth || '2025-07'
+    initialMonth || '2025-07',
   );
   const [availableMonths] = useState<string[]>(getAllAvailableMonths());
 
@@ -121,7 +121,7 @@ export function useMonthlyExpenses(
         await loadExpenseData(month);
       }
     },
-    [selectedMonth, loadExpenseData]
+    [selectedMonth, loadExpenseData],
   );
 
   /**
@@ -175,7 +175,7 @@ export function useMonthlyExpenses(
         setLoading(false);
       }
     },
-    [selectedMonth, loadExpenseData]
+    [selectedMonth, loadExpenseData],
   );
 
   /**
@@ -213,7 +213,7 @@ export function useMonthlyExpenses(
         setLoading(false);
       }
     },
-    [selectedMonth, loadExpenseData]
+    [selectedMonth, loadExpenseData],
   );
 
   /**
@@ -242,7 +242,7 @@ export function useMonthlyExpenses(
         setLoading(false);
       }
     },
-    [selectedMonth, loadExpenseData]
+    [selectedMonth, loadExpenseData],
   );
 
   /**
@@ -269,11 +269,11 @@ export function useMonthlyExpenses(
       } catch (err) {
         console.error('Error inicializando mes:', err);
         setError(
-          err instanceof Error ? err.message : 'Error inicializando mes'
+          err instanceof Error ? err.message : 'Error inicializando mes',
         );
       }
     },
-    [loadExpenseData]
+    [loadExpenseData],
   );
 
   /**
@@ -284,11 +284,11 @@ export function useMonthlyExpenses(
       if (!expenseData) return 0;
 
       const categoryData = expenseData.summary.find(
-        s => s.category_name === categoryName
+        s => s.category_name === categoryName,
       );
       return categoryData?.total_amount || 0;
     },
-    [expenseData]
+    [expenseData],
   );
 
   /**
@@ -299,10 +299,10 @@ export function useMonthlyExpenses(
       if (!expenseData) return [];
 
       return expenseData.transactions.filter(
-        t => t.category_name === categoryName
+        t => t.category_name === categoryName,
       );
     },
-    [expenseData]
+    [expenseData],
   );
 
   // Efecto para cargar datos iniciales

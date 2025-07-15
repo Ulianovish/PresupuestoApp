@@ -94,7 +94,7 @@ export async function obtenerIngresos(): Promise<Ingreso[]> {
  * Crear un nuevo ingreso
  */
 export async function crearIngreso(
-  nuevoIngreso: NuevoIngreso
+  nuevoIngreso: NuevoIngreso,
 ): Promise<Ingreso> {
   try {
     // Verificar que el usuario esté autenticado
@@ -138,7 +138,7 @@ export async function crearIngreso(
  */
 export async function actualizarIngreso(
   id: string,
-  datosActualizados: Partial<NuevoIngreso>
+  datosActualizados: Partial<NuevoIngreso>,
 ): Promise<Ingreso> {
   try {
     const { data, error } = await supabase
@@ -254,7 +254,7 @@ export async function crearDeuda(nuevaDeuda: NuevaDeuda): Promise<Deuda> {
  */
 export async function actualizarDeuda(
   id: string,
-  datosActualizados: Partial<NuevaDeuda> & { pagada?: boolean }
+  datosActualizados: Partial<NuevaDeuda> & { pagada?: boolean },
 ): Promise<Deuda> {
   try {
     const { data, error } = await supabase
@@ -459,7 +459,7 @@ export function estaProximaAVencer(fechaVencimiento: string): boolean {
   const hoy = new Date();
   const vencimiento = new Date(fechaVencimiento);
   const diferenciaDias = Math.ceil(
-    (vencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
+    (vencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24),
   );
 
   return diferenciaDias <= 7 && diferenciaDias >= 0;
@@ -470,7 +470,7 @@ export function estaProximaAVencer(fechaVencimiento: string): boolean {
  */
 export function obtenerColorMonto(
   monto: number,
-  esIngreso: boolean = true
+  esIngreso: boolean = true,
 ): string {
   if (monto === 0) return 'text-gray-500';
   return esIngreso ? 'text-emerald-400' : 'text-orange-400';

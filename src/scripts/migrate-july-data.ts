@@ -979,7 +979,7 @@ export async function migrateJulyData() {
         p_user_id: user.user.id,
         p_month_year: '2025-07',
         p_template_name: 'Presupuesto Julio 2025',
-      }
+      },
     );
 
     if (templateError || !templateId) {
@@ -1018,13 +1018,13 @@ export async function migrateJulyData() {
 
     // Crear mapas para búsqueda rápida
     const categoriesMap = new Map(
-      categoriesResult.data?.map(c => [c.name, c.id]) || []
+      categoriesResult.data?.map(c => [c.name, c.id]) || [],
     );
     const classificationsMap = new Map(
-      classificationsResult.data?.map(c => [c.name, c.id]) || []
+      classificationsResult.data?.map(c => [c.name, c.id]) || [],
     );
     const controlsMap = new Map(
-      controlsResult.data?.map(c => [c.name, c.id]) || []
+      controlsResult.data?.map(c => [c.name, c.id]) || [],
     );
     const activeStatusId = statusResult.data?.id;
 
@@ -1052,7 +1052,7 @@ export async function migrateJulyData() {
 
           if (!classificationId || !controlId) {
             console.warn(
-              `⚠️  Referencias no encontradas para item: ${item.descripcion}`
+              `⚠️  Referencias no encontradas para item: ${item.descripcion}`,
             );
             continue;
           }
@@ -1076,12 +1076,12 @@ export async function migrateJulyData() {
           if (itemError) {
             console.error(
               `❌ Error insertando item ${item.descripcion}:`,
-              itemError.message
+              itemError.message,
             );
           } else {
             successfulItems++;
             console.log(
-              `  ✅ ${item.descripcion} - $${item.presupuestado.toLocaleString()}`
+              `  ✅ ${item.descripcion} - $${item.presupuestado.toLocaleString()}`,
             );
           }
         } catch (error) {
@@ -1128,7 +1128,7 @@ export async function checkMigrationStatus() {
       {
         p_user_id: user.user.id,
         p_month_year: '2025-07',
-      }
+      },
     );
 
     if (error) {

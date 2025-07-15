@@ -91,7 +91,7 @@ export default function CurrencyInput({
       className={cn(
         'w-full bg-slate-800 border-slate-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500/20',
         error && 'border-red-500 focus:border-red-500 focus:ring-red-500/20',
-        className
+        className,
       )}
       aria-describedby={error ? 'currency-error' : undefined}
     />

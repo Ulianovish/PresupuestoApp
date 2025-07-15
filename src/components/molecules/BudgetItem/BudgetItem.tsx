@@ -118,7 +118,7 @@ export default function BudgetItem({
             <div
               className={cn(
                 'h-2 rounded-full transition-all duration-300',
-                percentageSpent > 100 ? 'bg-red-500' : 'bg-blue-500'
+                percentageSpent > 100 ? 'bg-red-500' : 'bg-blue-500',
               )}
               style={{ width: `${Math.min(percentageSpent, 100)}%` }}
             />
@@ -131,7 +131,7 @@ export default function BudgetItem({
           <span
             className={cn(
               'font-semibold',
-              item.remaining < 0 ? 'text-red-400' : 'text-green-400'
+              item.remaining < 0 ? 'text-red-400' : 'text-green-400',
             )}
           >
             {formatCurrency(item.remaining)}

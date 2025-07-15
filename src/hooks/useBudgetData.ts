@@ -141,7 +141,7 @@ export const useBudgetData = () => {
   const [budgetItems, setBudgetItems] = useState<BudgetItem[]>(mockBudgetItems);
   const [isLoading, setIsLoading] = useState(false);
   const [realIncomeTotal, setRealIncomeTotal] = useState<number | undefined>(
-    undefined
+    undefined,
   );
 
   // Función para formatear moneda de manera consistente
@@ -160,7 +160,7 @@ export const useBudgetData = () => {
       setRealIncomeTotal(resumen.totalIngresos);
     } catch {
       console.log(
-        'No se pudieron cargar ingresos de Supabase, usando datos mock'
+        'No se pudieron cargar ingresos de Supabase, usando datos mock',
       );
       setRealIncomeTotal(undefined);
     }
@@ -172,7 +172,7 @@ export const useBudgetData = () => {
     const totalSpent = budgetItems.reduce((sum, item) => sum + item.spent, 0);
     const totalRemaining = totalBudget - totalSpent;
     const overBudgetCount = budgetItems.filter(
-      item => item.status === 'over-budget'
+      item => item.status === 'over-budget',
     ).length;
 
     // Usar ingresos reales de Supabase si están disponibles, sino usar datos mock
@@ -181,7 +181,7 @@ export const useBudgetData = () => {
         ? realIncomeFromSupabase
         : Object.values(mockIncomeData).reduce(
             (sum, income) => sum + income,
-            0
+            0,
           );
 
     return {

@@ -107,7 +107,7 @@ export default function MobileSidebar({
   useEffect(() => {
     if (isOpen && sidebarRef.current) {
       const firstFocusableElement = sidebarRef.current.querySelector(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       ) as HTMLElement;
 
       if (firstFocusableElement) {
@@ -173,7 +173,7 @@ export default function MobileSidebar({
                         'flex items-center gap-3 p-3 rounded-lg transition-all duration-200 group',
                         isActive
                           ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                          : 'text-gray-300 hover:text-white hover:bg-white/10 hover:border-white/20 border border-transparent'
+                          : 'text-gray-300 hover:text-white hover:bg-white/10 hover:border-white/20 border border-transparent',
                       )}
                     >
                       <Icon
@@ -182,7 +182,7 @@ export default function MobileSidebar({
                           'transition-colors',
                           isActive
                             ? 'text-blue-400'
-                            : 'text-gray-400 group-hover:text-white'
+                            : 'text-gray-400 group-hover:text-white',
                         )}
                       />
                       <div>

@@ -36,7 +36,7 @@ export const createClient = async () => {
           }
         },
       },
-    }
+    },
   );
 };
 
@@ -56,6 +56,6 @@ export const createAdminClient = () => {
         set() {},
         remove() {},
       },
-    }
+    },
   );
 };

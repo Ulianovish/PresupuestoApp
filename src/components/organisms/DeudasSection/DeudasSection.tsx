@@ -68,7 +68,7 @@ export default function DeudasSection({
                   <p className="text-sm text-gray-400">
                     {deuda.acreedor} • Vence:{' '}
                     {new Date(deuda.fecha_vencimiento).toLocaleDateString(
-                      'es-CO'
+                      'es-CO',
                     )}
                   </p>
                 </div>

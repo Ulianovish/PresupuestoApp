@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Usuario no autenticado' },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json(
         { error: 'Error obteniendo clasificación, control o status' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       console.error('Error creando item de presupuesto:', error);
       return NextResponse.json(
         { error: `Error creando item de presupuesto: ${error.message}` },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -126,13 +126,13 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Datos inválidos', details: error.issues },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     return NextResponse.json(
       { error: 'Error interno del servidor' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

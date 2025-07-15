@@ -20,7 +20,7 @@ const UpdateExpenseSchema = z.object({
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     // Extraer params de forma async (Next.js 15)
@@ -38,7 +38,7 @@ export async function PATCH(
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Usuario no autenticado' },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -59,7 +59,7 @@ export async function PATCH(
       if (accountError) {
         return NextResponse.json(
           { error: 'Cuenta no encontrada' },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -109,7 +109,7 @@ export async function PATCH(
       console.error('Error actualizando gasto:', error);
       return NextResponse.json(
         { error: `Error actualizando gasto: ${error.message}` },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -124,13 +124,13 @@ export async function PATCH(
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Datos inválidos', details: error.issues },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     return NextResponse.json(
       { error: 'Error interno del servidor' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -141,7 +141,7 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     // Extraer params de forma async (Next.js 15)
@@ -159,7 +159,7 @@ export async function DELETE(
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Usuario no autenticado' },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -174,7 +174,7 @@ export async function DELETE(
       console.error('Error eliminando gasto:', error);
       return NextResponse.json(
         { error: `Error eliminando gasto: ${error.message}` },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -186,7 +186,7 @@ export async function DELETE(
     console.error('Error en DELETE /api/expenses/[id]:', error);
     return NextResponse.json(
       { error: 'Error interno del servidor' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

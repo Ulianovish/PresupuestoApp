@@ -76,11 +76,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       baseStyles,
       variants[variant],
       errorStyles,
-      className
+      className,
     );
 
     return <input ref={ref} className={inputClasses} {...props} />;
-  }
+  },
 );
 
 // Establecer nombre de display para debugging

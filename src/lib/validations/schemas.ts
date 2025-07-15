@@ -56,7 +56,7 @@ export const DateSchema = z.string().refine(
     const parsedDate = new Date(date);
     return !isNaN(parsedDate.getTime());
   },
-  { message: 'Debe ser una fecha válida' }
+  { message: 'Debe ser una fecha válida' },
 );
 
 // Esquema para colores hexadecimales
@@ -333,7 +333,7 @@ export const UpdateBudgetItemSchema = BudgetItemSchema.omit({
     {
       message: 'El monto gastado no puede superar el presupuestado',
       path: ['spent_amount'],
-    }
+    },
   );
 
 // Esquema para crear transacción
@@ -429,7 +429,7 @@ export const BudgetSummarySchema = z.object({
       budgeted: MoneySchema,
       spent: MoneySchema,
       remaining: MoneySchema,
-    })
+    }),
   ),
   by_classification: z.array(
     z.object({
@@ -438,7 +438,7 @@ export const BudgetSummarySchema = z.object({
       budgeted: MoneySchema,
       spent: MoneySchema,
       remaining: MoneySchema,
-    })
+    }),
   ),
   by_control: z.array(
     z.object({
@@ -447,7 +447,7 @@ export const BudgetSummarySchema = z.object({
       budgeted: MoneySchema,
       spent: MoneySchema,
       remaining: MoneySchema,
-    })
+    }),
   ),
 });
 

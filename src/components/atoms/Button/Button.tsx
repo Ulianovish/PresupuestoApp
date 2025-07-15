@@ -89,7 +89,7 @@ export default function Button({
         loading && 'pointer-events-none opacity-70',
         // Disabled state
         disabled && 'opacity-50 cursor-not-allowed hover:scale-100',
-        className
+        className,
       )}
       variant={
         variant === 'gradient' || variant === 'glass' ? 'default' : variant

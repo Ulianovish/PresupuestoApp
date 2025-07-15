@@ -29,11 +29,11 @@ export interface UseMonthlyBudgetReturn {
   toggleCategory: (categoryId: string) => void;
   addBudgetItem: (
     categoryId: string,
-    item: Omit<BudgetItem, 'id'>
+    item: Omit<BudgetItem, 'id'>,
   ) => Promise<boolean>;
   editBudgetItem: (
     itemId: string,
-    updates: Partial<Omit<BudgetItem, 'id'>>
+    updates: Partial<Omit<BudgetItem, 'id'>>,
   ) => Promise<boolean>;
   initializeMonth: (monthYear: string) => Promise<boolean>;
 }
@@ -42,7 +42,7 @@ export interface UseMonthlyBudgetReturn {
  * Hook para manejar presupuestos mensuales
  */
 export function useMonthlyBudget(
-  initialMonth: string = '2025-07'
+  initialMonth: string = '2025-07',
 ): UseMonthlyBudgetReturn {
   // Estado del hook
   const [budgetData, setBudgetData] = useState<MonthlyBudgetData | null>(null);
@@ -105,7 +105,7 @@ export function useMonthlyBudget(
         setIsLoading(false);
       }
     },
-    [loadBudgetData]
+    [loadBudgetData],
   );
 
   /**
@@ -128,8 +128,8 @@ export function useMonthlyBudget(
   const toggleCategory = useCallback((categoryId: string) => {
     setCategories(prev =>
       prev.map(cat =>
-        cat.id === categoryId ? { ...cat, expanded: !cat.expanded } : cat
-      )
+        cat.id === categoryId ? { ...cat, expanded: !cat.expanded } : cat,
+      ),
     );
   }, []);
 
@@ -139,7 +139,7 @@ export function useMonthlyBudget(
   const addBudgetItem = useCallback(
     async (
       categoryId: string,
-      item: Omit<BudgetItem, 'id'>
+      item: Omit<BudgetItem, 'id'>,
     ): Promise<boolean> => {
       if (!budgetData?.template_id) {
         setError('No hay un template de presupuesto activo');
@@ -152,7 +152,7 @@ export function useMonthlyBudget(
         const newItem = await createBudgetItem(
           budgetData.template_id,
           categoryId,
-          item
+          item,
         );
 
         if (newItem) {
@@ -170,7 +170,7 @@ export function useMonthlyBudget(
                 };
               }
               return cat;
-            })
+            }),
           );
 
           // Actualizar totales del presupuesto
@@ -182,7 +182,7 @@ export function useMonthlyBudget(
                     prev.total_presupuestado + newItem.presupuestado,
                   total_real: prev.total_real + newItem.real,
                 }
-              : null
+              : null,
           );
 
           return true;
@@ -196,7 +196,7 @@ export function useMonthlyBudget(
         return false;
       }
     },
-    [budgetData?.template_id]
+    [budgetData?.template_id],
   );
 
   /**
@@ -205,7 +205,7 @@ export function useMonthlyBudget(
   const editBudgetItem = useCallback(
     async (
       itemId: string,
-      updates: Partial<Omit<BudgetItem, 'id'>>
+      updates: Partial<Omit<BudgetItem, 'id'>>,
     ): Promise<boolean> => {
       setError(null);
 
@@ -238,7 +238,7 @@ export function useMonthlyBudget(
                 };
               }
               return cat;
-            })
+            }),
           );
 
           // Recargar datos para asegurar consistencia
@@ -254,7 +254,7 @@ export function useMonthlyBudget(
         return false;
       }
     },
-    [refreshBudget]
+    [refreshBudget],
   );
 
   // Efecto para cargar datos cuando cambia el mes seleccionado

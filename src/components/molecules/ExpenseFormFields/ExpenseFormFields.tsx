@@ -37,7 +37,7 @@ interface ExpenseFormFieldsProps {
   expenseCategories: string[];
   accountTypes: string[];
   onFormChange: (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => void;
 }
 

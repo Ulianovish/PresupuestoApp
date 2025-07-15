@@ -47,7 +47,7 @@ export interface DashboardData {
  * Hook para obtener datos integrados del dashboard
  */
 export const useDashboardData = (
-  initialMonth: string = '2025-07'
+  initialMonth: string = '2025-07',
 ): DashboardData => {
   const [selectedMonth, setSelectedMonth] = useState(initialMonth);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +99,7 @@ export const useDashboardData = (
         // Obtener gastos reales para esta categoría
         const categoryExpenses =
           expenseHook.expenseData?.summary?.find(
-            s => s.category_name === category.nombre
+            s => s.category_name === category.nombre,
           )?.total_amount || 0;
 
         return categoryExpenses > category.totalPresupuestado;
@@ -143,7 +143,7 @@ export const useDashboardData = (
       setSelectedMonth(month);
       budgetHook.setSelectedMonth(month);
     },
-    [budgetHook]
+    [budgetHook],
   );
 
   // Calcular resumen

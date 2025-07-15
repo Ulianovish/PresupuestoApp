@@ -73,7 +73,7 @@ const supabase = createClient();
  * Obtiene los gastos de un mes específico para el usuario actual
  */
 export async function getExpensesByMonth(
-  monthYear: string
+  monthYear: string,
 ): Promise<ExpenseTransaction[]> {
   const {
     data: { user },
@@ -100,7 +100,7 @@ export async function getExpensesByMonth(
  * Obtiene el resumen de gastos por categoría para un mes específico
  */
 export async function getExpensesSummaryByMonth(
-  monthYear: string
+  monthYear: string,
 ): Promise<ExpenseSummary[]> {
   const {
     data: { user },
@@ -127,7 +127,7 @@ export async function getExpensesSummaryByMonth(
  * Obtiene los datos completos de gastos para un mes (transacciones + resumen)
  */
 export async function getMonthlyExpenseData(
-  monthYear: string
+  monthYear: string,
 ): Promise<MonthlyExpenseData> {
   try {
     const [transactions, summary] = await Promise.all([
@@ -137,7 +137,7 @@ export async function getMonthlyExpenseData(
 
     const totalAmount = summary.reduce(
       (total, item) => total + item.total_amount,
-      0
+      0,
     );
 
     return {
@@ -156,7 +156,7 @@ export async function getMonthlyExpenseData(
  * Crea un nuevo gasto
  */
 export async function createExpenseTransaction(
-  expenseData: ExpenseFormData
+  expenseData: ExpenseFormData,
 ): Promise<string> {
   const {
     data: { user },
@@ -189,7 +189,7 @@ export async function createExpenseTransaction(
  */
 export async function updateExpenseTransaction(
   transactionId: string,
-  expenseData: Partial<ExpenseFormData>
+  expenseData: Partial<ExpenseFormData>,
 ): Promise<void> {
   try {
     // Usar la API proxy para evitar problemas de CORS
@@ -216,7 +216,7 @@ export async function updateExpenseTransaction(
   } catch (error) {
     console.error('Error actualizando gasto:', error);
     throw new Error(
-      `Error actualizando gasto: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      `Error actualizando gasto: ${error instanceof Error ? error.message : 'Error desconocido'}`,
     );
   }
 }
@@ -225,7 +225,7 @@ export async function updateExpenseTransaction(
  * Elimina un gasto usando la API proxy
  */
 export async function deleteExpenseTransaction(
-  transactionId: string
+  transactionId: string,
 ): Promise<void> {
   try {
     // Usar la API proxy para evitar problemas de CORS
@@ -251,7 +251,7 @@ export async function deleteExpenseTransaction(
   } catch (error) {
     console.error('Error eliminando gasto:', error);
     throw new Error(
-      `Error eliminando gasto: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      `Error eliminando gasto: ${error instanceof Error ? error.message : 'Error desconocido'}`,
     );
   }
 }
@@ -356,7 +356,7 @@ export function formatMonthName(monthYear: string): string {
  * Verifica si un mes tiene datos de gastos
  */
 export async function hasExpenseDataForMonth(
-  monthYear: string
+  monthYear: string,
 ): Promise<boolean> {
   try {
     const transactions = await getExpensesByMonth(monthYear);

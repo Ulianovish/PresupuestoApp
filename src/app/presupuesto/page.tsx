@@ -176,7 +176,7 @@ export default function PresupuestoPage() {
       control: string;
       presupuestado: number;
       real: number;
-    }
+    },
   ) => {
     setModalState({
       isOpen: true,

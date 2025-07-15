@@ -100,7 +100,7 @@ export default function GastosPage() {
       const result = await migrateJulyExpenses();
       if (result.success) {
         console.warn(
-          `✅ Migración completada! ${result.migratedCount} gastos migrados.`
+          `✅ Migración completada! ${result.migratedCount} gastos migrados.`,
         );
         setShowMigrationPanel(false);
         refreshExpenses();
@@ -115,7 +115,7 @@ export default function GastosPage() {
 
   // Funciones del formulario
   const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value, type } = e.target;
     setForm(prev => ({
