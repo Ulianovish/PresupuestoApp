@@ -238,7 +238,7 @@ export async function getControls() {
 }
 
 /**
- * Crea un nuevo item de presupuesto
+ * Crea un nuevo item de presupuesto usando la API proxy
  */
 export async function createBudgetItem(
   templateId: string,
@@ -246,60 +246,40 @@ export async function createBudgetItem(
   item: Omit<BudgetItem, 'id'>
 ): Promise<BudgetItem | null> {
   try {
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) {
-      throw new Error('Usuario no autenticado');
-    }
-
-    // Buscar IDs de clasificación y control por nombre
-    const [classificationResult, controlResult] = await Promise.all([
-      supabase
-        .from('classifications')
-        .select('id')
-        .eq('name', item.clasificacion)
-        .single(),
-      supabase.from('controls').select('id').eq('name', item.control).single(),
-    ]);
-
-    if (classificationResult.error || controlResult.error) {
-      console.error('Error obteniendo IDs:', {
-        classificationResult,
-        controlResult,
-      });
-      return null;
-    }
-
-    const { data, error } = await supabase
-      .from('budget_items')
-      .insert({
-        user_id: user.user.id,
+    // Usar la API proxy para evitar problemas de CORS
+    const response = await fetch('/api/budget', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         template_id: templateId,
         category_id: categoryId,
-        classification_id: classificationResult.data.id,
-        control_id: controlResult.data.id,
-        status_id: '1', // Asumiendo que existe un status activo
-        name: item.descripcion,
-        budgeted_amount: item.presupuestado,
-        real_amount: item.real,
-        due_date: item.fecha,
-      })
-      .select()
-      .single();
+        descripcion: item.descripcion,
+        fecha: item.fecha,
+        clasificacion: item.clasificacion,
+        control: item.control,
+        presupuestado: item.presupuestado,
+        real: item.real,
+      }),
+    });
 
-    if (error) {
-      console.error('Error creando item de presupuesto:', error);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Error creando item de presupuesto:', errorData.error);
       return null;
     }
 
-    return {
-      id: data.id,
-      descripcion: data.name,
-      fecha: data.due_date || '',
-      clasificacion: item.clasificacion,
-      control: item.control,
-      presupuestado: parseFloat(data.budgeted_amount) || 0,
-      real: parseFloat(data.real_amount) || 0,
-    };
+    const result = await response.json();
+
+    if (!result.success) {
+      console.error('Error creando item de presupuesto:', result.error);
+      return null;
+    }
+
+    // Mensaje de éxito - se puede eliminar en producción
+    // console.log('Item de presupuesto creado exitosamente:', result.message);
+    return result.data;
   } catch (error) {
     console.error('Error en createBudgetItem:', error);
     return null;
@@ -336,10 +316,8 @@ export async function updateBudgetItem(
       return null;
     }
 
-    console.log(
-      'Item de presupuesto actualizado exitosamente:',
-      result.message
-    );
+    // Mensaje de éxito - se puede eliminar en producción
+    // console.log('Item de presupuesto actualizado exitosamente:', result.message);
     return result.data;
   } catch (error) {
     console.error('Error en updateBudgetItem:', error);

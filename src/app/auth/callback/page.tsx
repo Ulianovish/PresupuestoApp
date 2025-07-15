@@ -1,5 +1,3 @@
-import { Suspense } from 'react';
-
 import { redirect } from 'next/navigation';
 
 import { createClient } from '@/lib/supabase/server';
@@ -8,7 +6,7 @@ import { createClient } from '@/lib/supabase/server';
  * AuthCallbackPage - Página para manejar el callback de autenticación
  * Server Component que procesa el callback de Supabase
  */
-export default async function AuthCallbackPage({
+export default async function CallbackPage({
   searchParams,
 }: {
   searchParams: { code?: string; error?: string; redirectTo?: string };
@@ -39,31 +37,4 @@ export default async function AuthCallbackPage({
 
   // Fallback: redirigir al login
   redirect('/auth/login');
-}
-
-/**
- * Loading component para Suspense
- */
-function LoadingComponent() {
-  return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-        <p className="text-white">Procesando autenticación...</p>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Wrapper con Suspense para el callback
- */
-export function CallbackPageWithSuspense(props: {
-  searchParams: { code?: string; error?: string; redirectTo?: string };
-}) {
-  return (
-    <Suspense fallback={<LoadingComponent />}>
-      <AuthCallbackPage {...props} />
-    </Suspense>
-  );
 }

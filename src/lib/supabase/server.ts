@@ -8,8 +8,8 @@ import { Database } from '@/types/database';
  * Cliente de Supabase para uso en el servidor
  * Usado en Server Components y Server Actions
  */
-export const createClient = () => {
-  const cookieStore = cookies();
+export const createClient = async () => {
+  const cookieStore = await cookies();
 
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,7 +19,7 @@ export const createClient = () => {
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
-        set(name: string, value: string, options: unknown) {
+        set(name: string, value: string, options: { [key: string]: unknown }) {
           try {
             cookieStore.set({ name, value, ...options });
           } catch {
@@ -27,7 +27,7 @@ export const createClient = () => {
             // Esto es esperado y no es un error
           }
         },
-        remove(name: string, options: unknown) {
+        remove(name: string, options: { [key: string]: unknown }) {
           try {
             cookieStore.set({ name, value: '', ...options });
           } catch {

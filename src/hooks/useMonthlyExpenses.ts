@@ -87,7 +87,7 @@ export function useMonthlyExpenses(
       setLoading(true);
       setError(null);
 
-      console.log(`📊 Cargando gastos para ${month}...`);
+      // console.log(`📊 Cargando gastos para ${month}...`);
 
       const [monthlyData, userAccounts] = await Promise.all([
         getMonthlyExpenseData(month),
@@ -97,9 +97,9 @@ export function useMonthlyExpenses(
       setExpenseData(monthlyData);
       setAccounts(userAccounts);
 
-      console.log(
-        `✅ Gastos cargados: ${monthlyData.transactions.length} transacciones`
-      );
+      // console.log(
+      //   `✅ Gastos cargados: ${monthlyData.transactions.length} transacciones`
+      // );
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Error desconocido';
@@ -157,14 +157,14 @@ export function useMonthlyExpenses(
       try {
         setLoading(true);
 
-        console.log('💰 Agregando nuevo gasto:', expenseData.description);
+        // console.log('💰 Agregando nuevo gasto:', expenseData.description);
 
         await createExpenseTransaction(expenseData);
 
         // Refrescar datos después de agregar
         await loadExpenseData(selectedMonth);
 
-        console.log('✅ Gasto agregado exitosamente');
+        // console.log('✅ Gasto agregado exitosamente');
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Error agregando gasto';
@@ -195,14 +195,14 @@ export function useMonthlyExpenses(
       try {
         setLoading(true);
 
-        console.log('📝 Actualizando gasto:', transactionId);
+        // console.log('📝 Actualizando gasto:', transactionId);
 
         await updateExpenseTransaction(transactionId, expenseData);
 
         // Refrescar datos después de actualizar
         await loadExpenseData(selectedMonth);
 
-        console.log('✅ Gasto actualizado exitosamente');
+        // console.log('✅ Gasto actualizado exitosamente');
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Error actualizando gasto';
@@ -224,14 +224,14 @@ export function useMonthlyExpenses(
       try {
         setLoading(true);
 
-        console.log('🗑️ Eliminando gasto:', transactionId);
+        // console.log('🗑️ Eliminando gasto:', transactionId);
 
         await deleteExpenseTransaction(transactionId);
 
         // Refrescar datos después de eliminar
         await loadExpenseData(selectedMonth);
 
-        console.log('✅ Gasto eliminado exitosamente');
+        // console.log('✅ Gasto eliminado exitosamente');
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Error eliminando gasto';
@@ -254,7 +254,7 @@ export function useMonthlyExpenses(
         const hasData = await hasExpenseDataForMonth(month);
 
         if (!hasData) {
-          console.log(`📅 Inicializando mes ${month} sin datos previos`);
+          // console.log(`📅 Inicializando mes ${month} sin datos previos`);
           // Para gastos, no necesitamos crear datos iniciales
           // Solo cargamos un mes vacío
           setExpenseData({
@@ -308,7 +308,7 @@ export function useMonthlyExpenses(
   // Efecto para cargar datos iniciales
   useEffect(() => {
     loadExpenseData(selectedMonth);
-  }, []); // Solo ejecutar una vez al montar
+  }, [selectedMonth, loadExpenseData]); // Incluir dependencias correctas
 
   return {
     // Estado de datos

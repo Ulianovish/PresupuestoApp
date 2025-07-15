@@ -16,7 +16,6 @@ import {
   TrendingUp,
   Target,
   BarChart3,
-  User,
   LogIn,
   UserPlus,
   TestTube,

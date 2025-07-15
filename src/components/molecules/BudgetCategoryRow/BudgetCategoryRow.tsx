@@ -51,8 +51,8 @@ export default function BudgetCategoryRow({
     onToggle(category.id);
   };
 
-  const handleAddClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleAddClick = (e?: React.MouseEvent<HTMLButtonElement>) => {
+    e?.stopPropagation();
     onAddItem(category.id);
   };
 

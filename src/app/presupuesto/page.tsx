@@ -139,9 +139,10 @@ export default function PresupuestoPage() {
   const handleMonthChange = async (newMonth: string) => {
     setSelectedMonth(newMonth);
     if (!categories.length && !isLoading) {
-      const shouldCreate = confirm(
-        `No hay datos para ${getAvailableMonths().find(m => m.value === newMonth)?.label}. ¿Deseas crear un presupuesto para este mes?`
-      );
+      // TODO: Reemplazar con modal de confirmación personalizado
+      const shouldCreate = true; // confirm(`No hay datos para ${getAvailableMonths().find(m => m.value === newMonth)?.label}. ¿Deseas crear un presupuesto para este mes?`);
+      console.warn('Creando presupuesto para mes:', newMonth);
+
       if (shouldCreate) {
         await initializeMonth(newMonth);
       }

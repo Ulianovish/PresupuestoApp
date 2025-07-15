@@ -88,11 +88,12 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
       setDeudas(deudasData);
       setResumen(resumenData);
 
-      console.log('Datos cargados exitosamente:', {
-        ingresos: ingresosData.length,
-        deudas: deudasData.length,
-        resumen: resumenData,
-      });
+      // console.log('Datos cargados exitosamente:', {
+      //   totalIngresos,
+      //   totalDeudas,
+      //   ingresosCount: ingresos.length,
+      //   deudasCount: deudas.length,
+      // });
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Error desconocido';
@@ -114,9 +115,9 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
 
       // Si no hay datos, inicializar con ejemplos
       if (ingresos.length === 0 && deudas.length === 0) {
-        console.log(
-          'No se encontraron datos, inicializando datos de ejemplo...'
-        );
+        // console.log(
+        //   'No se encontraron datos, inicializando datos de ejemplo...'
+        // );
         await inicializarDatosEjemplo();
         // Recargar después de inicializar
         await cargarDatos();
@@ -135,7 +136,7 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
   // Cargar datos al montar el componente
   useEffect(() => {
     inicializarDatos();
-  }, []); // Solo ejecutar una vez al montar
+  }, [inicializarDatos]); // Incluir dependencia correcta
 
   // ============================================
   // FUNCIONES PARA MANEJAR INGRESOS
@@ -156,7 +157,7 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
       const nuevoResumen = await obtenerResumenFinanciero();
       setResumen(nuevoResumen);
 
-      console.log('Ingreso agregado exitosamente:', ingresoCreado);
+      // console.log('Ingreso agregado exitosamente:', ingresoCreado);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Error al agregar ingreso';
@@ -187,7 +188,7 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
       const nuevoResumen = await obtenerResumenFinanciero();
       setResumen(nuevoResumen);
 
-      console.log('Deuda agregada exitosamente:', deudaCreada);
+      // console.log('Deuda agregada exitosamente:', deudaCreada);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Error al agregar deuda';
@@ -204,7 +205,7 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
   // ============================================
 
   const recargarDatos = useCallback(async () => {
-    console.log('Recargando datos...');
+    // console.log('Recargando datos...');
     await cargarDatos();
   }, [cargarDatos]);
 

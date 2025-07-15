@@ -22,7 +22,7 @@ export async function loginAction(formData: FormData) {
     const validatedData = loginSchema.parse(rawData);
 
     // Crear cliente de Supabase
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Intentar login
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -39,7 +39,7 @@ export async function loginAction(formData: FormData) {
     }
 
     if (data.user) {
-      console.log('✅ Login exitoso para:', validatedData.email);
+      // console.log('✅ Login exitoso para:', validatedData.email);
 
       // Revalidar y redireccionar
       revalidatePath('/', 'layout');
@@ -79,7 +79,7 @@ export async function registerAction(formData: FormData) {
     const validatedData = registerSchema.parse(rawData);
 
     // Crear cliente de Supabase
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Intentar registro
     const { data, error } = await supabase.auth.signUp({
@@ -100,7 +100,7 @@ export async function registerAction(formData: FormData) {
     }
 
     if (data.user) {
-      console.log('✅ Registro exitoso para:', validatedData.email);
+      // console.log('✅ Registro exitoso para:', validatedData.email);
 
       // Si el registro fue exitoso pero requiere confirmación
       if (!data.session) {
@@ -135,7 +135,7 @@ export async function registerAction(formData: FormData) {
  */
 export async function logoutAction() {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const { error } = await supabase.auth.signOut();
 
@@ -144,7 +144,7 @@ export async function logoutAction() {
       redirect('/?error=Error al cerrar sesión');
     }
 
-    console.log('✅ Logout exitoso');
+    // console.log('✅ Logout exitoso');
 
     revalidatePath('/', 'layout');
     redirect('/');
@@ -166,7 +166,7 @@ export async function logoutAction() {
  */
 export async function getCurrentUser() {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const {
       data: { user },

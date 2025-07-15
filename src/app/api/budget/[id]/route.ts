@@ -24,7 +24,7 @@ export async function PATCH(
 ) {
   try {
     // Crear cliente de Supabase para server-side
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Verificar autenticación
     const {
@@ -102,7 +102,7 @@ export async function PATCH(
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Datos inválidos', details: error.errors },
+        { error: 'Datos inválidos', details: error.issues },
         { status: 400 }
       );
     }
@@ -124,7 +124,7 @@ export async function DELETE(
 ) {
   try {
     // Crear cliente de Supabase para server-side
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Verificar autenticación
     const {
