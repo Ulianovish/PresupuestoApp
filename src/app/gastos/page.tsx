@@ -27,10 +27,11 @@ import {
   formatMonthName,
   ExpenseTransaction,
 } from '@/lib/services/expenses';
-import {
-  migrateJulyExpenses,
-  checkMigrationStatus,
-} from '@/scripts/migrate-july-expenses';
+// Migration functionality disabled for production
+// import {
+//   migrateJulyExpenses,
+//   checkMigrationStatus,
+// } from '@/scripts/migrate-july-expenses';
 
 // Interfaces
 interface FormData {
@@ -42,11 +43,11 @@ interface FormData {
   place: string;
 }
 
-interface MigrationStatus {
-  hasJulyData: boolean;
-  expenseCount: number;
-  totalAmount: number;
-}
+// interface MigrationStatus {
+//   hasJulyData: boolean;
+//   expenseCount: number;
+//   totalAmount: number;
+// }
 
 export default function GastosPage() {
   // Hook para manejar gastos mensuales
@@ -69,10 +70,10 @@ export default function GastosPage() {
     deleteExpense,
   } = useMonthlyExpenses();
 
-  // Estados locales
+  // Estados locales (migration disabled for production)
   const [showMigrationPanel, setShowMigrationPanel] = useState(false);
-  const [migrationStatus, setMigrationStatus] =
-    useState<MigrationStatus | null>(null);
+  // const [migrationStatus, setMigrationStatus] =
+  //   useState<MigrationStatus | null>(null);
 
   // Estado del formulario
   const [form, setForm] = useState<FormData>({
@@ -84,33 +85,42 @@ export default function GastosPage() {
     place: '',
   });
 
-  // Funciones para migración
+  // Migration functions disabled for production
+  // const handleShowMigrationPanel = async () => {
+  //   setShowMigrationPanel(true);
+  //   try {
+  //     const status = await checkMigrationStatus();
+  //     setMigrationStatus(status);
+  //   } catch (error) {
+  //     console.error('Error verificando estado de migración:', error);
+  //   }
+  // };
+
+  // const handleMigrateJuly = async () => {
+  //   try {
+  //     const result = await migrateJulyExpenses();
+  //     if (result.success) {
+  //       console.warn(
+  //         `✅ Migración completada! ${result.migratedCount} gastos migrados.`,
+  //       );
+  //       setShowMigrationPanel(false);
+  //       refreshExpenses();
+  //     } else {
+  //       console.warn(`❌ Error en migración: ${result.errors.join(', ')}`);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error durante migración:', error);
+  //     console.warn('❌ Error inesperado durante la migración');
+  //   }
+  // };
+
+  // Placeholder functions for production
   const handleShowMigrationPanel = async () => {
-    setShowMigrationPanel(true);
-    try {
-      const status = await checkMigrationStatus();
-      setMigrationStatus(status);
-    } catch (error) {
-      console.error('Error verificando estado de migración:', error);
-    }
+    console.warn('Migration functionality disabled in production');
   };
 
   const handleMigrateJuly = async () => {
-    try {
-      const result = await migrateJulyExpenses();
-      if (result.success) {
-        console.warn(
-          `✅ Migración completada! ${result.migratedCount} gastos migrados.`,
-        );
-        setShowMigrationPanel(false);
-        refreshExpenses();
-      } else {
-        console.warn(`❌ Error en migración: ${result.errors.join(', ')}`);
-      }
-    } catch (error) {
-      console.error('Error durante migración:', error);
-      console.warn('❌ Error inesperado durante la migración');
-    }
+    console.warn('Migration functionality disabled in production');
   };
 
   // Funciones del formulario
@@ -221,7 +231,7 @@ export default function GastosPage() {
       migrationPanel={
         <ExpenseMigrationPanel
           isVisible={showMigrationPanel}
-          migrationStatus={migrationStatus}
+          migrationStatus={null}
           onMigrate={handleMigrateJuly}
           onClose={() => setShowMigrationPanel(false)}
         />

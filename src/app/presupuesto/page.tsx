@@ -19,10 +19,11 @@ import BudgetTable from '@/components/organisms/BudgetTable/BudgetTable';
 import BudgetPageTemplate from '@/components/templates/BudgetPageTemplate/BudgetPageTemplate';
 import { useMonthlyBudget } from '@/hooks/useMonthlyBudget';
 import { getAvailableMonths, formatCurrency } from '@/lib/services/budget';
-import {
-  migrateJulyData,
-  checkMigrationStatus,
-} from '@/scripts/migrate-july-data';
+// Migration functionality disabled for production
+// import {
+//   migrateJulyData,
+//   checkMigrationStatus,
+// } from '@/scripts/migrate-july-data';
 
 // Interfaces para tipos de datos
 interface ModalState {
@@ -103,36 +104,50 @@ export default function PresupuestoPage() {
     }
   }, [selectedMonth]);
 
-  // Funciones de migración
+  // Migration functions disabled for production
+  // const checkMigration = async () => {
+  //   setMigrationStatus(prev => ({ ...prev, checking: true }));
+  //   try {
+  //     const status = await checkMigrationStatus();
+  //     setMigrationStatus(prev => ({
+  //       ...prev,
+  //       checking: false,
+  //       migrated: status.migrated,
+  //     }));
+  //   } catch (error) {
+  //     console.error('Error checking migration:', error);
+  //     setMigrationStatus(prev => ({ ...prev, checking: false }));
+  //   }
+  // };
+
+  // const handleMigration = async () => {
+  //   setMigrationStatus(prev => ({ ...prev, migrating: true }));
+  //   try {
+  //     await migrateJulyData();
+  //     setMigrationStatus(prev => ({
+  //       ...prev,
+  //       migrating: false,
+  //       migrated: true,
+  //     }));
+  //     refreshBudget();
+  //   } catch (error) {
+  //     console.error('Error during migration:', error);
+  //     setMigrationStatus(prev => ({ ...prev, migrating: false }));
+  //   }
+  // };
+
+  // Placeholder functions for production
   const checkMigration = async () => {
-    setMigrationStatus(prev => ({ ...prev, checking: true }));
-    try {
-      const status = await checkMigrationStatus();
-      setMigrationStatus(prev => ({
-        ...prev,
-        checking: false,
-        migrated: status.migrated,
-      }));
-    } catch (error) {
-      console.error('Error checking migration:', error);
-      setMigrationStatus(prev => ({ ...prev, checking: false }));
-    }
+    setMigrationStatus(prev => ({
+      ...prev,
+      checking: false,
+      migrated: true,
+    }));
+    console.warn('Migration functionality disabled in production');
   };
 
   const handleMigration = async () => {
-    setMigrationStatus(prev => ({ ...prev, migrating: true }));
-    try {
-      await migrateJulyData();
-      setMigrationStatus(prev => ({
-        ...prev,
-        migrating: false,
-        migrated: true,
-      }));
-      refreshBudget();
-    } catch (error) {
-      console.error('Error during migration:', error);
-      setMigrationStatus(prev => ({ ...prev, migrating: false }));
-    }
+    console.warn('Migration functionality disabled in production');
   };
 
   // Funciones del modal
