@@ -13,7 +13,6 @@ import React, { useState } from 'react';
 
 import ExpenseFloatingButton from '@/components/molecules/ExpenseFloatingButton/ExpenseFloatingButton';
 import ExpenseHeader from '@/components/organisms/ExpenseHeader/ExpenseHeader';
-import ExpenseMigrationPanel from '@/components/organisms/ExpenseMigrationPanel/ExpenseMigrationPanel';
 import ExpenseModal from '@/components/organisms/ExpenseModal/ExpenseModal';
 import ExpenseStatusPanels from '@/components/organisms/ExpenseStatusPanels/ExpenseStatusPanels';
 import ExpenseSummary from '@/components/organisms/ExpenseSummary/ExpenseSummary';
@@ -27,11 +26,6 @@ import {
   formatMonthName,
   ExpenseTransaction,
 } from '@/lib/services/expenses';
-// Migration functionality disabled for production
-// import {
-//   migrateJulyExpenses,
-//   checkMigrationStatus,
-// } from '@/scripts/migrate-july-expenses';
 
 // Interfaces
 interface FormData {
@@ -42,12 +36,6 @@ interface FormData {
   account_name: string;
   place: string;
 }
-
-// interface MigrationStatus {
-//   hasJulyData: boolean;
-//   expenseCount: number;
-//   totalAmount: number;
-// }
 
 export default function GastosPage() {
   // Hook para manejar gastos mensuales
@@ -70,11 +58,6 @@ export default function GastosPage() {
     deleteExpense,
   } = useMonthlyExpenses();
 
-  // Estados locales (migration disabled for production)
-  const [showMigrationPanel, setShowMigrationPanel] = useState(false);
-  // const [migrationStatus, setMigrationStatus] =
-  //   useState<MigrationStatus | null>(null);
-
   // Estado del formulario
   const [form, setForm] = useState<FormData>({
     description: '',
@@ -84,44 +67,6 @@ export default function GastosPage() {
     account_name: ACCOUNT_TYPES[0],
     place: '',
   });
-
-  // Migration functions disabled for production
-  // const handleShowMigrationPanel = async () => {
-  //   setShowMigrationPanel(true);
-  //   try {
-  //     const status = await checkMigrationStatus();
-  //     setMigrationStatus(status);
-  //   } catch (error) {
-  //     console.error('Error verificando estado de migración:', error);
-  //   }
-  // };
-
-  // const handleMigrateJuly = async () => {
-  //   try {
-  //     const result = await migrateJulyExpenses();
-  //     if (result.success) {
-  //       console.warn(
-  //         `✅ Migración completada! ${result.migratedCount} gastos migrados.`,
-  //       );
-  //       setShowMigrationPanel(false);
-  //       refreshExpenses();
-  //     } else {
-  //       console.warn(`❌ Error en migración: ${result.errors.join(', ')}`);
-  //     }
-  //   } catch (error) {
-  //     console.error('Error durante migración:', error);
-  //     console.warn('❌ Error inesperado durante la migración');
-  //   }
-  // };
-
-  // Placeholder functions for production
-  const handleShowMigrationPanel = async () => {
-    console.warn('Migration functionality disabled in production');
-  };
-
-  const handleMigrateJuly = async () => {
-    console.warn('Migration functionality disabled in production');
-  };
 
   // Funciones del formulario
   const handleFormChange = (
@@ -224,16 +169,7 @@ export default function GastosPage() {
           }))}
           onMonthChange={setSelectedMonth}
           onRefresh={refreshExpenses}
-          onShowMigration={handleShowMigrationPanel}
           isLoading={loading}
-        />
-      }
-      migrationPanel={
-        <ExpenseMigrationPanel
-          isVisible={showMigrationPanel}
-          migrationStatus={null}
-          onMigrate={handleMigrateJuly}
-          onClose={() => setShowMigrationPanel(false)}
         />
       }
       statusPanels={<ExpenseStatusPanels isLoading={loading} error={error} />}

@@ -40,7 +40,7 @@ interface ExpenseHeaderProps {
   availableMonths: MonthOption[];
   onMonthChange: (month: string) => void;
   onRefresh: () => void;
-  onShowMigration: () => void;
+  onShowMigration?: () => void;
   isLoading: boolean;
 }
 
@@ -76,7 +76,7 @@ export default function ExpenseHeader({
         />
 
         {/* Botón de migración julio */}
-        {selectedMonth === '2025-07' && (
+        {selectedMonth === '2025-07' && onShowMigration && (
           <Button
             variant="outline"
             size="sm"

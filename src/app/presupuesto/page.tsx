@@ -9,21 +9,15 @@
  */
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 import BudgetHeader from '@/components/organisms/BudgetHeader/BudgetHeader';
 import BudgetItemModal from '@/components/organisms/BudgetItemModal/BudgetItemModal';
-import BudgetMigrationPanel from '@/components/organisms/BudgetMigrationPanel/BudgetMigrationPanel';
 import BudgetStatusPanels from '@/components/organisms/BudgetStatusPanels/BudgetStatusPanels';
 import BudgetTable from '@/components/organisms/BudgetTable/BudgetTable';
 import BudgetPageTemplate from '@/components/templates/BudgetPageTemplate/BudgetPageTemplate';
 import { useMonthlyBudget } from '@/hooks/useMonthlyBudget';
 import { getAvailableMonths, formatCurrency } from '@/lib/services/budget';
-// Migration functionality disabled for production
-// import {
-//   migrateJulyData,
-//   checkMigrationStatus,
-// } from '@/scripts/migrate-july-data';
 
 // Interfaces para tipos de datos
 interface ModalState {
@@ -48,12 +42,6 @@ interface FormData {
   control: 'Necesario' | 'Discrecional';
   presupuestado: number;
   real: number;
-}
-
-interface MigrationStatus {
-  checking: boolean;
-  migrated: boolean;
-  migrating: boolean;
 }
 
 export default function PresupuestoPage() {
@@ -89,66 +77,6 @@ export default function PresupuestoPage() {
     presupuestado: 0,
     real: 0,
   });
-
-  // Estado de migración
-  const [migrationStatus, setMigrationStatus] = useState<MigrationStatus>({
-    checking: false,
-    migrated: false,
-    migrating: false,
-  });
-
-  // Efecto para verificar migración al cargar
-  useEffect(() => {
-    if (selectedMonth === '2025-07') {
-      checkMigration();
-    }
-  }, [selectedMonth]);
-
-  // Migration functions disabled for production
-  // const checkMigration = async () => {
-  //   setMigrationStatus(prev => ({ ...prev, checking: true }));
-  //   try {
-  //     const status = await checkMigrationStatus();
-  //     setMigrationStatus(prev => ({
-  //       ...prev,
-  //       checking: false,
-  //       migrated: status.migrated,
-  //     }));
-  //   } catch (error) {
-  //     console.error('Error checking migration:', error);
-  //     setMigrationStatus(prev => ({ ...prev, checking: false }));
-  //   }
-  // };
-
-  // const handleMigration = async () => {
-  //   setMigrationStatus(prev => ({ ...prev, migrating: true }));
-  //   try {
-  //     await migrateJulyData();
-  //     setMigrationStatus(prev => ({
-  //       ...prev,
-  //       migrating: false,
-  //       migrated: true,
-  //     }));
-  //     refreshBudget();
-  //   } catch (error) {
-  //     console.error('Error during migration:', error);
-  //     setMigrationStatus(prev => ({ ...prev, migrating: false }));
-  //   }
-  // };
-
-  // Placeholder functions for production
-  const checkMigration = async () => {
-    setMigrationStatus(prev => ({
-      ...prev,
-      checking: false,
-      migrated: true,
-    }));
-    console.warn('Migration functionality disabled in production');
-  };
-
-  const handleMigration = async () => {
-    console.warn('Migration functionality disabled in production');
-  };
 
   // Funciones del modal
   const handleMonthChange = async (newMonth: string) => {
@@ -266,14 +194,6 @@ export default function PresupuestoPage() {
           onRefresh={refreshBudget}
           isLoading={isLoading}
           monthOptions={monthOptions}
-        />
-      }
-      migrationPanel={
-        <BudgetMigrationPanel
-          isVisible={!migrationStatus.migrated && selectedMonth === '2025-07'}
-          isChecking={migrationStatus.checking}
-          isMigrating={migrationStatus.migrating}
-          onMigrate={handleMigration}
         />
       }
       statusPanels={
