@@ -308,6 +308,50 @@ export interface Database {
           updated_at?: string;
         };
       };
+      electronic_invoices: {
+        Row: {
+          id: string;
+          user_id: string;
+          cufe_code: string;
+          supplier_name: string | null;
+          supplier_nit: string | null;
+          invoice_date: string;
+          total_amount: number;
+          extracted_data: Record<string, unknown> | null;
+          pdf_url: string | null;
+          processed_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          cufe_code: string;
+          supplier_name?: string | null;
+          supplier_nit?: string | null;
+          invoice_date: string;
+          total_amount?: number;
+          extracted_data?: Record<string, unknown> | null;
+          pdf_url?: string | null;
+          processed_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          cufe_code?: string;
+          supplier_name?: string | null;
+          supplier_nit?: string | null;
+          invoice_date?: string;
+          total_amount?: number;
+          extracted_data?: Record<string, unknown> | null;
+          pdf_url?: string | null;
+          processed_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;

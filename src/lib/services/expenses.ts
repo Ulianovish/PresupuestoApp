@@ -14,6 +14,7 @@ export interface ExpenseTransaction {
   category_name: string;
   account_name: string;
   place?: string;
+  electronic_invoice_id?: string; // Nueva columna para relación con facturas electrónicas
   created_at: string;
 }
 
@@ -24,6 +25,7 @@ export interface ExpenseFormData {
   category_name: string;
   account_name: string;
   place?: string;
+  electronic_invoice_id?: string; // Para gastos creados desde facturas electrónicas
 }
 
 export interface ExpenseSummary {
@@ -212,7 +214,7 @@ export async function updateExpenseTransaction(
       throw new Error(result.error || 'Error actualizando gasto');
     }
 
-    console.log('Gasto actualizado exitosamente:', result.message);
+    console.warn('Gasto actualizado exitosamente:', result.message);
   } catch (error) {
     console.error('Error actualizando gasto:', error);
     throw new Error(
@@ -247,7 +249,7 @@ export async function deleteExpenseTransaction(
       throw new Error(result.error || 'Error eliminando gasto');
     }
 
-    console.log('Gasto eliminado exitosamente:', result.message);
+    console.warn('Gasto eliminado exitosamente:', result.message);
   } catch (error) {
     console.error('Error eliminando gasto:', error);
     throw new Error(

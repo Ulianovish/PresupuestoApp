@@ -17,6 +17,7 @@ import ExpenseModal from '@/components/organisms/ExpenseModal/ExpenseModal';
 import ExpenseStatusPanels from '@/components/organisms/ExpenseStatusPanels/ExpenseStatusPanels';
 import ExpenseSummary from '@/components/organisms/ExpenseSummary/ExpenseSummary';
 import ExpenseTable from '@/components/organisms/ExpenseTable/ExpenseTable';
+import ExpenseTypeSelectionModal from '@/components/organisms/ExpenseTypeSelectionModal/ExpenseTypeSelectionModal';
 import ExpensePageTemplate from '@/components/templates/ExpensePageTemplate/ExpensePageTemplate';
 import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
 import {
@@ -58,6 +59,9 @@ export default function GastosPage() {
     deleteExpense,
   } = useMonthlyExpenses();
 
+  // Estado para el modal de selección de tipo de gasto
+  const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false);
+
   // Estado del formulario
   const [form, setForm] = useState<FormData>({
     description: '',
@@ -67,6 +71,30 @@ export default function GastosPage() {
     account_name: ACCOUNT_TYPES[0],
     place: '',
   });
+
+  // Funciones para el modal de selección de tipo
+  const openTypeSelection = () => setIsTypeSelectionOpen(true);
+  const closeTypeSelection = () => setIsTypeSelectionOpen(false);
+
+  const handleSelectManual = () => {
+    // Cerrar modal de selección y abrir modal de formulario
+    closeTypeSelection();
+    openModal();
+  };
+
+  const handleSelectInvoice = () => {
+    // Por ahora, mostrar mensaje de próximamente
+    closeTypeSelection();
+    console.warn('🚧 Funcionalidad de factura próximamente disponible');
+    // TODO: Implementar funcionalidad de factura
+  };
+
+  const handleSelectQR = () => {
+    // Por ahora, mostrar mensaje de próximamente
+    closeTypeSelection();
+    console.warn('🚧 Funcionalidad de QR próximamente disponible');
+    // TODO: Implementar funcionalidad de QR
+  };
 
   // Funciones del formulario
   const handleFormChange = (
@@ -190,23 +218,34 @@ export default function GastosPage() {
             formatMonthName={formatMonthName}
             onEdit={handleEditTransaction}
             onDelete={handleDeleteExpense}
-            onAddFirst={openModal}
+            onAddFirst={openTypeSelection}
           />
         ) : undefined
       }
       modal={
-        <ExpenseModal
-          isOpen={isModalOpen}
-          isEditing={isEditing}
-          formData={form}
-          expenseCategories={[...EXPENSE_CATEGORIES]}
-          accountTypes={[...ACCOUNT_TYPES]}
-          onFormChange={handleFormChange}
-          onSubmit={handleSubmitExpense}
-          onClose={handleCloseModal}
-        />
+        <>
+          {/* Modal de selección de tipo de gasto */}
+          <ExpenseTypeSelectionModal
+            isOpen={isTypeSelectionOpen}
+            onClose={closeTypeSelection}
+            onSelectManual={handleSelectManual}
+            onSelectInvoice={handleSelectInvoice}
+            onSelectQR={handleSelectQR}
+          />
+          {/* Modal de formulario de gasto */}
+          <ExpenseModal
+            isOpen={isModalOpen}
+            isEditing={isEditing}
+            formData={form}
+            expenseCategories={[...EXPENSE_CATEGORIES]}
+            accountTypes={[...ACCOUNT_TYPES]}
+            onFormChange={handleFormChange}
+            onSubmit={handleSubmitExpense}
+            onClose={handleCloseModal}
+          />
+        </>
       }
-      floatingButton={<ExpenseFloatingButton onClick={openModal} />}
+      floatingButton={<ExpenseFloatingButton onClick={openTypeSelection} />}
     />
   );
 }

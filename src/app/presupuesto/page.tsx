@@ -29,9 +29,6 @@ interface ModalState {
     descripcion: string;
     fecha: string;
     clasificacion: string;
-    control: string;
-    presupuestado: number;
-    real: number;
   };
 }
 
