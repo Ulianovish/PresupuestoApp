@@ -11,17 +11,17 @@ import type {
   UpdateElectronicInvoiceData,
   InvoiceProcessingResult,
   SuggestedExpense,
-  InvoiceProcessingStatus,
-  ElectronicInvoiceFilters,
-  InvoiceStatistics,
+  InvoiceProcessingStatus: _InvoiceProcessingStatus,
+  ElectronicInvoiceFilters: _ElectronicInvoiceFilters,
+  InvoiceStatistics: _InvoiceStatistics,
   CategoryMappingRule,
 } from '@/types/electronic-invoices';
 import {
   validateCufeCode,
   normalizeCufeCode,
-  isValidCufeFormat,
+  isValidCufeFormat: _isValidCufeFormat,
 } from '@/lib/validations/cufe-validator';
-import { EXPENSE_CATEGORIES } from '@/lib/services/expenses';
+import { EXPENSE_CATEGORIES as _EXPENSE_CATEGORIES } from '@/lib/services/expenses';
 
 // Cliente de Supabase
 const supabase = createClient();

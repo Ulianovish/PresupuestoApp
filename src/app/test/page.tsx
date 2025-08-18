@@ -51,7 +51,7 @@ export default function TestPage() {
     status_details,
     current_invoice,
     suggested_expenses,
-    loading,
+    loading: _loading,
     error: invoiceError,
     processing_info,
     processFromQR,

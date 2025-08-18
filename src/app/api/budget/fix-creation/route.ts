@@ -239,7 +239,7 @@ export async function GET() {
     }
 
     // Verificar cuántos items se crearon
-    const { data: itemsData, error: itemsError } = await supabase
+    const { data: itemsData, error: _itemsError } = await supabase
       .from('budget_items')
       .select('*')
       .eq('template_id', data)

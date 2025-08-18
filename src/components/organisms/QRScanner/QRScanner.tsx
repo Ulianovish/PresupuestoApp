@@ -194,7 +194,7 @@ export default function QRScanner({
 
     try {
       // Obtener datos de imagen
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+              const _imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
       // Aquí usaríamos una librería de QR como jsQR o qr-scanner
       // Por ahora, simulamos la detección para desarrollo

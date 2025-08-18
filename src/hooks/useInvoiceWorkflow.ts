@@ -52,13 +52,13 @@ export function useInvoiceWorkflow(): UseInvoiceWorkflowState &
   // Hook de facturas electrónicas
   const {
     processing_status,
-    progress,
-    status_message,
-    current_invoice,
-    suggested_expenses,
-    error: processingError,
-    processFromQR,
-    processAndSave,
+    progress: _progress,
+    status_message: _status_message,
+    current_invoice: _current_invoice,
+    suggested_expenses: _suggested_expenses,
+    error: _processingError,
+    processFromQR: _processFromQR,
+    processAndSave: _processAndSave,
     resetProcessing,
   } = useElectronicInvoices();
 
