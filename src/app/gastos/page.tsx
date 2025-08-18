@@ -102,7 +102,7 @@ export default function GastosPage() {
 
   // Funciones del workflow de facturas electrónicas
   const handleInvoiceWorkflowClose = () => {
-    console.log('🚨 handleInvoiceWorkflowClose llamado - cerrando workflow');
+    console.error('🚨 handleInvoiceWorkflowClose llamado - cerrando workflow');
     console.trace('🔍 Stack trace del cierre:');
     setIsInvoiceWorkflowOpen(false);
   };
@@ -124,7 +124,7 @@ export default function GastosPage() {
       }
 
       // Mostrar mensaje de éxito
-      console.log(
+      console.error(
         `✅ ${expenses.length} gastos agregados desde factura electrónica`,
       );
 

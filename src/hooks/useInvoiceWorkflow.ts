@@ -92,11 +92,11 @@ export function useInvoiceWorkflow(): UseInvoiceWorkflowState &
   // Manejar detección de CUFE desde QR
   const handleCufeDetected = useCallback(
     (cufeCode: string) => {
-      console.log(
+      console.error(
         '🎯 useInvoiceWorkflow: handleCufeDetected llamado con CUFE:',
         cufeCode,
       );
-      console.log('📊 Estado actual antes del update:', state);
+      console.error('📊 Estado actual antes del update:', state);
 
       const newState = {
         currentCufe: cufeCode,
@@ -105,14 +105,14 @@ export function useInvoiceWorkflow(): UseInvoiceWorkflowState &
         isProcessing: true,
       };
 
-      console.log('📝 Actualizando estado a:', newState);
+      console.error('📝 Actualizando estado a:', newState);
       updateState(newState);
 
-      console.log('✅ Estado actualizado - debería mostrar processing modal');
+      console.error('✅ Estado actualizado - debería mostrar processing modal');
 
       // Verificar después de un pequeño delay si el estado se mantiene
       setTimeout(() => {
-        console.log('⏰ Estado después de 100ms:', state);
+        console.error('⏰ Estado después de 100ms:', state);
       }, 100);
     },
     [updateState, state],
@@ -139,7 +139,7 @@ export function useInvoiceWorkflow(): UseInvoiceWorkflowState &
         // Por ejemplo, agregando los gastos a la lista local o llamando a una función de callback
 
         // Simular guardado local
-        console.log('Guardando gastos localmente:', expenses);
+        console.error('Guardando gastos localmente:', expenses);
 
         // En una implementación real, esto podría ser:
         // await onAddExpenses(expenses.map(expense => ({
@@ -164,7 +164,7 @@ export function useInvoiceWorkflow(): UseInvoiceWorkflowState &
 
   // Resetear todo el workflow
   const resetWorkflow = useCallback(() => {
-    console.log('🔄 resetWorkflow llamado');
+    console.error('🔄 resetWorkflow llamado');
     console.trace('🔍 Stack trace del reset:');
     updateState({
       showQRModal: false,

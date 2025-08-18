@@ -159,7 +159,7 @@ export const useBudgetData = () => {
       const resumen = await obtenerResumenFinanciero();
       setRealIncomeTotal(resumen.totalIngresos);
     } catch {
-      console.log(
+      console.error(
         'No se pudieron cargar ingresos de Supabase, usando datos mock',
       );
       setRealIncomeTotal(undefined);

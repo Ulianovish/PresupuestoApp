@@ -23,7 +23,7 @@ export async function POST(_request: NextRequest) {
       );
     }
 
-    console.log(
+    console.error(
       '🔧 Fix - Aplicando migración para mejorar creación de presupuestos...',
     );
 
@@ -149,7 +149,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
       }
     }
 
-    console.log('🔧 Fix - ✅ Migración aplicada exitosamente');
+    console.error('🔧 Fix - ✅ Migración aplicada exitosamente');
 
     // Actualizar la función original
     const updateOriginalSQL = `

@@ -11,7 +11,7 @@ export async function copyBudgetItemsFromPreviousMonth(
   targetMonthYear: string,
 ): Promise<number> {
   try {
-    console.log(
+    console.error(
       '🔄 copyBudgetItems - Iniciando copia para template:',
       newTemplateId,
     );
@@ -32,12 +32,12 @@ export async function copyBudgetItemsFromPreviousMonth(
     }
 
     if (!previousTemplates || previousTemplates.length === 0) {
-      console.log('🔄 No se encontró template anterior para copiar');
+      console.error('🔄 No se encontró template anterior para copiar');
       return 0;
     }
 
     const previousTemplateId = previousTemplates[0].id;
-    console.log(
+    console.error(
       '🔄 Template anterior encontrado:',
       previousTemplateId,
       'mes:',
@@ -57,7 +57,7 @@ export async function copyBudgetItemsFromPreviousMonth(
     }
 
     if (existingItems && existingItems.length > 0) {
-      console.log('🔄 Ya existen items en el nuevo template, saltando copia');
+      console.error('🔄 Ya existen items en el nuevo template, saltando copia');
       return existingItems.length;
     }
 
@@ -85,11 +85,11 @@ export async function copyBudgetItemsFromPreviousMonth(
     }
 
     if (!sourceItems || sourceItems.length === 0) {
-      console.log('🔄 No hay items en el template anterior para copiar');
+      console.error('🔄 No hay items en el template anterior para copiar');
       return 0;
     }
 
-    console.log('🔄 Encontrados', sourceItems.length, 'items para copiar');
+    console.error('🔄 Encontrados', sourceItems.length, 'items para copiar');
 
     // 4. Preparar datos para insertar
     const newItems = sourceItems.map(item => ({
@@ -120,7 +120,7 @@ export async function copyBudgetItemsFromPreviousMonth(
     }
 
     const itemsCreated = insertedItems?.length || 0;
-    console.log(
+    console.error(
       '🔄 ✅ Copiados exitosamente',
       itemsCreated,
       'items del mes anterior',
@@ -141,7 +141,7 @@ export async function createMonthlyBudgetWithItems(
   templateName?: string,
 ): Promise<{ templateId: string | null; itemsCopied: number }> {
   try {
-    console.log(
+    console.error(
       '🔵 createMonthlyBudgetWithItems - Iniciando para mes:',
       monthYear,
     );
@@ -166,7 +166,7 @@ export async function createMonthlyBudgetWithItems(
       return { templateId: null, itemsCopied: 0 };
     }
 
-    console.log('🔵 Template creado:', templateId);
+    console.error('🔵 Template creado:', templateId);
 
     // 2. Copiar items del mes anterior
     const itemsCopied = await copyBudgetItemsFromPreviousMonth(
@@ -175,7 +175,7 @@ export async function createMonthlyBudgetWithItems(
       monthYear,
     );
 
-    console.log('🔵 ✅ Presupuesto creado con', itemsCopied, 'items copiados');
+    console.error('🔵 ✅ Presupuesto creado con', itemsCopied, 'items copiados');
 
     return { templateId, itemsCopied };
   } catch (error) {
@@ -192,7 +192,7 @@ export async function fixExistingBudgetsWithoutItems(): Promise<{
   totalItemsCreated: number;
 }> {
   try {
-    console.log(
+    console.error(
       '🔧 fixExistingBudgets - Iniciando reparación usando función SQL...',
     );
 
@@ -215,7 +215,7 @@ export async function fixExistingBudgetsWithoutItems(): Promise<{
     }
 
     if (!repairResults || repairResults.length === 0) {
-      console.log('🔧 No hay templates que requieran reparación');
+      console.error('🔧 No hay templates que requieran reparación');
       return { templatesFixed: 0, totalItemsCreated: 0 };
     }
 

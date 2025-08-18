@@ -77,8 +77,8 @@ export default function TestPage() {
           return;
         }
 
-        console.log('✅ Conexión exitosa con Supabase');
-        console.log('Categorías obtenidas:', data);
+        console.error('✅ Conexión exitosa con Supabase');
+        console.error('Categorías obtenidas:', data);
         setCategories(data || []);
         setConnectionStatus('connected');
       } catch (err) {

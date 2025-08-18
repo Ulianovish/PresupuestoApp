@@ -24,7 +24,7 @@ export default function TestBudgetPage() {
     setResult(null);
 
     try {
-      console.log('🧪 Test - Iniciando test de creación para:', selectedMonth);
+      console.error('🧪 Test - Iniciando test de creación para:', selectedMonth);
 
       const response = await fetch('/api/budget/create', {
         method: 'POST',
@@ -38,14 +38,14 @@ export default function TestBudgetPage() {
       });
 
       const data = await response.json();
-      console.log('🧪 Test - Respuesta API:', data);
+      console.error('🧪 Test - Respuesta API:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Error en la API');
       }
 
       setResult(data);
-      console.log('🧪 Test - ✅ Presupuesto creado exitosamente');
+      console.error('🧪 Test - ✅ Presupuesto creado exitosamente');
 
       // Recargar templates después de crear
       await loadTemplates();
@@ -60,7 +60,7 @@ export default function TestBudgetPage() {
   // Función para cargar templates existentes con conteo de items
   const loadTemplates = async () => {
     try {
-      console.log('🧪 Test - Cargando templates con conteo de items...');
+      console.error('🧪 Test - Cargando templates con conteo de items...');
 
       // Importar función para obtener templates con items
       const { createClient } = await import('@/lib/supabase/client');
@@ -101,7 +101,7 @@ export default function TestBudgetPage() {
       );
 
       setTemplates(templatesWithCounts);
-      console.log(
+      console.error(
         '🧪 Test - Templates cargados con conteos:',
         templatesWithCounts,
       );
@@ -115,7 +115,7 @@ export default function TestBudgetPage() {
 
         if (response.ok) {
           setTemplates(data.templates || []);
-          console.log(
+          console.error(
             '🧪 Test - Templates cargados (fallback):',
             data.templates,
           );
@@ -132,7 +132,7 @@ export default function TestBudgetPage() {
     setFixResult(null);
 
     try {
-      console.log(
+      console.error(
         '🔧 Test - Iniciando reparación de presupuestos existentes...',
       );
 
@@ -143,7 +143,7 @@ export default function TestBudgetPage() {
 
       const result = await fixExistingBudgetsWithoutItems();
 
-      console.log('🔧 Test - Resultado de reparación:', result);
+      console.error('🔧 Test - Resultado de reparación:', result);
       setFixResult(result);
 
       // Recargar templates después de reparar

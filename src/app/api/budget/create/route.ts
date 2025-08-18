@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
         fetchError,
       );
     } else {
-      console.log('🟡 API - Presupuesto verificado:', budgetData);
+      console.error('🟡 API - Presupuesto verificado:', budgetData);
     }
 
     return NextResponse.json({

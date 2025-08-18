@@ -52,7 +52,7 @@ export default function InvoiceWorkflow({
 
   // Debug: Mostrar estados actuales
   React.useEffect(() => {
-    console.log('🔍 InvoiceWorkflow estado:', {
+    console.error('🔍 InvoiceWorkflow estado:', {
       showQRModal,
       showProcessingModal,
       currentCufe,
@@ -62,17 +62,17 @@ export default function InvoiceWorkflow({
 
   // Abrir automáticamente el QR modal cuando se active el componente
   React.useEffect(() => {
-    console.log('🔄 InvoiceWorkflow useEffect evaluando:', {
+    console.error('🔄 InvoiceWorkflow useEffect evaluando:', {
       isOpen,
       showQRModal,
       showProcessingModal,
     });
 
     if (isOpen && !showQRModal && !showProcessingModal) {
-      console.log('✅ Abriendo QR modal...');
+      console.error('✅ Abriendo QR modal...');
       openQRModal();
     } else if (!isOpen && (showQRModal || showProcessingModal)) {
-      console.log('🚨 isOpen=false pero modales activos - RESETEANDO WORKFLOW');
+      console.error('🚨 isOpen=false pero modales activos - RESETEANDO WORKFLOW');
       console.trace('🔍 Stack trace del reset automático:');
       resetWorkflow();
     }
@@ -80,7 +80,7 @@ export default function InvoiceWorkflow({
 
   // Manejar cierre del workflow
   const handleClose = () => {
-    console.log('🚨 InvoiceWorkflow: handleClose llamado');
+    console.error('🚨 InvoiceWorkflow: handleClose llamado');
     console.trace('🔍 Stack trace del cierre del workflow:');
     resetWorkflow();
     onClose?.();
@@ -110,7 +110,7 @@ export default function InvoiceWorkflow({
       // const result = await processAndSave(currentCufe, expenses);
       // onInvoiceSaved?.(result.invoiceId, result.expensesCreated);
 
-      console.log('Guardando en Supabase:', { cufe: currentCufe, expenses });
+      console.error('Guardando en Supabase:', { cufe: currentCufe, expenses });
       handleClose();
     } catch (error) {
       const errorMessage =

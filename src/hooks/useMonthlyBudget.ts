@@ -84,7 +84,7 @@ export function useMonthlyBudget(
    */
   const initializeMonth = useCallback(
     async (monthYear: string): Promise<boolean> => {
-      console.log('🔵 Inicializando presupuesto para:', monthYear);
+      console.error('🔵 Inicializando presupuesto para:', monthYear);
       setIsLoading(true);
       setError(null);
 
@@ -93,10 +93,10 @@ export function useMonthlyBudget(
 
         if (templateId) {
           await loadBudgetData(monthYear);
-          console.log('🔵 ✅ Presupuesto creado exitosamente para', monthYear);
+          console.error('🔵 ✅ Presupuesto creado exitosamente para', monthYear);
           return true;
         } else {
-          console.log(
+          console.error(
             '🔴 Error: No se pudo crear el presupuesto para',
             monthYear,
           );

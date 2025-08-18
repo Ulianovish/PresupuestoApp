@@ -109,14 +109,14 @@ export default function QRInputModal({
 
   // Manejar envío de formulario
   const handleSubmit = useCallback(() => {
-    console.log('🚀 QRInputModal: handleSubmit llamado');
-    console.log('🔍 Validation:', validation);
+    console.error('🚀 QRInputModal: handleSubmit llamado');
+    console.error('🔍 Validation:', validation);
 
     if (validation?.isValid && validation.cufe) {
-      console.log('✅ Validación exitosa, CUFE:', validation.cufe);
-      console.log('📞 Llamando onCufeDetected...');
+      console.error('✅ Validación exitosa, CUFE:', validation.cufe);
+      console.error('📞 Llamando onCufeDetected...');
       onCufeDetected(validation.cufe);
-      console.log('✅ onCufeDetected completado - NO cerrando modal todavía');
+      console.error('✅ onCufeDetected completado - NO cerrando modal todavía');
       // NO cerrar el modal aquí - dejar que el workflow lo maneje
       // handleClose();
     } else {
@@ -340,7 +340,7 @@ export default function QRInputModal({
             <Button
               variant="gradient"
               onClick={() => {
-                console.log('🔘 Click en botón "Procesar Factura"');
+                console.error('🔘 Click en botón "Procesar Factura"');
                 handleSubmit();
               }}
               className="w-full"

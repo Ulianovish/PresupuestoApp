@@ -214,7 +214,7 @@ export async function updateExpenseTransaction(
       throw new Error(result.error || 'Error actualizando gasto');
     }
 
-    console.log('Gasto actualizado exitosamente:', result.message);
+    console.error('Gasto actualizado exitosamente:', result.message);
   } catch (error) {
     console.error('Error actualizando gasto:', error);
     throw new Error(
@@ -249,7 +249,7 @@ export async function deleteExpenseTransaction(
       throw new Error(result.error || 'Error eliminando gasto');
     }
 
-    console.log('Gasto eliminado exitosamente:', result.message);
+    console.error('Gasto eliminado exitosamente:', result.message);
   } catch (error) {
     console.error('Error eliminando gasto:', error);
     throw new Error(

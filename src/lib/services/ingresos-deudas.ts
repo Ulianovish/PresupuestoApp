@@ -429,7 +429,7 @@ export async function inicializarDatosEjemplo(): Promise<void> {
         ...deudasEjemplo.map(deuda => crearDeuda(deuda)),
       ]);
 
-      console.log('Datos de ejemplo inicializados correctamente');
+      console.error('Datos de ejemplo inicializados correctamente');
     }
   } catch (error) {
     console.error('Error al inicializar datos de ejemplo:', error);

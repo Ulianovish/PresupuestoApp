@@ -145,7 +145,7 @@ export async function createMonthlyBudget(
   templateName?: string,
 ): Promise<string | null> {
   try {
-    console.log('🟡 Creando presupuesto para:', monthYear);
+    console.error('🟡 Creando presupuesto para:', monthYear);
 
     const { data: user } = await supabase.auth.getUser();
     if (!user.user) {
@@ -172,7 +172,7 @@ export async function createMonthlyBudget(
       .eq('is_active', true);
 
     const itemsCount = countError ? 0 : count || 0;
-    console.log(
+    console.error(
       `🟡 ✅ Presupuesto ${monthYear} creado con ${itemsCount} items`,
     );
 
@@ -293,7 +293,7 @@ export async function createBudgetItem(
     }
 
     // Mensaje de éxito - se puede eliminar en producción
-    // console.log('Item de presupuesto creado exitosamente:', result.message);
+    // console.error('Item de presupuesto creado exitosamente:', result.message);
     return result.data;
   } catch (error) {
     console.error('Error en createBudgetItem:', error);
@@ -332,7 +332,7 @@ export async function updateBudgetItem(
     }
 
     // Mensaje de éxito - se puede eliminar en producción
-    // console.log('Item de presupuesto actualizado exitosamente:', result.message);
+    // console.error('Item de presupuesto actualizado exitosamente:', result.message);
     return result.data;
   } catch (error) {
     console.error('Error en updateBudgetItem:', error);

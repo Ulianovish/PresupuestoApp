@@ -49,7 +49,7 @@ export default function InvoiceProcessingModal({
 
   // Debug: Mostrar props y estado
   useEffect(() => {
-    console.log('🔍 InvoiceProcessingModal props:', {
+    console.error('🔍 InvoiceProcessingModal props:', {
       isOpen,
       cufeCode,
       autoProcess,
@@ -59,7 +59,7 @@ export default function InvoiceProcessingModal({
 
   // Auto-procesar cuando se abre el modal
   useEffect(() => {
-    console.log('🚀 InvoiceProcessingModal: Evaluando auto-proceso:', {
+    console.error('🚀 InvoiceProcessingModal: Evaluando auto-proceso:', {
       isOpen,
       cufeCode,
       autoProcess,
@@ -67,7 +67,7 @@ export default function InvoiceProcessingModal({
     });
 
     if (isOpen && cufeCode && autoProcess && processing_status === 'idle') {
-      console.log('✅ Iniciando procesamiento automático...');
+      console.error('✅ Iniciando procesamiento automático...');
       handleStartProcessing();
     }
   }, [isOpen, cufeCode, autoProcess, processing_status]);
