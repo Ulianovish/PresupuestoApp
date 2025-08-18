@@ -18,9 +18,6 @@ import type {
   UpdateElectronicInvoiceData,
   InvoiceProcessingResult,
   SuggestedExpense,
-  InvoiceProcessingStatus: _InvoiceProcessingStatus,
-  ElectronicInvoiceFilters: _ElectronicInvoiceFilters,
-  InvoiceStatistics: _InvoiceStatistics,
   CategoryMappingRule,
 } from '@/types/electronic-invoices';
 

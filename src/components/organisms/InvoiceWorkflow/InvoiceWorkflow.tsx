@@ -6,9 +6,11 @@
 'use client';
 
 import React from 'react';
-import { useInvoiceWorkflow } from '@/hooks/useInvoiceWorkflow';
+
 import QRInputModal from '@/components/organisms/QRInputModal/QRInputModal';
 import InvoiceProcessingModal from '@/components/organisms/InvoiceProcessingModal/InvoiceProcessingModal';
+import { useInvoiceWorkflow } from '@/hooks/useInvoiceWorkflow';
+
 import type { SuggestedExpense } from '@/types/electronic-invoices';
 
 interface InvoiceWorkflowProps {

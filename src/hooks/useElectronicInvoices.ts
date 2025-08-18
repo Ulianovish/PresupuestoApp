@@ -5,10 +5,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 
-import {
-  validateCufeCode,
-  normalizeCufeCode,
-} from '@/lib/validations/cufe-validator';
+import { validateCufeCode, normalizeCufeCode } from '@/lib/validations/cufe-validator';
 import {
   processInvoiceFromQR,
   saveElectronicInvoice,
