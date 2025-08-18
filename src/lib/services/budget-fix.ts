@@ -222,19 +222,19 @@ export async function fixExistingBudgetsWithoutItems(): Promise<{
     // Calcular totales
     const templatesFixed = repairResults.length;
     const totalItemsCreated = repairResults.reduce(
-      (total: number, result: any) => {
+      (total: number, result: Record<string, unknown>) => {
         return total + (result.items_copied || 0);
       },
       0,
     );
 
-    console.log('🔧 ✅ Reparación completada:');
-    repairResults.forEach((result: any) => {
-      console.log(
+    console.error('🔧 ✅ Reparación completada:');
+    repairResults.forEach((result: Record<string, unknown>) => {
+      console.error(
         `  - ${result.month_year}: ${result.items_copied} items copiados`,
       );
     });
-    console.log(
+    console.error(
       `  - Total: ${templatesFixed} templates reparados, ${totalItemsCreated} items creados`,
     );
 

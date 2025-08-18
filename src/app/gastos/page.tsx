@@ -18,8 +18,8 @@ import ExpenseStatusPanels from '@/components/organisms/ExpenseStatusPanels/Expe
 import ExpenseSummary from '@/components/organisms/ExpenseSummary/ExpenseSummary';
 import ExpenseTable from '@/components/organisms/ExpenseTable/ExpenseTable';
 import ExpenseTypeSelectionModal from '@/components/organisms/ExpenseTypeSelectionModal/ExpenseTypeSelectionModal';
-import ExpensePageTemplate from '@/components/templates/ExpensePageTemplate/ExpensePageTemplate';
 import InvoiceWorkflow from '@/components/organisms/InvoiceWorkflow/InvoiceWorkflow';
+import ExpensePageTemplate from '@/components/templates/ExpensePageTemplate/ExpensePageTemplate';
 import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
 import {
   EXPENSE_CATEGORIES,

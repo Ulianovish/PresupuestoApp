@@ -41,7 +41,7 @@ export default function TestPage() {
   const [testCufeCode, setTestCufeCode] = useState(
     'fe8b0ece665f054b2949685fc3b3f0fd681888381b5169f661f60ad2d88b3710e9a1f8200d51827c58e8011265d1e0b4',
   );
-  const [cufeValidation, setCufeValidation] = useState<any>(null);
+  const [cufeValidation, setCufeValidation] = useState<{ isValid: boolean; error?: string } | null>(null);
 
   // Hook para manejo de facturas electrónicas
   const {

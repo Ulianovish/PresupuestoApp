@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
+
 import type {
   ElectronicInvoice,
   InvoiceProcessingResult,
