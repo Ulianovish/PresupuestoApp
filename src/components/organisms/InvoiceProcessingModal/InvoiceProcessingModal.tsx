@@ -6,6 +6,7 @@
 'use client';
 
 import { useEffect } from 'react';
+
 import Button from '@/components/atoms/Button/Button';
 import Card, {
   CardContent,

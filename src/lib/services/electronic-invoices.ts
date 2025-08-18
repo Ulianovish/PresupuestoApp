@@ -5,22 +5,24 @@
  */
 
 import { createClient } from '@/lib/supabase/client';
+
+import {
+  validateCufeCode,
+  normalizeCufeCode,
+} from '@/lib/validations/cufe-validator';
+import { EXPENSE_CATEGORIES as _EXPENSE_CATEGORIES } from '@/lib/services/expenses';
+
 import type {
   ElectronicInvoice,
   CreateElectronicInvoiceData,
   UpdateElectronicInvoiceData,
   InvoiceProcessingResult,
   SuggestedExpense,
-  InvoiceProcessingStatus,
-  ElectronicInvoiceFilters,
-  InvoiceStatistics,
+  InvoiceProcessingStatus: _InvoiceProcessingStatus,
+  ElectronicInvoiceFilters: _ElectronicInvoiceFilters,
+  InvoiceStatistics: _InvoiceStatistics,
   CategoryMappingRule,
 } from '@/types/electronic-invoices';
-import {
-  validateCufeCode,
-  normalizeCufeCode,
-} from '@/lib/validations/cufe-validator';
-import { EXPENSE_CATEGORIES as _EXPENSE_CATEGORIES } from '@/lib/services/expenses';
 
 // Cliente de Supabase
 const supabase = createClient();
@@ -127,7 +129,7 @@ export async function processInvoiceFromQR(
           normalizedCufe,
         );
         resolve(result);
-      } catch (error) {
+      } catch (_error) {
         eventSource.close();
         reject(
           new InvoiceProcessingErrorLocal(
@@ -391,12 +393,12 @@ function suggestCategoryFromSupplier(
  * Sugiere una categoría basada en el item específico
  */
 function suggestCategoryFromItem(
-  item: any,
+  item: Record<string, unknown>,
   supplierName: string,
   mappingRules: CategoryMappingRule[],
 ): string {
-  const itemDescription = (item.description || '').toLowerCase();
-  const lowerSupplier = (supplierName || '').toLowerCase();
+  const itemDescription = (item.description as string || '').toLowerCase();
+  const _lowerSupplier = (supplierName || '').toLowerCase();
 
   // Palabras clave específicas para categorización por producto
   const productKeywords = {

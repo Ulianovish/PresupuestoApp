@@ -5,14 +5,6 @@
 
 import { useState, useCallback, useRef } from 'react';
 
-import type {
-  ElectronicInvoice,
-  InvoiceProcessingResult,
-  SuggestedExpense,
-  InvoiceProcessingStatus,
-  CreateElectronicInvoiceData,
-  UpdateElectronicInvoiceData,
-} from '@/types/electronic-invoices';
 import {
   validateCufeCode,
   normalizeCufeCode,
@@ -27,6 +19,15 @@ import {
   checkCufeExists,
   InvoiceProcessingError,
 } from '@/lib/services/electronic-invoices';
+
+import type {
+  ElectronicInvoice,
+  InvoiceProcessingResult,
+  SuggestedExpense,
+  InvoiceProcessingStatus,
+  CreateElectronicInvoiceData,
+  UpdateElectronicInvoiceData,
+} from '@/types/electronic-invoices';
 
 interface UseElectronicInvoicesState {
   // Estado del procesamiento

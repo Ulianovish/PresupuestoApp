@@ -4,11 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { createClient } from '@/lib/supabase/server';
 import {
   validateCufeCode,
   normalizeCufeCode,
 } from '@/lib/validations/cufe-validator';
+
 import type { CreateElectronicInvoiceData } from '@/types/electronic-invoices';
 
 // GET /api/electronic-invoices - Obtener facturas del usuario

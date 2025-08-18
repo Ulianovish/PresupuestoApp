@@ -49,7 +49,7 @@ export default function TestBudgetPage() {
 
       // Recargar templates después de crear
       await loadTemplates();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('🧪 Test - Error:', err);
       setError(err.message || 'Error desconocido');
     } finally {
@@ -148,7 +148,7 @@ export default function TestBudgetPage() {
 
       // Recargar templates después de reparar
       await loadTemplates();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('🔧 Test - Error en reparación:', err);
       setError(`Error en reparación: ${err.message || 'Error desconocido'}`);
     } finally {
