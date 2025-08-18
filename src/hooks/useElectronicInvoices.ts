@@ -16,7 +16,6 @@ import {
   processInvoiceFromQR,
   saveElectronicInvoice,
   createExpensesFromInvoice,
-  processAndSaveInvoice: _processAndSaveInvoice,
   updateElectronicInvoice,
   deleteElectronicInvoice,
   getElectronicInvoicesByDateRange,
@@ -48,7 +47,7 @@ interface UseElectronicInvoicesState {
 
   // Información específica de progreso (captchas, etc.)
   processing_info: {
-    captcha_info?: any;
+    captcha_info?: Record<string, unknown>;
     total_time?: number;
     items_found?: number;
   };
