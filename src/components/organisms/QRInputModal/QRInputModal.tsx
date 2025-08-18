@@ -14,7 +14,7 @@ import Card, {
 } from '@/components/atoms/Card/Card';
 import {
   extractCufeFromQR,
-  isPotentialDianInvoiceQR,
+  isPotentialDianInvoiceQR: _isPotentialDianInvoiceQR,
   validateCufeCode,
   normalizeCufeCode,
 } from '@/lib/validations/cufe-validator';

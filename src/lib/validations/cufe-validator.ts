@@ -15,15 +15,18 @@ export function isValidCufeFormat(cufe: string): boolean {
 /**
  * Valida un código CUFE
  */
-export function validateCufeCode(cufe: string): { isValid: boolean; error?: string } {
+export function validateCufeCode(cufe: string): {
+  isValid: boolean;
+  error?: string;
+} {
   if (!cufe) {
     return { isValid: false, error: 'CUFE no puede estar vacío' };
   }
 
   if (!isValidCufeFormat(cufe)) {
-    return { 
-      isValid: false, 
-      error: 'CUFE debe tener exactamente 96 caracteres hexadecimales' 
+    return {
+      isValid: false,
+      error: 'CUFE debe tener exactamente 96 caracteres hexadecimales',
     };
   }
 
@@ -64,8 +67,8 @@ export function isPotentialDianInvoiceQR(qrData: string): boolean {
     'NumFac',
     'FecFac',
   ];
-  
-  return dianKeywords.some(keyword => 
-    qrData.toLowerCase().includes(keyword.toLowerCase())
+
+  return dianKeywords.some(keyword =>
+    qrData.toLowerCase().includes(keyword.toLowerCase()),
   );
 }

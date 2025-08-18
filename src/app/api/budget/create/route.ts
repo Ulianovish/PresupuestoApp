@@ -148,7 +148,7 @@ export async function GET() {
 
     return NextResponse.json({
       user_id: user.id,
-              templates,
+      templates,
       total_templates: templates?.length || 0,
     });
   } catch (error) {

@@ -16,7 +16,7 @@ import {
   processInvoiceFromQR,
   saveElectronicInvoice,
   createExpensesFromInvoice,
-      processAndSaveInvoice: _processAndSaveInvoice,
+  processAndSaveInvoice: _processAndSaveInvoice,
   updateElectronicInvoice,
   deleteElectronicInvoice,
   getElectronicInvoicesByDateRange,
