@@ -319,7 +319,7 @@ export default function InvoiceProcessingModal({
                   </div>
 
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {suggested_expenses.map((expense, index) => (
+                    {suggested_expenses.map((expense, _index) => (
                       <div
                         key={expense.id}
                         className="bg-slate-800/50 p-3 rounded-lg border border-slate-700"

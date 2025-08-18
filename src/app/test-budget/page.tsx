@@ -11,11 +11,11 @@ import Card from '@/components/atoms/Card/Card';
 export default function TestBudgetPage() {
   const [selectedMonth, setSelectedMonth] = useState('2025-08');
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [templates, setTemplates] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<Record<string, unknown>[]>([]);
   const [isFixing, setIsFixing] = useState(false);
-  const [fixResult, setFixResult] = useState<any>(null);
+  const [fixResult, setFixResult] = useState<Record<string, unknown> | null>(null);
 
   // Función para probar la creación de presupuesto usando API
   const testCreateBudget = async () => {

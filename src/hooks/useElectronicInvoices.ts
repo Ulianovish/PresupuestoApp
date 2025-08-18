@@ -14,6 +14,10 @@ import type {
   UpdateElectronicInvoiceData,
 } from '@/types/electronic-invoices';
 import {
+  validateCufeCode,
+  normalizeCufeCode,
+} from '@/lib/validations/cufe-validator';
+import {
   processInvoiceFromQR,
   saveElectronicInvoice,
   createExpensesFromInvoice,
@@ -23,10 +27,6 @@ import {
   checkCufeExists,
   InvoiceProcessingError,
 } from '@/lib/services/electronic-invoices';
-import {
-  validateCufeCode,
-  normalizeCufeCode,
-} from '@/lib/validations/cufe-validator';
 
 interface UseElectronicInvoicesState {
   // Estado del procesamiento

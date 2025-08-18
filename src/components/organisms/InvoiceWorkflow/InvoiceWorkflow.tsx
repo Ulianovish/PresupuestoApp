@@ -102,7 +102,7 @@ export default function InvoiceWorkflow({
   };
 
   // Manejar guardado directo en Supabase (opcional)
-  const handleSaveToSupabase = async (expenses: SuggestedExpense[]) => {
+  const _handleSaveToSupabase = async (expenses: SuggestedExpense[]) => {
     if (!allowDirectSave || !currentCufe) return;
 
     try {
