@@ -145,11 +145,14 @@ export async function createMonthlyBudget(
   templateName?: string,
 ): Promise<string | null> {
   try {
+    console.log('🟡 Creando presupuesto para:', monthYear);
+
     const { data: user } = await supabase.auth.getUser();
     if (!user.user) {
       throw new Error('Usuario no autenticado');
     }
 
+    // Usar la función SQL mejorada que ya copia items automáticamente
     const { data, error } = await supabase.rpc('upsert_monthly_budget', {
       p_user_id: user.user.id,
       p_month_year: monthYear,
@@ -157,13 +160,25 @@ export async function createMonthlyBudget(
     });
 
     if (error) {
-      console.error('Error creando presupuesto mensual:', error);
+      console.error('🔴 Error creando presupuesto:', error);
       return null;
     }
 
+    // Verificar cuántos items se crearon
+    const { count, error: countError } = await supabase
+      .from('budget_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('template_id', data)
+      .eq('is_active', true);
+
+    const itemsCount = countError ? 0 : count || 0;
+    console.log(
+      `🟡 ✅ Presupuesto ${monthYear} creado con ${itemsCount} items`,
+    );
+
     return data;
   } catch (error) {
-    console.error('Error en createMonthlyBudget:', error);
+    console.error('🔴 Error en createMonthlyBudget:', error);
     return null;
   }
 }

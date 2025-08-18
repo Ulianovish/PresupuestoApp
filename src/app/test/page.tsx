@@ -10,6 +10,11 @@ import Card, {
 } from '@/components/atoms/Card/Card';
 import CurrencyInput from '@/components/atoms/CurrencyInput/CurrencyInput';
 import { supabase } from '@/lib/supabase/client';
+import { useElectronicInvoices } from '@/hooks/useElectronicInvoices';
+import {
+  // validateCufeCode,
+  normalizeCufeCode,
+} from '@/lib/validations/cufe-validator';
 
 /**
  * TestPage - Página completa de prueba para componentes y Supabase
@@ -31,6 +36,29 @@ export default function TestPage() {
       subcategories?: { id: string; name: string }[];
     }[]
   >([]);
+
+  // Estados para prueba de facturas electrónicas
+  const [testCufeCode, setTestCufeCode] = useState(
+    'fe8b0ece665f054b2949685fc3b3f0fd681888381b5169f661f60ad2d88b3710e9a1f8200d51827c58e8011265d1e0b4',
+  );
+  const [cufeValidation, setCufeValidation] = useState<any>(null);
+
+  // Hook para manejo de facturas electrónicas
+  const {
+    processing_status,
+    progress,
+    status_message,
+    status_details,
+    current_invoice,
+    suggested_expenses,
+    loading,
+    error: invoiceError,
+    processing_info,
+    processFromQR,
+    validateCufe,
+    resetProcessing,
+    cancelProcessing,
+  } = useElectronicInvoices();
 
   useEffect(() => {
     // Función para probar la conexión con Supabase
@@ -63,11 +91,49 @@ export default function TestPage() {
     testConnection();
   }, []);
 
+  // Funciones para prueba de facturas electrónicas
+  const handleValidateCufe = async () => {
+    try {
+      setCufeValidation({ status: 'validating' });
+      const result = await validateCufe(testCufeCode);
+      setCufeValidation({
+        status: 'completed',
+        result,
+        cufe_normalized: normalizeCufeCode(testCufeCode),
+      });
+    } catch (error) {
+      setCufeValidation({
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  };
+
+  const handleProcessInvoice = async () => {
+    try {
+      resetProcessing();
+      await processFromQR(testCufeCode, {
+        maxRetries: 3,
+      });
+    } catch (error) {
+      console.error('Error procesando factura:', error);
+    }
+  };
+
+  const handleCancelProcessing = () => {
+    cancelProcessing();
+  };
+
+  const handleResetTest = () => {
+    resetProcessing();
+    setCufeValidation(null);
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 p-8">
       <div className="max-w-4xl mx-auto space-y-8">
         <h1 className="text-4xl font-bold text-center text-blue-400">
-          Test de Componentes - Dark Theme
+          Test de Componentes y Facturas Electrónicas
         </h1>
 
         {/* NUEVA SECCIÓN: Prueba de Supabase */}
@@ -152,6 +218,287 @@ export default function TestPage() {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* NUEVA SECCIÓN: Prueba de Facturas Electrónicas DIAN */}
+        <Card variant="glass" className="p-6">
+          <CardHeader>
+            <CardTitle className="text-white">
+              🧾 Prueba de Facturas Electrónicas DIAN
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Input del CUFE */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-white">
+                Código CUFE de Prueba:
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={testCufeCode}
+                  onChange={e => setTestCufeCode(e.target.value)}
+                  placeholder="Ingresa el código CUFE..."
+                  className="flex-1 px-3 py-2 border border-slate-600 rounded-md text-sm bg-slate-800 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500/20"
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleValidateCufe}
+                  disabled={
+                    !testCufeCode.trim() ||
+                    cufeValidation?.status === 'validating'
+                  }
+                  className="text-white border-slate-600 hover:bg-slate-700"
+                >
+                  {cufeValidation?.status === 'validating'
+                    ? 'Validando...'
+                    : 'Validar CUFE'}
+                </Button>
+              </div>
+            </div>
+
+            {/* Resultado de Validación */}
+            {cufeValidation && (
+              <div>
+                <h3 className="text-lg font-semibold mb-2 text-white">
+                  Resultado de Validación:
+                </h3>
+                <div
+                  className={`p-3 rounded-lg border ${
+                    cufeValidation.status === 'completed' &&
+                    cufeValidation.result.isValid
+                      ? 'bg-green-500/10 border-green-500/20 text-green-400'
+                      : cufeValidation.status === 'error' ||
+                          (cufeValidation.status === 'completed' &&
+                            !cufeValidation.result.isValid)
+                        ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                        : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
+                  }`}
+                >
+                  {cufeValidation.status === 'validating' &&
+                    '🔄 Validando formato y duplicados...'}
+                  {cufeValidation.status === 'error' &&
+                    `❌ Error: ${cufeValidation.error}`}
+                  {cufeValidation.status === 'completed' && (
+                    <div className="space-y-2">
+                      <div>
+                        {cufeValidation.result.is_valid
+                          ? '✅ CUFE válido'
+                          : '❌ CUFE inválido'}
+                      </div>
+                      <div className="text-sm">
+                        <strong>CUFE normalizado:</strong>{' '}
+                        {cufeValidation.cufe_normalized}
+                      </div>
+                      {cufeValidation.result.error_message && (
+                        <div className="text-sm">
+                          <strong>Error:</strong>{' '}
+                          {cufeValidation.result.error_message}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Controles de Procesamiento */}
+            <div className="flex gap-4 flex-wrap">
+              <Button
+                variant="gradient"
+                onClick={handleProcessInvoice}
+                disabled={
+                  !testCufeCode.trim() ||
+                  processing_status === 'downloading' ||
+                  processing_status === 'extracting' ||
+                  processing_status === 'saving'
+                }
+              >
+                {processing_status === 'idle'
+                  ? 'Procesar Factura'
+                  : 'Procesando...'}
+              </Button>
+
+              {(processing_status === 'downloading' ||
+                processing_status === 'extracting') && (
+                <Button
+                  variant="outline"
+                  onClick={handleCancelProcessing}
+                  className="text-white border-slate-600 hover:bg-slate-700"
+                >
+                  Cancelar
+                </Button>
+              )}
+
+              <Button
+                variant="secondary"
+                onClick={handleResetTest}
+                className="bg-slate-700 text-white hover:bg-slate-600"
+              >
+                Reset
+              </Button>
+            </div>
+
+            {/* Progreso de Procesamiento */}
+            {processing_status !== 'idle' && (
+              <div>
+                <h3 className="text-lg font-semibold mb-2 text-white">
+                  Estado del Procesamiento:
+                </h3>
+                <div className="space-y-3">
+                  {/* Barra de Progreso */}
+                  <div className="w-full bg-slate-700 rounded-full h-3">
+                    <div
+                      className="h-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+
+                  {/* Información del Estado */}
+                  <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-white font-medium">
+                        {status_message}
+                      </span>
+                      <span className="text-blue-400 font-mono">
+                        {progress}%
+                      </span>
+                    </div>
+                    {status_details && (
+                      <div className="text-sm text-gray-400">
+                        {status_details}
+                      </div>
+                    )}
+
+                    {/* Información de Captcha si está disponible */}
+                    {processing_info.captcha_info && (
+                      <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded text-amber-400 text-sm">
+                        🔐{' '}
+                        <strong>
+                          Captcha {processing_info.captcha_info.number}:
+                        </strong>
+                        {processing_info.captcha_info.taskId && (
+                          <span className="ml-2">
+                            ID: {processing_info.captcha_info.taskId}
+                          </span>
+                        )}
+                        {processing_info.captcha_info.attempt &&
+                          processing_info.captcha_info.maxAttempts && (
+                            <span className="ml-2">
+                              Intento: {processing_info.captcha_info.attempt}/
+                              {processing_info.captcha_info.maxAttempts}
+                            </span>
+                          )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Error de Procesamiento */}
+            {invoiceError && (
+              <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg text-red-400">
+                <strong>❌ Error:</strong> {invoiceError}
+              </div>
+            )}
+
+            {/* Resultados del Procesamiento */}
+            {current_invoice && processing_status === 'success' && (
+              <div>
+                <h3 className="text-lg font-semibold mb-2 text-white">
+                  ✅ Factura Procesada Exitosamente:
+                </h3>
+                <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <strong className="text-green-400">Proveedor:</strong>
+                      <div className="text-white">
+                        {current_invoice.supplier_name}
+                      </div>
+                    </div>
+                    <div>
+                      <strong className="text-green-400">NIT:</strong>
+                      <div className="text-white">
+                        {current_invoice.supplier_nit}
+                      </div>
+                    </div>
+                    <div>
+                      <strong className="text-green-400">Fecha:</strong>
+                      <div className="text-white">
+                        {current_invoice.invoice_date}
+                      </div>
+                    </div>
+                    <div>
+                      <strong className="text-green-400">Total:</strong>
+                      <div className="text-white">
+                        {new Intl.NumberFormat('es-CO', {
+                          style: 'currency',
+                          currency: 'COP',
+                          minimumFractionDigits: 0,
+                        }).format(current_invoice.total_amount)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {suggested_expenses.length > 0 && (
+                    <div className="mt-4">
+                      <strong className="text-green-400">
+                        Gastos Sugeridos:
+                      </strong>
+                      <div className="text-white mt-2">
+                        {suggested_expenses.length === 1 ? (
+                          <div>
+                            1 gasto agrupado por $
+                            {new Intl.NumberFormat('es-CO').format(
+                              suggested_expenses[0].amount,
+                            )}
+                          </div>
+                        ) : (
+                          <div>
+                            {suggested_expenses.length} gastos individuales
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-400 mt-1">
+                        Categoría sugerida:{' '}
+                        {suggested_expenses[0]?.suggested_category || 'OTROS'}
+                      </div>
+                    </div>
+                  )}
+
+                  {processing_info.items_found && (
+                    <div className="mt-2 text-sm text-gray-400">
+                      Items encontrados: {processing_info.items_found}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Información del Endpoint */}
+            <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg">
+              <h3 className="font-semibold text-blue-400 mb-2">
+                ℹ️ Información del Test:
+              </h3>
+              <div className="text-blue-300 space-y-1 text-sm">
+                <div>
+                  <strong>Endpoint:</strong>{' '}
+                  https://factura-dian.vercel.app/api/cufe-to-data-stream
+                </div>
+                <div>
+                  <strong>CUFE de Prueba:</strong> Factura real de INVERSIONES
+                  RIOS HOYOS SAS
+                </div>
+                <div>
+                  <strong>Items esperados:</strong> 63 productos de supermercado
+                </div>
+                <div>
+                  <strong>Total esperado:</strong> $535,927 COP
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

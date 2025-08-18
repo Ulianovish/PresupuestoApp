@@ -19,6 +19,7 @@ import ExpenseSummary from '@/components/organisms/ExpenseSummary/ExpenseSummary
 import ExpenseTable from '@/components/organisms/ExpenseTable/ExpenseTable';
 import ExpenseTypeSelectionModal from '@/components/organisms/ExpenseTypeSelectionModal/ExpenseTypeSelectionModal';
 import ExpensePageTemplate from '@/components/templates/ExpensePageTemplate/ExpensePageTemplate';
+import InvoiceWorkflow from '@/components/organisms/InvoiceWorkflow/InvoiceWorkflow';
 import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
 import {
   EXPENSE_CATEGORIES,
@@ -27,6 +28,7 @@ import {
   formatMonthName,
   ExpenseTransaction,
 } from '@/lib/services/expenses';
+import type { SuggestedExpense } from '@/types/electronic-invoices';
 
 // Interfaces
 interface FormData {
@@ -62,6 +64,9 @@ export default function GastosPage() {
   // Estado para el modal de selección de tipo de gasto
   const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false);
 
+  // Estado para el workflow de facturas electrónicas
+  const [isInvoiceWorkflowOpen, setIsInvoiceWorkflowOpen] = useState(false);
+
   // Estado del formulario
   const [form, setForm] = useState<FormData>({
     description: '',
@@ -90,10 +95,50 @@ export default function GastosPage() {
   };
 
   const handleSelectQR = () => {
-    // Por ahora, mostrar mensaje de próximamente
+    // Abrir el workflow de facturas electrónicas
     closeTypeSelection();
-    console.warn('🚧 Funcionalidad de QR próximamente disponible');
-    // TODO: Implementar funcionalidad de QR
+    setIsInvoiceWorkflowOpen(true);
+  };
+
+  // Funciones del workflow de facturas electrónicas
+  const handleInvoiceWorkflowClose = () => {
+    console.log('🚨 handleInvoiceWorkflowClose llamado - cerrando workflow');
+    console.trace('🔍 Stack trace del cierre:');
+    setIsInvoiceWorkflowOpen(false);
+  };
+
+  const handleExpensesFromInvoice = async (expenses: SuggestedExpense[]) => {
+    try {
+      // Convertir gastos sugeridos al formato del sistema
+      for (const expense of expenses) {
+        const expenseForm: FormData = {
+          description: expense.description,
+          amount: expense.amount,
+          transaction_date: expense.transaction_date,
+          category_name: expense.suggested_category,
+          account_name: 'Efectivo', // Cuenta por defecto para facturas
+          place: expense.place || '',
+        };
+
+        await addExpense(expenseForm);
+      }
+
+      // Mostrar mensaje de éxito
+      console.log(
+        `✅ ${expenses.length} gastos agregados desde factura electrónica`,
+      );
+
+      // Refrescar la lista de gastos
+      await refreshExpenses();
+    } catch (error) {
+      console.error('Error agregando gastos desde factura:', error);
+      console.warn('❌ Error al agregar gastos desde la factura');
+    }
+  };
+
+  const handleInvoiceError = (error: string) => {
+    console.error('Error en workflow de facturas:', error);
+    console.warn(`❌ Error procesando factura: ${error}`);
   };
 
   // Funciones del formulario
@@ -242,6 +287,15 @@ export default function GastosPage() {
             onFormChange={handleFormChange}
             onSubmit={handleSubmitExpense}
             onClose={handleCloseModal}
+          />
+          {/* Workflow de facturas electrónicas */}
+          <InvoiceWorkflow
+            isOpen={isInvoiceWorkflowOpen}
+            onClose={handleInvoiceWorkflowClose}
+            onExpensesAdded={handleExpensesFromInvoice}
+            onError={handleInvoiceError}
+            title="Agregar Factura Electrónica"
+            allowDirectSave={false}
           />
         </>
       }

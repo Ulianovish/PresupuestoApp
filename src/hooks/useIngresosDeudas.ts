@@ -12,6 +12,11 @@ import {
   obtenerDeudas,
   crearIngreso,
   crearDeuda,
+  actualizarIngreso,
+  actualizarDeuda,
+  eliminarIngreso,
+  eliminarDeuda,
+  marcarDeudaComoPagada,
   obtenerResumenFinanciero,
   inicializarDatosEjemplo,
   formatearMoneda,
@@ -38,9 +43,20 @@ interface UseIngresosDeudasReturn {
 
   // Funciones para ingresos
   agregarIngreso: (nuevoIngreso: NuevoIngreso) => Promise<void>;
+  editarIngreso: (
+    id: string,
+    datosActualizados: Partial<NuevoIngreso>,
+  ) => Promise<void>;
+  eliminarIngresoById: (id: string) => Promise<void>;
 
   // Funciones para deudas
   agregarDeuda: (nuevaDeuda: NuevaDeuda) => Promise<void>;
+  editarDeuda: (
+    id: string,
+    datosActualizados: Partial<NuevaDeuda> & { pagada?: boolean },
+  ) => Promise<void>;
+  eliminarDeudaById: (id: string) => Promise<void>;
+  marcarDeudaPagada: (id: string) => Promise<void>;
 
   // Funciones de utilidad
   recargarDatos: () => Promise<void>;
@@ -201,6 +217,176 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
   }, []);
 
   // ============================================
+  // FUNCIONES PARA EDITAR Y ELIMINAR INGRESOS
+  // ============================================
+
+  const editarIngreso = useCallback(
+    async (id: string, datosActualizados: Partial<NuevoIngreso>) => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Actualizar el ingreso en Supabase
+        const ingresoActualizado = await actualizarIngreso(
+          id,
+          datosActualizados,
+        );
+
+        // Actualizar el estado local
+        setIngresos(prevIngresos =>
+          prevIngresos.map(ingreso =>
+            ingreso.id === id ? ingresoActualizado : ingreso,
+          ),
+        );
+
+        // Recargar el resumen para mantener consistencia
+        const nuevoResumen = await obtenerResumenFinanciero();
+        setResumen(nuevoResumen);
+
+        console.error('Ingreso actualizado exitosamente:', ingresoActualizado);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Error al actualizar ingreso';
+        console.error('Error al actualizar ingreso:', err);
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  const eliminarIngresoById = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Eliminar el ingreso en Supabase (soft delete)
+      await eliminarIngreso(id);
+
+      // Actualizar el estado local removiendo el ingreso
+      setIngresos(prevIngresos =>
+        prevIngresos.filter(ingreso => ingreso.id !== id),
+      );
+
+      // Recargar el resumen para mantener consistencia
+      const nuevoResumen = await obtenerResumenFinanciero();
+      setResumen(nuevoResumen);
+
+      console.error('Ingreso eliminado exitosamente:', id);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Error al eliminar ingreso';
+      console.error('Error al eliminar ingreso:', err);
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // ============================================
+  // FUNCIONES PARA EDITAR Y ELIMINAR DEUDAS
+  // ============================================
+
+  const editarDeuda = useCallback(
+    async (
+      id: string,
+      datosActualizados: Partial<NuevaDeuda> & { pagada?: boolean },
+    ) => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Actualizar la deuda en Supabase
+        const deudaActualizada = await actualizarDeuda(id, datosActualizados);
+
+        // Actualizar el estado local
+        setDeudas(prevDeudas =>
+          prevDeudas.map(deuda => (deuda.id === id ? deudaActualizada : deuda)),
+        );
+
+        // Recargar el resumen para mantener consistencia
+        const nuevoResumen = await obtenerResumenFinanciero();
+        setResumen(nuevoResumen);
+
+        console.error('Deuda actualizada exitosamente:', deudaActualizada);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Error al actualizar deuda';
+        console.error('Error al actualizar deuda:', err);
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  const eliminarDeudaById = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Eliminar la deuda en Supabase (soft delete)
+      await eliminarDeuda(id);
+
+      // Actualizar el estado local removiendo la deuda
+      setDeudas(prevDeudas => prevDeudas.filter(deuda => deuda.id !== id));
+
+      // Recargar el resumen para mantener consistencia
+      const nuevoResumen = await obtenerResumenFinanciero();
+      setResumen(nuevoResumen);
+
+      console.error('Deuda eliminada exitosamente:', id);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Error al eliminar deuda';
+      console.error('Error al eliminar deuda:', err);
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const marcarDeudaPagada = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Marcar como pagada en Supabase
+      const deudaActualizada = await marcarDeudaComoPagada(id);
+
+      // Actualizar el estado local
+      setDeudas(prevDeudas =>
+        prevDeudas.map(deuda => (deuda.id === id ? deudaActualizada : deuda)),
+      );
+
+      // Recargar el resumen para mantener consistencia
+      const nuevoResumen = await obtenerResumenFinanciero();
+      setResumen(nuevoResumen);
+
+      console.error(
+        'Deuda marcada como pagada exitosamente:',
+        deudaActualizada,
+      );
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : 'Error al marcar deuda como pagada';
+      console.error('Error al marcar deuda como pagada:', err);
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // ============================================
   // FUNCIONES DE UTILIDAD
   // ============================================
 
@@ -229,9 +415,14 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
 
     // Funciones para ingresos
     agregarIngreso,
+    editarIngreso,
+    eliminarIngresoById,
 
     // Funciones para deudas
     agregarDeuda,
+    editarDeuda,
+    eliminarDeudaById,
+    marcarDeudaPagada,
 
     // Funciones de utilidad
     recargarDatos,
