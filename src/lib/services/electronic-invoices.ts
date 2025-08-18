@@ -19,7 +19,6 @@ import type {
 import {
   validateCufeCode,
   normalizeCufeCode,
-  isValidCufeFormat: _isValidCufeFormat,
 } from '@/lib/validations/cufe-validator';
 import { EXPENSE_CATEGORIES as _EXPENSE_CATEGORIES } from '@/lib/services/expenses';
 
