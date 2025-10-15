@@ -17,9 +17,9 @@ import React, { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
+import FloatingActionButtons from '@/components/molecules/FloatingActionButtons/FloatingActionButtons';
 import AddModals from '@/components/organisms/AddModals/AddModals';
 import DeudasSection from '@/components/organisms/DeudasSection/DeudasSection';
-import FloatingActionButtons from '@/components/molecules/FloatingActionButtons/FloatingActionButtons';
 import IngresosDeudaActionButtons from '@/components/organisms/IngresosDeudaActionButtons/IngresosDeudaActionButtons';
 import IngresosDeudaHeader from '@/components/organisms/IngresosDeudaHeader/IngresosDeudaHeader';
 import IngresosSection from '@/components/organisms/IngresosSection/IngresosSection';

@@ -173,7 +173,7 @@ export interface InvoiceProcessingError {
     | 'SAVE_FAILED'
     | 'NETWORK_ERROR';
   message: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 // Configuración para el escáner QR

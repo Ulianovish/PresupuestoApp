@@ -54,7 +54,7 @@ export default function QuickAddButtons({
     },
   };
 
-  const { icon: Icon, label, variant } = config[type];
+  const { icon: Icon, variant } = config[type];
 
   return (
     <Button
@@ -62,7 +62,6 @@ export default function QuickAddButtons({
       size="sm"
       onClick={onAction}
       className={`transition-all duration-200 hover:scale-105 ${className}`}
-      title={label}
     >
       <Plus className="w-4 h-4 mr-1" />
       <Icon className="w-4 h-4" />

@@ -48,7 +48,6 @@ export default function FloatingActionButtons({
         size="default"
         onClick={onAddIngreso}
         className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 group"
-        title="Agregar Ingreso"
       >
         <TrendingUp className="w-6 h-6 group-hover:scale-110 transition-transform duration-200" />
       </Button>
@@ -59,7 +58,6 @@ export default function FloatingActionButtons({
         size="default"
         onClick={onAddDeuda}
         className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 group border-2 border-orange-400/30 hover:border-orange-400/60"
-        title="Agregar Deuda"
       >
         <CreditCard className="w-6 h-6 text-orange-400 group-hover:scale-110 transition-transform duration-200" />
       </Button>

@@ -7,10 +7,9 @@
 
 import React from 'react';
 
-import QRInputModal from '@/components/organisms/QRInputModal/QRInputModal';
 import InvoiceProcessingModal from '@/components/organisms/InvoiceProcessingModal/InvoiceProcessingModal';
+import QRInputModal from '@/components/organisms/QRInputModal/QRInputModal';
 import { useInvoiceWorkflow } from '@/hooks/useInvoiceWorkflow';
-
 import type { SuggestedExpense } from '@/types/electronic-invoices';
 
 interface InvoiceWorkflowProps {
@@ -74,7 +73,9 @@ export default function InvoiceWorkflow({
       console.error('✅ Abriendo QR modal...');
       openQRModal();
     } else if (!isOpen && (showQRModal || showProcessingModal)) {
-      console.error('🚨 isOpen=false pero modales activos - RESETEANDO WORKFLOW');
+      console.error(
+        '🚨 isOpen=false pero modales activos - RESETEANDO WORKFLOW',
+      );
       console.trace('🔍 Stack trace del reset automático:');
       resetWorkflow();
     }

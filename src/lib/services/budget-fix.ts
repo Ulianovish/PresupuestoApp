@@ -2,6 +2,12 @@ import { createClient } from '@/lib/supabase/client';
 
 const supabase = createClient();
 
+interface RepairResult {
+  items_copied?: number;
+  month_year?: string;
+  [key: string]: unknown;
+}
+
 /**
  * Copia budget_items del mes anterior al nuevo presupuesto
  */
@@ -175,7 +181,11 @@ export async function createMonthlyBudgetWithItems(
       monthYear,
     );
 
-    console.error('🔵 ✅ Presupuesto creado con', itemsCopied, 'items copiados');
+    console.error(
+      '🔵 ✅ Presupuesto creado con',
+      itemsCopied,
+      'items copiados',
+    );
 
     return { templateId, itemsCopied };
   } catch (error) {
@@ -222,14 +232,14 @@ export async function fixExistingBudgetsWithoutItems(): Promise<{
     // Calcular totales
     const templatesFixed = repairResults.length;
     const totalItemsCreated = repairResults.reduce(
-      (total: number, result: Record<string, unknown>) => {
-        return total + (result.items_copied || 0);
+      (total: number, result: RepairResult) => {
+        return total + (Number(result.items_copied) || 0);
       },
       0,
     );
 
     console.error('🔧 ✅ Reparación completada:');
-    repairResults.forEach((result: Record<string, unknown>) => {
+    repairResults.forEach((result: RepairResult) => {
       console.error(
         `  - ${result.month_year}: ${result.items_copied} items copiados`,
       );

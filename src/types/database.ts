@@ -317,7 +317,7 @@ export interface Database {
           supplier_nit: string | null;
           invoice_date: string;
           total_amount: number;
-          extracted_data: any | null;
+          extracted_data: Record<string, unknown> | null;
           pdf_url: string | null;
           processed_at: string;
           created_at: string;
@@ -331,7 +331,7 @@ export interface Database {
           supplier_nit?: string | null;
           invoice_date: string;
           total_amount?: number;
-          extracted_data?: any | null;
+          extracted_data?: Record<string, unknown> | null;
           pdf_url?: string | null;
           processed_at?: string;
           created_at?: string;
@@ -345,7 +345,7 @@ export interface Database {
           supplier_nit?: string | null;
           invoice_date?: string;
           total_amount?: number;
-          extracted_data?: any | null;
+          extracted_data?: Record<string, unknown> | null;
           pdf_url?: string | null;
           processed_at?: string;
           created_at?: string;

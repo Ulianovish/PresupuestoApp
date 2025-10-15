@@ -5,6 +5,23 @@ import React, { useState } from 'react';
 import Button from '@/components/atoms/Button/Button';
 import Card from '@/components/atoms/Card/Card';
 
+interface ErrorWithMessage {
+  message?: string;
+}
+
+interface BudgetTemplate {
+  id?: string;
+  name?: string;
+  month_year?: string;
+  is_active?: boolean;
+  items_count?: number;
+}
+
+interface FixResult {
+  templatesFixed?: number;
+  totalItemsCreated?: number;
+}
+
 /**
  * Página de test para debuggear la creación de presupuestos
  */
@@ -13,9 +30,9 @@ export default function TestBudgetPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [templates, setTemplates] = useState<Record<string, unknown>[]>([]);
+  const [templates, setTemplates] = useState<BudgetTemplate[]>([]);
   const [isFixing, setIsFixing] = useState(false);
-  const [fixResult, setFixResult] = useState<Record<string, unknown> | null>(null);
+  const [fixResult, setFixResult] = useState<FixResult | null>(null);
 
   // Función para probar la creación de presupuesto usando API
   const testCreateBudget = async () => {
@@ -24,7 +41,10 @@ export default function TestBudgetPage() {
     setResult(null);
 
     try {
-      console.error('🧪 Test - Iniciando test de creación para:', selectedMonth);
+      console.error(
+        '🧪 Test - Iniciando test de creación para:',
+        selectedMonth,
+      );
 
       const response = await fetch('/api/budget/create', {
         method: 'POST',
@@ -51,7 +71,7 @@ export default function TestBudgetPage() {
       await loadTemplates();
     } catch (err: unknown) {
       console.error('🧪 Test - Error:', err);
-      setError(err.message || 'Error desconocido');
+      setError((err as ErrorWithMessage)?.message || 'Error desconocido');
     } finally {
       setIsLoading(false);
     }
@@ -150,7 +170,9 @@ export default function TestBudgetPage() {
       await loadTemplates();
     } catch (err: unknown) {
       console.error('🔧 Test - Error en reparación:', err);
-      setError(`Error en reparación: ${err.message || 'Error desconocido'}`);
+      setError(
+        `Error en reparación: ${(err as ErrorWithMessage)?.message || 'Error desconocido'}`,
+      );
     } finally {
       setIsFixing(false);
     }
@@ -263,11 +285,15 @@ export default function TestBudgetPage() {
             <div className="space-y-2 text-amber-300">
               <p>
                 Templates reparados:{' '}
-                <span className="font-bold">{fixResult.templatesFixed}</span>
+                <span className="font-bold">
+                  {fixResult?.templatesFixed || 0}
+                </span>
               </p>
               <p>
                 Items creados:{' '}
-                <span className="font-bold">{fixResult.totalItemsCreated}</span>
+                <span className="font-bold">
+                  {fixResult?.totalItemsCreated || 0}
+                </span>
               </p>
             </div>
             <pre className="text-amber-300 text-sm overflow-auto mt-4 bg-amber-900/20 p-2 rounded">
@@ -296,17 +322,17 @@ export default function TestBudgetPage() {
             <div className="space-y-2">
               {templates.map((template, index) => (
                 <div
-                  key={template.id || index}
+                  key={template?.id || index}
                   className="p-3 bg-slate-700/50 rounded-lg border border-slate-600"
                 >
                   <div className="flex justify-between items-center">
                     <div className="flex-1">
                       <div className="text-white font-medium">
-                        {template.name}
+                        {template?.name || 'Template sin nombre'}
                       </div>
                       <div className="text-gray-400 text-sm">
                         Mes: {template.month_year} | ID:{' '}
-                        {template.id?.slice(0, 8)}...
+                        {template?.id?.slice(0, 8) || 'N/A'}...
                       </div>
                     </div>
                     <div className="text-right space-y-1">
@@ -317,12 +343,12 @@ export default function TestBudgetPage() {
                         {template.items_count !== undefined ? (
                           <span
                             className={
-                              template.items_count > 0
+                              (template?.items_count || 0) > 0
                                 ? 'text-green-400'
-                                : 'text-red-400'
+                                : 'text-gray-400'
                             }
                           >
-                            {template.items_count} items
+                            {template?.items_count || 0} items
                           </span>
                         ) : (
                           <span className="text-gray-500">Items: ?</span>

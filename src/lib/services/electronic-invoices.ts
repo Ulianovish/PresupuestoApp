@@ -4,14 +4,12 @@
  * y maneja la persistencia en la base de datos
  */
 
+import { EXPENSE_CATEGORIES as _EXPENSE_CATEGORIES } from '@/lib/services/expenses';
 import { createClient } from '@/lib/supabase/client';
-
 import {
   validateCufeCode,
   normalizeCufeCode,
 } from '@/lib/validations/cufe-validator';
-import { EXPENSE_CATEGORIES as _EXPENSE_CATEGORIES } from '@/lib/services/expenses';
-
 import type {
   ElectronicInvoice,
   CreateElectronicInvoiceData,
@@ -20,6 +18,31 @@ import type {
   SuggestedExpense,
   CategoryMappingRule,
 } from '@/types/electronic-invoices';
+
+interface InvoiceDetails {
+  storeName?: string;
+  nit?: string;
+  date?: string;
+  total_amount?: number;
+  subtotal?: number;
+  currency?: string;
+  invoiceNumber?: string;
+  cufe?: string;
+}
+
+interface InvoiceItem {
+  idx?: number;
+  item_number?: number;
+  description?: string;
+  quantity?: string | number;
+  unit_price?: string | number;
+  total_price?: string | number;
+  iva_percent?: string | number;
+  iva_amount?: string | number;
+  unit_measure?: string;
+  code?: string;
+  [key: string]: unknown;
+}
 
 // Cliente de Supabase
 const supabase = createClient();
@@ -64,17 +87,17 @@ export async function processInvoiceFromQR(
   options: {
     maxRetries?: number;
     captchaApiKey?: string;
-    onProgress?: (data: any) => void;
+    onProgress?: (data: Record<string, unknown>) => void;
     onConnect?: () => void;
   } = {},
 ): Promise<InvoiceProcessingResult> {
   // Validar CUFE antes de procesar
-  const validationResult = await validateCufeCode(cufeCode, checkCufeExists);
+  const validationResult = await validateCufeCode(cufeCode);
 
-  if (!validationResult.is_valid) {
+  if (!validationResult.isValid) {
     throw new InvoiceProcessingErrorLocal(
       'INVALID_CUFE',
-      validationResult.error_message || 'CUFE inválido',
+      validationResult.error || 'CUFE inválido',
     );
   }
 
@@ -126,7 +149,7 @@ export async function processInvoiceFromQR(
           normalizedCufe,
         );
         resolve(result);
-      } catch (_error) {
+      } catch {
         eventSource.close();
         reject(
           new InvoiceProcessingErrorLocal(
@@ -140,7 +163,7 @@ export async function processInvoiceFromQR(
     // Manejar errores
     eventSource.addEventListener('error', event => {
       try {
-        const data = JSON.parse((event as any).data);
+        const data = JSON.parse((event as MessageEvent).data);
         eventSource.close();
         reject(
           new InvoiceProcessingErrorLocal('PROCESSING_FAILED', data.error),
@@ -174,78 +197,91 @@ export async function processInvoiceFromQR(
  * Transforma el resultado del SSE al formato esperado por el frontend
  */
 function transformSSEResultToInvoiceProcessingResult(
-  sseResult: any,
+  sseResult: Record<string, unknown>,
   cufeCode: string,
 ): InvoiceProcessingResult {
   const invoiceDetails = sseResult.invoice_details;
   const items = sseResult.items || [];
   const processingInfo = sseResult.processing_info || {};
 
+  // Type assertions for extracted data
+  const invoiceDetailsTyped = invoiceDetails as InvoiceDetails;
+  const itemsTyped = items as InvoiceItem[];
+
   // Crear datos de factura electrónica
   const invoiceData: CreateElectronicInvoiceData = {
     cufe_code: cufeCode,
-    supplier_name: invoiceDetails.storeName,
-    supplier_nit: invoiceDetails.nit,
-    invoice_date: invoiceDetails.date,
-    total_amount: invoiceDetails.total_amount,
+    supplier_name: invoiceDetailsTyped.storeName || '',
+    supplier_nit: invoiceDetailsTyped.nit || '',
+    invoice_date: invoiceDetailsTyped.date || '',
+    total_amount: invoiceDetailsTyped.total_amount || 0,
     extracted_data: {
       supplier: {
-        name: invoiceDetails.storeName,
-        nit: invoiceDetails.nit,
+        name: invoiceDetailsTyped.storeName || '',
+        nit: invoiceDetailsTyped.nit || '',
       },
       invoice_details: {
         number:
-          invoiceDetails.invoiceNumber ||
-          invoiceDetails.cufe?.substring(0, 8) ||
+          invoiceDetailsTyped.invoiceNumber ||
+          invoiceDetailsTyped.cufe?.substring(0, 8) ||
           '',
-        date: invoiceDetails.date,
-        currency: invoiceDetails.currency || 'COP',
+        date: invoiceDetailsTyped.date || '',
+        currency: invoiceDetailsTyped.currency || 'COP',
       },
-      items: items.map((item: any) => ({
-        id: `item-${item.idx || item.item_number}`,
-        description: item.description || 'Producto sin descripción',
-        quantity: parseFloat(item.quantity) || 1,
-        unit_price: parseFloat(item.unit_price) || 0,
-        total_price: parseFloat(item.total_price) || 0,
-        tax_rate: item.iva_percent ? parseFloat(item.iva_percent) : undefined,
-        tax_amount: item.iva_amount ? parseFloat(item.iva_amount) : undefined,
+      items: itemsTyped.map((item: InvoiceItem) => ({
+        id: `item-${item.idx || item.item_number || Math.random()}`,
+        description: String(item.description || 'Producto sin descripción'),
+        quantity: parseFloat(String(item.quantity)) || 1,
+        unit_price: parseFloat(String(item.unit_price)) || 0,
+        total_price: parseFloat(String(item.total_price)) || 0,
+        tax_rate: item.iva_percent
+          ? parseFloat(String(item.iva_percent))
+          : undefined,
+        tax_amount: item.iva_amount
+          ? parseFloat(String(item.iva_amount))
+          : undefined,
         unit: item.unit_measure || undefined,
         product_code: item.code || undefined,
       })),
       totals: {
-        subtotal: invoiceDetails.subtotal || 0,
+        subtotal: invoiceDetailsTyped.subtotal || 0,
         tax_amount:
-          (invoiceDetails.total_amount || 0) - (invoiceDetails.subtotal || 0),
-        total_amount: invoiceDetails.total_amount || 0,
+          (invoiceDetailsTyped.total_amount || 0) -
+          (invoiceDetailsTyped.subtotal || 0),
+        total_amount: invoiceDetailsTyped.total_amount || 0,
       },
       taxes: [
         {
           type: 'IVA',
           rate: 19, // IVA estándar en Colombia
-          base_amount: invoiceDetails.subtotal || 0,
+          base_amount: invoiceDetailsTyped.subtotal || 0,
           tax_amount:
-            (invoiceDetails.total_amount || 0) - (invoiceDetails.subtotal || 0),
+            (invoiceDetailsTyped.total_amount || 0) -
+            (invoiceDetailsTyped.subtotal || 0),
         },
       ],
       additional_info: {
-        notes: `Procesado en ${processingInfo.total_time}ms`,
-        observations: `PDF de ${processingInfo.pdf_size} bytes con ${processingInfo.items_found} items`,
+        notes: `Procesado en ${(processingInfo as Record<string, unknown>).total_time || 0}ms`,
+        observations: `PDF de ${(processingInfo as Record<string, unknown>).pdf_size || 0} bytes con ${(processingInfo as Record<string, unknown>).items_found || 0} items`,
       },
     },
   };
 
   // Generar gastos sugeridos
-  const suggestedExpenses = generateSuggestedExpenses(items, invoiceDetails);
+  const suggestedExpenses = generateSuggestedExpenses(
+    itemsTyped,
+    invoiceDetailsTyped,
+  );
 
   // Crear factura temporal para el resultado
   const tempInvoice: ElectronicInvoice = {
-    id: 'temp-' + Date.now(),
+    id: `temp-${Date.now()}`,
     user_id: '',
     cufe_code: cufeCode,
-    supplier_name: invoiceDetails.storeName,
-    supplier_nit: invoiceDetails.nit,
-    invoice_date: invoiceDetails.date,
-    total_amount: invoiceDetails.total_amount,
+    supplier_name: invoiceDetailsTyped.storeName || '',
+    supplier_nit: invoiceDetailsTyped.nit || '',
+    invoice_date: invoiceDetailsTyped.date || '',
+    total_amount: invoiceDetailsTyped.total_amount || 0,
     extracted_data: invoiceData.extracted_data!,
     pdf_url: null,
     processed_at: new Date().toISOString(),
@@ -265,8 +301,8 @@ function transformSSEResultToInvoiceProcessingResult(
  * Genera gastos sugeridos basados en los items de la factura
  */
 function generateSuggestedExpenses(
-  items: any[],
-  invoiceDetails: any,
+  items: InvoiceItem[],
+  invoiceDetails: InvoiceDetails,
 ): SuggestedExpense[] {
   const expenses: SuggestedExpense[] = [];
 
@@ -302,14 +338,14 @@ function generateSuggestedExpenses(
     // Si no hay items, crear un gasto único con el total
     expenses.push({
       id: 'expense-1',
-      description: `Compra en ${invoiceDetails.storeName}`,
-      amount: invoiceDetails.total_amount,
-      transaction_date: invoiceDetails.date,
+      description: `Compra en ${invoiceDetails.storeName || 'Proveedor'}`,
+      amount: Number(invoiceDetails.total_amount) || 0,
+      transaction_date: String(invoiceDetails.date) || '',
       suggested_category: suggestCategoryFromSupplier(
-        invoiceDetails.storeName,
+        String(invoiceDetails.storeName || ''),
         categoryMapping,
       ),
-      place: invoiceDetails.storeName,
+      place: String(invoiceDetails.storeName) || undefined,
       confidence_score: 0.6,
     });
   } else {
@@ -320,40 +356,42 @@ function generateSuggestedExpenses(
       // Crear un gasto único agrupado
       expenses.push({
         id: 'expense-grouped',
-        description: `Compra en ${invoiceDetails.storeName} (${items.length} items)`,
-        amount: invoiceDetails.total_amount,
-        transaction_date: invoiceDetails.date,
+        description: `Compra en ${invoiceDetails.storeName || 'Proveedor'} (${items.length} items)`,
+        amount: Number(invoiceDetails.total_amount) || 0,
+        transaction_date: String(invoiceDetails.date) || '',
         suggested_category: suggestCategoryFromSupplier(
-          invoiceDetails.storeName,
+          String(invoiceDetails.storeName || ''),
           categoryMapping,
         ),
-        place: invoiceDetails.storeName,
+        place: String(invoiceDetails.storeName) || undefined,
         confidence_score: 0.8,
       });
     } else {
       // Crear un gasto por cada item (solo para pocas cantidades)
       items.forEach(item => {
-        const amount = parseFloat(item.total_price) || 0;
+        const amount = parseFloat(String(item.total_price)) || 0;
         if (amount > 0) {
           expenses.push({
-            id: `expense-${item.idx || item.item_number}`,
-            description: item.description || 'Producto sin descripción',
+            id: `expense-${item.idx || item.item_number || Math.random()}`,
+            description: String(item.description || 'Producto sin descripción'),
             amount,
-            transaction_date: invoiceDetails.date,
+            transaction_date: String(invoiceDetails.date) || '',
             suggested_category: suggestCategoryFromItem(
               item,
-              invoiceDetails.storeName,
+              String(invoiceDetails.storeName || ''),
               categoryMapping,
             ),
-            place: invoiceDetails.storeName,
+            place: String(invoiceDetails.storeName) || undefined,
             original_item: {
-              id: `item-${item.idx || item.item_number}`,
-              description: item.description || 'Producto sin descripción',
-              quantity: parseFloat(item.quantity) || 1,
-              unit_price: parseFloat(item.unit_price) || 0,
+              id: `item-${item.idx || item.item_number || Math.random()}`,
+              description: String(
+                item.description || 'Producto sin descripción',
+              ),
+              quantity: parseFloat(String(item.quantity)) || 1,
+              unit_price: parseFloat(String(item.unit_price)) || 0,
               total_price: amount,
-              unit: item.unit_measure || undefined,
-              product_code: item.code || undefined,
+              unit: String(item.unit_measure) || undefined,
+              product_code: String(item.code) || undefined,
             },
             confidence_score: 0.7,
           });
@@ -394,7 +432,7 @@ function suggestCategoryFromItem(
   supplierName: string,
   mappingRules: CategoryMappingRule[],
 ): string {
-  const itemDescription = (item.description as string || '').toLowerCase();
+  const itemDescription = ((item.description as string) || '').toLowerCase();
   const _lowerSupplier = (supplierName || '').toLowerCase();
 
   // Palabras clave específicas para categorización por producto
@@ -559,7 +597,7 @@ export async function processAndSaveInvoice(
   options: {
     maxRetries?: number;
     captchaApiKey?: string;
-    onProgress?: (data: any) => void;
+    onProgress?: (data: Record<string, unknown>) => void;
     onConnect?: () => void;
   } = {},
 ): Promise<{
@@ -572,8 +610,7 @@ export async function processAndSaveInvoice(
 
   if (processingResult.processing_status !== 'success') {
     throw new Error(
-      'Error procesando factura: ' +
-        processingResult.processing_errors?.join(', '),
+      `Error procesando factura: ${processingResult.processing_errors?.join(', ')}`,
     );
   }
 

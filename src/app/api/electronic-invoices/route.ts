@@ -6,8 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { createClient } from '@/lib/supabase/server';
-import { validateCufeCode, normalizeCufeCode } from '@/lib/validations/cufe-validator';
-
+import {
+  validateCufeCode,
+  normalizeCufeCode,
+} from '@/lib/validations/cufe-validator';
 import type { CreateElectronicInvoiceData } from '@/types/electronic-invoices';
 
 // GET /api/electronic-invoices - Obtener facturas del usuario
@@ -74,10 +76,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener estadísticas adicionales
-    const { data: stats } = await supabase
+    const { count } = await supabase
       .from('electronic_invoices')
-      .select('count(*), total_amount.sum()')
+      .select('*', { count: 'exact' })
       .eq('user_id', user.id);
+
+    const { data: sumData } = await supabase
+      .from('electronic_invoices')
+      .select('total_amount')
+      .eq('user_id', user.id);
+
+    const totalAmount =
+      sumData?.reduce((sum, invoice) => sum + (invoice.total_amount || 0), 0) ||
+      0;
 
     return NextResponse.json({
       success: true,
@@ -86,11 +97,11 @@ export async function GET(request: NextRequest) {
         pagination: {
           limit,
           offset,
-          total: stats?.[0]?.count || 0,
+          total: count || 0,
         },
         summary: {
-          total_invoices: stats?.[0]?.count || 0,
-          total_amount: stats?.[0]?.sum || 0,
+          total_invoices: count || 0,
+          total_amount: totalAmount,
         },
       },
     });
@@ -138,7 +149,7 @@ export async function POST(request: NextRequest) {
     const normalizedCufe = normalizeCufeCode(invoiceData.cufe_code);
     const validation = await validateCufeCode(normalizedCufe);
 
-    if (!validation.format_valid) {
+    if (!validation.isValid) {
       return NextResponse.json(
         { error: 'Formato de CUFE inválido' },
         { status: 400 },

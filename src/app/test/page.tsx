@@ -16,6 +16,15 @@ import {
   normalizeCufeCode,
 } from '@/lib/validations/cufe-validator';
 
+interface CaptchaInfo {
+  number?: string | number;
+  taskId?: string;
+  attempt?: number;
+  maxAttempts?: number;
+  status?: string;
+  solveTime?: number;
+}
+
 /**
  * TestPage - Página completa de prueba para componentes y Supabase
  */
@@ -41,7 +50,12 @@ export default function TestPage() {
   const [testCufeCode, setTestCufeCode] = useState(
     'fe8b0ece665f054b2949685fc3b3f0fd681888381b5169f661f60ad2d88b3710e9a1f8200d51827c58e8011265d1e0b4',
   );
-  const [cufeValidation, setCufeValidation] = useState<{ isValid: boolean; error?: string } | null>(null);
+  const [cufeValidation, setCufeValidation] = useState<{
+    status: 'validating' | 'completed' | 'error';
+    result?: { isValid: boolean; error?: string };
+    cufe_normalized?: string;
+    error?: string;
+  } | null>(null);
 
   // Hook para manejo de facturas electrónicas
   const {
@@ -267,11 +281,11 @@ export default function TestPage() {
                 <div
                   className={`p-3 rounded-lg border ${
                     cufeValidation.status === 'completed' &&
-                    cufeValidation.result.isValid
+                    cufeValidation.result?.isValid
                       ? 'bg-green-500/10 border-green-500/20 text-green-400'
                       : cufeValidation.status === 'error' ||
                           (cufeValidation.status === 'completed' &&
-                            !cufeValidation.result.isValid)
+                            !cufeValidation.result?.isValid)
                         ? 'bg-red-500/10 border-red-500/20 text-red-400'
                         : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
                   }`}
@@ -283,7 +297,7 @@ export default function TestPage() {
                   {cufeValidation.status === 'completed' && (
                     <div className="space-y-2">
                       <div>
-                        {cufeValidation.result.is_valid
+                        {cufeValidation.result?.isValid
                           ? '✅ CUFE válido'
                           : '❌ CUFE inválido'}
                       </div>
@@ -291,10 +305,9 @@ export default function TestPage() {
                         <strong>CUFE normalizado:</strong>{' '}
                         {cufeValidation.cufe_normalized}
                       </div>
-                      {cufeValidation.result.error_message && (
+                      {cufeValidation.result?.error && (
                         <div className="text-sm">
-                          <strong>Error:</strong>{' '}
-                          {cufeValidation.result.error_message}
+                          <strong>Error:</strong> {cufeValidation.result?.error}
                         </div>
                       )}
                     </div>
@@ -376,18 +389,36 @@ export default function TestPage() {
                       <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded text-amber-400 text-sm">
                         🔐{' '}
                         <strong>
-                          Captcha {processing_info.captcha_info.number}:
+                          Captcha{' '}
+                          {(processing_info.captcha_info as CaptchaInfo)
+                            ?.number || ''}
+                          :
                         </strong>
-                        {processing_info.captcha_info.taskId && (
+                        {(processing_info.captcha_info as CaptchaInfo)
+                          ?.taskId && (
                           <span className="ml-2">
-                            ID: {processing_info.captcha_info.taskId}
+                            ID:{' '}
+                            {
+                              (processing_info.captcha_info as CaptchaInfo)
+                                .taskId
+                            }
                           </span>
                         )}
-                        {processing_info.captcha_info.attempt &&
-                          processing_info.captcha_info.maxAttempts && (
+                        {(processing_info.captcha_info as CaptchaInfo)
+                          ?.attempt &&
+                          (processing_info.captcha_info as CaptchaInfo)
+                            ?.maxAttempts && (
                             <span className="ml-2">
-                              Intento: {processing_info.captcha_info.attempt}/
-                              {processing_info.captcha_info.maxAttempts}
+                              Intento:{' '}
+                              {
+                                (processing_info.captcha_info as CaptchaInfo)
+                                  .attempt
+                              }
+                              /
+                              {
+                                (processing_info.captcha_info as CaptchaInfo)
+                                  .maxAttempts
+                              }
                             </span>
                           )}
                       </div>

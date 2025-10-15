@@ -4,8 +4,10 @@
  */
 
 import { useState, useCallback } from 'react';
-import { useElectronicInvoices } from './useElectronicInvoices';
+
 import type { SuggestedExpense } from '@/types/electronic-invoices';
+
+import { useElectronicInvoices } from './useElectronicInvoices';
 
 interface UseInvoiceWorkflowState {
   // Estados de UI

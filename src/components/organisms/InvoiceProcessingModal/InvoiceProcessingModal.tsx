@@ -16,6 +16,15 @@ import Card, {
 import { useElectronicInvoices } from '@/hooks/useElectronicInvoices';
 import type { SuggestedExpense } from '@/types/electronic-invoices';
 
+interface CaptchaInfo {
+  number?: string | number;
+  taskId?: string;
+  attempt?: number;
+  maxAttempts?: number;
+  status?: string;
+  solveTime?: number;
+}
+
 interface InvoiceProcessingModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -213,41 +222,42 @@ export default function InvoiceProcessingModal({
                 )}
 
                 {/* Información específica de captcha */}
-                {processing_info.captcha_info && (
-                  <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded text-amber-400">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-medium">
-                        🔐 Captcha {processing_info.captcha_info.number}
-                      </span>
-                      <span className="text-xs bg-amber-500/20 px-2 py-1 rounded">
-                        {processing_info.captcha_info.status}
-                      </span>
-                    </div>
-
-                    {processing_info.captcha_info.taskId && (
-                      <div className="text-xs">
-                        <strong>Task ID:</strong>{' '}
-                        {processing_info.captcha_info.taskId}
-                      </div>
-                    )}
-
-                    {processing_info.captcha_info.attempt &&
-                      processing_info.captcha_info.maxAttempts && (
-                        <div className="text-xs">
-                          <strong>Intento:</strong>{' '}
-                          {processing_info.captcha_info.attempt}/
-                          {processing_info.captcha_info.maxAttempts}
+                {processing_info.captcha_info &&
+                  (() => {
+                    const captcha = processing_info.captcha_info as CaptchaInfo;
+                    return (
+                      <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded text-amber-400">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="font-medium">
+                            🔐 Captcha {captcha.number || ''}
+                          </span>
+                          <span className="text-xs bg-amber-500/20 px-2 py-1 rounded">
+                            {captcha.status || ''}
+                          </span>
                         </div>
-                      )}
 
-                    {processing_info.captcha_info.solveTime && (
-                      <div className="text-xs">
-                        <strong>Tiempo de resolución:</strong>{' '}
-                        {processing_info.captcha_info.solveTime}s
+                        {captcha.taskId && (
+                          <div className="text-xs">
+                            <strong>Task ID:</strong> {captcha.taskId}
+                          </div>
+                        )}
+
+                        {captcha.attempt && captcha.maxAttempts && (
+                          <div className="text-xs">
+                            <strong>Intento:</strong> {captcha.attempt}/
+                            {captcha.maxAttempts}
+                          </div>
+                        )}
+
+                        {captcha.solveTime && (
+                          <div className="text-xs">
+                            <strong>Tiempo de resolución:</strong>{' '}
+                            {captcha.solveTime}s
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )}
+                    );
+                  })()}
               </div>
 
               {/* Botón de cancelar durante procesamiento */}

@@ -4,13 +4,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { createClient } from '@/lib/supabase/server';
 import type { UpdateElectronicInvoiceData } from '@/types/electronic-invoices';
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 // GET /api/electronic-invoices/[id] - Obtener factura específica
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json(
@@ -97,7 +98,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const updateData: UpdateElectronicInvoiceData = body;
 
@@ -124,7 +125,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     }
 
     // Preparar datos de actualización
-    const updateFields: any = {
+    const updateFields: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
 
@@ -191,7 +192,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json(

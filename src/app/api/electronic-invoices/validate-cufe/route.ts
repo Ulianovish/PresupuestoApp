@@ -74,15 +74,15 @@ export async function POST(request: NextRequest) {
       return data || false;
     };
 
-    // Validar completamente
-    const validationResult = await validateCufeCode(
-      normalizedCufe,
-      checkCufeExists,
-    );
+    // Validar formato
+    const validationResult = validateCufeCode(normalizedCufe);
+
+    // Verificar si ya existe
+    const alreadyExists = await checkCufeExists(normalizedCufe);
 
     // Información adicional sobre la factura si ya existe
     let existingInvoiceInfo = null;
-    if (validationResult.already_exists) {
+    if (alreadyExists) {
       const { data: existingInvoice } = await supabase
         .from('electronic_invoices')
         .select(
@@ -109,20 +109,45 @@ export async function POST(request: NextRequest) {
           total_amount: existingInvoice.total_amount,
           processed_at: existingInvoice.processed_at,
           has_expenses:
-            (existingInvoice.related_expenses as any)?.[0]?.count > 0,
+            (existingInvoice.related_expenses as { count: number }[])?.[0]
+              ?.count > 0,
         };
       }
     }
 
-    const response = {
+    const response: {
+      success: boolean;
+      valid: boolean;
+      cufe_code: string;
+      original_cufe: string;
+      validation: {
+        format_valid: boolean;
+        already_exists: boolean;
+        error_message?: string;
+      };
+      existing_invoice: {
+        id: string;
+        supplier_name: string;
+        supplier_nit: string;
+        invoice_date: string;
+        total_amount: number;
+        processed_at: string;
+        has_expenses: boolean;
+      } | null;
+      qr_processing?: {
+        original_content: string;
+        cufe_extracted: boolean;
+        extraction_method: string;
+      };
+    } = {
       success: true,
-      valid: validationResult.is_valid,
+      valid: validationResult.isValid,
       cufe_code: normalizedCufe,
       original_cufe: finalCufeCode,
       validation: {
-        format_valid: validationResult.format_valid,
-        already_exists: validationResult.already_exists,
-        error_message: validationResult.error_message,
+        format_valid: validationResult.isValid,
+        already_exists: alreadyExists,
+        error_message: validationResult.error,
       },
       existing_invoice: existingInvoiceInfo,
     };
@@ -188,21 +213,21 @@ export async function GET(request: NextRequest) {
       return data || false;
     };
 
-    // Validar
-    const validationResult = await validateCufeCode(
-      normalizedCufe,
-      checkCufeExists,
-    );
+    // Validar formato
+    const validationResult = await validateCufeCode(normalizedCufe);
+
+    // Verificar si ya existe
+    const alreadyExists = await checkCufeExists(normalizedCufe);
 
     return NextResponse.json({
       success: true,
-      valid: validationResult.is_valid,
+      valid: validationResult.isValid,
       cufe_code: normalizedCufe,
       original_cufe: cufeCode,
       validation: {
-        format_valid: validationResult.format_valid,
-        already_exists: validationResult.already_exists,
-        error_message: validationResult.error_message,
+        format_valid: validationResult.isValid,
+        already_exists: alreadyExists,
+        error_message: validationResult.error,
       },
     });
   } catch (error) {

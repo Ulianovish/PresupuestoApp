@@ -86,7 +86,7 @@ export default function QRInputModal({
       const normalizedCufe = normalizeCufeCode(cufeToValidate);
       const result = await validateCufeCode(normalizedCufe);
 
-      if (result.is_valid) {
+      if (result.isValid) {
         setValidation({
           isValid: true,
           cufe: normalizedCufe,
@@ -94,7 +94,7 @@ export default function QRInputModal({
       } else {
         setValidation({
           isValid: false,
-          error: result.error_message || 'Código CUFE inválido',
+          error: result.error || 'Código CUFE inválido',
         });
       }
     } catch (error) {

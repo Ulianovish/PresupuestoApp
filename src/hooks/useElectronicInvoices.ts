@@ -5,7 +5,6 @@
 
 import { useState, useCallback, useRef } from 'react';
 
-import { validateCufeCode, normalizeCufeCode } from '@/lib/validations/cufe-validator';
 import {
   processInvoiceFromQR,
   saveElectronicInvoice,
@@ -16,7 +15,10 @@ import {
   checkCufeExists,
   InvoiceProcessingError,
 } from '@/lib/services/electronic-invoices';
-
+import {
+  validateCufeCode,
+  normalizeCufeCode,
+} from '@/lib/validations/cufe-validator';
 import type {
   ElectronicInvoice,
   InvoiceProcessingResult,
@@ -25,6 +27,15 @@ import type {
   CreateElectronicInvoiceData,
   UpdateElectronicInvoiceData,
 } from '@/types/electronic-invoices';
+
+interface ProgressData {
+  progress?: number;
+  message?: string;
+  details?: string;
+  captcha?: Record<string, unknown>;
+  processing_time?: number;
+  step?: string;
+}
 
 interface UseElectronicInvoicesState {
   // Estado del procesamiento
@@ -152,15 +163,12 @@ export function useElectronicInvoices(): UseElectronicInvoicesState &
       try {
         // Validar CUFE
         const normalizedCufe = normalizeCufeCode(cufeCode);
-        const validation = await validateCufeCode(
-          normalizedCufe,
-          checkCufeExists,
-        );
+        const validation = await validateCufeCode(normalizedCufe);
 
-        if (!validation.is_valid) {
+        if (!validation.isValid) {
           throw new InvoiceProcessingError(
             'INVALID_CUFE',
-            validation.error_message || 'CUFE inválido',
+            validation.error || 'CUFE inválido',
           );
         }
 
@@ -186,21 +194,26 @@ export function useElectronicInvoices(): UseElectronicInvoicesState &
               status_details: 'Iniciando descarga de PDF desde DIAN',
             });
           },
-          onProgress: data => {
+          onProgress: (data: ProgressData) => {
             if (cancelRef.current) return;
 
             updateState({
-              progress: data.progress || 0,
-              status_message: data.message || '',
-              status_details: data.details || '',
+              progress: typeof data.progress === 'number' ? data.progress : 0,
+              status_message:
+                typeof data.message === 'string' ? data.message : '',
+              status_details:
+                typeof data.details === 'string' ? data.details : '',
               processing_info: {
-                captcha_info: data.captcha,
-                total_time: data.processing_time,
+                captcha_info: data.captcha || undefined,
+                total_time:
+                  typeof data.processing_time === 'number'
+                    ? data.processing_time
+                    : undefined,
               },
             });
 
             // Actualizar estado según el step
-            if (data.step) {
+            if (data.step && typeof data.step === 'string') {
               let newStatus: InvoiceProcessingStatus = 'downloading';
 
               if (
@@ -462,10 +475,10 @@ export function useElectronicInvoices(): UseElectronicInvoicesState &
   const validateCufe = useCallback(
     async (cufeCode: string): Promise<{ isValid: boolean; error?: string }> => {
       try {
-        const result = await validateCufeCode(cufeCode, checkCufeExists);
+        const result = await validateCufeCode(cufeCode);
         return {
-          isValid: result.is_valid,
-          error: result.error_message,
+          isValid: result.isValid,
+          error: result.error,
         };
       } catch (error) {
         return {
