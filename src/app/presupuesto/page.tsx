@@ -51,10 +51,11 @@ interface FormData {
 }
 
 export default function PresupuestoPage() {
-  // Usar contexto global para el mes seleccionado
+  // Usar contexto global para el mes seleccionado (única fuente de verdad)
   const { selectedMonth, setSelectedMonth } = useMonth();
 
   // Hook personalizado para manejar presupuesto mensual
+  // Ahora recibe el mes del contexto y se sincroniza automáticamente
   const {
     budgetData,
     categories,

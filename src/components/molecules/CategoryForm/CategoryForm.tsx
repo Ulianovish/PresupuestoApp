@@ -112,7 +112,7 @@ export default function CategoryForm({
     } catch (error) {
       if (error instanceof z.ZodError) {
         const fieldErrors: Partial<Record<keyof CategoryFormData, string>> = {};
-        error.errors.forEach(err => {
+        error.issues.forEach((err: z.ZodIssue) => {
           if (err.path[0]) {
             fieldErrors[err.path[0] as keyof CategoryFormData] = err.message;
           }

@@ -79,10 +79,7 @@ export default function IngresosDeudaActionButtons({
   // Manejar envío del formulario de ingresos
   const handleSubmitIngreso = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onAddIngreso({
-      ...nuevoIngreso,
-      monto: nuevoIngreso.monto.toString(),
-    });
+    await onAddIngreso(nuevoIngreso);
     setNuevoIngreso({
       descripcion: '',
       fuente: '',
@@ -95,10 +92,7 @@ export default function IngresosDeudaActionButtons({
   // Manejar envío del formulario de deudas
   const handleSubmitDeuda = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onAddDeuda({
-      ...nuevaDeuda,
-      monto: nuevaDeuda.monto.toString(),
-    });
+    await onAddDeuda(nuevaDeuda);
     setNuevaDeuda({
       descripcion: '',
       acreedor: '',

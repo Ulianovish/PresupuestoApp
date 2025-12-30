@@ -137,12 +137,12 @@ export const useDashboardData = (): DashboardData => {
   }, [budgetHook, expenseHook, incomeHook]);
 
   // Función para cambiar mes
+  // Solo actualiza el contexto, el hook de presupuesto se sincroniza automáticamente
   const handleSetSelectedMonth = useCallback(
     (month: string) => {
       setSelectedMonth(month);
-      budgetHook.setSelectedMonth(month);
     },
-    [setSelectedMonth, budgetHook],
+    [setSelectedMonth],
   );
 
   // Calcular resumen

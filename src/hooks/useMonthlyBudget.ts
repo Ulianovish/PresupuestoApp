@@ -24,10 +24,8 @@ export interface UseMonthlyBudgetReturn {
   categories: BudgetCategory[];
   isLoading: boolean;
   error: string | null;
-  selectedMonth: string;
 
   // Funciones
-  setSelectedMonth: (month: string) => void;
   refreshBudget: () => Promise<void>;
   refreshCategories: () => Promise<void>;
   toggleCategory: (categoryId: string) => void;
@@ -45,16 +43,14 @@ export interface UseMonthlyBudgetReturn {
 
 /**
  * Hook para manejar presupuestos mensuales
+ * @param monthYear - El mes actual seleccionado desde el contexto (formato YYYY-MM)
  */
-export function useMonthlyBudget(
-  initialMonth: string = '2025-07',
-): UseMonthlyBudgetReturn {
+export function useMonthlyBudget(monthYear: string): UseMonthlyBudgetReturn {
   // Estado del hook
   const [budgetData, setBudgetData] = useState<MonthlyBudgetData | null>(null);
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState(initialMonth);
 
   // Hook para manejar categorías disponibles
   const { refreshCategories: refreshAvailableCategories } = useCategories();
@@ -62,12 +58,12 @@ export function useMonthlyBudget(
   /**
    * Carga los datos del presupuesto para el mes seleccionado
    */
-  const loadBudgetData = useCallback(async (monthYear: string) => {
+  const loadBudgetData = useCallback(async (month: string) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await getBudgetByMonth(monthYear);
+      const data = await getBudgetByMonth(month);
 
       if (data) {
         setBudgetData(data);
@@ -91,15 +87,15 @@ export function useMonthlyBudget(
    * Inicializa un nuevo mes de presupuesto
    */
   const initializeMonth = useCallback(
-    async (monthYear: string): Promise<boolean> => {
+    async (month: string): Promise<boolean> => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const templateId = await createMonthlyBudget(monthYear);
+        const templateId = await createMonthlyBudget(month);
 
         if (templateId) {
-          await loadBudgetData(monthYear);
+          await loadBudgetData(month);
           return true;
         } else {
           setError('Error al crear el presupuesto mensual');
@@ -117,11 +113,11 @@ export function useMonthlyBudget(
   );
 
   /**
-   * Refresca los datos del presupuesto
+   * Refresca los datos del presupuesto usando el mes actual del parámetro
    */
   const refreshBudget = useCallback(async () => {
-    await loadBudgetData(selectedMonth);
-  }, [selectedMonth, loadBudgetData]);
+    await loadBudgetData(monthYear);
+  }, [monthYear, loadBudgetData]);
 
   /**
    * Refresca las categorías disponibles
@@ -129,13 +125,6 @@ export function useMonthlyBudget(
   const refreshCategories = useCallback(async () => {
     await refreshAvailableCategories();
   }, [refreshAvailableCategories]);
-
-  /**
-   * Cambia el mes seleccionado y carga sus datos
-   */
-  const handleSetSelectedMonth = useCallback((month: string) => {
-    setSelectedMonth(month);
-  }, []);
 
   /**
    * Expande o contrae una categoría
@@ -363,10 +352,10 @@ export function useMonthlyBudget(
     [categories],
   );
 
-  // Efecto para cargar datos cuando cambia el mes seleccionado
+  // Efecto para cargar datos cuando cambia el mes desde el contexto
   useEffect(() => {
-    loadBudgetData(selectedMonth);
-  }, [selectedMonth, loadBudgetData]);
+    loadBudgetData(monthYear);
+  }, [monthYear, loadBudgetData]);
 
   return {
     // Estado
@@ -374,10 +363,8 @@ export function useMonthlyBudget(
     categories,
     isLoading,
     error,
-    selectedMonth,
 
     // Funciones
-    setSelectedMonth: handleSetSelectedMonth,
     refreshBudget,
     refreshCategories,
     toggleCategory,

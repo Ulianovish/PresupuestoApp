@@ -42,14 +42,14 @@ interface IngresosDeudasProps {
 interface IngresoData {
   descripcion: string;
   fuente: string;
-  monto: string;
+  monto: number;
   fecha: string;
 }
 
 interface DeudaData {
   descripcion: string;
   acreedor: string;
-  monto: string;
+  monto: number;
   fechaVencimiento: string;
 }
 
@@ -79,8 +79,7 @@ export default function IngresosDeudas({ user: _user }: IngresosDeudasProps) {
         throw new Error('Todos los campos son obligatorios');
       }
 
-      const monto = parseFloat(ingresoData.monto);
-      if (isNaN(monto) || monto <= 0) {
+      if (isNaN(ingresoData.monto) || ingresoData.monto <= 0) {
         throw new Error('El monto debe ser un número positivo');
       }
 
@@ -88,7 +87,7 @@ export default function IngresosDeudas({ user: _user }: IngresosDeudasProps) {
       const nuevoIngreso = {
         descripcion: ingresoData.descripcion.trim(),
         fuente: ingresoData.fuente.trim(),
-        monto,
+        monto: ingresoData.monto,
         fecha: ingresoData.fecha,
       };
 
@@ -114,8 +113,7 @@ export default function IngresosDeudas({ user: _user }: IngresosDeudasProps) {
         throw new Error('Todos los campos son obligatorios');
       }
 
-      const monto = parseFloat(deudaData.monto);
-      if (isNaN(monto) || monto <= 0) {
+      if (isNaN(deudaData.monto) || deudaData.monto <= 0) {
         throw new Error('El monto debe ser un número positivo');
       }
 
@@ -127,7 +125,7 @@ export default function IngresosDeudas({ user: _user }: IngresosDeudasProps) {
       const nuevaDeuda = {
         descripcion: deudaData.descripcion.trim(),
         acreedor: deudaData.acreedor.trim(),
-        monto,
+        monto: deudaData.monto,
         fecha_vencimiento: deudaData.fechaVencimiento,
         pagada: false,
       };
