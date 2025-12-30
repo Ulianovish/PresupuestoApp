@@ -19,7 +19,7 @@ import BudgetTable from '@/components/organisms/BudgetTable/BudgetTable';
 import BudgetPageTemplate from '@/components/templates/BudgetPageTemplate/BudgetPageTemplate';
 import { useMonth } from '@/contexts/MonthContext';
 import { useMonthlyBudget } from '@/hooks/useMonthlyBudget';
-import { getAvailableMonths, formatCurrency } from '@/lib/services/budget';
+import { formatCurrency } from '@/lib/services/budget';
 
 // Interfaces para tipos de datos
 interface ModalState {
@@ -52,7 +52,7 @@ interface FormData {
 
 export default function PresupuestoPage() {
   // Usar contexto global para el mes seleccionado (única fuente de verdad)
-  const { selectedMonth, setSelectedMonth } = useMonth();
+  const { selectedMonth, setSelectedMonth, getAvailableMonths } = useMonth();
 
   // Hook personalizado para manejar presupuesto mensual
   // Ahora recibe el mes del contexto y se sincroniza automáticamente

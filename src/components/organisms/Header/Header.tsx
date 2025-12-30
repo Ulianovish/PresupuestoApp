@@ -25,9 +25,11 @@ import {
   User,
   LogOut,
   ChevronDown,
+  Calendar,
 } from 'lucide-react';
 
 import MobileSidebar from '@/components/molecules/MobileSidebar/MobileSidebar';
+import { useMonth } from '@/contexts/MonthContext';
 import { useBudgetData } from '@/hooks/useBudgetData';
 import { logoutAction } from '@/lib/actions/auth';
 import { supabase } from '@/lib/supabase/client';
@@ -40,6 +42,7 @@ export default function Header() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const { summary, formatCurrency, isLoading } = useBudgetData();
+  const { selectedYear, setSelectedYear, getAvailableYears } = useMonth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -215,6 +218,28 @@ export default function Header() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Selector de Año */}
+                    <div className="p-3 border-b border-white/10">
+                      <label className="flex items-center gap-2 text-sm text-gray-300 mb-2">
+                        <Calendar size={16} className="text-blue-400" />
+                        <span className="font-medium">Año</span>
+                      </label>
+                      <select
+                        value={selectedYear}
+                        onChange={e =>
+                          setSelectedYear(parseInt(e.target.value, 10))
+                        }
+                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      >
+                        {getAvailableYears().map(year => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div className="p-2">
                       <form action={logoutAction}>
                         <button

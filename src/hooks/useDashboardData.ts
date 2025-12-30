@@ -9,10 +9,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { useMonth } from '@/contexts/MonthContext';
-import {
-  getAvailableMonths,
-  type MonthlyBudgetData,
-} from '@/lib/services/budget';
+import { type MonthlyBudgetData } from '@/lib/services/budget';
 import { type MonthlyExpenseData } from '@/lib/services/expenses';
 import { type Ingreso, type Deuda } from '@/lib/services/ingresos-deudas';
 
@@ -48,7 +45,7 @@ export interface DashboardData {
  * Hook para obtener datos integrados del dashboard
  */
 export const useDashboardData = (): DashboardData => {
-  const { selectedMonth, setSelectedMonth } = useMonth();
+  const { selectedMonth, setSelectedMonth, getAvailableMonths } = useMonth();
   const [error, setError] = useState<string | null>(null);
 
   // Hooks para cada tipo de datos
@@ -61,7 +58,7 @@ export const useDashboardData = (): DashboardData => {
     expenseHook.setSelectedMonth(selectedMonth);
   }, [selectedMonth, expenseHook]);
 
-  // Obtener meses disponibles
+  // Obtener meses disponibles desde el contexto
   const availableMonths = getAvailableMonths();
 
   // Estado de carga combinado

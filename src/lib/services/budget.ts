@@ -420,22 +420,36 @@ export function formatCurrency(amount: number): string {
 
 /**
  * Obtiene la lista de meses disponibles para el selector
+ * @deprecated Usar getAvailableMonths() del MonthContext en su lugar
+ * Esta función se mantiene temporalmente para compatibilidad
  */
 export function getAvailableMonths(): Array<{ value: string; label: string }> {
-  const months = [
-    { value: '2025-01', label: 'Enero 2025' },
-    { value: '2025-02', label: 'Febrero 2025' },
-    { value: '2025-03', label: 'Marzo 2025' },
-    { value: '2025-04', label: 'Abril 2025' },
-    { value: '2025-05', label: 'Mayo 2025' },
-    { value: '2025-06', label: 'Junio 2025' },
-    { value: '2025-07', label: 'Julio 2025' },
-    { value: '2025-08', label: 'Agosto 2025' },
-    { value: '2025-09', label: 'Septiembre 2025' },
-    { value: '2025-10', label: 'Octubre 2025' },
-    { value: '2025-11', label: 'Noviembre 2025' },
-    { value: '2025-12', label: 'Diciembre 2025' },
+  console.warn(
+    'getAvailableMonths() del servicio está deprecado. Usa el MonthContext.',
+  );
+
+  // Generar meses del año actual dinámicamente
+  const currentYear = new Date().getFullYear();
+  const monthNames = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
   ];
 
-  return months;
+  return monthNames.map((name, index) => {
+    const month = String(index + 1).padStart(2, '0');
+    return {
+      value: `${currentYear}-${month}`,
+      label: `${name} ${currentYear}`,
+    };
+  });
 }
