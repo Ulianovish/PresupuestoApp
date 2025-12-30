@@ -47,8 +47,12 @@ interface BudgetItemModalProps {
   mode: 'add' | 'edit';
   formData: FormData;
   onFormDataChange: (data: FormData | ((prev: FormData) => FormData)) => void;
-  onSave: () => void;
+  onSave: (saveAndNext?: boolean) => void;
   onClose: () => void;
+  onDelete?: () => void;
+  chainedEditing?: boolean;
+  currentItemIndex?: number;
+  totalItemsInCategory?: number;
 }
 
 export default function BudgetItemModal({
@@ -58,13 +62,35 @@ export default function BudgetItemModal({
   onFormDataChange,
   onSave,
   onClose,
+  onDelete,
+  chainedEditing = false,
+  currentItemIndex = 0,
+  totalItemsInCategory = 0,
 }: BudgetItemModalProps) {
+  // Manejar atajos de teclado
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.ctrlKey && e.key === 'Enter') {
+      e.preventDefault();
+      onSave(mode === 'edit'); // En modo edit, auto-avanza al siguiente
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    }
+  };
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-slate-800 border-slate-700">
+      <DialogContent
+        className="sm:max-w-md bg-slate-800 border-slate-700"
+        onKeyDown={handleKeyDown}
+      >
         <DialogHeader>
           <DialogTitle className="text-white">
             {mode === 'add' ? 'Agregar Detalle' : 'Editar Detalle'}
+            {chainedEditing && mode === 'edit' && (
+              <span className="text-sm text-gray-400 ml-2">
+                ({currentItemIndex + 1} de {totalItemsInCategory})
+              </span>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -76,13 +102,34 @@ export default function BudgetItemModal({
           />
 
           {/* Botones de acción */}
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button variant="gradient" onClick={onSave}>
-              {mode === 'add' ? 'Agregar' : 'Guardar'}
-            </Button>
+          <div className="flex justify-between pt-4">
+            {/* Botón de eliminar (solo en modo edit) */}
+            <div>
+              {mode === 'edit' && onDelete && (
+                <Button
+                  variant="outline"
+                  onClick={onDelete}
+                  className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white"
+                >
+                  Eliminar
+                </Button>
+              )}
+            </div>
+
+            {/* Botones de cancelar y guardar */}
+            <div className="flex space-x-2">
+              <Button variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+
+              {/* Botón de guardar (con auto-avance en modo edit) */}
+              <Button
+                variant="gradient"
+                onClick={() => onSave(mode === 'edit')}
+              >
+                {mode === 'add' ? 'Agregar' : 'Guardar'}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

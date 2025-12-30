@@ -21,6 +21,7 @@ import React, { useState } from 'react';
 import { Plus, TrendingUp, CreditCard } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
+import CurrencyInput from '@/components/atoms/CurrencyInput/CurrencyInput';
 import Input from '@/components/atoms/Input/Input';
 import FormField from '@/components/molecules/FormField/FormField';
 import {
@@ -34,14 +35,14 @@ import {
 interface IngresoData {
   descripcion: string;
   fuente: string;
-  monto: string;
+  monto: number;
   fecha: string;
 }
 
 interface DeudaData {
   descripcion: string;
   acreedor: string;
-  monto: string;
+  monto: number;
   fechaVencimiento: string;
 }
 
@@ -64,25 +65,28 @@ export default function IngresosDeudaActionButtons({
   const [nuevoIngreso, setNuevoIngreso] = useState<IngresoData>({
     descripcion: '',
     fuente: '',
-    monto: '',
+    monto: 0,
     fecha: new Date().toISOString().split('T')[0],
   });
 
   const [nuevaDeuda, setNuevaDeuda] = useState<DeudaData>({
     descripcion: '',
     acreedor: '',
-    monto: '',
+    monto: 0,
     fechaVencimiento: '',
   });
 
   // Manejar envío del formulario de ingresos
   const handleSubmitIngreso = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onAddIngreso(nuevoIngreso);
+    await onAddIngreso({
+      ...nuevoIngreso,
+      monto: nuevoIngreso.monto.toString(),
+    });
     setNuevoIngreso({
       descripcion: '',
       fuente: '',
-      monto: '',
+      monto: 0,
       fecha: new Date().toISOString().split('T')[0],
     });
     setModalIngresoAbierto(false);
@@ -91,11 +95,14 @@ export default function IngresosDeudaActionButtons({
   // Manejar envío del formulario de deudas
   const handleSubmitDeuda = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onAddDeuda(nuevaDeuda);
+    await onAddDeuda({
+      ...nuevaDeuda,
+      monto: nuevaDeuda.monto.toString(),
+    });
     setNuevaDeuda({
       descripcion: '',
       acreedor: '',
-      monto: '',
+      monto: 0,
       fechaVencimiento: '',
     });
     setModalDeudaAbierto(false);
@@ -150,19 +157,16 @@ export default function IngresosDeudaActionButtons({
             </FormField>
 
             <FormField label="Monto" required>
-              <Input
-                variant="glass"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
+              <CurrencyInput
                 value={nuevoIngreso.monto}
-                onChange={e =>
+                onChange={value =>
                   setNuevoIngreso(prev => ({
                     ...prev,
-                    monto: e.target.value,
+                    monto: value,
                   }))
                 }
-                required
+                className="bg-slate-700/50 border-slate-600 text-white"
+                placeholder="$0"
               />
             </FormField>
 
@@ -252,19 +256,16 @@ export default function IngresosDeudaActionButtons({
             </FormField>
 
             <FormField label="Monto" required>
-              <Input
-                variant="glass"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
+              <CurrencyInput
                 value={nuevaDeuda.monto}
-                onChange={e =>
+                onChange={value =>
                   setNuevaDeuda(prev => ({
                     ...prev,
-                    monto: e.target.value,
+                    monto: value,
                   }))
                 }
-                required
+                className="bg-slate-700/50 border-slate-600 text-white"
+                placeholder="$0"
               />
             </FormField>
 

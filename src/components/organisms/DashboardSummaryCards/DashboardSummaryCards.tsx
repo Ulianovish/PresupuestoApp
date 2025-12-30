@@ -80,6 +80,27 @@ export default function DashboardSummaryCards({
         </CardContent>
       </Card>
 
+      {/* Ingresos Totales */}
+      <Card variant="glass" className="p-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-green-600/10"></div>
+        <CardContent className="relative">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-emerald-500/20 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-emerald-400" />
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-400">Ingresos Totales</p>
+              <p className="text-2xl font-bold text-white">
+                {isLoading ? '...' : formatCurrency(summary.totalIncome)}
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400">
+            Balance: {formatCurrency(summary.totalIncome - summary.totalSpent)}
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Total Gastado */}
       <Card variant="glass" className="p-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 to-red-600/10"></div>
@@ -89,7 +110,7 @@ export default function DashboardSummaryCards({
               <TrendingUp className="w-6 h-6 text-red-400" />
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-400">Total Gastado</p>
+              <p className="text-sm text-gray-400">Egresos Totales</p>
               <p className="text-2xl font-bold text-white">
                 {isLoading ? '...' : formatCurrency(summary.totalSpent)}
               </p>
@@ -115,7 +136,7 @@ export default function DashboardSummaryCards({
         </CardContent>
       </Card>
 
-      {/* Disponible */}
+      {/* Flujo Efectivo Mensual */}
       <Card variant="glass" className="p-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-purple-600/10"></div>
         <CardContent className="relative">
@@ -124,7 +145,7 @@ export default function DashboardSummaryCards({
               <DollarSign className="w-6 h-6 text-purple-400" />
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-400">Disponible</p>
+              <p className="text-sm text-gray-400">Flujo Efectivo Mensual</p>
               <p
                 className={`text-2xl font-bold ${summary.totalRemaining < 0 ? 'text-red-400' : 'text-white'}`}
               >
@@ -138,27 +159,6 @@ export default function DashboardSummaryCards({
               {summary.overBudgetCount} categorías excedidas
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Ingresos Totales */}
-      <Card variant="glass" className="p-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-green-600/10"></div>
-        <CardContent className="relative">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-emerald-500/20 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-emerald-400" />
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-400">Ingresos Totales</p>
-              <p className="text-2xl font-bold text-white">
-                {isLoading ? '...' : formatCurrency(summary.totalIncome)}
-              </p>
-            </div>
-          </div>
-          <p className="text-xs text-gray-400">
-            Balance: {formatCurrency(summary.totalIncome - summary.totalSpent)}
-          </p>
         </CardContent>
       </Card>
     </div>

@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+import { useMonth } from '@/contexts/MonthContext';
 import {
   getAvailableMonths,
   type MonthlyBudgetData,
@@ -46,10 +47,8 @@ export interface DashboardData {
 /**
  * Hook para obtener datos integrados del dashboard
  */
-export const useDashboardData = (
-  initialMonth: string = '2025-07',
-): DashboardData => {
-  const [selectedMonth, setSelectedMonth] = useState(initialMonth);
+export const useDashboardData = (): DashboardData => {
+  const { selectedMonth, setSelectedMonth } = useMonth();
   const [error, setError] = useState<string | null>(null);
 
   // Hooks para cada tipo de datos
@@ -143,7 +142,7 @@ export const useDashboardData = (
       setSelectedMonth(month);
       budgetHook.setSelectedMonth(month);
     },
-    [budgetHook],
+    [setSelectedMonth, budgetHook],
   );
 
   // Calcular resumen

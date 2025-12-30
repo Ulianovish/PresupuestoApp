@@ -20,6 +20,7 @@
 
 import React from 'react';
 
+import CurrencyInput from '@/components/atoms/CurrencyInput/CurrencyInput';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -39,6 +40,7 @@ interface ExpenseFormFieldsProps {
   onFormChange: (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => void;
+  onAmountChange?: (amount: number) => void;
 }
 
 export default function ExpenseFormFields({
@@ -46,6 +48,7 @@ export default function ExpenseFormFields({
   expenseCategories,
   accountTypes,
   onFormChange,
+  onAmountChange,
 }: ExpenseFormFieldsProps) {
   return (
     <div className="space-y-4">
@@ -70,17 +73,19 @@ export default function ExpenseFormFields({
         <Label htmlFor="amount" className="text-white">
           Monto *
         </Label>
-        <Input
-          id="amount"
-          name="amount"
-          type="number"
-          step="0.01"
-          min="0"
+        <CurrencyInput
           value={formData.amount}
-          onChange={onFormChange}
-          placeholder="0.00"
+          onChange={
+            onAmountChange ||
+            (value => {
+              const syntheticEvent = {
+                target: { name: 'amount', value: value.toString() },
+              } as React.ChangeEvent<HTMLInputElement>;
+              onFormChange(syntheticEvent);
+            })
+          }
           className="bg-slate-700/50 border-slate-600 text-white"
-          required
+          placeholder="$0"
         />
       </div>
 

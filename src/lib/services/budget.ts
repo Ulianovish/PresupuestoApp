@@ -59,49 +59,96 @@ export async function getBudgetByMonth(
   monthYear: string,
 ): Promise<MonthlyBudgetData | null> {
   try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('Usuario no autenticado');
+      return null;
+    }
+
     // Obtener datos usando la función SQL
-    const { data, error } = await supabase.rpc('get_budget_by_month', {
-      p_user_id: (await supabase.auth.getUser()).data.user?.id,
-      p_month_year: monthYear,
+    const { data: budgetData, error: budgetError } = await supabase.rpc(
+      'get_budget_by_month',
+      {
+        p_user_id: user.id,
+        p_month_year: monthYear,
+      },
+    );
+
+    if (budgetError) {
+      console.error('Error obteniendo presupuesto:', budgetError);
+      return null;
+    }
+
+    // Obtener todas las categorías del usuario (incluso las que no tienen items de presupuesto)
+    const { data: allCategories, error: categoriesError } = await supabase
+      .from('categories')
+      .select('id, name')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('name');
+
+    if (categoriesError) {
+      console.error('Error obteniendo categorías:', categoriesError);
+      return null;
+    }
+
+    // Si no hay datos de presupuesto pero sí categorías, crear estructura básica
+    if (
+      (!budgetData || budgetData.length === 0) &&
+      allCategories &&
+      allCategories.length > 0
+    ) {
+      return {
+        template_id: '',
+        template_name: `Presupuesto ${monthYear}`,
+        categories: allCategories.map(cat => ({
+          id: cat.id,
+          nombre: cat.name,
+          totalPresupuestado: 0,
+          totalReal: 0,
+          items: [],
+          expanded: false,
+        })),
+        total_presupuestado: 0,
+        total_real: 0,
+      };
+    }
+
+    if (!budgetData || budgetData.length === 0) {
+      return null;
+    }
+
+    // Crear mapa de todas las categorías del usuario
+    const categoriesMap = new Map<string, BudgetCategory>();
+
+    // Inicializar todas las categorías del usuario
+    allCategories?.forEach(cat => {
+      categoriesMap.set(cat.id, {
+        id: cat.id,
+        nombre: cat.name,
+        totalPresupuestado: 0,
+        totalReal: 0,
+        items: [],
+        expanded: false,
+      });
     });
 
-    if (error) {
-      console.error('Error obteniendo presupuesto:', error);
-      return null;
-    }
-
-    if (!data || data.length === 0) {
-      return null;
-    }
-
-    // Agrupar datos por categoría
-    const categoriesMap = new Map<string, BudgetCategory>();
     let templateId = '';
     let templateName = '';
     let totalPresupuestado = 0;
     let totalReal = 0;
 
-    data.forEach((row: BudgetQueryRow) => {
+    // Procesar datos del presupuesto
+    budgetData.forEach((row: BudgetQueryRow) => {
       if (!templateId) {
         templateId = row.template_id;
         templateName = row.template_name;
       }
 
-      if (row.category_id) {
-        const categoryKey = row.category_id;
-
-        if (!categoriesMap.has(categoryKey)) {
-          categoriesMap.set(categoryKey, {
-            id: row.category_id,
-            nombre: row.category_name,
-            totalPresupuestado: 0,
-            totalReal: 0,
-            items: [],
-            expanded: false,
-          });
-        }
-
-        const category = categoriesMap.get(categoryKey)!;
+      if (row.category_id && categoriesMap.has(row.category_id)) {
+        const category = categoriesMap.get(row.category_id)!;
 
         if (row.item_id) {
           const item: BudgetItem = {
@@ -322,6 +369,41 @@ export async function updateBudgetItem(
   } catch (error) {
     console.error('Error en updateBudgetItem:', error);
     return null;
+  }
+}
+
+/**
+ * Elimina un item de presupuesto usando la API proxy
+ */
+export async function deleteBudgetItem(itemId: string): Promise<boolean> {
+  try {
+    // Usar la API proxy para evitar problemas de CORS
+    const response = await fetch(`/api/budget/${itemId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Error eliminando item de presupuesto:', errorData.error);
+      return false;
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      console.error('Error eliminando item de presupuesto:', result.error);
+      return false;
+    }
+
+    // Mensaje de éxito - se puede eliminar en producción
+    // console.log('Item de presupuesto eliminado exitosamente:', result.message);
+    return true;
+  } catch (error) {
+    console.error('Error en deleteBudgetItem:', error);
+    return false;
   }
 }
 

@@ -11,11 +11,13 @@
 
 import React, { useState } from 'react';
 
+import Toast from '@/components/atoms/Toast/Toast';
 import BudgetHeader from '@/components/organisms/BudgetHeader/BudgetHeader';
 import BudgetItemModal from '@/components/organisms/BudgetItemModal/BudgetItemModal';
 import BudgetStatusPanels from '@/components/organisms/BudgetStatusPanels/BudgetStatusPanels';
 import BudgetTable from '@/components/organisms/BudgetTable/BudgetTable';
 import BudgetPageTemplate from '@/components/templates/BudgetPageTemplate/BudgetPageTemplate';
+import { useMonth } from '@/contexts/MonthContext';
 import { useMonthlyBudget } from '@/hooks/useMonthlyBudget';
 import { getAvailableMonths, formatCurrency } from '@/lib/services/budget';
 
@@ -33,6 +35,10 @@ interface ModalState {
     presupuestado: number;
     real: number;
   };
+  // Nuevos campos para edición encadenada
+  chainedEditing?: boolean;
+  currentItemIndex?: number;
+  totalItemsInCategory?: number;
 }
 
 interface FormData {
@@ -45,20 +51,23 @@ interface FormData {
 }
 
 export default function PresupuestoPage() {
+  // Usar contexto global para el mes seleccionado
+  const { selectedMonth, setSelectedMonth } = useMonth();
+
   // Hook personalizado para manejar presupuesto mensual
   const {
     budgetData,
     categories,
     isLoading,
     error,
-    selectedMonth,
-    setSelectedMonth,
     refreshBudget,
+    refreshCategories,
     toggleCategory,
     addBudgetItem,
     editBudgetItem,
+    deleteBudgetItem,
     initializeMonth,
-  } = useMonthlyBudget('2025-07');
+  } = useMonthlyBudget(selectedMonth);
 
   // Estado del modal
   const [modalState, setModalState] = useState<ModalState>({
@@ -66,6 +75,20 @@ export default function PresupuestoPage() {
     mode: 'add',
     categoriaId: '',
     item: undefined,
+    chainedEditing: false,
+    currentItemIndex: 0,
+    totalItemsInCategory: 0,
+  });
+
+  // Estado para toast notifications
+  const [toast, setToast] = useState<{
+    show: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    message: '',
+    type: 'success',
   });
 
   // Estado del formulario
@@ -120,12 +143,21 @@ export default function PresupuestoPage() {
       presupuestado: number;
       real: number;
     },
+    chainedEditing: boolean = false,
   ) => {
+    // Encontrar la categoría y el índice del item
+    const category = categories.find(cat => cat.id === categoriaId);
+    const itemIndex = category?.items.findIndex(i => i.id === item.id) ?? 0;
+    const totalItems = category?.items.length ?? 0;
+
     setModalState({
       isOpen: true,
       mode: 'edit',
       categoriaId,
       item,
+      chainedEditing,
+      currentItemIndex: itemIndex,
+      totalItemsInCategory: totalItems,
     });
     setFormData({
       descripcion: item.descripcion,
@@ -143,16 +175,98 @@ export default function PresupuestoPage() {
       mode: 'add',
       categoriaId: '',
       item: undefined,
+      chainedEditing: false,
+      currentItemIndex: 0,
+      totalItemsInCategory: 0,
     });
   };
 
-  const handleSave = async () => {
-    if (modalState.mode === 'add') {
-      await addBudgetItem(modalState.categoriaId, formData);
-    } else if (modalState.item) {
-      await editBudgetItem(modalState.item.id, formData);
+  // Función para mostrar toast
+  const showToast = (
+    message: string,
+    type: 'success' | 'error' = 'success',
+  ) => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, 3000);
+  };
+
+  // Función para abrir el siguiente item en edición encadenada
+  const openNextItemForEdit = (
+    currentCategoryId: string,
+    currentItemIndex: number,
+  ) => {
+    const category = categories.find(cat => cat.id === currentCategoryId);
+    if (!category) return false;
+
+    const nextIndex = currentItemIndex + 1;
+    if (nextIndex < category.items.length) {
+      const nextItem = category.items[nextIndex];
+      // Pequeño delay para permitir que se complete la actualización del estado
+      setTimeout(() => {
+        openEditModal(currentCategoryId, nextItem, true);
+      }, 100);
+      return true;
     }
-    closeModal();
+    return false;
+  };
+
+  const handleSave = async (saveAndNext: boolean = false) => {
+    try {
+      if (modalState.mode === 'add') {
+        const success = await addBudgetItem(modalState.categoriaId, formData);
+        if (success) {
+          showToast('Item agregado exitosamente');
+          closeModal();
+        } else {
+          showToast('Error al agregar el item', 'error');
+        }
+      } else if (modalState.item) {
+        const success = await editBudgetItem(modalState.item.id, formData);
+        if (success) {
+          // Asegurar que la categoría del item editado permanezca expandida
+          const editedItemCategory = categories.find(cat =>
+            cat.items.some(item => item.id === modalState.item?.id),
+          );
+          if (editedItemCategory && !editedItemCategory.expanded) {
+            toggleCategory(editedItemCategory.id);
+          }
+
+          showToast('Item guardado exitosamente');
+
+          // Si se solicita guardar y pasar al siguiente, o si está en modo de edición encadenada
+          if (saveAndNext || modalState.chainedEditing) {
+            const hasNext = openNextItemForEdit(
+              modalState.categoriaId,
+              modalState.currentItemIndex ?? 0,
+            );
+
+            if (!hasNext) {
+              // Si no hay siguiente item, cerrar modal y mostrar mensaje
+              closeModal();
+              showToast('Edición completada - último item de la categoría');
+            }
+          } else {
+            closeModal();
+          }
+        } else {
+          showToast('Error al guardar el item', 'error');
+        }
+      }
+    } catch (error) {
+      console.error('Error en handleSave:', error);
+      showToast('Error inesperado al guardar', 'error');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (modalState.item) {
+      const success = await deleteBudgetItem(modalState.item.id);
+      if (success) {
+        closeModal();
+      }
+    }
   };
 
   // Funciones utilitarias
@@ -186,50 +300,68 @@ export default function PresupuestoPage() {
     monthOptions.find(m => m.value === selectedMonth)?.label || selectedMonth;
 
   return (
-    <BudgetPageTemplate
-      header={
-        <BudgetHeader
-          selectedMonth={selectedMonth}
-          onMonthChange={handleMonthChange}
-          onRefresh={refreshBudget}
-          isLoading={isLoading}
-          monthOptions={monthOptions}
-        />
-      }
-      statusPanels={
-        <BudgetStatusPanels
-          isLoading={isLoading}
-          error={error}
-          hasData={categories.length > 0}
-          selectedMonth={selectedMonth}
-          selectedMonthLabel={selectedMonthLabel}
-          onCreateBudget={initializeMonth}
-        />
-      }
-      budgetTable={
-        !isLoading && categories.length > 0 ? (
-          <BudgetTable
-            categories={categories}
-            budgetData={budgetData}
-            onToggleCategory={toggleCategory}
-            onAddItem={openAddModal}
-            onEditItem={openEditModal}
-            formatCurrency={formatCurrency}
-            getClasificacionColor={getClasificacionColor}
-            getControlColor={getControlColor}
+    <>
+      <BudgetPageTemplate
+        header={
+          <BudgetHeader
+            selectedMonth={selectedMonth}
+            onMonthChange={handleMonthChange}
+            onRefresh={refreshBudget}
+            isLoading={isLoading}
+            monthOptions={monthOptions}
+            onCategoryCreated={async () => {
+              await refreshCategories();
+              await refreshBudget();
+            }}
           />
-        ) : undefined
-      }
-      modal={
-        <BudgetItemModal
-          isOpen={modalState.isOpen}
-          mode={modalState.mode}
-          formData={formData}
-          onFormDataChange={setFormData}
-          onSave={handleSave}
-          onClose={closeModal}
-        />
-      }
-    />
+        }
+        statusPanels={
+          <BudgetStatusPanels
+            isLoading={isLoading}
+            error={error}
+            hasData={categories.length > 0}
+            selectedMonth={selectedMonth}
+            selectedMonthLabel={selectedMonthLabel}
+            onCreateBudget={initializeMonth}
+          />
+        }
+        budgetTable={
+          !isLoading && categories.length > 0 ? (
+            <BudgetTable
+              categories={categories}
+              budgetData={budgetData}
+              onToggleCategory={toggleCategory}
+              onAddItem={openAddModal}
+              onEditItem={openEditModal}
+              formatCurrency={formatCurrency}
+              getClasificacionColor={getClasificacionColor}
+              getControlColor={getControlColor}
+            />
+          ) : undefined
+        }
+        modal={
+          <BudgetItemModal
+            isOpen={modalState.isOpen}
+            mode={modalState.mode}
+            formData={formData}
+            onFormDataChange={setFormData}
+            onSave={handleSave}
+            onClose={closeModal}
+            onDelete={handleDelete}
+            chainedEditing={modalState.chainedEditing}
+            currentItemIndex={modalState.currentItemIndex}
+            totalItemsInCategory={modalState.totalItemsInCategory}
+          />
+        }
+      />
+
+      {/* Toast notifications */}
+      <Toast
+        show={toast.show}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast(prev => ({ ...prev, show: false }))}
+      />
+    </>
   );
 }

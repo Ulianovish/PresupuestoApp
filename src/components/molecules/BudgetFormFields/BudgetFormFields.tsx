@@ -16,6 +16,7 @@
 
 import React from 'react';
 
+import CurrencyInput from '@/components/atoms/CurrencyInput/CurrencyInput';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -132,18 +133,16 @@ export default function BudgetFormFields({
         <Label htmlFor="presupuestado" className="text-white">
           Presupuestado
         </Label>
-        <Input
-          id="presupuestado"
-          type="number"
+        <CurrencyInput
           value={formData.presupuestado}
-          onChange={e =>
+          onChange={value =>
             onFormDataChange(prev => ({
               ...prev,
-              presupuestado: Number(e.target.value),
+              presupuestado: value,
             }))
           }
           className="bg-slate-700/50 border-slate-600 text-white"
-          placeholder="0"
+          placeholder="$0"
         />
       </div>
 
@@ -152,18 +151,16 @@ export default function BudgetFormFields({
         <Label htmlFor="real" className="text-white">
           Real
         </Label>
-        <Input
-          id="real"
-          type="number"
+        <CurrencyInput
           value={formData.real}
-          onChange={e =>
+          onChange={value =>
             onFormDataChange(prev => ({
               ...prev,
-              real: Number(e.target.value),
+              real: value,
             }))
           }
           className="bg-slate-700/50 border-slate-600 text-white"
-          placeholder="0"
+          placeholder="$0"
         />
       </div>
     </div>

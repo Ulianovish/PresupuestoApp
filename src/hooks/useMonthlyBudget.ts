@@ -10,10 +10,13 @@ import {
   createMonthlyBudget,
   createBudgetItem,
   updateBudgetItem,
+  deleteBudgetItem,
   BudgetCategory,
   BudgetItem,
   MonthlyBudgetData,
 } from '@/lib/services/budget';
+
+import { useCategories } from './useCategories';
 
 export interface UseMonthlyBudgetReturn {
   // Estado
@@ -26,6 +29,7 @@ export interface UseMonthlyBudgetReturn {
   // Funciones
   setSelectedMonth: (month: string) => void;
   refreshBudget: () => Promise<void>;
+  refreshCategories: () => Promise<void>;
   toggleCategory: (categoryId: string) => void;
   addBudgetItem: (
     categoryId: string,
@@ -35,6 +39,7 @@ export interface UseMonthlyBudgetReturn {
     itemId: string,
     updates: Partial<Omit<BudgetItem, 'id'>>,
   ) => Promise<boolean>;
+  deleteBudgetItem: (itemId: string) => Promise<boolean>;
   initializeMonth: (monthYear: string) => Promise<boolean>;
 }
 
@@ -50,6 +55,9 @@ export function useMonthlyBudget(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(initialMonth);
+
+  // Hook para manejar categorías disponibles
+  const { refreshCategories: refreshAvailableCategories } = useCategories();
 
   /**
    * Carga los datos del presupuesto para el mes seleccionado
@@ -114,6 +122,13 @@ export function useMonthlyBudget(
   const refreshBudget = useCallback(async () => {
     await loadBudgetData(selectedMonth);
   }, [selectedMonth, loadBudgetData]);
+
+  /**
+   * Refresca las categorías disponibles
+   */
+  const refreshCategories = useCallback(async () => {
+    await refreshAvailableCategories();
+  }, [refreshAvailableCategories]);
 
   /**
    * Cambia el mes seleccionado y carga sus datos
@@ -214,11 +229,13 @@ export function useMonthlyBudget(
 
         if (updatedItem) {
           // Actualizar el estado local
+          let oldItem: BudgetItem | null = null;
+
           setCategories(prev =>
             prev.map(cat => {
               const itemIndex = cat.items.findIndex(item => item.id === itemId);
               if (itemIndex !== -1) {
-                const oldItem = cat.items[itemIndex];
+                oldItem = cat.items[itemIndex];
                 const newItems = [...cat.items];
                 newItems[itemIndex] = updatedItem;
 
@@ -235,14 +252,32 @@ export function useMonthlyBudget(
                   items: newItems,
                   totalPresupuestado,
                   totalReal,
+                  // Mantener la categoría expandida después de editar
+                  expanded: true,
                 };
               }
               return cat;
             }),
           );
 
-          // Recargar datos para asegurar consistencia
-          await refreshBudget();
+          // Actualizar totales del presupuesto
+          if (oldItem) {
+            setBudgetData(prev =>
+              prev
+                ? {
+                    ...prev,
+                    total_presupuestado:
+                      prev.total_presupuestado -
+                      oldItem!.presupuestado +
+                      updatedItem.presupuestado,
+                    total_real:
+                      prev.total_real - oldItem!.real + updatedItem.real,
+                  }
+                : null,
+            );
+          }
+
+          // Los datos ya están actualizados en el estado local
           return true;
         } else {
           setError('Error al actualizar el item del presupuesto');
@@ -255,6 +290,77 @@ export function useMonthlyBudget(
       }
     },
     [refreshBudget],
+  );
+
+  /**
+   * Elimina un item del presupuesto
+   */
+  const deleteBudgetItemHandler = useCallback(
+    async (itemId: string): Promise<boolean> => {
+      setError(null);
+
+      try {
+        const success = await deleteBudgetItem(itemId);
+
+        if (success) {
+          // Actualizar el estado local removiendo el item
+          setCategories(prev =>
+            prev.map(cat => {
+              const itemToDelete = cat.items.find(item => item.id === itemId);
+              if (itemToDelete) {
+                const updatedItems = cat.items.filter(
+                  item => item.id !== itemId,
+                );
+                return {
+                  ...cat,
+                  items: updatedItems,
+                  totalPresupuestado:
+                    cat.totalPresupuestado - itemToDelete.presupuestado,
+                  totalReal: cat.totalReal - itemToDelete.real,
+                };
+              }
+              return cat;
+            }),
+          );
+
+          // Actualizar totales del presupuesto
+          setBudgetData(prev => {
+            if (!prev) return null;
+
+            // Encontrar el item eliminado para actualizar totales
+            let deletedItem: BudgetItem | null = null;
+            for (const category of categories) {
+              const item = category.items.find(item => item.id === itemId);
+              if (item) {
+                deletedItem = item;
+                break;
+              }
+            }
+
+            if (deletedItem) {
+              return {
+                ...prev,
+                total_presupuestado:
+                  prev.total_presupuestado - deletedItem.presupuestado,
+                total_real: prev.total_real - deletedItem.real,
+              };
+            }
+
+            return prev;
+          });
+
+          return true;
+        } else {
+          setError('Error al eliminar el item del presupuesto');
+          return false;
+        }
+      } catch (err) {
+        console.error('Error eliminando item:', err);
+        setError('Error al eliminar el item del presupuesto');
+        return false;
+      }
+    },
+    [categories],
   );
 
   // Efecto para cargar datos cuando cambia el mes seleccionado
@@ -273,9 +379,11 @@ export function useMonthlyBudget(
     // Funciones
     setSelectedMonth: handleSetSelectedMonth,
     refreshBudget,
+    refreshCategories,
     toggleCategory,
     addBudgetItem,
     editBudgetItem,
+    deleteBudgetItem: deleteBudgetItemHandler,
     initializeMonth,
   };
 }

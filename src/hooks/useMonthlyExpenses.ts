@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+import { useMonth } from '@/contexts/MonthContext';
 import {
   getMonthlyExpenseData,
   createExpenseTransaction,
@@ -56,9 +57,11 @@ interface UseMonthlyExpensesState {
   getTransactionsByCategory: (categoryName: string) => ExpenseTransaction[];
 }
 
-export function useMonthlyExpenses(
-  initialMonth?: string,
-): UseMonthlyExpensesState {
+export function useMonthlyExpenses(): UseMonthlyExpensesState {
+  // Usar contexto global para el mes seleccionado
+  const { selectedMonth, setSelectedMonth: setGlobalSelectedMonth } =
+    useMonth();
+
   // Estado principal
   const [expenseData, setExpenseData] = useState<MonthlyExpenseData | null>(
     null,
@@ -68,9 +71,6 @@ export function useMonthlyExpenses(
   // Estado de UI
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonthState] = useState(
-    initialMonth || '2025-07',
-  );
   const [availableMonths] = useState<string[]>(getAllAvailableMonths());
 
   // Estado de modal/formulario
@@ -117,11 +117,11 @@ export function useMonthlyExpenses(
   const setSelectedMonth = useCallback(
     async (month: string) => {
       if (month !== selectedMonth) {
-        setSelectedMonthState(month);
+        setGlobalSelectedMonth(month);
         await loadExpenseData(month);
       }
     },
-    [selectedMonth, loadExpenseData],
+    [selectedMonth, setGlobalSelectedMonth, loadExpenseData],
   );
 
   /**

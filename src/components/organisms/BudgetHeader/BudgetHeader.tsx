@@ -3,12 +3,14 @@
  *
  * Header principal de la página de presupuesto con título, selector de mes y botón de actualizar.
  * Maneja la selección de mes y la actualización de datos.
+ * Incluye funcionalidad para agregar nuevas categorías.
  *
  * @param selectedMonth - Mes seleccionado actualmente
  * @param onMonthChange - Función para cambiar el mes
  * @param onRefresh - Función para actualizar los datos
  * @param isLoading - Estado de carga
  * @param monthOptions - Opciones disponibles para el selector de mes
+ * @param onCategoryCreated - Función que se ejecuta cuando se crea una nueva categoría
  *
  * @example
  * <BudgetHeader
@@ -17,15 +19,18 @@
  *   onRefresh={refreshBudget}
  *   isLoading={false}
  *   monthOptions={monthOptions}
+ *   onCategoryCreated={handleCategoryCreated}
  * />
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 
 import { RefreshCw } from 'lucide-react';
 
+import AddCategoryButton from '@/components/atoms/AddCategoryButton/AddCategoryButton';
 import Button from '@/components/atoms/Button/Button';
 import MonthSelector from '@/components/atoms/MonthSelector/MonthSelector';
+import CategoryModal from '@/components/organisms/CategoryModal/CategoryModal';
 
 interface MonthOption {
   value: string;
@@ -38,6 +43,7 @@ interface BudgetHeaderProps {
   onRefresh: () => void;
   isLoading: boolean;
   monthOptions: MonthOption[];
+  onCategoryCreated?: () => void;
 }
 
 export default function BudgetHeader({
@@ -46,10 +52,25 @@ export default function BudgetHeader({
   onRefresh,
   isLoading,
   monthOptions,
+  onCategoryCreated,
 }: BudgetHeaderProps) {
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+
   // Obtener la etiqueta del mes seleccionado
   const selectedMonthLabel =
     monthOptions.find(m => m.value === selectedMonth)?.label || selectedMonth;
+
+  const handleOpenCategoryModal = () => {
+    setShowCategoryModal(true);
+  };
+
+  const handleCloseCategoryModal = () => {
+    setShowCategoryModal(false);
+  };
+
+  const handleCategoryCreated = () => {
+    onCategoryCreated?.();
+  };
 
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -74,6 +95,12 @@ export default function BudgetHeader({
           className="min-w-[200px]"
         />
 
+        {/* Botón de agregar categoría */}
+        <AddCategoryButton
+          onClick={handleOpenCategoryModal}
+          loading={isLoading}
+        />
+
         {/* Botón de actualizar */}
         <Button
           variant="outline"
@@ -86,6 +113,13 @@ export default function BudgetHeader({
           Actualizar
         </Button>
       </div>
+
+      {/* Modal para crear categoría */}
+      <CategoryModal
+        isOpen={showCategoryModal}
+        onClose={handleCloseCategoryModal}
+        onCategoryCreated={handleCategoryCreated}
+      />
     </div>
   );
 }

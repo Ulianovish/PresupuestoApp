@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from 'next/font/google';
 
 import Header from '@/components/organisms/Header/Header';
+import { MonthProvider } from '@/contexts/MonthContext';
 
 import type { Metadata } from 'next';
 
@@ -32,8 +33,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} bg-slate-900 text-white min-h-screen pt-20`}
       >
-        <Header />
-        {children}
+        <MonthProvider>
+          <Header />
+          {children}
+        </MonthProvider>
       </body>
     </html>
   );
