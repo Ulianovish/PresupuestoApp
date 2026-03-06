@@ -35,53 +35,52 @@ const getCurrentMonth = (): string => {
 };
 
 export function MonthProvider({ children }: MonthProviderProps) {
-  // Estado del año seleccionado
-  const [selectedYear, setSelectedYear] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('selectedYear');
-      return saved ? parseInt(saved, 10) : new Date().getFullYear();
-    }
-    return new Date().getFullYear();
-  });
+  const now = new Date();
+  const defaultYear = now.getFullYear();
+  const defaultMonth = `${defaultYear}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-  // Estado del mes seleccionado
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const savedMonth = localStorage.getItem('selectedMonth');
-      if (savedMonth) {
-        // Validar que el mes pertenezca al año seleccionado
-        const [year] = savedMonth.split('-');
-        if (parseInt(year, 10) === selectedYear) {
-          return savedMonth;
-        }
+  // Inicializar con valores por defecto (sin localStorage) para evitar hydration mismatch
+  const [selectedYear, setSelectedYear] = useState<number>(defaultYear);
+  const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonth);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Leer localStorage DESPUÉS de la hidratación
+  useEffect(() => {
+    const savedYear = localStorage.getItem('selectedYear');
+    const savedMonth = localStorage.getItem('selectedMonth');
+
+    const year = savedYear ? parseInt(savedYear, 10) : defaultYear;
+    setSelectedYear(year);
+
+    if (savedMonth) {
+      const [savedYearStr] = savedMonth.split('-');
+      if (parseInt(savedYearStr, 10) === year) {
+        setSelectedMonth(savedMonth);
+      } else {
+        const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+        setSelectedMonth(
+          year === defaultYear ? `${year}-${currentMonth}` : `${year}-01`,
+        );
       }
     }
-    // Default: mes actual del año seleccionado
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
 
-    // Si el año seleccionado es el actual, usar el mes actual
-    // Si no, usar enero del año seleccionado
-    if (selectedYear === currentYear) {
-      return `${selectedYear}-${currentMonth}`;
-    }
-    return `${selectedYear}-01`;
-  });
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Persistir año en localStorage
+  // Persistir año en localStorage (solo después de hidratación)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (hydrated) {
       localStorage.setItem('selectedYear', selectedYear.toString());
     }
-  }, [selectedYear]);
+  }, [selectedYear, hydrated]);
 
-  // Persistir mes en localStorage
+  // Persistir mes en localStorage (solo después de hidratación)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (hydrated) {
       localStorage.setItem('selectedMonth', selectedMonth);
     }
-  }, [selectedMonth]);
+  }, [selectedMonth, hydrated]);
 
   // Función para cambiar año
   const handleSetSelectedYear = useCallback(

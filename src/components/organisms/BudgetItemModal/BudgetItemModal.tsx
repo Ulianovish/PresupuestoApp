@@ -3,29 +3,14 @@
  *
  * Modal para agregar o editar items de presupuesto.
  * Incluye formulario completo con validación y manejo de estado.
- *
- * @param isOpen - Si el modal está abierto
- * @param mode - Modo del modal ('add' o 'edit')
- * @param formData - Datos del formulario
- * @param onFormDataChange - Función para actualizar los datos del formulario
- * @param onSave - Función para guardar los cambios
- * @param onClose - Función para cerrar el modal
- *
- * @example
- * <BudgetItemModal
- *   isOpen={modalState.isOpen}
- *   mode={modalState.mode}
- *   formData={formData}
- *   onFormDataChange={setFormData}
- *   onSave={handleSave}
- *   onClose={closeModal}
- * />
  */
 
 import React from 'react';
 
 import Button from '@/components/atoms/Button/Button';
-import BudgetFormFields from '@/components/molecules/BudgetFormFields/BudgetFormFields';
+import BudgetFormFields, {
+  type BudgetFormData,
+} from '@/components/molecules/BudgetFormFields/BudgetFormFields';
 import {
   Dialog,
   DialogContent,
@@ -33,26 +18,32 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-interface FormData {
+interface LookupItem {
+  id: string;
+  name: string;
+}
+
+interface DeudaOption {
+  id: string;
   descripcion: string;
-  fecha: string;
-  clasificacion: 'Fijo' | 'Variable' | 'Discrecional';
-  control: 'Necesario' | 'Discrecional';
-  presupuestado: number;
-  real: number;
 }
 
 interface BudgetItemModalProps {
   isOpen: boolean;
   mode: 'add' | 'edit';
-  formData: FormData;
-  onFormDataChange: (data: FormData | ((prev: FormData) => FormData)) => void;
+  formData: BudgetFormData;
+  onFormDataChange: (
+    data: BudgetFormData | ((prev: BudgetFormData) => BudgetFormData),
+  ) => void;
   onSave: (saveAndNext?: boolean) => void;
   onClose: () => void;
   onDelete?: () => void;
   chainedEditing?: boolean;
   currentItemIndex?: number;
   totalItemsInCategory?: number;
+  classifications?: LookupItem[];
+  controls?: LookupItem[];
+  deudas?: DeudaOption[];
 }
 
 export default function BudgetItemModal({
@@ -66,12 +57,17 @@ export default function BudgetItemModal({
   chainedEditing = false,
   currentItemIndex = 0,
   totalItemsInCategory = 0,
+  classifications,
+  controls,
+  deudas,
 }: BudgetItemModalProps) {
   // Manejar atajos de teclado
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.ctrlKey && e.key === 'Enter') {
+    if (e.key === 'Enter') {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'TEXTAREA') return;
       e.preventDefault();
-      onSave(mode === 'edit'); // En modo edit, auto-avanza al siguiente
+      onSave(false);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       onClose();
@@ -99,6 +95,9 @@ export default function BudgetItemModal({
           <BudgetFormFields
             formData={formData}
             onFormDataChange={onFormDataChange}
+            classifications={classifications}
+            controls={controls}
+            deudas={deudas}
           />
 
           {/* Botones de acción */}
@@ -122,7 +121,6 @@ export default function BudgetItemModal({
                 Cancelar
               </Button>
 
-              {/* Botón de guardar (con auto-avance en modo edit) */}
               <Button
                 variant="gradient"
                 onClick={() => onSave(mode === 'edit')}
@@ -136,3 +134,5 @@ export default function BudgetItemModal({
     </Dialog>
   );
 }
+
+export type { BudgetFormData };

@@ -2,16 +2,7 @@
  * BudgetFormFields - Molecule Level
  *
  * Campos del formulario para agregar/editar items de presupuesto.
- * Incluye todos los campos necesarios: descripción, fecha, clasificación, control, presupuestado, real.
- *
- * @param formData - Datos del formulario
- * @param onFormDataChange - Función para actualizar los datos del formulario
- *
- * @example
- * <BudgetFormFields
- *   formData={formData}
- *   onFormDataChange={setFormData}
- * />
+ * Carga clasificaciones y controles dinámicamente desde la BD.
  */
 
 import React from 'react';
@@ -20,23 +11,42 @@ import CurrencyInput from '@/components/atoms/CurrencyInput/CurrencyInput';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-interface FormData {
+export interface BudgetFormData {
   descripcion: string;
   fecha: string;
-  clasificacion: 'Fijo' | 'Variable' | 'Discrecional';
-  control: 'Necesario' | 'Discrecional';
+  clasificacion: string;
+  control: string;
   presupuestado: number;
   real: number;
+  deuda_id?: string | null;
+}
+
+interface LookupItem {
+  id: string;
+  name: string;
+}
+
+interface DeudaOption {
+  id: string;
+  descripcion: string;
 }
 
 interface BudgetFormFieldsProps {
-  formData: FormData;
-  onFormDataChange: (data: FormData | ((prev: FormData) => FormData)) => void;
+  formData: BudgetFormData;
+  onFormDataChange: (
+    data: BudgetFormData | ((prev: BudgetFormData) => BudgetFormData),
+  ) => void;
+  classifications?: LookupItem[];
+  controls?: LookupItem[];
+  deudas?: DeudaOption[];
 }
 
 export default function BudgetFormFields({
   formData,
   onFormDataChange,
+  classifications = [],
+  controls = [],
+  deudas,
 }: BudgetFormFieldsProps) {
   return (
     <div className="space-y-4">
@@ -75,57 +85,46 @@ export default function BudgetFormFields({
         />
       </div>
 
-      {/* Campo clasificación */}
+      {/* Campo clasificación - dropdown */}
       <div className="space-y-2">
         <Label className="text-white">Clasificación</Label>
-        <div className="flex gap-4">
-          {['Fijo', 'Variable', 'Discrecional'].map(tipo => (
-            <label key={tipo} className="flex items-center space-x-2">
-              <input
-                type="radio"
-                name="clasificacion"
-                value={tipo}
-                checked={formData.clasificacion === tipo}
-                onChange={e =>
-                  onFormDataChange(prev => ({
-                    ...prev,
-                    clasificacion: e.target.value as
-                      | 'Fijo'
-                      | 'Variable'
-                      | 'Discrecional',
-                  }))
-                }
-                className="text-blue-500"
-              />
-              <span className="text-white text-sm">{tipo}</span>
-            </label>
+        <select
+          value={formData.clasificacion}
+          onChange={e =>
+            onFormDataChange(prev => ({
+              ...prev,
+              clasificacion: e.target.value,
+            }))
+          }
+          className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {classifications.map(c => (
+            <option key={c.id} value={c.name}>
+              {c.name}
+            </option>
           ))}
-        </div>
+        </select>
       </div>
 
-      {/* Campo control */}
+      {/* Campo control - dropdown */}
       <div className="space-y-2">
         <Label className="text-white">Control</Label>
-        <div className="flex gap-4">
-          {['Necesario', 'Discrecional'].map(tipo => (
-            <label key={tipo} className="flex items-center space-x-2">
-              <input
-                type="radio"
-                name="control"
-                value={tipo}
-                checked={formData.control === tipo}
-                onChange={e =>
-                  onFormDataChange(prev => ({
-                    ...prev,
-                    control: e.target.value as 'Necesario' | 'Discrecional',
-                  }))
-                }
-                className="text-blue-500"
-              />
-              <span className="text-white text-sm">{tipo}</span>
-            </label>
+        <select
+          value={formData.control}
+          onChange={e =>
+            onFormDataChange(prev => ({
+              ...prev,
+              control: e.target.value,
+            }))
+          }
+          className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {controls.map(c => (
+            <option key={c.id} value={c.name}>
+              {c.name}
+            </option>
           ))}
-        </div>
+        </select>
       </div>
 
       {/* Campo presupuestado */}
@@ -163,6 +162,30 @@ export default function BudgetFormFields({
           placeholder="$0"
         />
       </div>
+
+      {/* Vincular deuda (opcional) */}
+      {deudas && deudas.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-white">Vincular Deuda (opcional)</Label>
+          <select
+            value={formData.deuda_id || ''}
+            onChange={e =>
+              onFormDataChange(prev => ({
+                ...prev,
+                deuda_id: e.target.value || null,
+              }))
+            }
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Sin deuda vinculada</option>
+            {deudas.map(d => (
+              <option key={d.id} value={d.id}>
+                {d.descripcion}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 }

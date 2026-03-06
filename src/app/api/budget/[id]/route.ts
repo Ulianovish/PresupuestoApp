@@ -12,6 +12,7 @@ const UpdateBudgetItemSchema = z.object({
   real: z.number().optional(),
   clasificacion: z.string().optional(),
   control: z.string().optional(),
+  deuda_id: z.string().uuid().nullable().optional(),
 });
 
 /**
@@ -52,6 +53,9 @@ export async function PATCH(
       due_date?: string;
       budgeted_amount?: number;
       real_amount?: number;
+      classification_id?: string;
+      control_id?: string;
+      deuda_id?: string | null;
     } = {};
 
     if (validatedData.descripcion !== undefined) {
@@ -65,6 +69,27 @@ export async function PATCH(
     }
     if (validatedData.real !== undefined) {
       updateData.real_amount = validatedData.real;
+    }
+    if (validatedData.deuda_id !== undefined) {
+      updateData.deuda_id = validatedData.deuda_id;
+    }
+
+    // Buscar IDs de clasificación y control por nombre
+    if (validatedData.clasificacion) {
+      const { data: clsData } = await supabase
+        .from('classifications')
+        .select('id')
+        .eq('name', validatedData.clasificacion)
+        .single();
+      if (clsData) updateData.classification_id = clsData.id;
+    }
+    if (validatedData.control) {
+      const { data: ctrlData } = await supabase
+        .from('controls')
+        .select('id')
+        .eq('name', validatedData.control)
+        .single();
+      if (ctrlData) updateData.control_id = ctrlData.id;
     }
 
     // Actualizar el item de presupuesto en Supabase
@@ -84,15 +109,37 @@ export async function PATCH(
       );
     }
 
+    // Resolver nombres de clasificación y control desde sus IDs
+    let clasificacionName = validatedData.clasificacion || '';
+    let controlName = validatedData.control || '';
+
+    if (!clasificacionName && data.classification_id) {
+      const { data: cls } = await supabase
+        .from('classifications')
+        .select('name')
+        .eq('id', data.classification_id)
+        .single();
+      if (cls) clasificacionName = cls.name;
+    }
+    if (!controlName && data.control_id) {
+      const { data: ctrl } = await supabase
+        .from('controls')
+        .select('name')
+        .eq('id', data.control_id)
+        .single();
+      if (ctrl) controlName = ctrl.name;
+    }
+
     // Transformar datos para respuesta
     const transformedData = {
       id: data.id,
       descripcion: data.name,
       fecha: data.due_date || '',
-      clasificacion: validatedData.clasificacion || '',
-      control: validatedData.control || '',
+      clasificacion: clasificacionName,
+      control: controlName,
       presupuestado: parseFloat(data.budgeted_amount) || 0,
       real: parseFloat(data.real_amount) || 0,
+      deuda_id: data.deuda_id || null,
     };
 
     return NextResponse.json({

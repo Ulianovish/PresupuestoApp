@@ -22,7 +22,7 @@ import { ReactNode } from 'react';
 import { Button as ShadcnButton } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-interface ButtonProps {
+export interface ButtonProps {
   variant?:
     | 'default'
     | 'destructive'
@@ -39,6 +39,7 @@ interface ButtonProps {
   onClick?: (e?: React.MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
   type?: 'button' | 'submit' | 'reset';
+  title?: string;
 }
 
 export default function Button({
@@ -50,6 +51,7 @@ export default function Button({
   disabled,
   onClick,
   type = 'button',
+  title,
   ...props
 }: ButtonProps) {
   const variants = {
@@ -98,6 +100,7 @@ export default function Button({
       disabled={disabled || loading}
       onClick={onClick}
       type={type}
+      title={title}
       {...props}
     >
       {/* Loading spinner */}

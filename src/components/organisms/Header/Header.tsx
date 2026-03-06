@@ -17,10 +17,10 @@ import Link from 'next/link';
 import {
   LayoutDashboard,
   PieChart,
-  ReceiptText,
   FlaskConical,
   Wallet,
   TrendingUp,
+  CreditCard,
   Menu,
   User,
   LogOut,
@@ -103,7 +103,7 @@ export default function Header() {
             : 'bg-white/10 dark:bg-slate-800/30 backdrop-blur-md border-b border-white/20'
         }`}
       >
-        <nav className="max-w-7xl mx-auto flex items-center justify-between px-6 sm:px-8 py-3 gap-4">
+        <nav className="flex items-center justify-between px-6 sm:px-8 py-3 gap-4">
           {/* Logo y título */}
           <div className="flex items-center gap-3">
             <span className="text-xl sm:text-2xl font-bold text-blue-400 tracking-tight select-none">
@@ -143,6 +143,15 @@ export default function Header() {
             </li>
             <li>
               <Link
+                href="/ingresos"
+                className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all"
+              >
+                <TrendingUp size={18} />
+                <span>Ingresos</span>
+              </Link>
+            </li>
+            <li>
+              <Link
                 href="/presupuesto"
                 className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all"
               >
@@ -155,17 +164,17 @@ export default function Header() {
                 href="/gastos"
                 className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all"
               >
-                <ReceiptText size={18} />
+                <Wallet size={18} />
                 <span>Gastos</span>
               </Link>
             </li>
             <li>
               <Link
-                href="/ingresos-deudas"
+                href="/deudas"
                 className="flex items-center gap-2 px-3 py-2 text-white hover:text-blue-400 hover:bg-white/10 rounded-lg transition-all"
               >
-                <TrendingUp size={18} />
-                <span>Ingresos/Deudas</span>
+                <CreditCard size={18} />
+                <span>Deudas</span>
               </Link>
             </li>
             <li>

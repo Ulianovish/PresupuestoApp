@@ -12,6 +12,8 @@ import {
   obtenerDeudas,
   crearIngreso,
   crearDeuda,
+  actualizarDeuda,
+  eliminarDeuda,
   obtenerResumenFinanciero,
   inicializarDatosEjemplo,
   formatearMoneda,
@@ -41,6 +43,11 @@ interface UseIngresosDeudasReturn {
 
   // Funciones para deudas
   agregarDeuda: (nuevaDeuda: NuevaDeuda) => Promise<void>;
+  editarDeuda: (
+    id: string,
+    datos: Partial<NuevaDeuda> & { pagada?: boolean },
+  ) => Promise<void>;
+  borrarDeuda: (id: string) => Promise<void>;
 
   // Funciones de utilidad
   recargarDatos: () => Promise<void>;
@@ -200,6 +207,37 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
     }
   }, []);
 
+  const editarDeudaHandler = useCallback(
+    async (id: string, datos: Partial<NuevaDeuda> & { pagada?: boolean }) => {
+      try {
+        setError(null);
+        await actualizarDeuda(id, datos);
+        await cargarDatos();
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Error al editar deuda';
+        setError(errorMessage);
+        throw err;
+      }
+    },
+    [cargarDatos],
+  );
+
+  const borrarDeudaHandler = useCallback(async (id: string) => {
+    try {
+      setError(null);
+      await eliminarDeuda(id);
+      setDeudas(prev => prev.filter(d => d.id !== id));
+      const nuevoResumen = await obtenerResumenFinanciero();
+      setResumen(nuevoResumen);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Error al eliminar deuda';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
   // ============================================
   // FUNCIONES DE UTILIDAD
   // ============================================
@@ -232,6 +270,8 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
 
     // Funciones para deudas
     agregarDeuda,
+    editarDeuda: editarDeudaHandler,
+    borrarDeuda: borrarDeudaHandler,
 
     // Funciones de utilidad
     recargarDatos,

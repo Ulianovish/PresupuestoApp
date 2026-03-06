@@ -24,9 +24,10 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   PieChart,
-  ReceiptText,
   FlaskConical,
   TrendingUp,
+  CreditCard,
+  Wallet,
   X,
   Home,
 } from 'lucide-react';
@@ -48,6 +49,12 @@ const navigationLinks = [
     description: 'Panel principal de control',
   },
   {
+    href: '/ingresos',
+    label: 'Ingresos',
+    icon: TrendingUp,
+    description: 'Gestión de ingresos',
+  },
+  {
     href: '/presupuesto',
     label: 'Presupuesto',
     icon: PieChart,
@@ -56,14 +63,14 @@ const navigationLinks = [
   {
     href: '/gastos',
     label: 'Gastos',
-    icon: ReceiptText,
-    description: 'Seguimiento de gastos',
+    icon: Wallet,
+    description: 'Gestión de gastos mensuales',
   },
   {
-    href: '/ingresos-deudas',
-    label: 'Ingresos/Deudas',
-    icon: TrendingUp,
-    description: 'Gestión de ingresos y deudas',
+    href: '/deudas',
+    label: 'Deudas',
+    icon: CreditCard,
+    description: 'Gestión de deudas',
   },
   {
     href: '/test',

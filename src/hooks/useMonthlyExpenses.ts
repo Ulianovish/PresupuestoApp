@@ -12,7 +12,6 @@ import {
   updateExpenseTransaction,
   deleteExpenseTransaction,
   getUserAccounts,
-  getAllAvailableMonths,
   hasExpenseDataForMonth,
   ExpenseTransaction,
   ExpenseFormData,
@@ -59,8 +58,11 @@ interface UseMonthlyExpensesState {
 
 export function useMonthlyExpenses(): UseMonthlyExpensesState {
   // Usar contexto global para el mes seleccionado
-  const { selectedMonth, setSelectedMonth: setGlobalSelectedMonth } =
-    useMonth();
+  const {
+    selectedMonth,
+    setSelectedMonth: setGlobalSelectedMonth,
+    getAvailableMonths,
+  } = useMonth();
 
   // Estado principal
   const [expenseData, setExpenseData] = useState<MonthlyExpenseData | null>(
@@ -71,7 +73,7 @@ export function useMonthlyExpenses(): UseMonthlyExpensesState {
   // Estado de UI
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [availableMonths] = useState<string[]>(getAllAvailableMonths());
+  const availableMonths = getAvailableMonths().map(m => m.value);
 
   // Estado de modal/formulario
   const [isModalOpen, setIsModalOpen] = useState(false);

@@ -43,8 +43,6 @@ export default function AddCategoryButton({
       )}
     >
       <Plus className="h-4 w-4" />
-      <span className="hidden sm:inline">Agregar Categoría</span>
-      <span className="sm:hidden">Nueva</span>
     </Button>
   );
 }

@@ -127,3 +127,36 @@ export async function createCategory(input: CreateCategoryInput) {
     };
   }
 }
+
+export async function deleteCategory(categoryId: string) {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: 'Usuario no autenticado' };
+    }
+
+    // Soft delete: marcar como inactiva
+    const { error } = await supabase
+      .from('categories')
+      .update({ is_active: false })
+      .eq('id', categoryId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error al eliminar categoría:', error);
+      return { success: false, error: 'Error al eliminar la categoría' };
+    }
+
+    revalidatePath('/presupuesto');
+    return { success: true };
+  } catch (error) {
+    console.error('Error en deleteCategory:', error);
+    return { success: false, error: 'Error interno del servidor' };
+  }
+}

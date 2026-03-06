@@ -1,5 +1,6 @@
 import { Geist, Geist_Mono } from 'next/font/google';
 
+import ToasterProvider from '@/components/atoms/ToasterProvider/ToasterProvider';
 import Header from '@/components/organisms/Header/Header';
 import { MonthProvider } from '@/contexts/MonthContext';
 
@@ -36,6 +37,7 @@ export default function RootLayout({
         <MonthProvider>
           <Header />
           {children}
+          <ToasterProvider />
         </MonthProvider>
       </body>
     </html>

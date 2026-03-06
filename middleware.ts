@@ -60,6 +60,8 @@ export async function middleware(request: NextRequest) {
     '/dashboard',
     '/presupuesto',
     '/gastos',
+    '/ingresos',
+    '/deudas',
     '/profile',
     '/settings'
   ]

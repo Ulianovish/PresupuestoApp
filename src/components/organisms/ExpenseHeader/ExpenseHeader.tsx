@@ -24,7 +24,7 @@
 
 import React from 'react';
 
-import { RefreshCw, Database } from 'lucide-react';
+import { RefreshCw, Database, Upload } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
 import MonthSelector from '@/components/atoms/MonthSelector/MonthSelector';
@@ -40,8 +40,10 @@ interface ExpenseHeaderProps {
   availableMonths: MonthOption[];
   onMonthChange: (month: string) => void;
   onRefresh: () => void;
+  onImportExcel?: () => void;
   onShowMigration?: () => void;
   isLoading: boolean;
+  isImporting?: boolean;
 }
 
 export default function ExpenseHeader({
@@ -49,8 +51,10 @@ export default function ExpenseHeader({
   availableMonths,
   onMonthChange,
   onRefresh,
+  onImportExcel,
   onShowMigration,
   isLoading,
+  isImporting,
 }: ExpenseHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -74,6 +78,22 @@ export default function ExpenseHeader({
           disabled={isLoading}
           className="min-w-[200px]"
         />
+
+        {/* Botón de importar Excel */}
+        {onImportExcel && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onImportExcel}
+            disabled={isLoading || isImporting}
+            className="flex items-center gap-2 border-green-500/50 text-green-300 hover:bg-green-500/10"
+          >
+            <Upload
+              className={`w-4 h-4 ${isImporting ? 'animate-pulse' : ''}`}
+            />
+            {isImporting ? 'Importando...' : 'Importar Excel'}
+          </Button>
+        )}
 
         {/* Botón de migración julio */}
         {selectedMonth === '2025-07' && onShowMigration && (

@@ -32,8 +32,20 @@ export interface Deuda {
   monto: number;
   fecha_vencimiento: string;
   pagada: boolean;
-  tipo: 'deuda';
+  tipo: string;
+  tipo_deuda?: 'banco' | 'tarjeta_credito';
   es_activo: boolean;
+  // V2 fields
+  valor_total: number;
+  saldo_pendiente: number;
+  plazo_meses: number;
+  valor_cuota: number;
+  fecha_corte: string;
+  fecha_pago: string;
+  tasa_interes: number;
+  cuotas_pagas: number;
+  cuotas_faltantes: number;
+  valor_polizas: number;
   created_at: string;
   updated_at: string;
 }
@@ -51,6 +63,18 @@ export interface NuevaDeuda {
   acreedor: string;
   monto: number;
   fecha_vencimiento: string;
+  tipo_deuda?: 'banco' | 'tarjeta_credito';
+  // V2 fields
+  valor_total?: number;
+  saldo_pendiente?: number;
+  plazo_meses?: number;
+  valor_cuota?: number;
+  fecha_corte?: string;
+  fecha_pago?: string;
+  tasa_interes?: number;
+  cuotas_pagas?: number;
+  cuotas_faltantes?: number;
+  valor_polizas?: number;
 }
 
 // Tipo para resumen financiero
@@ -230,8 +254,19 @@ export async function crearDeuda(nuevaDeuda: NuevaDeuda): Promise<Deuda> {
           acreedor: nuevaDeuda.acreedor,
           monto: nuevaDeuda.monto,
           fecha_vencimiento: nuevaDeuda.fecha_vencimiento,
-          tipo: 'deuda',
+          tipo: nuevaDeuda.tipo_deuda || 'banco',
           pagada: false,
+          // V2 fields
+          valor_total: nuevaDeuda.valor_total ?? 0,
+          saldo_pendiente: nuevaDeuda.saldo_pendiente ?? 0,
+          plazo_meses: nuevaDeuda.plazo_meses ?? 0,
+          valor_cuota: nuevaDeuda.valor_cuota ?? 0,
+          fecha_corte: nuevaDeuda.fecha_corte ?? '',
+          fecha_pago: nuevaDeuda.fecha_pago ?? '',
+          tasa_interes: nuevaDeuda.tasa_interes ?? 0,
+          cuotas_pagas: nuevaDeuda.cuotas_pagas ?? 0,
+          cuotas_faltantes: nuevaDeuda.cuotas_faltantes ?? 0,
+          valor_polizas: nuevaDeuda.valor_polizas ?? 0,
         },
       ])
       .select()

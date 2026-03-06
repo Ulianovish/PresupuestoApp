@@ -34,6 +34,7 @@ interface ExpensePageTemplateProps {
   expenseTable?: React.ReactNode;
   modal: React.ReactNode;
   floatingButton: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 export default function ExpensePageTemplate({
@@ -44,6 +45,7 @@ export default function ExpensePageTemplate({
   expenseTable,
   modal,
   floatingButton,
+  children,
 }: ExpensePageTemplateProps) {
   return (
     <div className="min-h-screen bg-slate-900 p-8">
@@ -68,6 +70,9 @@ export default function ExpensePageTemplate({
 
         {/* Floating button */}
         {floatingButton}
+
+        {/* Extra children (hidden inputs, etc.) */}
+        {children}
       </div>
     </div>
   );

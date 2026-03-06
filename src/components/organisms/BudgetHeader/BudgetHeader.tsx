@@ -23,14 +23,12 @@
  * />
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Copy } from 'lucide-react';
 
-import AddCategoryButton from '@/components/atoms/AddCategoryButton/AddCategoryButton';
 import Button from '@/components/atoms/Button/Button';
 import MonthSelector from '@/components/atoms/MonthSelector/MonthSelector';
-import CategoryModal from '@/components/organisms/CategoryModal/CategoryModal';
 
 interface MonthOption {
   value: string;
@@ -43,7 +41,7 @@ interface BudgetHeaderProps {
   onRefresh: () => void;
   isLoading: boolean;
   monthOptions: MonthOption[];
-  onCategoryCreated?: () => void;
+  onCopyPreviousMonth?: () => void;
 }
 
 export default function BudgetHeader({
@@ -52,25 +50,11 @@ export default function BudgetHeader({
   onRefresh,
   isLoading,
   monthOptions,
-  onCategoryCreated,
+  onCopyPreviousMonth,
 }: BudgetHeaderProps) {
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-
   // Obtener la etiqueta del mes seleccionado
   const selectedMonthLabel =
     monthOptions.find(m => m.value === selectedMonth)?.label || selectedMonth;
-
-  const handleOpenCategoryModal = () => {
-    setShowCategoryModal(true);
-  };
-
-  const handleCloseCategoryModal = () => {
-    setShowCategoryModal(false);
-  };
-
-  const handleCategoryCreated = () => {
-    onCategoryCreated?.();
-  };
 
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -95,31 +79,35 @@ export default function BudgetHeader({
           className="min-w-[200px]"
         />
 
-        {/* Botón de agregar categoría */}
-        <AddCategoryButton
-          onClick={handleOpenCategoryModal}
-          loading={isLoading}
-        />
+        {/* Botones de copiar y actualizar (apilados) */}
+        <div className="flex flex-col gap-2">
+          {onCopyPreviousMonth && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onCopyPreviousMonth}
+              disabled={isLoading}
+              className="flex items-center gap-2"
+            >
+              <Copy className="w-4 h-4" />
+              Copiar mes anterior
+            </Button>
+          )}
 
-        {/* Botón de actualizar */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRefresh}
-          disabled={isLoading}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            disabled={isLoading}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`}
+            />
+            Actualizar
+          </Button>
+        </div>
       </div>
-
-      {/* Modal para crear categoría */}
-      <CategoryModal
-        isOpen={showCategoryModal}
-        onClose={handleCloseCategoryModal}
-        onCategoryCreated={handleCategoryCreated}
-      />
     </div>
   );
 }

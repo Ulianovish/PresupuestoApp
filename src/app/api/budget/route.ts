@@ -14,6 +14,7 @@ const CreateBudgetItemSchema = z.object({
   control: z.string(),
   presupuestado: z.number(),
   real: z.number(),
+  deuda_id: z.string().uuid().nullable().optional(),
 });
 
 /**
@@ -87,11 +88,12 @@ export async function POST(request: NextRequest) {
         category_id: validatedData.category_id,
         classification_id: classificationResult.data.id,
         control_id: controlResult.data.id,
-        status_id: statusResult.data.id, // Usar el UUID del status activo
+        status_id: statusResult.data.id,
         name: validatedData.descripcion,
         budgeted_amount: validatedData.presupuestado,
         real_amount: validatedData.real,
         due_date: validatedData.fecha,
+        deuda_id: validatedData.deuda_id || null,
       })
       .select()
       .single();
@@ -113,6 +115,7 @@ export async function POST(request: NextRequest) {
       control: validatedData.control,
       presupuestado: parseFloat(data.budgeted_amount) || 0,
       real: parseFloat(data.real_amount) || 0,
+      deuda_id: data.deuda_id || null,
     };
 
     return NextResponse.json({

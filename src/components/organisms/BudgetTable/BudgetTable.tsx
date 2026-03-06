@@ -28,6 +28,7 @@
 
 import React from 'react';
 
+import AddCategoryButton from '@/components/atoms/AddCategoryButton/AddCategoryButton';
 import Card, {
   CardContent,
   CardHeader,
@@ -44,6 +45,7 @@ interface BudgetItem {
   control: string;
   presupuestado: number;
   real: number;
+  deuda_id?: string | null;
 }
 
 interface BudgetCategory {
@@ -60,12 +62,27 @@ interface BudgetData {
   total_real: number;
 }
 
+interface LookupItem {
+  id: string;
+  name: string;
+}
+
 interface BudgetTableProps {
   categories: BudgetCategory[];
   budgetData: BudgetData | null;
   onToggleCategory: (categoryId: string) => void;
   onAddItem: (categoryId: string) => void;
   onEditItem: (categoryId: string, item: BudgetItem) => void;
+  onDeleteCategory: (categoryId: string) => void;
+  onDeleteItem?: (itemId: string) => void;
+  onAddCategory?: () => void;
+  onInlineUpdate?: (
+    itemId: string,
+    updates: Partial<{ clasificacion: string; control: string }>,
+  ) => Promise<void>;
+  classifications?: LookupItem[];
+  controls?: LookupItem[];
+  isLoading?: boolean;
   formatCurrency: (amount: number) => string;
   getClasificacionColor: (clasificacion: string) => string;
   getControlColor: (control: string) => string;
@@ -77,6 +94,13 @@ export default function BudgetTable({
   onToggleCategory,
   onAddItem,
   onEditItem,
+  onDeleteCategory,
+  onDeleteItem,
+  onAddCategory,
+  onInlineUpdate,
+  classifications,
+  controls,
+  isLoading,
   formatCurrency,
   getClasificacionColor,
   getControlColor,
@@ -85,7 +109,12 @@ export default function BudgetTable({
     <Card variant="glass" className="p-6">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Categorías de Presupuesto</span>
+          <div className="flex items-center gap-3">
+            <span>Categorías de Presupuesto</span>
+            {onAddCategory && (
+              <AddCategoryButton onClick={onAddCategory} loading={isLoading} />
+            )}
+          </div>
           <div className="text-sm text-gray-400">
             Total: {formatCurrency(budgetData?.total_presupuestado || 0)} /{' '}
             {formatCurrency(budgetData?.total_real || 0)}
@@ -95,7 +124,7 @@ export default function BudgetTable({
 
       <CardContent>
         <div className="overflow-x-auto">
-          <table className="min-w-full">
+          <table className="min-w-full border-separate border-spacing-y-1">
             {/* Cabecera de la tabla */}
             <thead>
               <tr className="border-b border-white/10">
@@ -132,6 +161,7 @@ export default function BudgetTable({
                     category={categoria}
                     onToggle={onToggleCategory}
                     onAddItem={onAddItem}
+                    onDeleteCategory={onDeleteCategory}
                     formatCurrency={formatCurrency}
                   />
 
@@ -143,6 +173,10 @@ export default function BudgetTable({
                         item={item}
                         categoryId={categoria.id}
                         onEdit={onEditItem}
+                        onDelete={onDeleteItem}
+                        onInlineUpdate={onInlineUpdate}
+                        classifications={classifications}
+                        controls={controls}
                         formatCurrency={formatCurrency}
                         getClasificacionColor={getClasificacionColor}
                         getControlColor={getControlColor}

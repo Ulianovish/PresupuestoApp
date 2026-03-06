@@ -16,23 +16,17 @@ export const createClient = async () => {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        getAll() {
+          return cookieStore.getAll();
         },
-        set(name: string, value: string, options: { [key: string]: unknown }) {
+        setAll(cookiesToSet) {
           try {
-            cookieStore.set({ name, value, ...options });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options),
+            );
           } catch {
-            // La llamada a `set` falla en middleware
-            // Esto es esperado y no es un error
-          }
-        },
-        remove(name: string, options: { [key: string]: unknown }) {
-          try {
-            cookieStore.set({ name, value: '', ...options });
-          } catch {
-            // La llamada a `remove` falla en middleware
-            // Esto es esperado y no es un error
+            // La llamada a `setAll` falla en Server Components
+            // Esto es esperado si se llama desde un Server Component
           }
         },
       },
@@ -50,11 +44,10 @@ export const createAdminClient = () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
       cookies: {
-        get() {
-          return undefined;
+        getAll() {
+          return [];
         },
-        set() {},
-        remove() {},
+        setAll() {},
       },
     },
   );

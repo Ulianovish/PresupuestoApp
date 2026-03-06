@@ -20,6 +20,7 @@ interface BudgetQueryRow {
   control_name: string;
   budgeted_amount: string | number;
   real_amount: string | number;
+  deuda_id: string | null;
 }
 
 export interface BudgetItem {
@@ -30,6 +31,7 @@ export interface BudgetItem {
   control: string;
   presupuestado: number;
   real: number;
+  deuda_id?: string | null;
 }
 
 export interface BudgetCategory {
@@ -159,6 +161,7 @@ export async function getBudgetByMonth(
             control: row.control_name,
             presupuestado: Number(row.budgeted_amount) || 0,
             real: Number(row.real_amount) || 0,
+            deuda_id: row.deuda_id || null,
           };
 
           category.items.push(item);
@@ -308,6 +311,7 @@ export async function createBudgetItem(
         control: item.control,
         presupuestado: item.presupuestado,
         real: item.real,
+        deuda_id: item.deuda_id || null,
       }),
     });
 
