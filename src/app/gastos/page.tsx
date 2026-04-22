@@ -27,10 +27,104 @@ import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
 import {
   ACCOUNT_TYPES,
   createExpenseTransaction,
+  updateExpenseTransaction,
   formatCurrency,
   formatMonthName,
   ExpenseTransaction,
 } from '@/lib/services/expenses';
+
+// Mapa de palabras clave para auto-categorizar gastos por descripción
+const KEYWORD_MAP: Record<string, string[]> = {
+  TRANSPORTE: [
+    'didi',
+    'gasolina',
+    'parking',
+    'parqueadero',
+    'lavado',
+    'llanta',
+    'combustible',
+    'peaje',
+    'taxi',
+    'uber',
+    'autopista',
+    'mecanico',
+    'aceite',
+    'filtro',
+    'repuesto',
+    'taller',
+    'bencina',
+    'gasolinera',
+    'carwash',
+    'gnv',
+    'vehiculo',
+    'moto',
+    'autolavado',
+    'pique',
+  ],
+  VIVIENDA: [
+    'arriendo',
+    'alquiler',
+    'renta',
+    'agua',
+    'energia',
+    'electricidad',
+    'luz',
+    'gas domiciliario',
+    'internet',
+    'administracion',
+    'predial',
+    'epm',
+    'codensa',
+    'acueducto',
+    'alcantarillado',
+    'piscina',
+    'jardin',
+  ],
+  MERCADO: [
+    'mercado',
+    'supermercado',
+    'exito',
+    'carulla',
+    'jumbo',
+    'tienda',
+    'abarrotes',
+    'frutas',
+    'verduras',
+    'restaurante',
+    'almuerzo',
+    'desayuno',
+    'cena',
+    'rappi',
+    'ifood',
+    'domicilio',
+    'comestibles',
+    'drogueria',
+    'farmacia',
+  ],
+  DEUDAS: [
+    'prestamo',
+    'cuota',
+    'credito',
+    'financiamiento',
+    'hipoteca',
+    'pago tc',
+    'pago tarjeta',
+    'abono credito',
+    'deuda',
+  ],
+};
+
+const guessCategory = (desc: string, known: string[]): string => {
+  const lower = desc.toLowerCase();
+  for (const [cat, keywords] of Object.entries(KEYWORD_MAP)) {
+    if (keywords.some(kw => lower.includes(kw))) {
+      const match = known.find(k => k.toUpperCase() === cat.toUpperCase());
+      if (match) return match;
+      return cat;
+    }
+  }
+  return known[0] || 'OTROS';
+};
 
 // Interfaces
 interface FormData {
@@ -70,6 +164,7 @@ export default function GastosPage() {
   // Estado y ref para importar Excel
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isRecategorizing, setIsRecategorizing] = useState(false);
 
   // Estado del modal de confirmación de eliminación
   const [confirmDelete, setConfirmDelete] = useState<{
@@ -162,6 +257,36 @@ export default function GastosPage() {
     closeModal();
   };
 
+  const handleAutoRecategorize = async () => {
+    if (!expenseData || expenseData.transactions.length === 0) return;
+    const knownUpper = categoryNames.map(c => c.toUpperCase());
+    const toFix = expenseData.transactions.filter(
+      t => !knownUpper.includes(t.category_name.toUpperCase()),
+    );
+    if (toFix.length === 0) {
+      toast.info('Todos los gastos ya tienen una categoría válida');
+      return;
+    }
+    setIsRecategorizing(true);
+    let fixed = 0;
+    // Actualizar todas las filas en paralelo sin disparar re-renders intermedios
+    await Promise.all(
+      toFix.map(async t => {
+        const newCat = guessCategory(t.description, categoryNames);
+        try {
+          await updateExpenseTransaction(t.id, { category_name: newCat });
+          fixed++;
+        } catch {
+          // continuar con los demás
+        }
+      }),
+    );
+    // Un solo refresh al final
+    await refreshExpenses();
+    setIsRecategorizing(false);
+    toast.success(`${fixed} gasto(s) re-categorizados automáticamente`);
+  };
+
   const handleDeleteExpense = async (transactionId: string) => {
     // Buscar descripción del gasto para el modal
     const transaction = expenseData?.transactions.find(
@@ -209,11 +334,17 @@ export default function GastosPage() {
 
       toast.info(`Procesando ${rows.length} filas del Excel...`);
 
-      // Auto-detectar columnas por nombre (case-insensitive)
+      // Auto-detectar columnas por nombre (case-insensitive, accent-insensitive)
+      const normalize = (s: string) =>
+        s
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim();
       const findCol = (row: Record<string, unknown>, ...names: string[]) => {
         for (const key of Object.keys(row)) {
-          const lower = key.toLowerCase().trim();
-          if (names.some(n => lower.includes(n))) return key;
+          const norm = normalize(key);
+          if (names.some(n => norm.includes(n))) return key;
         }
         return null;
       };
@@ -277,12 +408,24 @@ export default function GastosPage() {
         const row = rows[i];
         try {
           const rawAmount = row[amountCol];
-          const amount =
-            typeof rawAmount === 'number'
-              ? Math.abs(rawAmount)
-              : Math.abs(
-                  parseFloat(String(rawAmount).replace(/[^0-9.-]/g, '')) || 0,
-                );
+          let amount: number;
+          if (typeof rawAmount === 'number') {
+            amount = Math.abs(rawAmount);
+          } else {
+            let str = String(rawAmount).replace(/[$\s]/g, '').trim();
+            // Detect comma-as-decimal format (e.g., "4.175,89" or "884,40")
+            // If last separator is comma and has 1-2 digits after it, treat comma as decimal
+            const lastComma = str.lastIndexOf(',');
+            const lastDot = str.lastIndexOf('.');
+            if (lastComma > lastDot && str.length - lastComma <= 3) {
+              // Comma is decimal separator: remove dots (thousands), replace comma with dot
+              str = str.replace(/\./g, '').replace(',', '.');
+            } else {
+              // Standard format: remove commas (thousands)
+              str = str.replace(/,/g, '');
+            }
+            amount = Math.abs(parseFloat(str) || 0);
+          }
 
           if (amount <= 0) {
             skipped++;
@@ -333,10 +476,16 @@ export default function GastosPage() {
           // Registrar el mes afectado (YYYY-MM)
           monthsAffected.add(transactionDate.slice(0, 7));
 
-          const categoryName =
+          // Usar columna de categoría si el valor coincide con una categoría conocida,
+          // de lo contrario inferir automáticamente por palabras clave de la descripción
+          const rawCat =
             catCol && row[catCol]
               ? String(row[catCol]).toUpperCase().trim()
-              : categoryNames[0] || 'OTROS';
+              : '';
+          const knownUpper = categoryNames.map(c => c.toUpperCase());
+          const categoryName = knownUpper.includes(rawCat)
+            ? rawCat
+            : guessCategory(description, categoryNames);
 
           const accountName =
             accountCol && row[accountCol]
@@ -415,8 +564,10 @@ export default function GastosPage() {
           onMonthChange={setSelectedMonth}
           onRefresh={refreshExpenses}
           onImportExcel={handleImportExcel}
+          onAutoRecategorize={handleAutoRecategorize}
           isLoading={loading}
           isImporting={isImporting}
+          isRecategorizing={isRecategorizing}
         />
       }
       statusPanels={<ExpenseStatusPanels isLoading={loading} error={error} />}
@@ -438,6 +589,10 @@ export default function GastosPage() {
             onEdit={handleEditTransaction}
             onDelete={handleDeleteExpense}
             onAddFirst={openModal}
+            categories={categoryNames}
+            onCategoryChange={async (id, categoryName) => {
+              await updateExpense(id, { category_name: categoryName });
+            }}
           />
         ) : undefined
       }

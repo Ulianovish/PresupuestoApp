@@ -46,6 +46,11 @@ interface ExpenseTableProps {
   onEdit: (transaction: ExpenseTransaction) => void;
   onDelete: (transactionId: string) => void;
   onAddFirst: () => void;
+  categories?: string[];
+  onCategoryChange?: (
+    transactionId: string,
+    categoryName: string,
+  ) => Promise<void>;
 }
 
 export default function ExpenseTable({
@@ -56,6 +61,8 @@ export default function ExpenseTable({
   onEdit,
   onDelete,
   onAddFirst,
+  categories,
+  onCategoryChange,
 }: ExpenseTableProps) {
   return (
     <Card variant="glass" className="p-6">
@@ -114,6 +121,8 @@ export default function ExpenseTable({
                     formatCurrency={formatCurrency}
                     onEdit={onEdit}
                     onDelete={onDelete}
+                    categories={categories}
+                    onCategoryChange={onCategoryChange}
                   />
                 ))}
               </tbody>
