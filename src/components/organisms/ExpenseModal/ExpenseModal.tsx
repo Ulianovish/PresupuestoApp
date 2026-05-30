@@ -26,10 +26,11 @@
  * />
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 
 import Button from '@/components/atoms/Button/Button';
 import ExpenseFormFields from '@/components/molecules/ExpenseFormFields/ExpenseFormFields';
+import CufeScanForm from '@/components/organisms/CufeScanForm/CufeScanForm';
 import {
   Dialog,
   DialogContent,
@@ -58,6 +59,7 @@ interface ExpenseModalProps {
   ) => void;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
+  onCufeSaved?: () => void;
 }
 
 export default function ExpenseModal({
@@ -69,7 +71,10 @@ export default function ExpenseModal({
   onFormChange,
   onSubmit,
   onClose,
+  onCufeSaved,
 }: ExpenseModalProps) {
+  const [mode, setMode] = useState<'manual' | 'cufe'>('manual');
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md bg-slate-800 border-slate-700 max-h-[90vh] overflow-y-auto">
@@ -84,30 +89,62 @@ export default function ExpenseModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={onSubmit} className="py-4">
-          {/* Campos del formulario */}
-          <ExpenseFormFields
-            formData={formData}
-            expenseCategories={expenseCategories}
-            accountTypes={accountTypes}
-            onFormChange={onFormChange}
-          />
-
-          {/* Botones de acción */}
-          <div className="flex justify-end space-x-2 pt-6">
-            <Button
+        {!isEditing && (
+          <div className="flex gap-2 mb-4">
+            <button
               type="button"
-              variant="outline"
-              onClick={onClose}
-              className="border-slate-600 text-slate-300"
+              onClick={() => setMode('manual')}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm ${
+                mode === 'manual' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'
+              }`}
             >
-              Cancelar
-            </Button>
-            <Button type="submit" variant="gradient">
-              {isEditing ? 'Actualizar' : 'Agregar'} Gasto
-            </Button>
+              Manual
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('cufe')}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm ${
+                mode === 'cufe' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'
+              }`}
+            >
+              Factura (CUFE)
+            </button>
           </div>
-        </form>
+        )}
+
+        {mode === 'cufe' && !isEditing ? (
+          <CufeScanForm
+            onSaved={() => {
+              onCufeSaved?.();
+              onClose();
+            }}
+          />
+        ) : (
+          <form onSubmit={onSubmit} className="py-4">
+            {/* Campos del formulario */}
+            <ExpenseFormFields
+              formData={formData}
+              expenseCategories={expenseCategories}
+              accountTypes={accountTypes}
+              onFormChange={onFormChange}
+            />
+
+            {/* Botones de acción */}
+            <div className="flex justify-end space-x-2 pt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="border-slate-600 text-slate-300"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" variant="gradient">
+                {isEditing ? 'Actualizar' : 'Agregar'} Gasto
+              </Button>
+            </div>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );
