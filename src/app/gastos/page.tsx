@@ -21,6 +21,7 @@ import ExpenseModal from '@/components/organisms/ExpenseModal/ExpenseModal';
 import ExpenseStatusPanels from '@/components/organisms/ExpenseStatusPanels/ExpenseStatusPanels';
 import ExpenseSummary from '@/components/organisms/ExpenseSummary/ExpenseSummary';
 import ExpenseTable from '@/components/organisms/ExpenseTable/ExpenseTable';
+import PendingInvoicesPanel from '@/components/organisms/PendingInvoicesPanel/PendingInvoicesPanel';
 import ExpensePageTemplate from '@/components/templates/ExpensePageTemplate/ExpensePageTemplate';
 import { useCategories } from '@/hooks/useCategories';
 import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
@@ -70,6 +71,9 @@ export default function GastosPage() {
   // Estado y ref para importar Excel
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Estado para forzar recarga del panel de facturas pendientes
+  const [invoiceRefresh, setInvoiceRefresh] = useState(0);
 
   // Estado del modal de confirmación de eliminación
   const [confirmDelete, setConfirmDelete] = useState<{
@@ -441,6 +445,12 @@ export default function GastosPage() {
           />
         ) : undefined
       }
+      migrationPanel={
+        <PendingInvoicesPanel
+          refreshToken={invoiceRefresh}
+          onApproved={refreshExpenses}
+        />
+      }
       modal={
         <ExpenseModal
           isOpen={isModalOpen}
@@ -451,6 +461,7 @@ export default function GastosPage() {
           onFormChange={handleFormChange}
           onSubmit={handleSubmitExpense}
           onClose={handleCloseModal}
+          onCufeSaved={() => setInvoiceRefresh(n => n + 1)}
         />
       }
       floatingButton={<ExpenseFloatingButton onClick={openModal} />}
