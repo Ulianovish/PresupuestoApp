@@ -221,3 +221,56 @@ upsert_monthly_expense(
 
 El draft se persiste al **completar** el procesamiento. Si el usuario cierra la pestaña
 durante el ~1 min, la fila queda en `processing` y debe reintentarse desde el panel.
+
+---
+
+## Resultado de implementación y pruebas (2026-05-30)
+
+Implementado y verificado end-to-end contra la DB remota de Supabase. Desviaciones y
+decisiones respecto al diseño original:
+
+### Base
+- Construido sobre `origin/main` (que ya traía Sprint 2 con import de Excel + fix de
+  seguridad de Next.js). Se descartó un scaffolding CUFE roto que vivía solo en un
+  `main` local divergente (mock scraper, `invoices.ts` contra tablas inexistentes).
+
+### Categorización con IA → MiniMax (no OpenAI)
+- En vez de OpenAI se usa **MiniMax M2.7** vía su endpoint **Anthropic-compatible**
+  (`https://api.minimax.io/anthropic/v1/messages`, `Authorization: Bearer`).
+- `categorizer.ts` hace `fetch` directo (sin SDK) y extrae el JSON de forma robusta
+  (tolera fences ```` ```json ```` y razonamiento del modelo antes del JSON).
+- Env: `MINIMAX_API_KEY`, `MINIMAX_BASE_URL`, `CATEGORIZE_MODEL` (default `MiniMax-M2.7`).
+- Fallback: ante error o falta de key, todos los ítems → `OTROS`.
+- ⚠️ La key usada es un **Coding Plan** (rate-limited, pensado para agentes de código);
+  para producción conviene una API key oficial de MiniMax.
+
+### IVA: ítems con valor del recibo
+- El API de factura-dian ahora devuelve por ítem `total_with_tax` y `unit_price_with_tax`.
+- El gasto se crea con `total_with_tax` (fallback a `total_price`), así los ítems se ven
+  como en la factura física y el total del mes refleja lo realmente pagado.
+- Como el modelo explota la factura en N gastos, el total del mes es la suma de ítems
+  (= `invoice_details.total_amount` salvo el ajuste DIAN de ≤$2 al peso).
+
+### Base de datos
+- La tabla `electronic_invoices` ya existía con el esquema viejo (`extracted_data`,
+  `pdf_url`). Se alineó con `ALTER ... ADD COLUMN IF NOT EXISTS` (migración
+  `20260530000001_align_electronic_invoices_cufe_feature.sql`): se agregaron `items`,
+  `status`, `currency`, `subtotal`, `selected_account_name`, `error_message`,
+  `processing_time_ms`, `approved_at` + índice `(user_id, status)`.
+- Dedup: el `cufe_code` ya tenía UNIQUE global (más estricto que el `(user_id, cufe_code)`
+  del diseño).
+
+### Hardening (post code-review)
+- RLS UPDATE con `WITH CHECK`.
+- Reintento de facturas atascadas: el dedup solo bloquea `pending_review`/`approved`;
+  filas en `processing`/`error` se reusan al reprocesar el mismo CUFE.
+- La respuesta de error de aprobación expone `created` (gastos creados antes del fallo).
+
+### Pruebas
+- Unit: 13 tests (SSE parser, categorizer + parsing robusto, mapper con/sin IVA).
+- E2E real: CUFE de factura D1 → 3 ítems → categorización MERCADO (MiniMax) → aprobación
+  → 3 gastos con IVA → total mes $12.150. Datos de prueba limpiados.
+
+### Backlog adicional detectado
+- Manejo explícito del IVA si en alguna factura `Σ(total_with_tax) ≠ total_amount` (±$1-2).
+- Migrar la categorización a una API key oficial de MiniMax para producción.
