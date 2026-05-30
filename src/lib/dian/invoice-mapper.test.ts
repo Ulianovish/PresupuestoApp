@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { mapInvoiceItemToExpenseArgs } from './invoice-mapper';
+
 import type { ElectronicInvoice, StoredInvoiceItem } from '@/types/invoices';
+
+import { mapInvoiceItemToExpenseArgs } from './invoice-mapper';
 
 const invoice = {
   invoice_date: '2026-05-15',

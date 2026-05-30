@@ -1,7 +1,7 @@
 // Servicio para gestionar facturas electrónicas DIAN (tabla electronic_invoices)
 
-import { createClient } from '@/lib/supabase/server';
 import { mapInvoiceItemToExpenseArgs } from '@/lib/dian/invoice-mapper';
+import { createClient } from '@/lib/supabase/server';
 import type {
   ElectronicInvoice,
   StoredInvoiceItem,

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { parseSSEEventLine } from './sse';
 
 describe('parseSSEEventLine', () => {

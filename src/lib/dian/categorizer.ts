@@ -12,7 +12,7 @@ export function buildCategorizationPrompt(
   return [
     'Eres un asistente de finanzas personales. Clasifica cada ítem de una',
     'factura en EXACTAMENTE una de estas categorías:',
-    categories.join(', ') + '.',
+    `${categories.join(', ')  }.`,
     '',
     'Ítems:',
     list,
