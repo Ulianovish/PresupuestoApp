@@ -4,9 +4,9 @@
 
 import { NextRequest } from 'next/server';
 
+import { EXPENSE_CATEGORIES } from '@/lib/constants/expense-categories';
 import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
 import { parseSSEEventLine } from '@/lib/dian/sse';
-import { EXPENSE_CATEGORIES } from '@/lib/services/expenses';
 import {
   createProcessingInvoice,
   getInvoiceByCufe,

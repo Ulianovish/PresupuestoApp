@@ -46,25 +46,16 @@ export interface Account {
   is_active: boolean;
 }
 
-// Categorías predefinidas para gastos
-export const EXPENSE_CATEGORIES = [
-  'VIVIENDA',
-  'DEUDAS',
-  'TRANSPORTE',
-  'MERCADO',
-  'OTROS',
-] as const;
-
-// Tipos de cuenta predefinidos
-export const ACCOUNT_TYPES = [
-  'Nequi',
-  'TC Falabella',
-  'Efectivo',
-  'Banco Santander',
-] as const;
-
-export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
-export type AccountType = (typeof ACCOUNT_TYPES)[number];
+// Categorías y tipos de cuenta: definidos en un módulo puro (sin side-effects)
+// y re-exportados aquí para conservar la API pública de este servicio.
+export {
+  EXPENSE_CATEGORIES,
+  ACCOUNT_TYPES,
+} from '@/lib/constants/expense-categories';
+export type {
+  ExpenseCategory,
+  AccountType,
+} from '@/lib/constants/expense-categories';
 
 // Cliente de Supabase
 const supabase = createClient();
