@@ -19,7 +19,7 @@ const item = {
 } as StoredInvoiceItem;
 
 describe('mapInvoiceItemToExpenseArgs', () => {
-  it('usa total_price como amount y el proveedor como place', () => {
+  it('cae a total_price (base) cuando no hay total_with_tax', () => {
     const args = mapInvoiceItemToExpenseArgs(
       item,
       invoice,
@@ -35,5 +35,16 @@ describe('mapInvoiceItemToExpenseArgs', () => {
       p_account_name: 'TC Falabella',
       p_place: 'Supermercado XYZ',
     });
+  });
+
+  it('prefiere total_with_tax (con IVA) cuando está presente', () => {
+    const withTax = { ...item, total_with_tax: 5950 } as StoredInvoiceItem;
+    const args = mapInvoiceItemToExpenseArgs(
+      withTax,
+      invoice,
+      'user-1',
+      'Nequi',
+    );
+    expect(args.p_amount).toBe(5950);
   });
 });

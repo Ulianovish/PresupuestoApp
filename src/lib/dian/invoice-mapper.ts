@@ -12,7 +12,8 @@ export interface UpsertExpenseArgs {
 
 /**
  * Mapea un ítem de factura a los argumentos del RPC `upsert_monthly_expense`.
- * El total de línea viene en `total_price` (no `total`).
+ * El monto usa `total_with_tax` (valor de línea CON IVA/INC, como en el recibo);
+ * si no viene, cae a `total_price` (base sin impuesto).
  */
 export function mapInvoiceItemToExpenseArgs(
   item: StoredInvoiceItem,
@@ -23,7 +24,7 @@ export function mapInvoiceItemToExpenseArgs(
   return {
     p_user_id: userId,
     p_description: item.description,
-    p_amount: item.total_price,
+    p_amount: item.total_with_tax ?? item.total_price,
     p_transaction_date: invoice.invoice_date ?? '',
     p_category_name: item.category,
     p_account_name: accountName,

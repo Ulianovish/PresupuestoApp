@@ -12,7 +12,9 @@ export interface InvoiceItem {
   iva_percent?: number;
   inc_amount?: number;
   inc_percent?: number;
-  total_price: number; // total de línea (OJO: no es `total`)
+  total_price: number; // total de línea SIN impuesto (base)
+  total_with_tax?: number; // total de línea CON IVA/INC (como en el recibo)
+  unit_price_with_tax?: number; // unitario con impuesto (columna "VALOR U")
 }
 
 export interface InvoiceDetails {

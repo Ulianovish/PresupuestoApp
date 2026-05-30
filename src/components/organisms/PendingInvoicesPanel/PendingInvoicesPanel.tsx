@@ -136,7 +136,7 @@ export default function PendingInvoicesPanel({
                         {it.description}
                       </span>
                       <span className="text-slate-400">
-                        {formatCurrency(it.total_price)}
+                        {formatCurrency(it.total_with_tax ?? it.total_price)}
                       </span>
                       <select
                         value={cats[idx]}
