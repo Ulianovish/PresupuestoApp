@@ -24,7 +24,7 @@
 
 import React from 'react';
 
-import { RefreshCw, Database, Upload } from 'lucide-react';
+import { RefreshCw, Database, Upload, Tags } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
 import MonthSelector from '@/components/atoms/MonthSelector/MonthSelector';
@@ -41,9 +41,11 @@ interface ExpenseHeaderProps {
   onMonthChange: (month: string) => void;
   onRefresh: () => void;
   onImportExcel?: () => void;
+  onAutoRecategorize?: () => void;
   onShowMigration?: () => void;
   isLoading: boolean;
   isImporting?: boolean;
+  isRecategorizing?: boolean;
 }
 
 export default function ExpenseHeader({
@@ -52,9 +54,11 @@ export default function ExpenseHeader({
   onMonthChange,
   onRefresh,
   onImportExcel,
+  onAutoRecategorize,
   onShowMigration,
   isLoading,
   isImporting,
+  isRecategorizing,
 }: ExpenseHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -92,6 +96,22 @@ export default function ExpenseHeader({
               className={`w-4 h-4 ${isImporting ? 'animate-pulse' : ''}`}
             />
             {isImporting ? 'Importando...' : 'Importar Excel'}
+          </Button>
+        )}
+
+        {/* Botón de auto-categorizar */}
+        {onAutoRecategorize && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onAutoRecategorize}
+            disabled={isLoading || isRecategorizing}
+            className="flex items-center gap-2 border-purple-500/50 text-purple-300 hover:bg-purple-500/10"
+          >
+            <Tags
+              className={`w-4 h-4 ${isRecategorizing ? 'animate-pulse' : ''}`}
+            />
+            {isRecategorizing ? 'Categorizando...' : 'Auto-categorizar'}
           </Button>
         )}
 
