@@ -1,0 +1,165 @@
+// Servicio para gestionar facturas electrónicas DIAN (tabla electronic_invoices)
+
+import { createClient } from '@/lib/supabase/server';
+import { mapInvoiceItemToExpenseArgs } from '@/lib/dian/invoice-mapper';
+import type {
+  ElectronicInvoice,
+  StoredInvoiceItem,
+} from '@/types/invoices';
+
+/** Busca una factura por CUFE (guarda anti-reprocesamiento). */
+export async function getInvoiceByCufe(
+  userId: string,
+  cufe: string,
+): Promise<ElectronicInvoice | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('electronic_invoices')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('cufe_code', cufe)
+    .maybeSingle();
+  return (data as ElectronicInvoice) ?? null;
+}
+
+/** Crea la fila en estado processing. Devuelve el id. */
+export async function createProcessingInvoice(
+  userId: string,
+  cufe: string,
+): Promise<string | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('electronic_invoices')
+    .insert({ user_id: userId, cufe_code: cufe, status: 'processing' })
+    .select('id')
+    .single();
+  if (error) {
+    console.error('Error creando factura en processing:', error);
+    return null;
+  }
+  return (data as { id: string }).id;
+}
+
+/** Marca la factura como error con un mensaje. */
+export async function markInvoiceError(
+  invoiceId: string,
+  message: string,
+): Promise<void> {
+  const supabase = await createClient();
+  await supabase
+    .from('electronic_invoices')
+    .update({ status: 'error', error_message: message })
+    .eq('id', invoiceId);
+}
+
+/** Guarda los datos extraídos + items categorizados y pasa a pending_review. */
+export async function saveProcessedInvoice(
+  invoiceId: string,
+  data: {
+    supplierName: string;
+    supplierNit: string;
+    invoiceDate: string;
+    currency: string;
+    subtotal: number;
+    totalAmount: number;
+    items: StoredInvoiceItem[];
+    processingTimeMs: number;
+  },
+): Promise<void> {
+  const supabase = await createClient();
+  await supabase
+    .from('electronic_invoices')
+    .update({
+      supplier_name: data.supplierName,
+      supplier_nit: data.supplierNit,
+      invoice_date: data.invoiceDate,
+      currency: data.currency,
+      subtotal: data.subtotal,
+      total_amount: data.totalAmount,
+      items: data.items,
+      processing_time_ms: data.processingTimeMs,
+      status: 'pending_review',
+      processed_at: new Date().toISOString(),
+    })
+    .eq('id', invoiceId);
+}
+
+/** Lista facturas en pending_review o error del usuario. */
+export async function listDraftInvoices(
+  userId: string,
+): Promise<ElectronicInvoice[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('electronic_invoices')
+    .select('*')
+    .eq('user_id', userId)
+    .in('status', ['pending_review', 'error'])
+    .order('created_at', { ascending: false });
+  return (data as ElectronicInvoice[]) ?? [];
+}
+
+/**
+ * Aprueba una factura: crea un gasto por ítem vía upsert_monthly_expense y
+ * marca la factura como approved.
+ */
+export async function approveInvoice(
+  userId: string,
+  invoiceId: string,
+  accountName: string,
+  categoryOverrides?: Record<number, string>,
+): Promise<{ success: boolean; created: number; error?: string }> {
+  const supabase = await createClient();
+
+  const { data: invoice, error } = await supabase
+    .from('electronic_invoices')
+    .select('*')
+    .eq('id', invoiceId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !invoice) {
+    return { success: false, created: 0, error: 'Factura no encontrada' };
+  }
+  if ((invoice as ElectronicInvoice).status !== 'pending_review') {
+    return {
+      success: false,
+      created: 0,
+      error: 'La factura no está pendiente de revisión',
+    };
+  }
+
+  const typed = invoice as ElectronicInvoice;
+  const items = (typed.items || []).map((it, idx) => ({
+    ...it,
+    category: categoryOverrides?.[idx] ?? it.category,
+  }));
+
+  let created = 0;
+  for (const item of items) {
+    const args = mapInvoiceItemToExpenseArgs(item, typed, userId, accountName);
+    const { error: rpcError } = await supabase.rpc(
+      'upsert_monthly_expense',
+      args,
+    );
+    if (rpcError) {
+      return {
+        success: false,
+        created,
+        error: `Error creando gasto "${item.description}": ${rpcError.message}`,
+      };
+    }
+    created++;
+  }
+
+  await supabase
+    .from('electronic_invoices')
+    .update({
+      status: 'approved',
+      selected_account_name: accountName,
+      items,
+      approved_at: new Date().toISOString(),
+    })
+    .eq('id', invoiceId);
+
+  return { success: true, created };
+}
