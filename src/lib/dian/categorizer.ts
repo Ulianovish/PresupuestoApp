@@ -1,18 +1,14 @@
-import OpenAI from 'openai';
-
 const FALLBACK = 'OTROS';
 
 export function buildCategorizationPrompt(
   items: Array<{ description: string }>,
   categories: string[],
 ): string {
-  const list = items
-    .map((it, i) => `${i + 1}. ${it.description}`)
-    .join('\n');
+  const list = items.map((it, i) => `${i + 1}. ${it.description}`).join('\n');
   return [
     'Eres un asistente de finanzas personales. Clasifica cada ítem de una',
     'factura en EXACTAMENTE una de estas categorías:',
-    `${categories.join(', ')  }.`,
+    `${categories.join(', ')}.`,
     '',
     'Ítems:',
     list,
@@ -21,6 +17,45 @@ export function buildCategorizationPrompt(
     'mismo orden y con la misma cantidad de ítems. Usa solo las categorías',
     'listadas; si dudas, usa OTROS.',
   ].join('\n');
+}
+
+/**
+ * Extrae un objeto JSON de un texto que puede venir como JSON puro, envuelto en
+ * fences markdown (```json ... ```), o precedido de razonamiento del modelo.
+ * Devuelve el objeto parseado o null.
+ */
+function extractJsonObject(content: string): unknown | null {
+  const trimmed = content.trim();
+
+  // 1. Intento directo.
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // continúa
+  }
+
+  // 2. Bloque entre fences ```json ... ``` o ``` ... ```.
+  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) {
+    try {
+      return JSON.parse(fence[1].trim());
+    } catch {
+      // continúa
+    }
+  }
+
+  // 3. Primer objeto {...} balanceado dentro del texto.
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    try {
+      return JSON.parse(trimmed.slice(start, end + 1));
+    } catch {
+      // continúa
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -34,14 +69,11 @@ export function parseCategorizationResponse(
 ): string[] {
   const result: string[] = new Array(itemCount).fill(FALLBACK);
   if (!content) return result;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    return result;
-  }
+
+  const parsed = extractJsonObject(content);
   const cats = (parsed as { categories?: unknown })?.categories;
   if (!Array.isArray(cats)) return result;
+
   const valid = new Set(categories);
   for (let i = 0; i < itemCount; i++) {
     const c = cats[i];
@@ -53,24 +85,54 @@ export function parseCategorizationResponse(
 }
 
 /**
- * Categoriza los ítems con OpenAI. Ante cualquier error devuelve todo OTROS.
+ * Categoriza los ítems con MiniMax (endpoint Anthropic-compatible del Coding
+ * Plan). Ante cualquier error o falta de API key devuelve todo OTROS.
  */
 export async function categorizeInvoiceItems(
   items: Array<{ description: string }>,
   categories: string[],
 ): Promise<string[]> {
   if (items.length === 0) return [];
+
+  const apiKey = process.env.MINIMAX_API_KEY;
+  if (!apiKey) {
+    return new Array(items.length).fill(FALLBACK);
+  }
+
+  const baseUrl = process.env.MINIMAX_BASE_URL || 'https://api.minimax.io/anthropic';
+  const model = process.env.CATEGORIZE_MODEL || 'MiniMax-M2.7';
+
   try {
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const completion = await client.chat.completions.create({
-      model: process.env.OPENAI_CATEGORIZE_MODEL || 'gpt-4o-mini',
-      messages: [
-        { role: 'user', content: buildCategorizationPrompt(items, categories) },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0,
+    const res = await fetch(`${baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'user',
+            content: buildCategorizationPrompt(items, categories),
+          },
+        ],
+      }),
     });
-    const content = completion.choices[0]?.message?.content ?? null;
+
+    if (!res.ok) {
+      throw new Error(`MiniMax respondió ${res.status}`);
+    }
+
+    const data = (await res.json()) as {
+      content?: Array<{ text?: string }>;
+    };
+    const content = Array.isArray(data.content)
+      ? data.content.map(c => c?.text ?? '').join('')
+      : null;
+
     return parseCategorizationResponse(content, items.length, categories);
   } catch (error) {
     console.error('Error categorizando items con IA:', error);

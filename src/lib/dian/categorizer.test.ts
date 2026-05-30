@@ -55,4 +55,21 @@ describe('parseCategorizationResponse', () => {
       'OTROS',
     ]);
   });
+
+  it('extrae JSON envuelto en fences markdown (MiniMax)', () => {
+    const raw = '```json\n{"categories":["MERCADO","DEUDAS"]}\n```';
+    expect(parseCategorizationResponse(raw, 2, CATS)).toEqual([
+      'MERCADO',
+      'DEUDAS',
+    ]);
+  });
+
+  it('extrae JSON aunque venga precedido de razonamiento del modelo', () => {
+    const raw =
+      'The user wants categories. Let me think...\n{"categories":["TRANSPORTE","OTROS"]}';
+    expect(parseCategorizationResponse(raw, 2, CATS)).toEqual([
+      'TRANSPORTE',
+      'OTROS',
+    ]);
+  });
 });
