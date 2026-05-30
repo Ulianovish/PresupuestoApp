@@ -11,6 +11,7 @@ import {
   createProcessingInvoice,
   getInvoiceByCufe,
   markInvoiceError,
+  resetInvoiceToProcessing,
   saveProcessedInvoice,
 } from '@/lib/services/invoices';
 import { createClient } from '@/lib/supabase/server';
@@ -50,9 +51,13 @@ export async function GET(request: NextRequest) {
   }
   const userId = user.id;
 
-  // Dedup: si ya existe, no reprocesar.
+  // Dedup: solo bloquear si ya está en revisión o aprobada.
+  // Filas atascadas en 'processing' o fallidas en 'error' se pueden reintentar.
   const existing = await getInvoiceByCufe(userId, cufe);
-  if (existing) {
+  if (
+    existing &&
+    (existing.status === 'pending_review' || existing.status === 'approved')
+  ) {
     return Response.json(
       {
         error: 'Esta factura ya fue procesada',
@@ -70,7 +75,13 @@ export async function GET(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       const startTime = Date.now();
-      const invoiceId = await createProcessingInvoice(userId, cufe);
+      let invoiceId: string | null;
+      if (existing) {
+        invoiceId = existing.id;
+        await resetInvoiceToProcessing(existing.id);
+      } else {
+        invoiceId = await createProcessingInvoice(userId, cufe);
+      }
       if (!invoiceId) {
         send(controller, { step: 'error', error: 'No se pudo crear el borrador' });
         controller.close();

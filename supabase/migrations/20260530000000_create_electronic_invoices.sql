@@ -41,7 +41,8 @@ CREATE POLICY "Los usuarios pueden crear sus propias facturas"
 
 CREATE POLICY "Los usuarios pueden actualizar sus propias facturas"
     ON electronic_invoices FOR UPDATE
-    USING (auth.uid() = user_id);
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Los usuarios pueden eliminar sus propias facturas"
     ON electronic_invoices FOR DELETE

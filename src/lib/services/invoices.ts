@@ -40,6 +40,17 @@ export async function createProcessingInvoice(
   return (data as { id: string }).id;
 }
 
+/** Reinicia una fila existente (processing/error) a processing para reintentar. */
+export async function resetInvoiceToProcessing(
+  invoiceId: string,
+): Promise<void> {
+  const supabase = await createClient();
+  await supabase
+    .from('electronic_invoices')
+    .update({ status: 'processing', error_message: null, processed_at: null })
+    .eq('id', invoiceId);
+}
+
 /** Marca la factura como error con un mensaje. */
 export async function markInvoiceError(
   invoiceId: string,

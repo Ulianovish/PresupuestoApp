@@ -44,7 +44,10 @@ export async function POST(
   );
 
   if (!result.success) {
-    return Response.json({ error: result.error }, { status: 400 });
+    return Response.json(
+      { error: result.error, created: result.created },
+      { status: 400 },
+    );
   }
 
   return Response.json({ success: true, created: result.created });
