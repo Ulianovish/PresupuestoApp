@@ -12,6 +12,21 @@
 
 **Convención de commits:** este repo usa Husky + lint-staged. Commits en español tipo `feat:`/`fix:`/`chore:`. Package manager: **bun**.
 
+> ⚠️ **Husky/lint-staged hace `git stash` de cambios no-staged y puede REVERTIR ediciones**
+> en commits que no tocan `src/`. Para commits SOLO de docs, usar `git commit --no-verify`.
+
+> **AJUSTE DE BASE (origin/main, 2026-05-30):** Este plan se ejecuta en un worktree
+> sobre `origin/main`, que **NO contiene el scaffolding CUFE roto** (vivía solo en un
+> local main descartado). Deltas respecto al texto original del plan:
+> - **`openai` NO está instalado** en esta base → se agrega en Task 1.
+> - `src/types/invoices.ts` y `src/lib/services/invoices.ts` **no existen** → en Tasks 3 y 7
+>   son **Create**, no Modify (el contenido a escribir es el mismo).
+> - `src/lib/dian/scraper.ts`, `src/app/api/invoices/cufe-to-data-stream/route.ts` y
+>   `src/app/gastos/escanear-factura/page.tsx` **no existen** → Task 12 no borra nada;
+>   queda solo el grep de verificación + env + build.
+> - `ExpenseModal.tsx` y `gastos/page.tsx` son la versión Sprint 2 (con import de Excel):
+>   el implementador DEBE leer el archivo actual antes de editar.
+
 ---
 
 ## File Structure
@@ -52,10 +67,11 @@
 - Create: `vitest.config.ts`
 - Create: `src/lib/dian/smoke.test.ts` (temporal, se borra al final del task)
 
-- [ ] **Step 1: Instalar Vitest**
+- [ ] **Step 1: Instalar Vitest + openai**
 
 ```bash
 bun add -d vitest @vitejs/plugin-react vite-tsconfig-paths
+bun add openai   # runtime dep: no está en esta base (origin/main)
 ```
 
 - [ ] **Step 2: Crear `vitest.config.ts`**
