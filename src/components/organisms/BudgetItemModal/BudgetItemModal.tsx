@@ -44,6 +44,7 @@ interface BudgetItemModalProps {
   classifications?: LookupItem[];
   controls?: LookupItem[];
   deudas?: DeudaOption[];
+  selectedMonth?: string;
 }
 
 export default function BudgetItemModal({
@@ -60,6 +61,7 @@ export default function BudgetItemModal({
   classifications,
   controls,
   deudas,
+  selectedMonth,
 }: BudgetItemModalProps) {
   // Manejar atajos de teclado
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -98,6 +100,7 @@ export default function BudgetItemModal({
             classifications={classifications}
             controls={controls}
             deudas={deudas}
+            selectedMonth={selectedMonth}
           />
 
           {/* Botones de acción */}

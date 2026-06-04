@@ -620,6 +620,7 @@ export default function PresupuestoPage() {
             classifications={classifications}
             controls={controls}
             deudas={deudasOptions}
+            selectedMonth={selectedMonth}
           />
         }
       />
