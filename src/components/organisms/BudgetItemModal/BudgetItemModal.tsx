@@ -45,6 +45,7 @@ interface BudgetItemModalProps {
   controls?: LookupItem[];
   deudas?: DeudaOption[];
   selectedMonth?: string;
+  descriptionSuggestions?: string[];
 }
 
 export default function BudgetItemModal({
@@ -62,6 +63,7 @@ export default function BudgetItemModal({
   controls,
   deudas,
   selectedMonth,
+  descriptionSuggestions,
 }: BudgetItemModalProps) {
   // Manejar atajos de teclado
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -101,6 +103,7 @@ export default function BudgetItemModal({
             controls={controls}
             deudas={deudas}
             selectedMonth={selectedMonth}
+            descriptionSuggestions={descriptionSuggestions}
           />
 
           {/* Botones de acción */}

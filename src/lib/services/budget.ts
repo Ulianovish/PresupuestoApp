@@ -219,6 +219,43 @@ export async function createMonthlyBudget(
 }
 
 /**
+ * Obtiene la lista de nombres de items ya usados por el usuario (sin repetir),
+ * para autocompletar la descripción al crear/editar items.
+ */
+export async function getItemNameSuggestions(): Promise<string[]> {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('budget_items')
+      .select('name')
+      .eq('user_id', user.id)
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('Error obteniendo nombres de items:', error);
+      return [];
+    }
+
+    const unique = new Set<string>();
+    data?.forEach(row => {
+      const name = (row.name || '').trim();
+      if (name) unique.add(name);
+    });
+
+    return Array.from(unique).sort((a, b) =>
+      a.localeCompare(b, 'es', { sensitivity: 'base' }),
+    );
+  } catch (error) {
+    console.error('Error en getItemNameSuggestions:', error);
+    return [];
+  }
+}
+
+/**
  * Obtiene las categorías disponibles
  */
 export async function getCategories() {

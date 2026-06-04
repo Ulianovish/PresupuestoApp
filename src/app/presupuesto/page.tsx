@@ -24,6 +24,7 @@ import {
   formatCurrency,
   getClassifications,
   getControls,
+  getItemNameSuggestions,
 } from '@/lib/services/budget';
 import { obtenerDeudas, type Deuda } from '@/lib/services/ingresos-deudas';
 
@@ -73,17 +74,22 @@ export default function PresupuestoPage() {
   const [classifications, setClassifications] = useState<LookupItem[]>([]);
   const [controls, setControls] = useState<LookupItem[]>([]);
   const [deudas, setDeudas] = useState<Deuda[]>([]);
+  const [descriptionSuggestions, setDescriptionSuggestions] = useState<
+    string[]
+  >([]);
 
   useEffect(() => {
     async function loadLookups() {
-      const [cls, ctrls, deudasData] = await Promise.all([
+      const [cls, ctrls, deudasData, nameSuggestions] = await Promise.all([
         getClassifications(),
         getControls(),
         obtenerDeudas(),
+        getItemNameSuggestions(),
       ]);
       setClassifications(cls);
       setControls(ctrls);
       setDeudas(deudasData);
+      setDescriptionSuggestions(nameSuggestions);
     }
     loadLookups();
   }, []);
@@ -621,6 +627,7 @@ export default function PresupuestoPage() {
             controls={controls}
             deudas={deudasOptions}
             selectedMonth={selectedMonth}
+            descriptionSuggestions={descriptionSuggestions}
           />
         }
       />
