@@ -128,6 +128,86 @@ export async function createCategory(input: CreateCategoryInput) {
   }
 }
 
+// Schema de validación para renombrar una categoría
+const updateCategorySchema = z.object({
+  id: z.string().uuid('ID de categoría inválido'),
+  name: z
+    .string()
+    .min(1, 'El nombre es requerido')
+    .max(50, 'El nombre no puede exceder 50 caracteres'),
+});
+
+export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
+
+export async function updateCategory(input: UpdateCategoryInput) {
+  try {
+    const validatedData = updateCategorySchema.parse(input);
+    const name = validatedData.name.trim();
+
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: 'Usuario no autenticado' };
+    }
+
+    // Verificar que no exista OTRA categoría con ese nombre (regla: nombres únicos)
+    const { data: existingCategory } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('name', name)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .neq('id', validatedData.id)
+      .maybeSingle();
+
+    if (existingCategory) {
+      return {
+        success: false,
+        error:
+          'Ya tienes una categoría con ese nombre. Elige un nombre diferente.',
+      };
+    }
+
+    const { data, error } = await supabase
+      .from('categories')
+      .update({ name })
+      .eq('id', validatedData.id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error al actualizar categoría:', error);
+      if (error.code === '23505') {
+        return {
+          success: false,
+          error:
+            'Ya tienes una categoría con ese nombre. Elige un nombre diferente.',
+        };
+      }
+      return { success: false, error: 'Error al actualizar la categoría' };
+    }
+
+    revalidatePath('/presupuesto');
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error en updateCategory:', error);
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: 'Datos de entrada inválidos',
+        fieldErrors: error.flatten().fieldErrors,
+      };
+    }
+    return { success: false, error: 'Error interno del servidor' };
+  }
+}
+
 export async function deleteCategory(categoryId: string) {
   try {
     const supabase = await createClient();

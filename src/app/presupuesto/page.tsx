@@ -19,7 +19,7 @@ import CategoryModal from '@/components/organisms/CategoryModal/CategoryModal';
 import BudgetPageTemplate from '@/components/templates/BudgetPageTemplate/BudgetPageTemplate';
 import { useMonth } from '@/contexts/MonthContext';
 import { useMonthlyBudget } from '@/hooks/useMonthlyBudget';
-import { deleteCategory } from '@/lib/actions/categories';
+import { deleteCategory, updateCategory } from '@/lib/actions/categories';
 import {
   formatCurrency,
   getClassifications,
@@ -387,6 +387,19 @@ export default function PresupuestoPage() {
     }
   };
 
+  // Renombrar una categoría (capítulo) editando el nombre inline.
+  // Aplica a todos los meses, ya que la categoría es compartida.
+  const handleRenameCategory = async (categoryId: string, newName: string) => {
+    const result = await updateCategory({ id: categoryId, name: newName });
+    if (result.success) {
+      showToast('Nombre de categoría actualizado');
+      await refreshCategories();
+      await refreshBudget();
+    } else {
+      showToast(result.error || 'Error al renombrar la categoría', 'error');
+    }
+  };
+
   // Indica si el mes actual ya tiene items presupuestados
   const currentMonthHasItems = categories.some(c => c.items.length > 0);
 
@@ -579,6 +592,7 @@ export default function PresupuestoPage() {
               onAddItem={openAddModal}
               onEditItem={openEditModal}
               onDeleteCategory={handleDeleteCategory}
+              onRenameCategory={handleRenameCategory}
               onDeleteItem={handleDeleteItem}
               onAddCategory={() => setShowCategoryModal(true)}
               onInlineUpdate={handleInlineUpdate}

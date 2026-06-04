@@ -74,6 +74,7 @@ interface BudgetTableProps {
   onAddItem: (categoryId: string) => void;
   onEditItem: (categoryId: string, item: BudgetItem) => void;
   onDeleteCategory: (categoryId: string) => void;
+  onRenameCategory?: (categoryId: string, newName: string) => Promise<void>;
   onDeleteItem?: (itemId: string) => void;
   onAddCategory?: () => void;
   onInlineUpdate?: (
@@ -95,6 +96,7 @@ export default function BudgetTable({
   onAddItem,
   onEditItem,
   onDeleteCategory,
+  onRenameCategory,
   onDeleteItem,
   onAddCategory,
   onInlineUpdate,
@@ -162,6 +164,7 @@ export default function BudgetTable({
                     onToggle={onToggleCategory}
                     onAddItem={onAddItem}
                     onDeleteCategory={onDeleteCategory}
+                    onRenameCategory={onRenameCategory}
                     formatCurrency={formatCurrency}
                   />
 
