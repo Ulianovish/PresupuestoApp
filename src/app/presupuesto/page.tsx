@@ -101,7 +101,6 @@ export default function PresupuestoPage() {
 
   // Estado para copiar el mes anterior (evita duplicados por reentrada/doble copia)
   const [isCopying, setIsCopying] = useState(false);
-  const [confirmCopy, setConfirmCopy] = useState(false);
 
   const handleCategoryCreated = async () => {
     await refreshCategories();
@@ -392,21 +391,26 @@ export default function PresupuestoPage() {
   const currentMonthHasItems = categories.some(c => c.items.length > 0);
 
   /**
-   * Punto de entrada del botón "Copiar mes anterior".
-   * Si el mes actual ya tiene items, pide confirmación para evitar
-   * duplicar el presupuesto al volver a copiar sobre datos existentes.
+   * Copia los items del mes anterior al mes actual.
+   *
+   * Reglas para evitar duplicados:
+   * - Si el mes actual ya tiene items, NO se vuelve a copiar (se avisa).
+   * - Guarda anti-reentrada para que un doble clic no encole dos copias.
+   * - Durante la copia se omite cualquier item cuyo nombre ya exista en
+   *   esa categoría, de modo que nunca se cree un item con nombre repetido.
    */
-  const handleCopyPreviousMonth = () => {
+  const handleCopyPreviousMonth = async () => {
     if (isCopying) return; // evitar reentrada / doble clic
+
+    // No permitir copiar dos veces sobre un mes que ya tiene datos
     if (currentMonthHasItems) {
-      setConfirmCopy(true);
+      showToast(
+        'Ya se copió el presupuesto de este mes. No se puede volver a copiar.',
+        'error',
+      );
       return;
     }
-    void doCopyPreviousMonth();
-  };
 
-  const doCopyPreviousMonth = async () => {
-    if (isCopying) return; // guarda anti-reentrada
     setIsCopying(true);
 
     const [year, month] = selectedMonth.split('-').map(Number);
@@ -438,9 +442,29 @@ export default function PresupuestoPage() {
         }
       }
 
+      // Nombres ya presentes por categoría (clave: categoría + nombre normalizado)
+      // para no crear dos items con el mismo nombre, ni siquiera si el mes
+      // anterior ya tuviera duplicados.
+      const seenNames = new Set<string>();
+      const nameKey = (categoryId: string, name: string) =>
+        `${categoryId}::${name.trim().toLowerCase()}`;
+      for (const cat of categories) {
+        for (const it of cat.items) {
+          seenNames.add(nameKey(cat.id, it.descripcion));
+        }
+      }
+
       let itemsCopied = 0;
+      let itemsOmitidos = 0;
       for (const category of prevBudget.categories) {
         for (const item of category.items) {
+          const key = nameKey(category.id, item.descripcion);
+          if (seenNames.has(key)) {
+            itemsOmitidos++;
+            continue; // ya existe un item con ese nombre en la categoría
+          }
+          seenNames.add(key);
+
           await createItem(templateId, category.id, {
             descripcion: item.descripcion,
             fecha: item.fecha,
@@ -454,7 +478,11 @@ export default function PresupuestoPage() {
         }
       }
 
-      showToast(`Se copiaron ${itemsCopied} items del mes anterior`);
+      showToast(
+        itemsOmitidos > 0
+          ? `Se copiaron ${itemsCopied} items (${itemsOmitidos} omitidos por nombre repetido)`
+          : `Se copiaron ${itemsCopied} items del mes anterior`,
+      );
       await refreshBudget();
     } catch (err) {
       console.error('Error copiando mes anterior:', err);
@@ -587,18 +615,6 @@ export default function PresupuestoPage() {
         isOpen={showCategoryModal}
         onClose={() => setShowCategoryModal(false)}
         onCategoryCreated={handleCategoryCreated}
-      />
-
-      {/* Modal de confirmación para copiar el mes anterior sobre datos existentes */}
-      <ConfirmModal
-        isOpen={confirmCopy}
-        onClose={() => setConfirmCopy(false)}
-        onConfirm={() => {
-          setConfirmCopy(false);
-          void doCopyPreviousMonth();
-        }}
-        title="Copiar mes anterior"
-        message="Este mes ya tiene items presupuestados. Si continúas, los items del mes anterior se agregarán además de los existentes y podrías duplicar tu presupuesto. ¿Deseas continuar?"
       />
 
       {/* Modal de confirmación de eliminación */}
