@@ -42,6 +42,7 @@ interface BudgetHeaderProps {
   isLoading: boolean;
   monthOptions: MonthOption[];
   onCopyPreviousMonth?: () => void;
+  isCopying?: boolean;
 }
 
 export default function BudgetHeader({
@@ -51,6 +52,7 @@ export default function BudgetHeader({
   isLoading,
   monthOptions,
   onCopyPreviousMonth,
+  isCopying = false,
 }: BudgetHeaderProps) {
   // Obtener la etiqueta del mes seleccionado
   const selectedMonthLabel =
@@ -86,11 +88,11 @@ export default function BudgetHeader({
               variant="outline"
               size="sm"
               onClick={onCopyPreviousMonth}
-              disabled={isLoading}
+              disabled={isLoading || isCopying}
               className="flex items-center gap-2"
             >
-              <Copy className="w-4 h-4" />
-              Copiar mes anterior
+              <Copy className={`w-4 h-4 ${isCopying ? 'animate-pulse' : ''}`} />
+              {isCopying ? 'Copiando...' : 'Copiar mes anterior'}
             </Button>
           )}
 

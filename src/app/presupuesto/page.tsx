@@ -99,6 +99,10 @@ export default function PresupuestoPage() {
     name: string;
   }>({ isOpen: false, type: 'item', id: '', name: '' });
 
+  // Estado para copiar el mes anterior (evita duplicados por reentrada/doble copia)
+  const [isCopying, setIsCopying] = useState(false);
+  const [confirmCopy, setConfirmCopy] = useState(false);
+
   const handleCategoryCreated = async () => {
     await refreshCategories();
     await refreshBudget();
@@ -384,7 +388,27 @@ export default function PresupuestoPage() {
     }
   };
 
-  const handleCopyPreviousMonth = async () => {
+  // Indica si el mes actual ya tiene items presupuestados
+  const currentMonthHasItems = categories.some(c => c.items.length > 0);
+
+  /**
+   * Punto de entrada del botón "Copiar mes anterior".
+   * Si el mes actual ya tiene items, pide confirmación para evitar
+   * duplicar el presupuesto al volver a copiar sobre datos existentes.
+   */
+  const handleCopyPreviousMonth = () => {
+    if (isCopying) return; // evitar reentrada / doble clic
+    if (currentMonthHasItems) {
+      setConfirmCopy(true);
+      return;
+    }
+    void doCopyPreviousMonth();
+  };
+
+  const doCopyPreviousMonth = async () => {
+    if (isCopying) return; // guarda anti-reentrada
+    setIsCopying(true);
+
     const [year, month] = selectedMonth.split('-').map(Number);
     const prevDate = new Date(year, month - 2, 1);
     const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
@@ -435,6 +459,8 @@ export default function PresupuestoPage() {
     } catch (err) {
       console.error('Error copiando mes anterior:', err);
       showToast('Error al copiar el mes anterior', 'error');
+    } finally {
+      setIsCopying(false);
     }
   };
 
@@ -503,6 +529,7 @@ export default function PresupuestoPage() {
             isLoading={isLoading}
             monthOptions={monthOptions}
             onCopyPreviousMonth={handleCopyPreviousMonth}
+            isCopying={isCopying}
           />
         }
         statusPanels={
@@ -560,6 +587,18 @@ export default function PresupuestoPage() {
         isOpen={showCategoryModal}
         onClose={() => setShowCategoryModal(false)}
         onCategoryCreated={handleCategoryCreated}
+      />
+
+      {/* Modal de confirmación para copiar el mes anterior sobre datos existentes */}
+      <ConfirmModal
+        isOpen={confirmCopy}
+        onClose={() => setConfirmCopy(false)}
+        onConfirm={() => {
+          setConfirmCopy(false);
+          void doCopyPreviousMonth();
+        }}
+        title="Copiar mes anterior"
+        message="Este mes ya tiene items presupuestados. Si continúas, los items del mes anterior se agregarán además de los existentes y podrías duplicar tu presupuesto. ¿Deseas continuar?"
       />
 
       {/* Modal de confirmación de eliminación */}
