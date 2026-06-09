@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import Button from '@/components/atoms/Button/Button';
+import { useCategories } from '@/hooks/useCategories';
 import {
   ACCOUNT_TYPES,
   EXPENSE_CATEGORIES,
@@ -26,6 +27,14 @@ export default function PendingInvoicesPanel({
   const [account, setAccount] = useState<string>([...ACCOUNT_TYPES][0]);
   const [cats, setCats] = useState<Record<number, string>>({});
   const [approving, setApproving] = useState(false);
+
+  // Categorías activas del usuario (mismas que el tab de presupuesto).
+  // Fallback a la lista fija mientras cargan o si no hay ninguna.
+  const { categories: userCategories } = useCategories();
+  const categoryOptions =
+    userCategories.length > 0
+      ? userCategories.map(c => c.name)
+      : [...EXPENSE_CATEGORIES];
 
   const load = useCallback(async () => {
     const res = await fetch('/api/invoices/pending');
@@ -145,7 +154,7 @@ export default function PendingInvoicesPanel({
                         }
                         className="rounded border border-slate-700 bg-slate-800 px-1 py-0.5 text-xs text-white"
                       >
-                        {[...EXPENSE_CATEGORIES].map(c => (
+                        {categoryOptions.map(c => (
                           <option key={c} value={c}>
                             {c}
                           </option>

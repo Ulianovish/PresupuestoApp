@@ -112,7 +112,12 @@ export async function categorizeInvoiceItems(
       },
       body: JSON.stringify({
         model,
-        max_tokens: 1024,
+        // MiniMax-M2.7 es un modelo de razonamiento: emite un bloque "thinking"
+        // ANTES del bloque "text" con el JSON. Con facturas de muchos ítems el
+        // thinking consume todo el presupuesto y la respuesta se corta
+        // (stop_reason=max_tokens) sin emitir el JSON -> todo cae a OTROS.
+        // 8192 da margen para el razonamiento + la respuesta.
+        max_tokens: 8192,
         messages: [
           {
             role: 'user',

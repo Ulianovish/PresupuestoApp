@@ -132,15 +132,26 @@ export async function GET(request: NextRequest) {
           throw new Error(result?.error || 'No se obtuvieron datos');
         }
 
-        // Categorizar con IA.
+        // Categorizar con IA. Usamos las categorías activas del usuario
+        // (mismas que el tab de presupuesto), no la lista fija. Si la consulta
+        // falla o no hay categorías, caemos a EXPENSE_CATEGORIES.
         send(controller, {
           step: 'categorizing',
           message: 'Clasificando ítems con IA...',
           progress: 95,
         });
+        const { data: userCategories } = await supabase
+          .from('categories')
+          .select('name')
+          .eq('is_active', true)
+          .order('name');
+        const categoryNames =
+          userCategories && userCategories.length > 0
+            ? userCategories.map(c => c.name as string)
+            : [...EXPENSE_CATEGORIES];
         const categories = await categorizeInvoiceItems(
           result.items.map(it => ({ description: it.description })),
-          [...EXPENSE_CATEGORIES],
+          categoryNames,
         );
         const storedItems: StoredInvoiceItem[] = result.items.map(
           (it, idx) => ({

@@ -18,6 +18,8 @@ export const ACCOUNT_TYPES = [
   'TC Falabella',
   'Efectivo',
   'Banco Santander',
+  'TC NU',
+  'Ahorros Nu',
 ] as const;
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
