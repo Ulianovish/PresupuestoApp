@@ -1,5 +1,6 @@
 // Servicio para gestionar facturas electrónicas DIAN (tabla electronic_invoices)
 
+import { EXPENSE_CATEGORIES } from '@/lib/constants/expense-categories';
 import { mapInvoiceItemToExpenseArgs } from '@/lib/dian/invoice-mapper';
 import { createClient } from '@/lib/supabase/server';
 import type {
@@ -51,6 +52,36 @@ export async function resetInvoiceToProcessing(
     .eq('id', invoiceId);
 }
 
+/** Persiste el avance del procesamiento para que la UI lo muestre por polling. */
+export async function updateInvoiceProgress(
+  invoiceId: string,
+  percent: number,
+  message: string,
+): Promise<void> {
+  const supabase = await createClient();
+  await supabase
+    .from('electronic_invoices')
+    .update({ progress_percent: percent, progress_message: message })
+    .eq('id', invoiceId);
+}
+
+/**
+ * Devuelve las categorías activas del usuario (mismas que el tab de presupuesto).
+ * Si no hay o falla la consulta, cae a EXPENSE_CATEGORIES.
+ */
+export async function resolveUserCategoryNames(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('categories')
+    .select('name')
+    .eq('is_active', true)
+    .order('name');
+  if (data && data.length > 0) {
+    return data.map(c => c.name as string);
+  }
+  return [...EXPENSE_CATEGORIES];
+}
+
 /** Marca la factura como error con un mensaje. */
 export async function markInvoiceError(
   invoiceId: string,
@@ -95,7 +126,7 @@ export async function saveProcessedInvoice(
     .eq('id', invoiceId);
 }
 
-/** Lista facturas en pending_review o error del usuario. */
+/** Lista facturas activas del usuario (processing, pending_review o error). */
 export async function listDraftInvoices(
   userId: string,
 ): Promise<ElectronicInvoice[]> {
@@ -104,7 +135,7 @@ export async function listDraftInvoices(
     .from('electronic_invoices')
     .select('*')
     .eq('user_id', userId)
-    .in('status', ['pending_review', 'error'])
+    .in('status', ['processing', 'pending_review', 'error'])
     .order('created_at', { ascending: false });
   return (data as ElectronicInvoice[]) ?? [];
 }
