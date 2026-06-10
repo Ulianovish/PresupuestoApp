@@ -1,0 +1,133 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { runInvoiceProcessing } from './process-invoice';
+
+vi.mock('@/lib/services/invoices', () => ({
+  saveProcessedInvoice: vi.fn(async () => undefined),
+  markInvoiceError: vi.fn(async () => undefined),
+}));
+vi.mock('@/lib/dian/categorizer', () => ({
+  categorizeInvoiceItems: vi.fn(
+    async (items: Array<{ description: string }>) => items.map(() => 'MERCADO'),
+  ),
+}));
+
+import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
+import { markInvoiceError, saveProcessedInvoice } from '@/lib/services/invoices';
+
+function sseStream(lines: string[]): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      for (const line of lines) controller.enqueue(enc.encode(line));
+      controller.close();
+    },
+  });
+}
+
+const sse = (obj: Record<string, unknown>) => `data: ${JSON.stringify(obj)}\n\n`;
+
+const COMPLETE_RESULT = {
+  success: true,
+  invoice_details: {
+    cufe: 'CUFE123',
+    storeName: 'D1',
+    date: '2026-06-01',
+    currency: 'COP',
+    nit: '900',
+    subtotal: 10000,
+    total_amount: 12000,
+  },
+  items: [
+    { description: 'Arroz', quantity: 1, unit_price: 5000, total_price: 5000, total_with_tax: 6000 },
+    { description: 'Leche', quantity: 1, unit_price: 5000, total_price: 5000, total_with_tax: 6000 },
+  ],
+};
+
+describe('runInvoiceProcessing', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('procesa, reporta progreso, categoriza con las categorías dadas y persiste', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        body: sseStream([
+          sse({ step: 'fetching', progress: 30, message: 'Descargando...' }),
+          sse({ step: 'complete', progress: 100, result: COMPLETE_RESULT }),
+        ]),
+      })),
+    );
+    const onProgress = vi.fn();
+
+    const res = await runInvoiceProcessing('inv-1', 'CUFE123', {
+      categoryNames: ['MERCADO', 'OTROS'],
+      onProgress,
+    });
+
+    expect(res).toEqual({ ok: true, itemsFound: 2 });
+    expect(onProgress).toHaveBeenCalled();
+    expect(categorizeInvoiceItems).toHaveBeenCalledWith(
+      [{ description: 'Arroz' }, { description: 'Leche' }],
+      ['MERCADO', 'OTROS'],
+    );
+    expect(saveProcessedInvoice).toHaveBeenCalledWith(
+      'inv-1',
+      expect.objectContaining({ supplierName: 'D1', totalAmount: 12000 }),
+    );
+    const savedItems = (saveProcessedInvoice as unknown as ReturnType<typeof vi.fn>)
+      .mock.calls[0][1].items;
+    expect(savedItems[0].category).toBe('MERCADO');
+  });
+
+  it('expone el error real del upstream emitido como {error} sin step', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        body: sseStream([sse({ error: 'Error descargando PDF de la DIAN' })]),
+      })),
+    );
+
+    const res = await runInvoiceProcessing('inv-2', 'CUFE123', {
+      categoryNames: ['OTROS'],
+    });
+
+    expect(res.ok).toBe(false);
+    expect(markInvoiceError).toHaveBeenCalledWith(
+      'inv-2',
+      expect.stringContaining('Error descargando PDF'),
+    );
+    expect(saveProcessedInvoice).not.toHaveBeenCalled();
+  });
+
+  it('reintenta ante cierre prematuro y tiene éxito en el 2º intento', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, body: sseStream([sse({ step: 'fetching', progress: 10 })]) })
+      .mockResolvedValueOnce({ ok: true, body: sseStream([sse({ step: 'complete', result: COMPLETE_RESULT })]) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await runInvoiceProcessing('inv-3', 'CUFE123', {
+      categoryNames: ['MERCADO'],
+      retryBaseMs: 0,
+    });
+
+    expect(res).toEqual({ ok: true, itemsFound: 2 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('NO reintenta un error no transitorio (4xx) y marca error', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: false, status: 404, body: null }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await runInvoiceProcessing('inv-4', 'CUFE123', {
+      categoryNames: ['OTROS'],
+      retryBaseMs: 0,
+    });
+
+    expect(res.ok).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(markInvoiceError).toHaveBeenCalledWith('inv-4', expect.stringContaining('404'));
+  });
+});
