@@ -33,6 +33,106 @@ function send(
   );
 }
 
+// Cuántos intentos totales contra el scraper upstream. OJO: cada intento
+// resuelve captchas en 2captcha (cuesta dinero y ~60s), así que mantenemos
+// 2 (un reintento) y solo ante errores transitorios.
+const MAX_UPSTREAM_ATTEMPTS = 2;
+
+// Errores del scraper que valen la pena reintentar: saturación de recursos en
+// la función serverless (memoria / disco en /tmp) o cierre abrupto del stream.
+// Un CUFE inválido o un 4xx NO entran aquí (no se reintentan).
+function isTransientUpstreamError(message: string): boolean {
+  return /INSUFFICIENT_RESOURCES|FILE_ERROR_NO_SPACE|temporary directory|Target page, context or browser has been closed|closed prematurely|cerró la conexión|ECONNRESET|socket hang up|fetch failed|terminated/i.test(
+    message,
+  );
+}
+
+// Consume UNA vez el stream SSE del upstream, haciendo passthrough del progreso
+// al cliente. Devuelve el resultado o lanza. Distingue 3 finales:
+//  - `complete` con result.success -> devuelve el result
+//  - `error`/`{error}` explícito    -> lanza con el mensaje real
+//  - stream cerrado sin complete    -> lanza "closed prematurely" (transitorio)
+async function streamUpstreamOnce(
+  controller: ReadableStreamDefaultController,
+  url: string,
+): Promise<CufeProcessResult> {
+  const upstream = await fetch(url, {
+    headers: { Accept: 'text/event-stream' },
+  });
+  if (!upstream.ok || !upstream.body) {
+    throw new Error(`factura-dian respondió ${upstream.status}`);
+  }
+
+  const reader = upstream.body.getReader();
+  const decoder = new TextDecoder();
+  let result: CufeProcessResult | null = null;
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const event = parseSSEEventLine(line);
+      if (!event) continue;
+
+      // Passthrough de progreso al cliente.
+      send(controller, event as unknown as Record<string, unknown>);
+
+      if (event.step === 'complete' && event.result) {
+        result = event.result;
+      }
+      // factura-dian emite los fallos como `event: error` con `{error}` pero
+      // SIN campo `step`. Detectamos ambas formas para no tragarnos la causa
+      // real (p. ej. "Error descargando PDF...") y mostrar el genérico.
+      if (event.step === 'error' || event.error) {
+        throw new Error(event.error || 'Error en factura-dian');
+      }
+    }
+  }
+
+  if (!result) {
+    // Terminó el stream sin `complete` ni `error`: el upstream cerró la conexión
+    // a mitad (típico de saturación de recursos en el scraper). Transitorio.
+    throw new Error(
+      'El servicio DIAN cerró la conexión sin completar (closed prematurely). Posible saturación; reintenta en unos minutos.',
+    );
+  }
+  if (!result.success) {
+    throw new Error(result.error || 'No se obtuvieron datos');
+  }
+  return result;
+}
+
+// Envuelve streamUpstreamOnce con reintento + backoff ante errores transitorios.
+async function streamUpstreamWithRetry(
+  controller: ReadableStreamDefaultController,
+  url: string,
+): Promise<CufeProcessResult> {
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= MAX_UPSTREAM_ATTEMPTS; attempt++) {
+    try {
+      return await streamUpstreamOnce(controller, url);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const transient = isTransientUpstreamError(lastError.message);
+      if (!transient || attempt >= MAX_UPSTREAM_ATTEMPTS) throw lastError;
+
+      const waitMs = 5000 * attempt; // 5s, 10s...
+      send(controller, {
+        step: 'retrying',
+        message: `Servicio DIAN saturado, reintentando en ${waitMs / 1000}s...`,
+        progress: 5,
+      });
+      await new Promise(resolve => setTimeout(resolve, waitMs));
+    }
+  }
+  throw lastError ?? new Error('No se obtuvieron datos');
+}
+
 export async function GET(request: NextRequest) {
   const cufe = request.nextUrl.searchParams.get('cufe')?.trim();
 
@@ -93,48 +193,9 @@ export async function GET(request: NextRequest) {
           cufe,
         )}&method=${method}&download-pdf=false`;
 
-        const upstream = await fetch(upstreamUrl, {
-          headers: { Accept: 'text/event-stream' },
-        });
-        if (!upstream.ok || !upstream.body) {
-          throw new Error(`factura-dian respondió ${upstream.status}`);
-        }
-
-        const reader = upstream.body.getReader();
-        const decoder = new TextDecoder();
-        let result: CufeProcessResult | null = null;
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-
-          for (const line of lines) {
-            const event = parseSSEEventLine(line);
-            if (!event) continue;
-
-            // Passthrough de progreso al cliente.
-            send(controller, event as unknown as Record<string, unknown>);
-
-            if (event.step === 'complete' && event.result) {
-              result = event.result;
-            }
-            // factura-dian emite los fallos como `event: error` con `{error}`
-            // pero SIN campo `step`. Detectamos ambas formas para no tragarnos
-            // la causa real (p. ej. "Error descargando PDF...") y mostrar el
-            // genérico "No se obtuvieron datos".
-            if (event.step === 'error' || event.error) {
-              throw new Error(event.error || 'Error en factura-dian');
-            }
-          }
-        }
-
-        if (!result || !result.success) {
-          throw new Error(result?.error || 'No se obtuvieron datos');
-        }
+        // Consume el stream upstream con passthrough de progreso y reintento
+        // automático ante fallos transitorios (saturación / cierre prematuro).
+        const result = await streamUpstreamWithRetry(controller, upstreamUrl);
 
         // Categorizar con IA. Usamos las categorías activas del usuario
         // (mismas que el tab de presupuesto), no la lista fija. Si la consulta
