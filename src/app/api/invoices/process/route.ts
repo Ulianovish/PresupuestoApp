@@ -122,7 +122,11 @@ export async function GET(request: NextRequest) {
             if (event.step === 'complete' && event.result) {
               result = event.result;
             }
-            if (event.step === 'error') {
+            // factura-dian emite los fallos como `event: error` con `{error}`
+            // pero SIN campo `step`. Detectamos ambas formas para no tragarnos
+            // la causa real (p. ej. "Error descargando PDF...") y mostrar el
+            // genérico "No se obtuvieron datos".
+            if (event.step === 'error' || event.error) {
               throw new Error(event.error || 'Error en factura-dian');
             }
           }
