@@ -94,6 +94,8 @@ export interface ElectronicInvoice {
   selected_account_name: string | null;
   error_message: string | null;
   processing_time_ms: number | null;
+  progress_percent: number | null;
+  progress_message: string | null;
   created_at: string;
   processed_at: string | null;
   approved_at: string | null;
