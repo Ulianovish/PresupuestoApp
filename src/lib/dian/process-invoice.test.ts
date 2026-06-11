@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { runInvoiceProcessing } from './process-invoice';
-
 vi.mock('@/lib/services/invoices', () => ({
   saveProcessedInvoice: vi.fn(async () => undefined),
   markInvoiceError: vi.fn(async () => undefined),
+  getInvoiceByCufe: vi.fn(),
+  createProcessingInvoice: vi.fn(),
+  resetInvoiceToProcessing: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/dian/categorizer', () => ({
   categorizeInvoiceItems: vi.fn(
@@ -13,7 +14,15 @@ vi.mock('@/lib/dian/categorizer', () => ({
 }));
 
 import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
-import { markInvoiceError, saveProcessedInvoice } from '@/lib/services/invoices';
+import {
+  createProcessingInvoice,
+  getInvoiceByCufe,
+  markInvoiceError,
+  resetInvoiceToProcessing,
+  saveProcessedInvoice,
+} from '@/lib/services/invoices';
+
+import { prepareInvoiceProcessing, runInvoiceProcessing } from './process-invoice';
 
 function sseStream(lines: string[]): ReadableStream<Uint8Array> {
   const enc = new TextEncoder();
@@ -67,6 +76,9 @@ describe('runInvoiceProcessing', () => {
 
     expect(res).toEqual({ ok: true, itemsFound: 2 });
     expect(onProgress).toHaveBeenCalled();
+    expect(onProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ step: 'categorizing' }),
+    );
     expect(categorizeInvoiceItems).toHaveBeenCalledWith(
       [{ description: 'Arroz' }, { description: 'Leche' }],
       ['MERCADO', 'OTROS'],
@@ -107,14 +119,19 @@ describe('runInvoiceProcessing', () => {
       .mockResolvedValueOnce({ ok: true, body: sseStream([sse({ step: 'fetching', progress: 10 })]) })
       .mockResolvedValueOnce({ ok: true, body: sseStream([sse({ step: 'complete', result: COMPLETE_RESULT })]) });
     vi.stubGlobal('fetch', fetchMock);
+    const onProgress = vi.fn();
 
     const res = await runInvoiceProcessing('inv-3', 'CUFE123', {
       categoryNames: ['MERCADO'],
       retryBaseMs: 0,
+      onProgress,
     });
 
     expect(res).toEqual({ ok: true, itemsFound: 2 });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(onProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ step: 'retrying' }),
+    );
   });
 
   it('NO reintenta un error no transitorio (4xx) y marca error', async () => {
@@ -129,5 +146,71 @@ describe('runInvoiceProcessing', () => {
     expect(res.ok).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(markInvoiceError).toHaveBeenCalledWith('inv-4', expect.stringContaining('404'));
+  });
+});
+
+const getInvoiceByCufeMock = getInvoiceByCufe as unknown as ReturnType<
+  typeof vi.fn
+>;
+const createProcessingInvoiceMock = createProcessingInvoice as unknown as ReturnType<
+  typeof vi.fn
+>;
+const resetInvoiceToProcessingMock = resetInvoiceToProcessing as unknown as ReturnType<
+  typeof vi.fn
+>;
+
+function fakeInvoice(status: string, id = 'inv-existing') {
+  return { id, status };
+}
+
+describe('prepareInvoiceProcessing', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('devuelve duplicate para una factura en pending_review sin crear/reiniciar', async () => {
+    const invoice = fakeInvoice('pending_review');
+    getInvoiceByCufeMock.mockResolvedValueOnce(invoice);
+
+    const res = await prepareInvoiceProcessing('user-1', 'CUFE123');
+
+    expect(res).toEqual({ kind: 'duplicate', invoice });
+    expect(createProcessingInvoiceMock).not.toHaveBeenCalled();
+    expect(resetInvoiceToProcessingMock).not.toHaveBeenCalled();
+  });
+
+  it('devuelve duplicate para una factura approved', async () => {
+    const invoice = fakeInvoice('approved');
+    getInvoiceByCufeMock.mockResolvedValueOnce(invoice);
+
+    const res = await prepareInvoiceProcessing('user-1', 'CUFE123');
+
+    expect(res).toEqual({ kind: 'duplicate', invoice });
+  });
+
+  it('reinicia una factura en error y la deja ready', async () => {
+    const invoice = fakeInvoice('error', 'inv-err');
+    getInvoiceByCufeMock.mockResolvedValueOnce(invoice);
+
+    const res = await prepareInvoiceProcessing('user-1', 'CUFE123');
+
+    expect(resetInvoiceToProcessingMock).toHaveBeenCalledWith('inv-err');
+    expect(res).toEqual({ kind: 'ready', invoiceId: 'inv-err' });
+  });
+
+  it('crea una nueva factura cuando no existe y la deja ready', async () => {
+    getInvoiceByCufeMock.mockResolvedValueOnce(null);
+    createProcessingInvoiceMock.mockResolvedValueOnce('inv-new');
+
+    const res = await prepareInvoiceProcessing('user-1', 'CUFE123');
+
+    expect(res).toEqual({ kind: 'ready', invoiceId: 'inv-new' });
+  });
+
+  it('devuelve error cuando no se pudo crear la factura', async () => {
+    getInvoiceByCufeMock.mockResolvedValueOnce(null);
+    createProcessingInvoiceMock.mockResolvedValueOnce(null);
+
+    const res = await prepareInvoiceProcessing('user-1', 'CUFE123');
+
+    expect(res.kind).toBe('error');
   });
 });

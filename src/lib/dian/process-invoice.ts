@@ -43,6 +43,11 @@ export interface RunOptions {
   retryBaseMs?: number;
 }
 
+// Cuántos intentos totales contra el scraper upstream. OJO: cada intento resuelve
+// captchas en 2captcha (cuesta dinero y ~60s), así que mantenemos 2 (un reintento)
+// y solo ante errores transitorios.
+const MAX_UPSTREAM_ATTEMPTS = 2;
+
 // Errores del scraper que vale la pena reintentar (saturación / cierre abrupto).
 // Un CUFE inválido o un 4xx NO entran aquí.
 function isTransientUpstreamError(message: string): boolean {
@@ -141,15 +146,14 @@ async function streamUpstreamWithRetry(
   onProgress?: (event: ProgressEvent) => void | Promise<void>,
   retryBaseMs = 5000,
 ): Promise<CufeProcessResult> {
-  const MAX_ATTEMPTS = 2;
   let lastError: Error | null = null;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= MAX_UPSTREAM_ATTEMPTS; attempt++) {
     try {
       return await streamUpstreamOnce(url, onProgress);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       const transient = isTransientUpstreamError(lastError.message);
-      if (!transient || attempt >= MAX_ATTEMPTS) throw lastError;
+      if (!transient || attempt >= MAX_UPSTREAM_ATTEMPTS) throw lastError;
 
       const waitMs = retryBaseMs * attempt;
       await onProgress?.({
