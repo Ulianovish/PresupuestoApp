@@ -48,6 +48,13 @@ export default function PendingInvoicesPanel({
     load();
   }, [load, refreshToken]);
 
+  useEffect(() => {
+    const hasProcessing = invoices.some(inv => inv.status === 'processing');
+    if (!hasProcessing) return;
+    const id = setInterval(load, 1500);
+    return () => clearInterval(id);
+  }, [invoices, load]);
+
   const openInvoice = (inv: ElectronicInvoice) => {
     setOpenId(inv.id);
     setAccount([...ACCOUNT_TYPES][0]);
@@ -93,16 +100,31 @@ export default function PendingInvoicesPanel({
                 <p className="text-sm text-white">
                   {inv.supplier_name || 'Proveedor desconocido'}
                 </p>
-                <p className="text-xs text-slate-400">
-                  {inv.invoice_date} &middot;{' '}
-                  {inv.total_amount != null
-                    ? formatCurrency(inv.total_amount)
-                    : '—'}{' '}
-                  &middot; {inv.items.length} ítems
-                  {inv.status === 'error' && (
-                    <span className="text-red-400"> &middot; error</span>
-                  )}
-                </p>
+                {inv.status === 'processing' ? (
+                  <div className="mt-1 space-y-1">
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>{inv.progress_message || 'Procesando...'}</span>
+                      <span>{inv.progress_percent ?? 0}%</span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-slate-700">
+                      <div
+                        className="h-1.5 rounded-full bg-blue-500 transition-all"
+                        style={{ width: `${inv.progress_percent ?? 0}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400">
+                    {inv.invoice_date} &middot;{' '}
+                    {inv.total_amount != null
+                      ? formatCurrency(inv.total_amount)
+                      : '—'}{' '}
+                    &middot; {inv.items.length} ítems
+                    {inv.status === 'error' && (
+                      <span className="text-red-400"> &middot; error</span>
+                    )}
+                  </p>
+                )}
               </div>
               {inv.status === 'pending_review' && (
                 <Button
