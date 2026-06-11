@@ -5,6 +5,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }));
 
 import { createAdminClient } from '@/lib/supabase/server';
+
 import {
   generateSixDigitCode,
   getLinkByPhone,
