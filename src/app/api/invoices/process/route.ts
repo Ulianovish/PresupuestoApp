@@ -68,6 +68,10 @@ export async function POST(request: NextRequest) {
     // relevante, para no martillar la DB con cada evento del stream.
     let lastPersisted = -1;
     const onProgress = async (event: ProgressEvent) => {
+      // El evento `complete` (progress 100) no se persiste: saveProcessedInvoice
+      // pasa la fila a pending_review justo después, y persistirlo haría que la
+      // barra saltara a 100 y volviera a 95 con el paso `categorizing`.
+      if (event.step === 'complete') return;
       const percent = typeof event.progress === 'number' ? event.progress : null;
       const isMilestone =
         event.step === 'retrying' || event.step === 'categorizing';

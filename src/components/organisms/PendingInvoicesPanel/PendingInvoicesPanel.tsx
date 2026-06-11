@@ -48,12 +48,14 @@ export default function PendingInvoicesPanel({
     load();
   }, [load, refreshToken]);
 
+  const hasProcessing = invoices.some(inv => inv.status === 'processing');
   useEffect(() => {
-    const hasProcessing = invoices.some(inv => inv.status === 'processing');
     if (!hasProcessing) return;
+    // Depende del booleano (no del array) para mantener una cadencia limpia de
+    // 1.5s: el intervalo solo se reinicia cuando deja de haber facturas en curso.
     const id = setInterval(load, 1500);
     return () => clearInterval(id);
-  }, [invoices, load]);
+  }, [hasProcessing, load]);
 
   const openInvoice = (inv: ElectronicInvoice) => {
     setOpenId(inv.id);
