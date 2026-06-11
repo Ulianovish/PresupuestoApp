@@ -18,9 +18,12 @@ export async function createLinkCode(userId: string): Promise<string> {
   const supabase = createAdminClient();
   const code = generateSixDigitCode();
   const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60_000).toISOString();
-  await supabase
+  const { error } = await supabase
     .from('whatsapp_link_codes')
     .insert({ code, user_id: userId, expires_at: expiresAt });
+  if (error) {
+    throw new Error(`No se pudo crear el código: ${error.message}`);
+  }
   return code;
 }
 
@@ -29,8 +32,13 @@ export type RedeemResult =
   | { ok: false; reason: 'invalid_or_expired' };
 
 /**
- * Canjea un código: valida vigencia y no-uso, lo marca usado y vincula el
- * número (upsert por phone_e164, así re-vincular mueve el número de presupuesto).
+ * Canjea un código y vincula el número.
+ *
+ * Usa un UPDATE atómico condicional (marca `used_at` SOLO si la fila está sin
+ * usar y vigente, devolviendo `user_id`): un único statement que garantiza que
+ * un código se canjee una sola vez aunque lleguen dos peticiones a la vez
+ * (evita la carrera SELECT→UPDATE). El upsert por `phone_e164` mueve el número
+ * de presupuesto al re-vincular.
  */
 export async function redeemLinkCode(
   code: string,
@@ -39,33 +47,32 @@ export async function redeemLinkCode(
   const supabase = createAdminClient();
   const nowIso = new Date().toISOString();
 
-  const { data: row } = await supabase
+  const { data: rows, error } = await supabase
     .from('whatsapp_link_codes')
-    .select('code, user_id')
+    .update({ used_at: nowIso })
     .eq('code', code)
     .is('used_at', null)
     .gt('expires_at', nowIso)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .select('user_id');
 
-  if (!row) {
+  const row = rows?.[0];
+  if (error || !row) {
     return { ok: false, reason: 'invalid_or_expired' };
   }
 
   const userId = (row as { user_id: string }).user_id;
 
-  await supabase
-    .from('whatsapp_link_codes')
-    .update({ used_at: nowIso })
-    .eq('code', code);
-
-  await supabase
+  const { error: upsertError } = await supabase
     .from('whatsapp_links')
     .upsert(
       { phone_e164: phoneE164, user_id: userId },
       { onConflict: 'phone_e164' },
     );
+  if (upsertError) {
+    // El código ya quedó consumido; reportamos fallo para que el usuario
+    // reintente con uno nuevo en vez de creer que quedó vinculado.
+    return { ok: false, reason: 'invalid_or_expired' };
+  }
 
   return { ok: true, userId };
 }

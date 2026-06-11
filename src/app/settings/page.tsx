@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
 
 function maskPhone(phone: string): string {
-  // +573001234567 -> +5730 ***4567
+  // +573001234567 -> +57300 ***4567
   if (phone.length < 7) return phone;
   return `${phone.slice(0, 6)} ***${phone.slice(-4)}`;
 }

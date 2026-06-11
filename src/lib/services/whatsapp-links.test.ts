@@ -25,20 +25,18 @@ describe('generateSixDigitCode', () => {
 describe('redeemLinkCode', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('canjea un código válido: marca usado, upserta el vínculo y devuelve userId', async () => {
-    const update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({}) });
-    const upsert = vi.fn().mockResolvedValue({});
-    const selectChain = {
-      select: vi.fn().mockReturnThis(),
+  it('canjea con UPDATE atómico condicional: marca usado, upserta y devuelve userId', async () => {
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    // Cadena del UPDATE atómico: update().eq().is().gt().select() → {data:[{user_id}]}
+    const updateChain = {
+      update: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       is: vi.fn().mockReturnThis(),
       gt: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: { code: '482913', user_id: 'user-1' } }),
+      select: vi.fn().mockResolvedValue({ data: [{ user_id: 'user-1' }], error: null }),
     };
     const from = vi.fn((table: string) => {
-      if (table === 'whatsapp_link_codes') return { ...selectChain, update };
+      if (table === 'whatsapp_link_codes') return updateChain;
       if (table === 'whatsapp_links') return { upsert };
       throw new Error(`tabla inesperada ${table}`);
     });
@@ -47,26 +45,28 @@ describe('redeemLinkCode', () => {
     const res = await redeemLinkCode('482913', '+573001234567');
 
     expect(res).toEqual({ ok: true, userId: 'user-1' });
-    expect(update).toHaveBeenCalled();
+    // El UPDATE filtra por código sin usar y vigente (un solo statement atómico).
+    expect(updateChain.update).toHaveBeenCalledWith(
+      expect.objectContaining({ used_at: expect.any(String) }),
+    );
+    expect(updateChain.is).toHaveBeenCalledWith('used_at', null);
     expect(upsert).toHaveBeenCalledWith(
       { phone_e164: '+573001234567', user_id: 'user-1' },
       { onConflict: 'phone_e164' },
     );
   });
 
-  it('rechaza un código inexistente/expirado sin upsertar', async () => {
-    const upsert = vi.fn().mockResolvedValue({});
-    const selectChain = {
-      select: vi.fn().mockReturnThis(),
+  it('rechaza un código inexistente/expirado (UPDATE no afecta filas) sin upsertar', async () => {
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const updateChain = {
+      update: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       is: vi.fn().mockReturnThis(),
       gt: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null }),
+      select: vi.fn().mockResolvedValue({ data: [], error: null }),
     };
     const from = vi.fn((table: string) => {
-      if (table === 'whatsapp_link_codes') return { ...selectChain, update: vi.fn() };
+      if (table === 'whatsapp_link_codes') return updateChain;
       if (table === 'whatsapp_links') return { upsert };
       throw new Error(`tabla inesperada ${table}`);
     });
