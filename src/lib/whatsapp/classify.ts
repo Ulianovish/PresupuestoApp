@@ -11,10 +11,21 @@ export function isCufe(text: string): boolean {
   return /^[0-9a-f]{96}$/i.test((text || '').trim());
 }
 
+/**
+ * Extrae un CUFE (96 hex) embebido en un texto: el bloque completo que devuelve
+ * un QR de factura DIAN (campos NumFac/CUFE/...) o una URL del catálogo DIAN.
+ * Toma la primera corrida de EXACTAMENTE 96 hex (no parte de un hash más largo).
+ * Devuelve el CUFE en minúsculas, o null.
+ */
+export function extractCufe(text: string): string | null {
+  const match = (text || '').match(/(?<![0-9a-f])[0-9a-f]{96}(?![0-9a-f])/i);
+  return match ? match[0].toLowerCase() : null;
+}
+
 export function classifyText(body: string, numMedia: number): Decision {
   if (numMedia > 0) return 'image';
   const text = (body || '').trim();
-  if (isCufe(text)) return 'cufe';
+  if (extractCufe(text)) return 'cufe';
   if (/^(ayuda|help)$/i.test(text)) return 'help';
   if (parseQuickExpense(text)) return 'quick_expense';
   return 'unknown';

@@ -2,6 +2,7 @@
 // background (after) y manda las respuestas por el transporte saliente. Deps
 // inyectadas para testear sin red ni DB.
 
+import { extractCufe } from '@/lib/whatsapp/classify';
 import { parseQuickExpense } from '@/lib/whatsapp/quick-expense';
 
 // Formateo COP inline: NO importar de '@/lib/services/expenses' (ese módulo crea
@@ -43,7 +44,14 @@ export async function handleAgentMessage(
   deps: AgentDeps,
 ): Promise<void> {
   if (decision === 'cufe') {
-    const cufe = ctx.body.trim();
+    const cufe = extractCufe(ctx.body);
+    if (!cufe) {
+      await deps.sendMessage(
+        ctx.phone,
+        'No encontré un CUFE válido en tu mensaje 🤔. Pega el CUFE (96 caracteres) o el texto/QR completo de la factura.',
+      );
+      return;
+    }
     const out = await deps.processCufe(ctx.userId, cufe);
     if (out.ok) {
       await deps.sendMessage(
