@@ -3,6 +3,7 @@
 // posteriores, por WhatsApp. Conserva la resiliencia del route: reintento ante
 // errores transitorios, detección del error real del upstream y cierre prematuro.
 
+
 import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
 import { parseSSEEventLine } from '@/lib/dian/sse';
 import {
@@ -12,11 +13,16 @@ import {
   resetInvoiceToProcessing,
   saveProcessedInvoice,
 } from '@/lib/services/invoices';
+import type { Database } from '@/types/database';
 import type {
   CufeProcessResult,
   ElectronicInvoice,
   StoredInvoiceItem,
 } from '@/types/invoices';
+
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+type DBClient = SupabaseClient<Database>;
 
 export type PrepareResult =
   | { kind: 'duplicate'; invoice: ElectronicInvoice }
@@ -41,6 +47,8 @@ export interface RunOptions {
   onProgress?: (event: ProgressEvent) => void | Promise<void>;
   /** Base del backoff entre reintentos (ms). Default 5000; los tests pasan 0. */
   retryBaseMs?: number;
+  /** Cliente Supabase a inyectar (service-role para WhatsApp). Web: cookie por defecto. */
+  client?: DBClient;
 }
 
 // Cuántos intentos totales contra el scraper upstream. OJO: cada intento resuelve
@@ -63,8 +71,9 @@ function isTransientUpstreamError(message: string): boolean {
 export async function prepareInvoiceProcessing(
   userId: string,
   cufe: string,
+  client?: DBClient,
 ): Promise<PrepareResult> {
-  const existing = await getInvoiceByCufe(userId, cufe);
+  const existing = await getInvoiceByCufe(userId, cufe, client);
   if (
     existing &&
     (existing.status === 'pending_review' || existing.status === 'approved')
@@ -75,9 +84,9 @@ export async function prepareInvoiceProcessing(
   let invoiceId: string | null;
   if (existing) {
     invoiceId = existing.id;
-    await resetInvoiceToProcessing(existing.id);
+    await resetInvoiceToProcessing(existing.id, client);
   } else {
-    invoiceId = await createProcessingInvoice(userId, cufe);
+    invoiceId = await createProcessingInvoice(userId, cufe, client);
   }
   if (!invoiceId) {
     return { kind: 'error', message: 'No se pudo crear el borrador' };
@@ -183,7 +192,7 @@ export async function runInvoiceProcessing(
   const baseUrl =
     process.env.FACTURA_DIAN_URL || 'https://factura-dian.vercel.app';
   const method = process.env.FACTURA_DIAN_METHOD || 'python';
-  const { categoryNames, onProgress, retryBaseMs } = opts;
+  const { categoryNames, onProgress, retryBaseMs, client } = opts;
 
   try {
     const upstreamUrl = `${baseUrl}/api/cufe-to-data-stream?cufe=${encodeURIComponent(
@@ -211,21 +220,25 @@ export async function runInvoiceProcessing(
       category: categories[idx] ?? 'OTROS',
     }));
 
-    await saveProcessedInvoice(invoiceId, {
-      supplierName: result.invoice_details.storeName,
-      supplierNit: result.invoice_details.nit,
-      invoiceDate: result.invoice_details.date,
-      currency: result.invoice_details.currency,
-      subtotal: result.invoice_details.subtotal,
-      totalAmount: result.invoice_details.total_amount,
-      items: storedItems,
-      processingTimeMs: Date.now() - startTime,
-    });
+    await saveProcessedInvoice(
+      invoiceId,
+      {
+        supplierName: result.invoice_details.storeName,
+        supplierNit: result.invoice_details.nit,
+        invoiceDate: result.invoice_details.date,
+        currency: result.invoice_details.currency,
+        subtotal: result.invoice_details.subtotal,
+        totalAmount: result.invoice_details.total_amount,
+        items: storedItems,
+        processingTimeMs: Date.now() - startTime,
+      },
+      client,
+    );
 
     return { ok: true, itemsFound: storedItems.length };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await markInvoiceError(invoiceId, message);
+    await markInvoiceError(invoiceId, message, client);
     return { ok: false, message };
   }
 }

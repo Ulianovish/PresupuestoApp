@@ -86,6 +86,7 @@ describe('runInvoiceProcessing', () => {
     expect(saveProcessedInvoice).toHaveBeenCalledWith(
       'inv-1',
       expect.objectContaining({ supplierName: 'D1', totalAmount: 12000 }),
+      undefined,
     );
     const savedItems = (saveProcessedInvoice as unknown as ReturnType<typeof vi.fn>)
       .mock.calls[0][1].items;
@@ -109,6 +110,7 @@ describe('runInvoiceProcessing', () => {
     expect(markInvoiceError).toHaveBeenCalledWith(
       'inv-2',
       expect.stringContaining('Error descargando PDF'),
+      undefined,
     );
     expect(saveProcessedInvoice).not.toHaveBeenCalled();
   });
@@ -145,7 +147,7 @@ describe('runInvoiceProcessing', () => {
 
     expect(res.ok).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(markInvoiceError).toHaveBeenCalledWith('inv-4', expect.stringContaining('404'));
+    expect(markInvoiceError).toHaveBeenCalledWith('inv-4', expect.stringContaining('404'), undefined);
   });
 });
 
@@ -192,7 +194,7 @@ describe('prepareInvoiceProcessing', () => {
 
     const res = await prepareInvoiceProcessing('user-1', 'CUFE123');
 
-    expect(resetInvoiceToProcessingMock).toHaveBeenCalledWith('inv-err');
+    expect(resetInvoiceToProcessingMock).toHaveBeenCalledWith('inv-err', undefined);
     expect(res).toEqual({ kind: 'ready', invoiceId: 'inv-err' });
   });
 
