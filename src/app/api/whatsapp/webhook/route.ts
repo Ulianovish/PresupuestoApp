@@ -1,26 +1,68 @@
 // POST /api/whatsapp/webhook
-// Webhook público de Twilio (fuera del middleware de auth). Valida la firma,
-// resuelve el comando de vinculación y responde con TwiML síncrono.
+// Webhook público de Twilio. Valida la firma, resuelve identidad y:
+//  - número NO vinculado → flujo de vinculación síncrono (TwiML).
+//  - vinculado → clasifica el texto, responde un ACK síncrono y, si hay trabajo
+//    lento (CUFE / gasto), lo corre en after() respondiendo por la REST API.
 
-import { NextRequest } from 'next/server';
+import { after, NextRequest } from 'next/server';
 
+import {
+  prepareInvoiceProcessing,
+  runInvoiceProcessing,
+} from '@/lib/dian/process-invoice';
+import { resolveUserCategoryNames } from '@/lib/services/invoices';
+import {
+  createDirectExpense,
+  resolveDefaultAccount,
+} from '@/lib/services/whatsapp-expenses';
 import {
   getLinkByPhone,
   redeemLinkCode,
 } from '@/lib/services/whatsapp-links';
+import { createAdminClient } from '@/lib/supabase/server';
+import { ackMessage, classifyText, simpleReply } from '@/lib/whatsapp/classify';
+import {
+  handleAgentMessage,
+  type CufeOutcome,
+} from '@/lib/whatsapp/handle-agent';
 import { handleLinkingMessage } from '@/lib/whatsapp/handle-linking';
 import { normalizeWhatsappFrom } from '@/lib/whatsapp/message';
+import { sendWhatsAppMessage } from '@/lib/whatsapp/transport';
 import { isValidTwilioSignature } from '@/lib/whatsapp/twilio-signature';
 import { twimlEmpty, twimlMessage } from '@/lib/whatsapp/twiml';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 function xml(body: string, status = 200): Response {
   return new Response(body, {
     status,
     headers: { 'Content-Type': 'text/xml; charset=utf-8' },
   });
+}
+
+/** Procesa un CUFE para WhatsApp con service-role; mapea el resultado a CufeOutcome. */
+async function processCufeForWhatsApp(
+  userId: string,
+  cufe: string,
+): Promise<CufeOutcome> {
+  const admin = createAdminClient();
+  const prep = await prepareInvoiceProcessing(userId, cufe, admin);
+  if (prep.kind === 'duplicate') return { ok: false, reason: 'duplicate' };
+  if (prep.kind === 'error') return { ok: false, reason: 'error', message: prep.message };
+
+  const categoryNames = await resolveUserCategoryNames(admin, userId);
+  const run = await runInvoiceProcessing(prep.invoiceId, cufe, {
+    categoryNames,
+    client: admin,
+  });
+  if (run.ok) return { ok: true, itemsFound: run.itemsFound };
+  return { ok: false, reason: 'error', message: run.message };
+}
+
+function todayYmd(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 export async function POST(request: NextRequest) {
@@ -30,7 +72,6 @@ export async function POST(request: NextRequest) {
     return new Response('Webhook no configurado', { status: 500 });
   }
 
-  // Twilio envía application/x-www-form-urlencoded.
   const form = await request.formData();
   const params: Record<string, string> = {};
   for (const [key, value] of form.entries()) {
@@ -47,10 +88,40 @@ export async function POST(request: NextRequest) {
     return xml(twimlEmpty());
   }
 
-  const reply = await handleLinkingMessage(phone, params.Body || '', {
-    redeemLinkCode,
-    getLinkByPhone,
-  });
+  const body = params.Body || '';
+  const numMedia = Number.parseInt(params.NumMedia || '0', 10) || 0;
 
-  return xml(twimlMessage(reply));
+  // ¿Vinculado?
+  const link = await getLinkByPhone(phone);
+  if (!link) {
+    // Flujo de vinculación (Plan 2): síncrono.
+    const reply = await handleLinkingMessage(phone, body, {
+      redeemLinkCode,
+      getLinkByPhone,
+    });
+    return xml(twimlMessage(reply));
+  }
+
+  const decision = classifyText(body, numMedia);
+
+  if (decision === 'cufe' || decision === 'quick_expense') {
+    const userId = link.userId;
+    after(async () => {
+      await handleAgentMessage(
+        decision,
+        { userId, phone, body },
+        {
+          sendMessage: sendWhatsAppMessage,
+          processCufe: processCufeForWhatsApp,
+          createDirectExpense,
+          resolveDefaultAccount,
+          today: todayYmd,
+        },
+      );
+    });
+    return xml(twimlMessage(ackMessage(decision)));
+  }
+
+  // image / help / unknown → respuesta completa síncrona.
+  return xml(twimlMessage(simpleReply(decision)));
 }
