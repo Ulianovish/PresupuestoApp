@@ -9,6 +9,7 @@ vi.mock('@/lib/dian/categorizer', () => ({
 
 import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
 import { createAdminClient } from '@/lib/supabase/server';
+
 import { createDirectExpense, resolveDefaultAccount } from './whatsapp-expenses';
 
 const mockedAdmin = createAdminClient as unknown as ReturnType<typeof vi.fn>;
