@@ -62,7 +62,9 @@ async function processCufeForWhatsApp(
 }
 
 function todayYmd(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Fecha "hoy" en horario de Colombia (no UTC): en-CA formatea YYYY-MM-DD.
+  // Evita adelantar el día para gastos enviados de noche (UTC-5).
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 }
 
 export async function POST(request: NextRequest) {
@@ -107,17 +109,27 @@ export async function POST(request: NextRequest) {
   if (decision === 'cufe' || decision === 'quick_expense') {
     const userId = link.userId;
     after(async () => {
-      await handleAgentMessage(
-        decision,
-        { userId, phone, body },
-        {
-          sendMessage: sendWhatsAppMessage,
-          processCufe: processCufeForWhatsApp,
-          createDirectExpense,
-          resolveDefaultAccount,
-          today: todayYmd,
-        },
-      );
+      try {
+        await handleAgentMessage(
+          decision,
+          { userId, phone, body },
+          {
+            sendMessage: sendWhatsAppMessage,
+            processCufe: processCufeForWhatsApp,
+            createDirectExpense,
+            resolveDefaultAccount,
+            today: todayYmd,
+          },
+        );
+      } catch (err) {
+        // Red de seguridad: si algo lanza en background (DB/red), el usuario ya
+        // recibió el ACK; sin esto se quedaría sin respuesta final.
+        console.error('Error en handleAgentMessage (background):', err);
+        await sendWhatsAppMessage(
+          phone,
+          '❌ Tuve un problema interno procesando tu mensaje. Inténtalo de nuevo en un momento.',
+        );
+      }
     });
     return xml(twimlMessage(ackMessage(decision)));
   }

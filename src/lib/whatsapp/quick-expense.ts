@@ -9,6 +9,10 @@ export interface QuickExpense {
 // Palabras de relleno que no aportan a la descripción.
 const STOPWORDS = new Set(['gasté', 'gaste', 'en', 'de', 'por', 'pague', 'pagué', '$']);
 
+// Tope de monto: un gasto por texto > 100 millones COP casi siempre es un typo
+// ("999999k"). Por encima de esto tratamos el texto como no-gasto (→ null).
+const MAX_AMOUNT = 100_000_000;
+
 /** Convierte un token de monto ("20k", "15.000", "2", "1.5k") a número, o null. */
 function parseAmountToken(raw: string): number | null {
   let t = raw.toLowerCase().replace(/\$/g, '');
@@ -46,7 +50,9 @@ export function parseQuickExpense(text: string): QuickExpense | null {
           .join(' ')
           .trim();
         if (!rest) return null;
-        return { amount: Math.round(base * 1000), description: rest };
+        const milAmount = Math.round(base * 1000);
+        if (milAmount > MAX_AMOUNT) return null;
+        return { amount: milAmount, description: rest };
       }
     }
   }
@@ -62,7 +68,7 @@ export function parseQuickExpense(text: string): QuickExpense | null {
       break;
     }
   }
-  if (amount == null) return null;
+  if (amount == null || amount > MAX_AMOUNT) return null;
 
   const description = tokens
     .filter((_, i) => i !== amountIdx)

@@ -41,4 +41,16 @@ describe('parseQuickExpense', () => {
   it('sin descripción usable → null (solo número)', () => {
     expect(parseQuickExpense('20000')).toBeNull();
   });
+
+  it('monto absurdo (typo) → null', () => {
+    expect(parseQuickExpense('999999k taxi')).toBeNull();
+    expect(parseQuickExpense('500000 mil pan')).toBeNull();
+  });
+
+  it('monto grande pero válido (≤100M) sí pasa', () => {
+    expect(parseQuickExpense('2000000 arriendo')).toEqual({
+      amount: 2000000,
+      description: 'arriendo',
+    });
+  });
 });
