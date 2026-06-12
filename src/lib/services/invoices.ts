@@ -1,19 +1,26 @@
 // Servicio para gestionar facturas electrónicas DIAN (tabla electronic_invoices)
 
+
 import { EXPENSE_CATEGORIES } from '@/lib/constants/expense-categories';
 import { mapInvoiceItemToExpenseArgs } from '@/lib/dian/invoice-mapper';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/types/database';
 import type {
   ElectronicInvoice,
   StoredInvoiceItem,
 } from '@/types/invoices';
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+type DBClient = SupabaseClient<Database>;
+
 /** Busca una factura por CUFE (guarda anti-reprocesamiento). */
 export async function getInvoiceByCufe(
   userId: string,
   cufe: string,
+  client?: DBClient,
 ): Promise<ElectronicInvoice | null> {
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
   const { data } = await supabase
     .from('electronic_invoices')
     .select('*')
@@ -27,8 +34,9 @@ export async function getInvoiceByCufe(
 export async function createProcessingInvoice(
   userId: string,
   cufe: string,
+  client?: DBClient,
 ): Promise<string | null> {
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
   const { data, error } = await supabase
     .from('electronic_invoices')
     .insert({ user_id: userId, cufe_code: cufe, status: 'processing' })
@@ -44,8 +52,9 @@ export async function createProcessingInvoice(
 /** Reinicia una fila existente (processing/error) a processing para reintentar. */
 export async function resetInvoiceToProcessing(
   invoiceId: string,
+  client?: DBClient,
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
   await supabase
     .from('electronic_invoices')
     .update({ status: 'processing', error_message: null, processed_at: null })
@@ -69,13 +78,19 @@ export async function updateInvoiceProgress(
  * Devuelve las categorías activas del usuario (mismas que el tab de presupuesto).
  * Si no hay o falla la consulta, cae a EXPENSE_CATEGORIES.
  */
-export async function resolveUserCategoryNames(): Promise<string[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
+export async function resolveUserCategoryNames(
+  client?: DBClient,
+  userId?: string,
+): Promise<string[]> {
+  const supabase = client ?? (await createClient());
+  let query = supabase
     .from('categories')
     .select('name')
-    .eq('is_active', true)
-    .order('name');
+    .eq('is_active', true);
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+  const { data } = await query.order('name');
   if (data && data.length > 0) {
     return data.map(c => c.name as string);
   }
@@ -86,8 +101,9 @@ export async function resolveUserCategoryNames(): Promise<string[]> {
 export async function markInvoiceError(
   invoiceId: string,
   message: string,
+  client?: DBClient,
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
   await supabase
     .from('electronic_invoices')
     .update({ status: 'error', error_message: message })
@@ -107,8 +123,9 @@ export async function saveProcessedInvoice(
     items: StoredInvoiceItem[];
     processingTimeMs: number;
   },
+  client?: DBClient,
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
   await supabase
     .from('electronic_invoices')
     .update({
