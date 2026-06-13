@@ -4,6 +4,7 @@
 import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
 import { resolveUserCategoryNames } from '@/lib/services/invoices';
 import { createAdminClient } from '@/lib/supabase/server';
+import type { StoredInvoiceItem } from '@/types/invoices';
 
 const FALLBACK_ACCOUNT = 'Efectivo';
 
@@ -65,4 +66,66 @@ export async function createDirectExpense(
     return { ok: false, category: finalCategory, error: error.message };
   }
   return { ok: true, category: finalCategory };
+}
+
+export interface VisionReceiptInput {
+  supplier: string | null;
+  date: string; // YYYY-MM-DD (resuelta por el llamador)
+  items: Array<{ description: string; amount: number }>;
+  total: number | null;
+}
+
+export interface VisionReceiptResult {
+  ok: boolean;
+  itemsFound: number;
+  error?: string;
+}
+
+/**
+ * Crea un borrador de factura a partir de una foto leída por visión (sin CUFE).
+ * Categoriza los ítems con IA y los guarda en electronic_invoices con
+ * source='vision_receipt' y status='pending_review' → aparece en la bandeja y se
+ * aprueba con el flujo existente.
+ */
+export async function createVisionReceiptDraft(
+  userId: string,
+  input: VisionReceiptInput,
+): Promise<VisionReceiptResult> {
+  const supabase = createAdminClient();
+
+  const categoryNames = await resolveUserCategoryNames(supabase, userId);
+  const categories = await categorizeInvoiceItems(
+    input.items.map(it => ({ description: it.description })),
+    categoryNames,
+  );
+
+  const storedItems: StoredInvoiceItem[] = input.items.map((it, idx) => ({
+    description: it.description,
+    quantity: 1,
+    unit_price: it.amount,
+    total_price: it.amount,
+    total_with_tax: it.amount,
+    suggested_category: categories[idx] ?? 'OTROS',
+    category: categories[idx] ?? 'OTROS',
+  }));
+
+  const totalAmount =
+    input.total ?? storedItems.reduce((sum, it) => sum + it.total_price, 0);
+
+  const { error } = await supabase.from('electronic_invoices').insert({
+    user_id: userId,
+    cufe_code: null,
+    source: 'vision_receipt',
+    supplier_name: input.supplier,
+    invoice_date: input.date,
+    total_amount: totalAmount,
+    items: storedItems,
+    status: 'pending_review',
+    processed_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    return { ok: false, itemsFound: 0, error: error.message };
+  }
+  return { ok: true, itemsFound: storedItems.length };
 }
