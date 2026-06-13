@@ -13,6 +13,7 @@ import {
 import { resolveUserCategoryNames } from '@/lib/services/invoices';
 import {
   createDirectExpense,
+  createVisionReceiptDraft,
   resolveDefaultAccount,
 } from '@/lib/services/whatsapp-expenses';
 import {
@@ -25,11 +26,16 @@ import {
   handleAgentMessage,
   type CufeOutcome,
 } from '@/lib/whatsapp/handle-agent';
+import { handleImageMessage } from '@/lib/whatsapp/handle-image';
 import { handleLinkingMessage } from '@/lib/whatsapp/handle-linking';
 import { normalizeWhatsappFrom } from '@/lib/whatsapp/message';
-import { sendWhatsAppMessage } from '@/lib/whatsapp/transport';
+import {
+  downloadTwilioMedia,
+  sendWhatsAppMessage,
+} from '@/lib/whatsapp/transport';
 import { isValidTwilioSignature } from '@/lib/whatsapp/twilio-signature';
 import { twimlEmpty, twimlMessage } from '@/lib/whatsapp/twiml';
+import { analyzeImage } from '@/lib/whatsapp/vision';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -105,6 +111,38 @@ export async function POST(request: NextRequest) {
   }
 
   const decision = classifyText(body, numMedia);
+
+  if (decision === 'image') {
+    const mediaUrl = params.MediaUrl0 || '';
+    const mediaType = params.MediaContentType0 || 'image/jpeg';
+    if (!mediaUrl) {
+      return xml(twimlMessage(simpleReply('unknown')));
+    }
+    const userId = link.userId;
+    after(async () => {
+      try {
+        await handleImageMessage(
+          { userId, phone, mediaUrl, mediaType },
+          {
+            sendMessage: sendWhatsAppMessage,
+            downloadMedia: downloadTwilioMedia,
+            analyzeImage,
+            createDirectExpense,
+            createVisionReceiptDraft,
+            resolveDefaultAccount,
+            today: todayYmd,
+          },
+        );
+      } catch (err) {
+        console.error('Error en handleImageMessage (background):', err);
+        await sendWhatsAppMessage(
+          phone,
+          '❌ Tuve un problema leyendo tu imagen. Inténtalo de nuevo.',
+        );
+      }
+    });
+    return xml(twimlMessage('📷 Recibí tu imagen, la estoy leyendo (~30s)...'));
+  }
 
   if (decision === 'cufe' || decision === 'quick_expense') {
     const userId = link.userId;
