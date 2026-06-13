@@ -58,3 +58,40 @@ export async function sendWhatsAppMessage(
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+export interface DownloadedMedia {
+  base64: string;
+  mime: string;
+}
+
+/**
+ * Descarga un archivo de media de Twilio (las MediaUrl requieren Basic auth con
+ * SID:token). Devuelve base64 + mime, o null ante falta de credenciales/error.
+ */
+export async function downloadTwilioMedia(
+  url: string,
+): Promise<DownloadedMedia | null> {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) {
+    console.error('downloadTwilioMedia sin credenciales (SID/TOKEN)');
+    return null;
+  }
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString('base64')}`,
+      },
+    });
+    if (!res.ok) {
+      console.error(`Descarga de media falló: ${res.status}`);
+      return null;
+    }
+    const mime = res.headers.get('content-type') || 'image/jpeg';
+    const buf = Buffer.from(await res.arrayBuffer());
+    return { base64: buf.toString('base64'), mime };
+  } catch (err) {
+    console.error('Error descargando media:', err);
+    return null;
+  }
+}

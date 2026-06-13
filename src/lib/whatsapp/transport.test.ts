@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { sendWhatsAppMessage } from './transport';
+import { downloadTwilioMedia, sendWhatsAppMessage } from './transport';
 
 describe('sendWhatsAppMessage', () => {
   beforeEach(() => {
@@ -57,5 +57,47 @@ describe('sendWhatsAppMessage', () => {
     const res = await sendWhatsAppMessage('+573001234567', 'x');
 
     expect(res.ok).toBe(false);
+  });
+});
+
+describe('downloadTwilioMedia', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.stubEnv('TWILIO_ACCOUNT_SID', 'AC123');
+    vi.stubEnv('TWILIO_AUTH_TOKEN', 'tok456');
+  });
+
+  it('descarga con Basic auth y devuelve base64 + mime', async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: (k: string) => (k.toLowerCase() === 'content-type' ? 'image/jpeg' : null) },
+      arrayBuffer: async () => bytes.buffer,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await downloadTwilioMedia('https://api.twilio.com/media/abc');
+
+    expect(res).not.toBeNull();
+    expect(res!.mime).toBe('image/jpeg');
+    expect(res!.base64).toBe(Buffer.from(bytes).toString('base64'));
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers.Authorization).toBe(`Basic ${Buffer.from('AC123:tok456').toString('base64')}`);
+  });
+
+  it('devuelve null si faltan credenciales', async () => {
+    vi.stubEnv('TWILIO_ACCOUNT_SID', '');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await downloadTwilioMedia('https://x')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('devuelve null si Twilio responde error', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404 });
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await downloadTwilioMedia('https://x')).toBeNull();
   });
 });
