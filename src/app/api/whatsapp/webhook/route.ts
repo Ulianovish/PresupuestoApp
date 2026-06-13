@@ -172,6 +172,6 @@ export async function POST(request: NextRequest) {
     return xml(twimlMessage(ackMessage(decision)));
   }
 
-  // image / help / unknown → respuesta completa síncrona.
+  // help / unknown → respuesta completa síncrona (image se maneja arriba).
   return xml(twimlMessage(simpleReply(decision)));
 }

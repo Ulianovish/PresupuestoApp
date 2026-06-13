@@ -43,21 +43,18 @@ describe('analyzeImage', () => {
   });
 
   it('parsea un recibo con ítems (tolerando fences ```json)', async () => {
-    mockMiniMax(
-      '```json\n' +
-        JSON.stringify({
-          type: 'receipt',
-          supplier: 'D1',
-          date: '2026-06-12',
-          items: [
-            { description: 'Arroz', amount: 6000 },
-            { description: 'Leche', amount: 5000 },
-          ],
-          total: 11000,
-          confidence: 0.8,
-        }) +
-        '\n```',
-    );
+    const receiptJson = JSON.stringify({
+      type: 'receipt',
+      supplier: 'D1',
+      date: '2026-06-12',
+      items: [
+        { description: 'Arroz', amount: 6000 },
+        { description: 'Leche', amount: 5000 },
+      ],
+      total: 11000,
+      confidence: 0.8,
+    });
+    mockMiniMax(['```json', receiptJson, '```'].join('\n'));
     const r = await analyzeImage('b64', 'image/jpeg');
     expect(r.kind).toBe('receipt');
     if (r.kind === 'receipt') {
