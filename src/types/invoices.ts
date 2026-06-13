@@ -82,7 +82,8 @@ export interface StoredInvoiceItem extends InvoiceItem {
 export interface ElectronicInvoice {
   id: string;
   user_id: string;
-  cufe_code: string;
+  cufe_code: string | null;
+  source: string;
   supplier_name: string | null;
   supplier_nit: string | null;
   invoice_date: string | null;
