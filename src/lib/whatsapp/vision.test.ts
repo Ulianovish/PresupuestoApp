@@ -92,4 +92,17 @@ describe('analyzeImage', () => {
     mockMiniMax(JSON.stringify({ type: 'transfer', amount: 0 }));
     expect(await analyzeImage('b64', 'image/png')).toEqual({ kind: 'unknown' });
   });
+
+  it('transfer con monto absurdo (>100M, typo OCR) → unknown', async () => {
+    mockMiniMax(JSON.stringify({ type: 'transfer', amount: 999999999 }));
+    expect(await analyzeImage('b64', 'image/png')).toEqual({ kind: 'unknown' });
+  });
+
+  it('fecha no-ISO → date null (cae a hoy en el llamador)', async () => {
+    mockMiniMax(
+      JSON.stringify({ type: 'transfer', amount: 1000, date: '05/06/26' }),
+    );
+    const r = await analyzeImage('b64', 'image/png');
+    expect(r.kind === 'transfer' && r.date).toBe(null);
+  });
 });

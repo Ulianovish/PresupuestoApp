@@ -68,9 +68,17 @@ function extractJson(content: string): unknown | null {
   return null;
 }
 
+// Tope: un monto > 100M COP leído de una imagen casi siempre es un error de OCR.
+const MAX_AMOUNT = 100_000_000;
+
 function toInt(v: unknown): number | null {
   const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+  return Number.isFinite(n) && n > 0 && n <= MAX_AMOUNT ? Math.round(n) : null;
+}
+
+/** Acepta solo fechas ISO YYYY-MM-DD; cualquier otra cosa → null (cae a hoy). */
+function toIsoDate(v: unknown): string | null {
+  return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
 }
 
 function toResult(parsed: unknown): VisionResult {
@@ -83,7 +91,7 @@ function toResult(parsed: unknown): VisionResult {
     return {
       kind: 'transfer',
       amount,
-      date: typeof obj.date === 'string' ? obj.date : null,
+      date: toIsoDate(obj.date),
       account: typeof obj.account === 'string' ? obj.account : null,
       description: typeof obj.description === 'string' ? obj.description : null,
       confidence: typeof obj.confidence === 'number' ? obj.confidence : 0.5,
@@ -105,7 +113,7 @@ function toResult(parsed: unknown): VisionResult {
     return {
       kind: 'receipt',
       supplier: typeof obj.supplier === 'string' ? obj.supplier : null,
-      date: typeof obj.date === 'string' ? obj.date : null,
+      date: toIsoDate(obj.date),
       items,
       total: toInt(obj.total),
       confidence: typeof obj.confidence === 'number' ? obj.confidence : 0.5,

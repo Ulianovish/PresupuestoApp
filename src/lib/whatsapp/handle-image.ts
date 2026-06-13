@@ -38,7 +38,6 @@ export interface ImageContext {
   userId: string;
   phone: string;
   mediaUrl: string;
-  mediaType: string;
 }
 
 export async function handleImageMessage(

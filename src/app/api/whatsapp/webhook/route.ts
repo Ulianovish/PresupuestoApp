@@ -114,7 +114,6 @@ export async function POST(request: NextRequest) {
 
   if (decision === 'image') {
     const mediaUrl = params.MediaUrl0 || '';
-    const mediaType = params.MediaContentType0 || 'image/jpeg';
     if (!mediaUrl) {
       return xml(twimlMessage(simpleReply('unknown')));
     }
@@ -122,7 +121,7 @@ export async function POST(request: NextRequest) {
     after(async () => {
       try {
         await handleImageMessage(
-          { userId, phone, mediaUrl, mediaType },
+          { userId, phone, mediaUrl },
           {
             sendMessage: sendWhatsAppMessage,
             downloadMedia: downloadTwilioMedia,

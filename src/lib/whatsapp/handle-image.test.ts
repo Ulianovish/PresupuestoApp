@@ -15,7 +15,7 @@ function makeDeps(overrides = {}) {
   };
 }
 
-const ctx = { userId: 'u1', phone: '+57300', mediaUrl: 'https://m/0', mediaType: 'image/png' };
+const ctx = { userId: 'u1', phone: '+57300', mediaUrl: 'https://m/0' };
 
 describe('handleImageMessage', () => {
   it('transferencia → gasto directo con la cuenta deducida', async () => {

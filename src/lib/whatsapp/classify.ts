@@ -42,14 +42,14 @@ export function ackMessage(decision: 'cufe' | 'quick_expense'): string {
 /** Respuesta completa (TwiML) para los casos que NO necesitan background. */
 export function simpleReply(decision: 'image' | 'help' | 'unknown'): string {
   if (decision === 'image') {
-    return '📷 ¡Gracias! Aún no proceso fotos ni QR, pero muy pronto podré. Por ahora envíame el CUFE en texto o un gasto como "20k taxi".';
+    return '📷 Recibí una imagen. Envíame la *foto* de una factura o de una transferencia y la registro.';
   }
   if (decision === 'help') {
     return [
       'Puedo registrar tus gastos 💸',
       '• Pega el *CUFE* de una factura DIAN → la dejo lista para aprobar.',
+      '• Envía una *foto* de una factura o de una transferencia → la leo y la registro.',
       '• Escribe un gasto: "20k taxi", "gasté 35000 en mercado".',
-      '(Las fotos y QR llegan pronto.)',
     ].join('\n');
   }
   return 'No te entendí 🤔. Pega el *CUFE* de una factura, o escribe un gasto como "20k taxi". Escribe *ayuda* para ver qué puedo hacer.';
