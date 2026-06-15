@@ -48,3 +48,25 @@
 - **Visión sin estado de conversación (v1):** receipt→revisar en app, transfer→editar en app, baja confianza→reenviar. _Plan 4._
 - **Host del webhook:** `presupuesto-app-beta.vercel.app` (los otros `*.vercel.app` dan 401 por Deployment Protection; `-beta` está exento). No requiere dominio propio.
 - **Tope de monto 100M COP** en texto y visión (anti-typo/OCR). _Plan 3/4._
+
+---
+
+## Anexo: conceptos para retomar fácil (2 ítems prioritarios del backlog)
+
+### "Visión sin conversación" (estado de conversación) — qué es y qué cambiaría
+**Hoy (v1, Plan 4):** el bot **nunca hace preguntas de seguimiento** sobre una foto. No tiene "memoria" de estar a mitad de un diálogo. Por eso degrada así:
+- Foto de **factura** → crea el **borrador** y dice "lista para revisar"; tú ajustas cuenta/categorías en la app.
+- Foto de **transferencia** → crea el **gasto directo** y avisa "registré $X en (cuenta)"; si algo salió mal lo **editas en la app**.
+- Imagen **dudosa/ilegible** → "no pude leerla, reenvíala o escribe el gasto". NO se queda preguntando.
+
+**Con conversación (lo que está en backlog):** cuando la visión **duda** (p. ej. no detecta la cuenta), el bot **preguntaría por el chat** ("Leí $32.000 en una panadería. ¿A qué cuenta lo cargo? Efectivo / Nequi / Tarjeta") y **esperaría tu respuesta** para completar el gasto, sin abrir la app.
+**Qué hace falta:** tabla `whatsapp_conversations` que guarde el "pendiente" por número (a este número le pregunté X, su próximo mensaje es la respuesta), con caducidad, e interpretar el siguiente mensaje como respuesta. Es lo que más haría sentir "un agente de verdad".
+**Por qué se difirió:** agrega complejidad (estado + caducidad + ruteo del mensaje-respuesta); el camino "corrígelo en la app" cubre los casos sin esa maquinaria.
+
+### "Realtime en la bandeja" vs polling — qué es
+La bandeja "Facturas por aprobar" debe enterarse de cuándo una factura pasa de "procesando" a "lista".
+- **Hoy: polling** — el navegador pregunta al servidor cada **1.5s** mientras haya algo en proceso. Simple, sin infra extra, pero hace muchas consultas que devuelven "todavía no".
+- **Realtime (Supabase Realtime):** el navegador se **suscribe** a la tabla `electronic_invoices` y Supabase **avisa** (websocket) solo cuando la fila cambia. Instantáneo y sin consultas desperdiciadas; requiere habilitar Realtime en la tabla + código de suscripción.
+**Por qué se difirió:** el polling 1.5s da buena experiencia para este volumen; Realtime es pulido, no necesidad.
+
+> Ambos los considera necesarios el usuario; por ahora quedan en backlog (visión-con-conversación es la prioridad cuando se retome).
