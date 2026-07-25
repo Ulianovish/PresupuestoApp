@@ -3,7 +3,6 @@
 // posteriores, por WhatsApp. Conserva la resiliencia del route: reintento ante
 // errores transitorios, detección del error real del upstream y cierre prematuro.
 
-
 import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
 import { parseSSEEventLine } from '@/lib/dian/sse';
 import {
@@ -178,6 +177,39 @@ async function streamUpstreamWithRetry(
   throw lastError ?? new Error('No se obtuvieron datos');
 }
 
+// Fallback al scraper del VPS (plan B): endpoint HTTP plano que devuelve el MISMO
+// shape que Vercel (CufeProcessResult). Se usa cuando el upstream principal falla y
+// DIAN_VPS_URL está configurado. El VPS corre un browser headful (menos detectado por
+// la DIAN → suele escalar menos captchas), así que es una red de seguridad real.
+async function fetchFromVpsFallback(
+  cufe: string,
+  onProgress?: (event: ProgressEvent) => void | Promise<void>,
+): Promise<CufeProcessResult> {
+  const base = process.env.DIAN_VPS_URL;
+  if (!base) throw new Error('DIAN_VPS_URL no configurado');
+  const url = `${base.replace(/\/$/, '')}/scrape?cufe=${encodeURIComponent(cufe)}`;
+
+  await onProgress?.({
+    step: 'fallback',
+    message: 'Scraper principal falló; usando respaldo (VPS)...',
+    progress: 10,
+  });
+
+  // El scrape del VPS resuelve captchas y descarga: puede tardar ~1-4 min.
+  const resp = await fetch(url, {
+    headers: { 'x-auth-token': process.env.DIAN_VPS_TOKEN || '' },
+    signal: AbortSignal.timeout(240_000),
+  });
+  if (!resp.ok) {
+    throw new Error(`VPS respondió ${resp.status}`);
+  }
+  const data = (await resp.json()) as CufeProcessResult;
+  if (!data.success) {
+    throw new Error(data.error || 'VPS no obtuvo datos');
+  }
+  return data;
+}
+
 /**
  * Parte pesada (~1 min): proxy SSE a factura-dian (con reintento), categorización
  * con las categorías dadas y persistencia. Reporta avance vía onProgress. No
@@ -199,11 +231,28 @@ export async function runInvoiceProcessing(
       cufe,
     )}&method=${method}&download-pdf=false`;
 
-    const result = await streamUpstreamWithRetry(
-      upstreamUrl,
-      onProgress,
-      retryBaseMs,
-    );
+    let result: CufeProcessResult;
+    try {
+      result = await streamUpstreamWithRetry(
+        upstreamUrl,
+        onProgress,
+        retryBaseMs,
+      );
+    } catch (upstreamErr) {
+      // Si el VPS no está configurado, propagamos el error original de Vercel.
+      if (!process.env.DIAN_VPS_URL) throw upstreamErr;
+      const upstreamMsg =
+        upstreamErr instanceof Error
+          ? upstreamErr.message
+          : String(upstreamErr);
+      try {
+        result = await fetchFromVpsFallback(cufe, onProgress);
+      } catch (vpsErr) {
+        const vpsMsg =
+          vpsErr instanceof Error ? vpsErr.message : String(vpsErr);
+        throw new Error(`Vercel falló (${upstreamMsg}); VPS falló (${vpsMsg})`);
+      }
+    }
 
     await onProgress?.({
       step: 'categorizing',
