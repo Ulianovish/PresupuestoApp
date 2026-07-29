@@ -177,11 +177,12 @@ async function streamUpstreamWithRetry(
   throw lastError ?? new Error('No se obtuvieron datos');
 }
 
-// Fallback al scraper del VPS (plan B): endpoint HTTP plano que devuelve el MISMO
-// shape que Vercel (CufeProcessResult). Se usa cuando el upstream principal falla y
-// DIAN_VPS_URL está configurado. El VPS corre un browser headful (menos detectado por
-// la DIAN → suele escalar menos captchas), así que es una red de seguridad real.
-async function fetchFromVpsFallback(
+// Scraper del VPS: endpoint HTTP plano que devuelve el MISMO shape que Vercel
+// (CufeProcessResult). El VPS corre un browser headful (menos detectado por la DIAN
+// → escala menos captchas: ~2 vs ~4 de Vercel), sin timeout de 300s y con más RAM,
+// así que suele fallar menos. Se usa como motor primario o de respaldo según
+// DIAN_VPS_PRIMARY (ver runInvoiceProcessing).
+async function fetchFromVps(
   cufe: string,
   onProgress?: (event: ProgressEvent) => void | Promise<void>,
 ): Promise<CufeProcessResult> {
@@ -190,9 +191,9 @@ async function fetchFromVpsFallback(
   const url = `${base.replace(/\/$/, '')}/scrape?cufe=${encodeURIComponent(cufe)}`;
 
   await onProgress?.({
-    step: 'fallback',
-    message: 'Scraper principal falló; usando respaldo (VPS)...',
-    progress: 10,
+    step: 'connecting_dian',
+    message: 'Procesando con scraper VPS (headful + 2captcha)...',
+    progress: 15,
   });
 
   // El scrape del VPS resuelve captchas y descarga: puede tardar ~1-4 min.
@@ -231,26 +232,47 @@ export async function runInvoiceProcessing(
       cufe,
     )}&method=${method}&download-pdf=false`;
 
+    // Motores. El VPS suele fallar menos (headful → menos captchas, sin timeout de
+    // 300s, más RAM), así que por defecto es el PRIMARIO cuando está configurado.
+    // Invertible con DIAN_VPS_PRIMARY=false (Vercel primario, VPS de respaldo).
+    const tryVercel = () =>
+      streamUpstreamWithRetry(upstreamUrl, onProgress, retryBaseMs);
+    const tryVps = () => fetchFromVps(cufe, onProgress);
+
+    const vpsConfigured = Boolean(process.env.DIAN_VPS_URL);
+    const vpsPrimary =
+      vpsConfigured && process.env.DIAN_VPS_PRIMARY !== 'false';
+
     let result: CufeProcessResult;
-    try {
-      result = await streamUpstreamWithRetry(
-        upstreamUrl,
-        onProgress,
-        retryBaseMs,
-      );
-    } catch (upstreamErr) {
-      // Si el VPS no está configurado, propagamos el error original de Vercel.
-      if (!process.env.DIAN_VPS_URL) throw upstreamErr;
-      const upstreamMsg =
-        upstreamErr instanceof Error
-          ? upstreamErr.message
-          : String(upstreamErr);
+    if (!vpsConfigured) {
+      // Sin VPS configurado: solo Vercel (comportamiento original).
+      result = await tryVercel();
+    } else {
+      const primary = vpsPrimary ? tryVps : tryVercel;
+      const secondary = vpsPrimary ? tryVercel : tryVps;
+      const primaryName = vpsPrimary ? 'VPS' : 'Vercel';
+      const secondaryName = vpsPrimary ? 'Vercel' : 'VPS';
       try {
-        result = await fetchFromVpsFallback(cufe, onProgress);
-      } catch (vpsErr) {
-        const vpsMsg =
-          vpsErr instanceof Error ? vpsErr.message : String(vpsErr);
-        throw new Error(`Vercel falló (${upstreamMsg}); VPS falló (${vpsMsg})`);
+        result = await primary();
+      } catch (primaryErr) {
+        const primaryMsg =
+          primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+        await onProgress?.({
+          step: 'retrying',
+          message: `${primaryName} falló; intentando con ${secondaryName}...`,
+          progress: 8,
+        });
+        try {
+          result = await secondary();
+        } catch (secondaryErr) {
+          const secondaryMsg =
+            secondaryErr instanceof Error
+              ? secondaryErr.message
+              : String(secondaryErr);
+          throw new Error(
+            `${primaryName} falló (${primaryMsg}); ${secondaryName} falló (${secondaryMsg})`,
+          );
+        }
       }
     }
 
