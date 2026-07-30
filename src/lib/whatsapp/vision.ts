@@ -198,9 +198,9 @@ export async function analyzeImage(
         // de "modelo inexistente". Sin esto el fallo es indistinguible de una
         // foto borrosa y se diagnostica a ciegas.
         const body = await res.text().catch(() => '');
+        const contexto = `modelo=${model} bytesB64=${base64.length} mime=${mime}`;
         console.error(
-          `analyzeImage HTTP ${res.status} (${intento}) modelo=${model} ` +
-            `bytesB64=${base64.length} mime=${mime} body=${body.slice(0, 500)}`,
+          `analyzeImage HTTP ${res.status} (${intento}) ${contexto} body=${body.slice(0, 500)}`,
         );
         if (TRANSIENT_STATUSES.has(res.status) && attempt < MAX_ATTEMPTS) {
           await sleep(retryDelayMs * attempt);
@@ -215,9 +215,9 @@ export async function analyzeImage(
         : '';
       const parsed = extractJson(text);
       if (!parsed) {
+        const preview = text.slice(0, 300);
         console.error(
-          `analyzeImage: respuesta sin JSON parseable (modelo=${model}): ` +
-            text.slice(0, 300),
+          `analyzeImage: respuesta sin JSON parseable (modelo=${model}): ${preview}`,
         );
         return { kind: 'unknown' };
       }

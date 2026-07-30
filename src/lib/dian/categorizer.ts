@@ -98,7 +98,7 @@ export async function categorizeInvoiceItems(
     process.env.AI_GATEWAY_API_KEY || process.env.MINIMAX_API_KEY;
   if (!apiKey) {
     console.error(
-      'categorizeInvoiceItems: falta AI_GATEWAY_API_KEY; todo cae a ' + FALLBACK,
+      `categorizeInvoiceItems: falta AI_GATEWAY_API_KEY; todo cae a ${FALLBACK}`,
     );
     return new Array(items.length).fill(FALLBACK);
   }
