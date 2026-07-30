@@ -177,6 +177,43 @@ async function streamUpstreamWithRetry(
   throw lastError ?? new Error('No se obtuvieron datos');
 }
 
+// Presupuesto de tiempo. La ruta que invoca esto tiene maxDuration = 300s, y si
+// se agota, Vercel mata la función SIN ejecutar ningún catch: no se escribe
+// error_message y el usuario no recibe nada (la fila queda en 'processing' para
+// siempre). Por eso el trabajo pesado se corta antes, dejando margen para
+// registrar el fallo y avisar. Silencio es el peor resultado posible.
+const TOTAL_BUDGET_MS = 270_000;
+/** Techo del scrape del VPS (headful + 2captcha: normalmente 60-70s). */
+const VPS_MAX_MS = 240_000;
+/**
+ * Por debajo de esto no se arranca el segundo motor: no alcanza a terminar y
+ * solo quema el margen que hace falta para reportar. Era el bug: el VPS agotaba
+ * sus 240s, el respaldo arrancaba con ~60s disponibles necesitando ~235s, y la
+ * función moría en silencio.
+ */
+const MIN_SECONDARY_MS = 90_000;
+
+/** Corta una promesa que exceda su presupuesto, para no arrastrar a toda la función. */
+function withDeadline<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const limit = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new Error(`${label} superó su presupuesto de ${Math.round(ms / 1000)}s`),
+        ),
+      ms,
+    );
+  });
+  return Promise.race([promise, limit]).finally(() =>
+    clearTimeout(timer),
+  ) as Promise<T>;
+}
+
 // Scraper del VPS: endpoint HTTP plano que devuelve el MISMO shape que Vercel
 // (CufeProcessResult). El VPS corre un browser headful (menos detectado por la DIAN
 // → escala menos captchas: ~2 vs ~4 de Vercel), sin timeout de 300s y con más RAM,
@@ -185,6 +222,7 @@ async function streamUpstreamWithRetry(
 async function fetchFromVps(
   cufe: string,
   onProgress?: (event: ProgressEvent) => void | Promise<void>,
+  timeoutMs: number = VPS_MAX_MS,
 ): Promise<CufeProcessResult> {
   const base = process.env.DIAN_VPS_URL;
   if (!base) throw new Error('DIAN_VPS_URL no configurado');
@@ -199,7 +237,7 @@ async function fetchFromVps(
   // El scrape del VPS resuelve captchas y descarga: puede tardar ~1-4 min.
   const resp = await fetch(url, {
     headers: { 'x-auth-token': process.env.DIAN_VPS_TOKEN || '' },
-    signal: AbortSignal.timeout(240_000),
+    signal: AbortSignal.timeout(Math.max(1_000, timeoutMs)),
   });
   if (!resp.ok) {
     throw new Error(`VPS respondió ${resp.status}`);
@@ -235,9 +273,26 @@ export async function runInvoiceProcessing(
     // Motores. El VPS suele fallar menos (headful → menos captchas, sin timeout de
     // 300s, más RAM), así que por defecto es el PRIMARIO cuando está configurado.
     // Invertible con DIAN_VPS_PRIMARY=false (Vercel primario, VPS de respaldo).
+    // Todo el trabajo pesado vive dentro de este presupuesto; lo que sobra es el
+    // margen para categorizar, guardar y avisar.
+    const deadline = startTime + TOTAL_BUDGET_MS;
+    const remainingMs = () => deadline - Date.now();
+
     const tryVercel = () =>
-      streamUpstreamWithRetry(upstreamUrl, onProgress, retryBaseMs);
-    const tryVps = () => fetchFromVps(cufe, onProgress);
+      withDeadline(
+        streamUpstreamWithRetry(upstreamUrl, onProgress, retryBaseMs),
+        Math.max(1_000, remainingMs()),
+        'Vercel',
+      );
+    // Al VPS se le da todo lo que quede (con su techo): es el motor que mejor
+    // rinde, así que la prioridad es que alcance a terminar, no reservarle
+    // tiempo a un respaldo que rara vez sirve.
+    const tryVps = () =>
+      fetchFromVps(
+        cufe,
+        onProgress,
+        Math.max(1_000, Math.min(VPS_MAX_MS, remainingMs())),
+      );
 
     const vpsConfigured = Boolean(process.env.DIAN_VPS_URL);
     const vpsPrimary =
@@ -257,6 +312,17 @@ export async function runInvoiceProcessing(
       } catch (primaryErr) {
         const primaryMsg =
           primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+
+        // Solo se intenta el respaldo si de verdad alcanza a terminar. Arrancarlo
+        // sin tiempo suficiente garantiza que la función muera antes de poder
+        // avisar, que es exactamente lo que dejaba facturas colgadas.
+        const left = remainingMs();
+        if (left < MIN_SECONDARY_MS) {
+          throw new Error(
+            `${primaryName} falló (${primaryMsg}); quedaban ${Math.round(left / 1000)}s, insuficiente para ${secondaryName} (mínimo ${MIN_SECONDARY_MS / 1000}s). Se corta para poder reportar el fallo.`,
+          );
+        }
+
         await onProgress?.({
           step: 'retrying',
           message: `${primaryName} falló; intentando con ${secondaryName}...`,

@@ -149,6 +149,61 @@ describe('runInvoiceProcessing', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(markInvoiceError).toHaveBeenCalledWith('inv-4', expect.stringContaining('404'), undefined);
   });
+
+  it('el primario agota el presupuesto → NO arranca el respaldo y reporta el fallo', async () => {
+    // Reproduce el bug real: el VPS consumía sus 240s, el respaldo arrancaba con
+    // ~60s necesitando ~235s, y la función moría a los 300s sin escribir error ni
+    // avisar. La factura quedaba en 'processing' para siempre.
+    vi.stubEnv('DIAN_VPS_URL', 'http://vps.test');
+    const base = Date.now();
+    let elapsed = 0;
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => base + elapsed);
+
+    const fetchMock = vi.fn(async () => {
+      elapsed = 250_000; // el VPS se comió casi todo el presupuesto
+      throw new Error('The operation was aborted due to timeout');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await runInvoiceProcessing('inv-budget', 'CUFE123', {
+      categoryNames: ['OTROS'],
+      retryBaseMs: 0,
+    });
+
+    expect(res.ok).toBe(false);
+    // Lo esencial: el respaldo nunca se intentó (una sola llamada, la del VPS).
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(markInvoiceError).toHaveBeenCalledWith(
+      'inv-budget',
+      expect.stringContaining('insuficiente'),
+      undefined,
+    );
+    nowSpy.mockRestore();
+  });
+
+  it('si el primario falla rápido, sí queda presupuesto y se usa el respaldo', async () => {
+    vi.stubEnv('DIAN_VPS_URL', 'http://vps.test');
+    let call = 0;
+    const fetchMock = vi.fn(async () => {
+      call += 1;
+      if (call === 1) throw new Error('VPS respondió 429'); // mutex: falla al instante
+      return {
+        ok: true,
+        status: 200,
+        body: null,
+        json: async () => COMPLETE_RESULT,
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await runInvoiceProcessing('inv-fast-fail', 'CUFE123', {
+      categoryNames: ['OTROS'],
+      retryBaseMs: 0,
+    });
+
+    // Con tiempo de sobra el respaldo sí debe intentarse.
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
+  });
 });
 
 const getInvoiceByCufeMock = getInvoiceByCufe as unknown as ReturnType<
