@@ -89,6 +89,20 @@ describe('handleImageMessage', () => {
     expect(deps.sendMessage).toHaveBeenCalledWith('+57300', expect.stringMatching(/no pude|reenv|escrib/i));
   });
 
+  it('service_error → culpa al servicio, NO a la foto', async () => {
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({ kind: 'service_error' })),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.createDirectExpense).not.toHaveBeenCalled();
+    expect(deps.createVisionReceiptDraft).not.toHaveBeenCalled();
+    const [, msg] = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0] as [string, string];
+    expect(msg).toMatch(/no es tu foto|fallando/i);
+    // el mensaje de "reenvíala más clara" culparía a la imagen: no debe salir
+    expect(msg).not.toMatch(/más clara/i);
+  });
+
   it('descarga falla → avisa y no analiza', async () => {
     const deps = makeDeps({ downloadMedia: vi.fn(async () => null) });
     await handleImageMessage(ctx, deps);

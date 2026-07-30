@@ -94,13 +94,20 @@ export async function categorizeInvoiceItems(
 ): Promise<string[]> {
   if (items.length === 0) return [];
 
-  const apiKey = process.env.MINIMAX_API_KEY;
+  const apiKey =
+    process.env.AI_GATEWAY_API_KEY || process.env.MINIMAX_API_KEY;
   if (!apiKey) {
+    console.error(
+      'categorizeInvoiceItems: falta AI_GATEWAY_API_KEY; todo cae a ' + FALLBACK,
+    );
     return new Array(items.length).fill(FALLBACK);
   }
 
-  const baseUrl = process.env.MINIMAX_BASE_URL || 'https://api.minimax.io/anthropic';
-  const model = process.env.CATEGORIZE_MODEL || 'MiniMax-M2.7';
+  const baseUrl =
+    process.env.AI_GATEWAY_BASE_URL ||
+    process.env.MINIMAX_BASE_URL ||
+    'https://ai-gateway.vercel.sh';
+  const model = process.env.CATEGORIZE_MODEL || 'alibaba/qwen3.7-flash';
 
   try {
     const res = await fetch(`${baseUrl}/v1/messages`, {

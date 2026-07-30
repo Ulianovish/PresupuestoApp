@@ -1,6 +1,9 @@
-// Extractor de visión: lee una imagen (transferencia o factura) con MiniMax-VL
-// vía el endpoint Anthropic-compatible (validado). Devuelve datos estructurados
-// o { kind: 'unknown' } ante cualquier problema. Nunca lanza.
+// Extractor de visión: lee una imagen (transferencia o factura) vía la superficie
+// Anthropic Messages del Vercel AI Gateway. Nunca lanza. Distingue dos fracasos:
+//   - 'unknown'       → el modelo respondió pero no pudo interpretar la imagen.
+//   - 'service_error' → falló la llamada (sin key, 4xx/5xx, red). NO es culpa de
+//                       la foto, así que el llamador no debe pedir "reenviala
+//                       más clara". Los transitorios se reintentan antes.
 
 export type TransferVision = {
   kind: 'transfer';
@@ -20,7 +23,19 @@ export type ReceiptVision = {
   confidence: number;
 };
 
-export type VisionResult = TransferVision | ReceiptVision | { kind: 'unknown' };
+export type VisionResult =
+  | TransferVision
+  | ReceiptVision
+  | { kind: 'unknown' }
+  | { kind: 'service_error' };
+
+/** Status que vale la pena reintentar: saturación o fallo pasajero del proveedor. */
+const TRANSIENT_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504, 529]);
+const MAX_ATTEMPTS = 3;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 const PROMPT = [
   'Eres un asistente que lee imágenes financieras colombianas. Analiza la imagen',
@@ -123,53 +138,99 @@ function toResult(parsed: unknown): VisionResult {
   return { kind: 'unknown' };
 }
 
-/** Analiza una imagen con MiniMax-VL. Nunca lanza; ante error → unknown. */
+/**
+ * Analiza una imagen con el modelo de visión configurado. Nunca lanza.
+ * Reintenta los fallos transitorios (429/5xx/red) hasta MAX_ATTEMPTS: la misma
+ * imagen fallaba de forma intermitente porque no había ningún reintento.
+ */
 export async function analyzeImage(
   base64: string,
   mime: string,
 ): Promise<VisionResult> {
-  const apiKey = process.env.MINIMAX_API_KEY;
-  if (!apiKey) return { kind: 'unknown' };
-
-  const baseUrl = process.env.MINIMAX_BASE_URL || 'https://api.minimax.io/anthropic';
-  const model = process.env.VISION_MODEL || 'MiniMax-VL-01';
-
-  try {
-    const res = await fetch(`${baseUrl}/v1/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 1024,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: mime, data: base64 },
-              },
-              { type: 'text', text: PROMPT },
-            ],
-          },
-        ],
-      }),
-    });
-    if (!res.ok) return { kind: 'unknown' };
-
-    const data = (await res.json()) as { content?: Array<{ text?: string }> };
-    const text = Array.isArray(data.content)
-      ? data.content.map(c => c?.text ?? '').join('')
-      : '';
-    const parsed = extractJson(text);
-    if (!parsed) return { kind: 'unknown' };
-    return toResult(parsed);
-  } catch (err) {
-    console.error('Error en analyzeImage:', err);
-    return { kind: 'unknown' };
+  // Se leen los nombres nuevos con caída a los viejos para que el deploy y el
+  // cambio de env puedan ocurrir en cualquier orden sin dejar el bot ciego.
+  const apiKey =
+    process.env.AI_GATEWAY_API_KEY || process.env.MINIMAX_API_KEY;
+  if (!apiKey) {
+    console.error(
+      'analyzeImage: falta AI_GATEWAY_API_KEY (ni MINIMAX_API_KEY como respaldo)',
+    );
+    return { kind: 'service_error' };
   }
+
+  const baseUrl =
+    process.env.AI_GATEWAY_BASE_URL ||
+    process.env.MINIMAX_BASE_URL ||
+    'https://ai-gateway.vercel.sh';
+  const model = process.env.VISION_MODEL || 'alibaba/qwen3-vl-instruct';
+  const retryDelayMs = Number(process.env.VISION_RETRY_DELAY_MS ?? 1500);
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const intento = `intento ${attempt}/${MAX_ATTEMPTS}`;
+    try {
+      const res = await fetch(`${baseUrl}/v1/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'image',
+                  source: { type: 'base64', media_type: mime, data: base64 },
+                },
+                { type: 'text', text: PROMPT },
+              ],
+            },
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        // El cuerpo es lo único que distingue "sin cupo" de "imagen rechazada"
+        // de "modelo inexistente". Sin esto el fallo es indistinguible de una
+        // foto borrosa y se diagnostica a ciegas.
+        const body = await res.text().catch(() => '');
+        console.error(
+          `analyzeImage HTTP ${res.status} (${intento}) modelo=${model} ` +
+            `bytesB64=${base64.length} mime=${mime} body=${body.slice(0, 500)}`,
+        );
+        if (TRANSIENT_STATUSES.has(res.status) && attempt < MAX_ATTEMPTS) {
+          await sleep(retryDelayMs * attempt);
+          continue;
+        }
+        return { kind: 'service_error' };
+      }
+
+      const data = (await res.json()) as { content?: Array<{ text?: string }> };
+      const text = Array.isArray(data.content)
+        ? data.content.map(c => c?.text ?? '').join('')
+        : '';
+      const parsed = extractJson(text);
+      if (!parsed) {
+        console.error(
+          `analyzeImage: respuesta sin JSON parseable (modelo=${model}): ` +
+            text.slice(0, 300),
+        );
+        return { kind: 'unknown' };
+      }
+      return toResult(parsed);
+    } catch (err) {
+      console.error(`Error en analyzeImage (${intento}):`, err);
+      if (attempt < MAX_ATTEMPTS) {
+        await sleep(retryDelayMs * attempt);
+        continue;
+      }
+      return { kind: 'service_error' };
+    }
+  }
+
+  return { kind: 'service_error' };
 }

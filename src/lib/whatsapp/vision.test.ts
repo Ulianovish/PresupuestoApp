@@ -18,6 +18,7 @@ describe('analyzeImage', () => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.stubEnv('MINIMAX_API_KEY', 'k');
+    vi.stubEnv('VISION_RETRY_DELAY_MS', '0');
   });
 
   it('parsea una transferencia', async () => {
@@ -75,17 +76,52 @@ describe('analyzeImage', () => {
     expect(await analyzeImage('b64', 'image/png')).toEqual({ kind: 'unknown' });
   });
 
-  it('sin API key → unknown sin llamar fetch', async () => {
+  it('sin API key → service_error sin llamar fetch', async () => {
     vi.stubEnv('MINIMAX_API_KEY', '');
+    vi.stubEnv('AI_GATEWAY_API_KEY', '');
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    expect(await analyzeImage('b64', 'image/png')).toEqual({ kind: 'unknown' });
+    expect(await analyzeImage('b64', 'image/png')).toEqual({
+      kind: 'service_error',
+    });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('HTTP error → unknown', async () => {
-    mockMiniMax('x', false, 500);
-    expect(await analyzeImage('b64', 'image/png')).toEqual({ kind: 'unknown' });
+  it('HTTP 500 (transitorio) → reintenta y termina en service_error', async () => {
+    const fetchMock = mockMiniMax('x', false, 500);
+    expect(await analyzeImage('b64', 'image/png')).toEqual({
+      kind: 'service_error',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('HTTP 400 (permanente) → service_error sin reintentar', async () => {
+    const fetchMock = mockMiniMax('bad request', false, 400);
+    expect(await analyzeImage('b64', 'image/png')).toEqual({
+      kind: 'service_error',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('429 y luego 200 → se recupera con el reintento', async () => {
+    const okBody = JSON.stringify({ type: 'transfer', amount: 1000 });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        text: async () => 'rate limited',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ content: [{ text: okBody }] }),
+        text: async () => okBody,
+      });
+    vi.stubGlobal('fetch', fetchMock);
+    const r = await analyzeImage('b64', 'image/png');
+    expect(r.kind).toBe('transfer');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('transfer sin amount válido → unknown', async () => {

@@ -99,6 +99,16 @@ export async function handleImageMessage(
     return;
   }
 
+  if (result.kind === 'service_error') {
+    // No es culpa de la foto: pedirle al usuario que la mejore lo manda a
+    // perseguir un problema que no existe.
+    await deps.sendMessage(
+      ctx.phone,
+      '⚠️ El lector de imágenes está fallando ahora mismo (no es tu foto). Reenvíala en un minuto, o escribe el gasto (ej. "20k taxi").',
+    );
+    return;
+  }
+
   await deps.sendMessage(
     ctx.phone,
     'No pude leer la imagen 🤔. Reenvíala más clara, o escribe el gasto (ej. "20k taxi") o pega el CUFE.',
