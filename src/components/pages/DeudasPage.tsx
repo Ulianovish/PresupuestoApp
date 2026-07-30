@@ -228,9 +228,19 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
           <div key={deuda.id} className="p-3 bg-white/5 rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-white font-medium">{deuda.descripcion}</p>
+                <p className="text-white font-medium">
+                  {deuda.descripcion}
+                  {deuda.acreedor && (
+                    <>
+                      <span className="text-gray-500"> · </span>
+                      <span className="text-orange-300 font-semibold">
+                        {deuda.acreedor}
+                      </span>
+                    </>
+                  )}
+                </p>
                 <p className="text-sm text-gray-400">
-                  {deuda.acreedor} &bull; Vence:{' '}
+                  Vence:{' '}
                   {new Date(deuda.fecha_vencimiento).toLocaleDateString(
                     'es-CO',
                   )}
