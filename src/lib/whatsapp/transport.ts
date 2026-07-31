@@ -50,7 +50,10 @@ export async function sendWhatsAppMessage(
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
       console.error(`Twilio respondió ${res.status}: ${detail}`);
-      return { ok: false, status: res.status };
+      // Devolver el detalle, no solo el status: el fallo típico es el 63016
+      // (texto libre fuera de la ventana de 24h) y sin el código es indistinguible
+      // de un problema de credenciales.
+      return { ok: false, status: res.status, error: detail.slice(0, 300) };
     }
     return { ok: true, status: res.status };
   } catch (err) {
