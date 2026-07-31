@@ -97,7 +97,10 @@ export async function prepareInvoiceProcessing(
 //  - `complete` con result.success -> devuelve el result
 //  - `error`/`{error}` explícito    -> lanza con el mensaje real
 //  - stream cerrado sin complete    -> lanza "closed prematurely" (transitorio)
-async function streamUpstreamOnce(
+// Exportada para el canario (src/lib/dian/canary.ts): así la verificación diaria
+// ejercita EXACTAMENTE el mismo camino que usa el bot, sin el reintento (un
+// canario debe reportar la primera falla, no disimularla).
+export async function streamUpstreamOnce(
   url: string,
   onProgress?: (event: ProgressEvent) => void | Promise<void>,
 ): Promise<CufeProcessResult> {
@@ -219,7 +222,7 @@ function withDeadline<T>(
 // → escala menos captchas: ~2 vs ~4 de Vercel), sin timeout de 300s y con más RAM,
 // así que suele fallar menos. Se usa como motor primario o de respaldo según
 // DIAN_VPS_PRIMARY (ver runInvoiceProcessing).
-async function fetchFromVps(
+export async function fetchFromVps(
   cufe: string,
   onProgress?: (event: ProgressEvent) => void | Promise<void>,
   timeoutMs: number = VPS_MAX_MS,
