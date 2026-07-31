@@ -63,7 +63,8 @@ export async function handleAgentMessage(
     } else {
       await deps.sendMessage(
         ctx.phone,
-        `❌ No pude procesar la factura: ${out.message}. Puedes reintentar más tarde.`,
+        // El mensaje del motor suele venir ya con punto final; no duplicarlo.
+        `❌ No pude procesar la factura: ${out.message.replace(/\.?$/, '.')} Puedes reintentar más tarde.`,
       );
     }
     return;
