@@ -1,12 +1,19 @@
 /**
- * Canario diario del CUFE (Vercel Cron).
+ * Canario del CUFE: corre una factura conocida por cada motor y avisa si alguno
+ * dejó de funcionar. Existe porque la DIAN rompe el scraper en silencio (el
+ * campo NIT que agregó en jun-2026 tardó ~6 semanas en detectarse).
  *
- * Corre una factura conocida por cada motor y avisa por WhatsApp si alguno dejó
- * de funcionar. Existe porque la DIAN rompe el scraper en silencio: el campo NIT
- * que agregó en jun-2026 tardó ~6 semanas en detectarse.
+ * ⏸️ SIN PROGRAMAR (`crons: []` en vercel.json). Funciona a demanda; el cron
+ * quedó apagado a propósito hasta resolver el canal de aviso.
  *
- * Gasta 2captcha (~2 captchas por motor), así que la ruta está protegida: sin el
- * secreto correcto devuelve 401 y no ejecuta nada.
+ * El aviso NO va por WhatsApp: la ventana de 24h de WhatsApp Business bloquea el
+ * texto libre justo en el caso que importa (llevás días sin escribirle al bot).
+ * El canal elegido es **Telegram**, vía el agente que ya corre en el VPS —
+ * pendiente de conectar. Mientras tanto un cron diario solo quemaría saldo de
+ * 2captcha (~5 captchas por corrida) sin que nadie lea el resultado, y ese saldo
+ * hace falta para las facturas de verdad.
+ *
+ * La ruta está protegida: sin el secreto correcto devuelve 401 y no ejecuta nada.
  */
 import { NextRequest, NextResponse } from 'next/server';
 
