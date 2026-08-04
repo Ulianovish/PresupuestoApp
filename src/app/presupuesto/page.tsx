@@ -16,6 +16,7 @@ import BudgetItemModal from '@/components/organisms/BudgetItemModal/BudgetItemMo
 import BudgetStatusPanels from '@/components/organisms/BudgetStatusPanels/BudgetStatusPanels';
 import BudgetTable from '@/components/organisms/BudgetTable/BudgetTable';
 import CategoryModal from '@/components/organisms/CategoryModal/CategoryModal';
+import UnclassifiedExpensesPanel from '@/components/organisms/UnclassifiedExpensesPanel/UnclassifiedExpensesPanel';
 import BudgetPageTemplate from '@/components/templates/BudgetPageTemplate/BudgetPageTemplate';
 import { useMonth } from '@/contexts/MonthContext';
 import { useMonthlyBudget } from '@/hooks/useMonthlyBudget';
@@ -591,24 +592,30 @@ export default function PresupuestoPage() {
         }
         budgetTable={
           !isLoading && categories.length > 0 ? (
-            <BudgetTable
-              categories={categories}
-              budgetData={budgetData}
-              onToggleCategory={toggleCategory}
-              onAddItem={openAddModal}
-              onEditItem={openEditModal}
-              onDeleteCategory={handleDeleteCategory}
-              onRenameCategory={handleRenameCategory}
-              onDeleteItem={handleDeleteItem}
-              onAddCategory={() => setShowCategoryModal(true)}
-              onInlineUpdate={handleInlineUpdate}
-              classifications={classifications}
-              controls={controls}
-              isLoading={isLoading}
-              formatCurrency={formatCurrency}
-              getClasificacionColor={getClasificacionColor}
-              getControlColor={getControlColor}
-            />
+            <>
+              <UnclassifiedExpensesPanel
+                monthYear={selectedMonth}
+                onChanged={refreshBudget}
+              />
+              <BudgetTable
+                categories={categories}
+                budgetData={budgetData}
+                onToggleCategory={toggleCategory}
+                onAddItem={openAddModal}
+                onEditItem={openEditModal}
+                onDeleteCategory={handleDeleteCategory}
+                onRenameCategory={handleRenameCategory}
+                onDeleteItem={handleDeleteItem}
+                onAddCategory={() => setShowCategoryModal(true)}
+                onInlineUpdate={handleInlineUpdate}
+                classifications={classifications}
+                controls={controls}
+                isLoading={isLoading}
+                formatCurrency={formatCurrency}
+                getClasificacionColor={getClasificacionColor}
+                getControlColor={getControlColor}
+              />
+            </>
           ) : undefined
         }
         modal={
