@@ -1,14 +1,12 @@
 // Servicio para gestionar facturas electrónicas DIAN (tabla electronic_invoices)
 
-
 import { EXPENSE_CATEGORIES } from '@/lib/constants/expense-categories';
+import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
 import { mapInvoiceItemToExpenseArgs } from '@/lib/dian/invoice-mapper';
+import { resolveItemNameToId } from '@/lib/services/expenses-rollup';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
-import type {
-  ElectronicInvoice,
-  StoredInvoiceItem,
-} from '@/types/invoices';
+import type { ElectronicInvoice, StoredInvoiceItem } from '@/types/invoices';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -83,10 +81,7 @@ export async function resolveUserCategoryNames(
   userId?: string,
 ): Promise<string[]> {
   const supabase = client ?? (await createClient());
-  let query = supabase
-    .from('categories')
-    .select('name')
-    .eq('is_active', true);
+  let query = supabase.from('categories').select('name').eq('is_active', true);
   if (userId) {
     query = query.eq('user_id', userId);
   }
@@ -193,10 +188,16 @@ export async function approveInvoice(
     category: categoryOverrides?.[idx] ?? it.category,
   }));
 
+  const createdExpenses: Array<{
+    id: string;
+    description: string;
+    categoryName: string;
+    monthYear: string;
+  }> = [];
   let created = 0;
   for (const item of items) {
     const args = mapInvoiceItemToExpenseArgs(item, typed, userId, accountName);
-    const { error: rpcError } = await supabase.rpc(
+    const { data: transactionId, error: rpcError } = await supabase.rpc(
       'upsert_monthly_expense',
       args,
     );
@@ -207,8 +208,19 @@ export async function approveInvoice(
         error: `Error creando gasto "${item.description}": ${rpcError.message}`,
       };
     }
+    if (transactionId) {
+      createdExpenses.push({
+        id: transactionId as string,
+        description: args.p_description,
+        categoryName: args.p_category_name,
+        monthYear: (args.p_transaction_date || '').slice(0, 7),
+      });
+    }
     created++;
   }
+
+  // Clasificación best-effort: asigna cada gasto creado a un ítem del presupuesto.
+  await classifyApprovedExpenses(supabase, userId, createdExpenses);
 
   await supabase
     .from('electronic_invoices')
@@ -221,4 +233,88 @@ export async function approveInvoice(
     .eq('id', invoiceId);
 
   return { success: true, created };
+}
+
+/**
+ * Clasifica (por IA) los gastos recién creados de una factura y los asigna al
+ * ítem del presupuesto correspondiente. Server-side: usa el cliente tipado y el
+ * userId conocido (no depende de la sesión del navegador). Best-effort: agrupa
+ * por mes y por categoría del gasto, acota la IA a los ítems de esa categoría, y
+ * solo asigna cuando hay match. Nunca relanza (si falla, el gasto queda sin
+ * clasificar y aparece en el panel rojo del presupuesto).
+ */
+async function classifyApprovedExpenses(
+  supabase: DBClient,
+  userId: string,
+  expenses: Array<{
+    id: string;
+    description: string;
+    categoryName: string;
+    monthYear: string;
+  }>,
+): Promise<void> {
+  try {
+    if (expenses.length === 0) return;
+
+    // Agrupar por mes (una factura suele ser un solo mes, pero por si acaso)
+    const byMonth = new Map<string, typeof expenses>();
+    for (const e of expenses) {
+      const arr = byMonth.get(e.monthYear) ?? [];
+      arr.push(e);
+      byMonth.set(e.monthYear, arr);
+    }
+
+    for (const [monthYear, monthExpenses] of byMonth) {
+      const { data: itemsRaw } = await supabase.rpc(
+        'get_budget_items_for_month',
+        { p_user_id: userId, p_month_year: monthYear },
+      );
+      const items = ((itemsRaw as unknown[]) || []).map(row => {
+        const r = row as {
+          item_id: string;
+          item_name: string;
+          category_name: string;
+        };
+        return {
+          id: r.item_id,
+          name: r.item_name,
+          category_name: r.category_name,
+        };
+      });
+      if (items.length === 0) continue;
+
+      // Agrupar por categoría del gasto y clasificar cada grupo en un lote
+      const byCategory = new Map<string, typeof monthExpenses>();
+      for (const e of monthExpenses) {
+        const arr = byCategory.get(e.categoryName) ?? [];
+        arr.push(e);
+        byCategory.set(e.categoryName, arr);
+      }
+
+      for (const [categoryName, catExpenses] of byCategory) {
+        const inCategory = items.filter(i => i.category_name === categoryName);
+        if (inCategory.length === 0) continue;
+
+        const names = await classifyExpensesToItems(
+          catExpenses.map(e => ({ description: e.description })),
+          inCategory.map(i => i.name),
+        );
+
+        for (let i = 0; i < catExpenses.length; i++) {
+          const itemId = resolveItemNameToId(names[i], inCategory);
+          if (itemId) {
+            await supabase.rpc('assign_expense_budget_item', {
+              p_user_id: userId,
+              p_transaction_id: catExpenses[i].id,
+              p_budget_item_id: itemId,
+              p_source: 'ai',
+            });
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error clasificando gastos de factura aprobada:', error);
+    // best-effort: no relanzar
+  }
 }
