@@ -50,9 +50,13 @@ Presupuesto → categoría Mercado:
 2. **Corrección manual**: un desplegable permite reasignar el ítem de un gasto.
    La corrección manual se respeta y **la IA no la vuelve a sobrescribir**.
 3. **Gastos sin asignar**: se muestran en un **panel "Sin clasificar"** dentro de
-   la página Presupuesto, en rojo, con desplegable para ubicarlos.
-4. **Columna "Real" = suma automática** de los gastos asignados a ese ítem en el
-   mes. Se **quita** el campo manual "Real" del modal de ítem.
+   la página Presupuesto, en rojo, con desplegable para ubicarlos. El panel
+   deja **explícito que esos montos aún NO suman** en ningún ítem del
+   Presupuesto Real, e incluye un **total de "gastos sin contar"** del mes.
+4. **Columna "Real" híbrida**: si el ítem **tiene gastos asignados**, "Real" =
+   la **suma automática** de esos gastos (mandan los gastos). Si el ítem **no
+   tiene gastos asignados**, se conserva el **valor manual** que se escribe en
+   el modal (como hoy). El campo manual "Real" **se mantiene**.
 5. **Alcance de la IA acotado a la categoría del gasto**: la IA solo elige entre
    los ítems de la **misma categoría general** del gasto (ej. gasto MERCADO →
    escoge entre Carnes/Aseo/Bolsa…). Si el gasto no tiene categoría clara o es
@@ -97,16 +101,19 @@ Se puede clasificar en lote (varias descripciones en una llamada), igual que hoy
 
 Cambiar monto, fecha o borrar un gasto **no** requiere IA.
 
-### Totales (columna "Real") — en vivo
+### Totales (columna "Real") — en vivo, híbrido
 
-- Modificar el RPC `get_budget_by_month` para que el `real` de cada ítem sea
-  `SUM(t.amount)` de las `transactions` con `t.budget_item_id = bi.id`
-  (`type = Gasto`). Como el vínculo ya es por mes, la suma queda acotada al mes.
+- Modificar el RPC `get_budget_by_month` para que el `real` de cada ítem sea:
+  - Si hay **gastos asignados** al ítem (COUNT de `transactions` con
+    `t.budget_item_id = bi.id`, `type = Gasto`, > 0) → `SUM(t.amount)` de esos
+    gastos (mandan los gastos).
+  - Si **no** hay gastos asignados → el valor manual `bi.real_amount` (como hoy).
+- Como el vínculo ya es por mes, la suma queda acotada al mes.
 - Es SQL puro que se recalcula al cargar el presupuesto → se actualiza solo al
   agregar/editar/eliminar gastos (cumple la regla de actualización automática).
 - El front ya renderiza `item.real`; cambio mínimo.
-- Quitar el campo manual "Real" del modal de ítem
-  (`BudgetFormFields`) y del flujo de guardado.
+- El campo manual "Real" del modal de ítem (`BudgetFormFields`) **se conserva**;
+  aplica solo como respaldo cuando el ítem no tiene gastos asignados.
 
 ### UI: panel "Sin clasificar" + corrección
 
@@ -114,6 +121,8 @@ Cambiar monto, fecha o borrar un gasto **no** requiere IA.
   lista los gastos del mes con `budget_item_id IS NULL` (rojo): descripción,
   monto, categoría, y un **desplegable** con los ítems del mes para asignarlos.
   Asignar → marca `'manual'` y refresca.
+- El panel muestra un **total de "gastos sin contar"** y un texto claro de que
+  esos montos **aún no suman** en el Presupuesto Real hasta asignarlos.
 - Botón **"Clasificar con IA"** en el panel para procesar los pendientes del mes.
 - Desplegable de reasignación también disponible por gasto (para corregir
   cuando la IA se equivoque).
@@ -142,6 +151,8 @@ Cambiar monto, fecha o borrar un gasto **no** requiere IA.
   helpers de `categorizer.ts`).
 - Suma por ítem (RPC): varios gastos al mismo ítem se acumulan; gasto sin
   `budget_item_id` no suma a ningún ítem.
+- Real híbrido (RPC): con gastos asignados manda la suma; sin gastos asignados
+  se muestra el `real_amount` manual.
 - Respeto de `'manual'`: reclasificar no pisa un gasto marcado manual.
 - Vínculo por mes: un gasto de abril no se enlaza a un ítem de marzo.
 
