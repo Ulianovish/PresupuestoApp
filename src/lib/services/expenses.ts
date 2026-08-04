@@ -179,6 +179,16 @@ export async function createExpenseTransaction(
     throw new Error(`Error creando gasto: ${error.message}`);
   }
 
+  // Clasificación best-effort: asigna el gasto a un ítem del presupuesto.
+  // No bloquea la creación si la IA falla (el gasto queda "sin clasificar").
+  const monthYear = expenseData.transaction_date.slice(0, 7);
+  await classifyAndAssignExpense(
+    data,
+    expenseData.description,
+    expenseData.category_name,
+    monthYear,
+  );
+
   return data; // Retorna el ID de la transacción creada
 }
 
