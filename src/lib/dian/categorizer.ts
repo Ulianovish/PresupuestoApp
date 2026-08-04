@@ -24,7 +24,7 @@ export function buildCategorizationPrompt(
  * fences markdown (```json ... ```), o precedido de razonamiento del modelo.
  * Devuelve el objeto parseado o null.
  */
-function extractJsonObject(content: string): unknown | null {
+export function extractJsonObject(content: string): unknown | null {
   const trimmed = content.trim();
 
   // 1. Intento directo.
@@ -94,8 +94,7 @@ export async function categorizeInvoiceItems(
 ): Promise<string[]> {
   if (items.length === 0) return [];
 
-  const apiKey =
-    process.env.AI_GATEWAY_API_KEY || process.env.MINIMAX_API_KEY;
+  const apiKey = process.env.AI_GATEWAY_API_KEY || process.env.MINIMAX_API_KEY;
   if (!apiKey) {
     console.error(
       `categorizeInvoiceItems: falta AI_GATEWAY_API_KEY; todo cae a ${FALLBACK}`,
