@@ -3,7 +3,14 @@
  * Proporciona funciones CRUD para transacciones de gastos organizadas por mes
  */
 
+import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
 import { createClient } from '@/lib/supabase/client';
+
+import {
+  resolveItemNameToId,
+  type BudgetItemRef,
+  type UnclassifiedExpense,
+} from './expenses-rollup';
 
 // Interfaces para gastos mensuales
 export interface ExpenseTransaction {
@@ -357,3 +364,125 @@ export async function hasExpenseDataForMonth(
     return false;
   }
 }
+
+/** Ítems del presupuesto de un mes (para dropdown y clasificador). */
+export async function getBudgetItemsForMonth(
+  monthYear: string,
+): Promise<BudgetItemRef[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Usuario no autenticado');
+
+  const { data, error } = await supabase.rpc('get_budget_items_for_month', {
+    p_user_id: user.id,
+    p_month_year: monthYear,
+  });
+  if (error) {
+    console.error('Error obteniendo ítems del mes:', error);
+    return [];
+  }
+  return (data || []).map(
+    (r: { item_id: string; item_name: string; category_name: string }) => ({
+      id: r.item_id,
+      name: r.item_name,
+      category_name: r.category_name,
+    }),
+  );
+}
+
+/** Gastos del mes sin ítem asignado. */
+export async function getUnclassifiedExpenses(
+  monthYear: string,
+): Promise<UnclassifiedExpense[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Usuario no autenticado');
+
+  const { data, error } = await supabase.rpc('get_unclassified_expenses', {
+    p_user_id: user.id,
+    p_month_year: monthYear,
+  });
+  if (error) {
+    console.error('Error obteniendo gastos sin clasificar:', error);
+    return [];
+  }
+  return data || [];
+}
+
+/** Asigna (o desasigna con null) un gasto a un ítem. source: 'ai' | 'manual'. */
+export async function assignExpenseToBudgetItem(
+  expenseId: string,
+  budgetItemId: string | null,
+  source: 'ai' | 'manual',
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Usuario no autenticado');
+
+  const { error } = await supabase.rpc('assign_expense_budget_item', {
+    p_user_id: user.id,
+    p_transaction_id: expenseId,
+    p_budget_item_id: budgetItemId,
+    p_source: source,
+  });
+  if (error) {
+    console.error('Error asignando gasto a ítem:', error);
+    throw new Error(`Error asignando gasto: ${error.message}`);
+  }
+}
+
+/**
+ * Clasifica UN gasto (por IA) dentro de su categoría y lo asigna si hay match.
+ * Acotado a la categoría del gasto; si no hay ítems en esa categoría, no hace nada.
+ */
+export async function classifyAndAssignExpense(
+  expenseId: string,
+  description: string,
+  categoryName: string,
+  monthYear: string,
+): Promise<void> {
+  try {
+    const items = await getBudgetItemsForMonth(monthYear);
+    const inCategory = items.filter(i => i.category_name === categoryName);
+    if (inCategory.length === 0) return; // OTROS/sin ítems -> queda sin clasificar
+
+    const [name] = await classifyExpensesToItems(
+      [{ description }],
+      inCategory.map(i => i.name),
+    );
+    const itemId = resolveItemNameToId(name, inCategory);
+    if (itemId) {
+      await assignExpenseToBudgetItem(expenseId, itemId, 'ai');
+    }
+  } catch (error) {
+    console.error('Error en classifyAndAssignExpense:', error);
+    // No relanzar: la clasificación es best-effort; el gasto queda sin asignar.
+  }
+}
+
+/** Clasifica en lote los gastos sin asignar de un mes (botón "Clasificar con IA"). */
+export async function classifyUnassignedForMonth(
+  monthYear: string,
+): Promise<number> {
+  const pending = await getUnclassifiedExpenses(monthYear);
+  let assigned = 0;
+  for (const exp of pending) {
+    await classifyAndAssignExpense(
+      exp.id,
+      exp.description,
+      exp.category_name,
+      monthYear,
+    );
+    assigned++;
+  }
+  return assigned;
+}
+
+export {
+  resolveItemNameToId,
+  type BudgetItemRef,
+  type UnclassifiedExpense,
+} from './expenses-rollup';
