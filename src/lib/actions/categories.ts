@@ -240,3 +240,111 @@ export async function deleteCategory(categoryId: string) {
     return { success: false, error: 'Error interno del servidor' };
   }
 }
+
+/**
+ * Crea un ítem por defecto (mismo nombre que la categoría) en el template del
+ * mes indicado, para que una categoría recién creada quede lista para clasificar
+ * gastos de inmediato (el panel y el clasificador trabajan a nivel de ítem).
+ */
+export async function createDefaultBudgetItemForCategory(
+  categoryId: string,
+  categoryName: string,
+  monthYear: string,
+) {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: 'Usuario no autenticado' };
+    }
+
+    // Obtener (o crear) el template del mes seleccionado
+    const { data: templateId, error: templateError } = await supabase.rpc(
+      'upsert_monthly_budget',
+      {
+        p_user_id: user.id,
+        p_month_year: monthYear,
+        p_template_name: undefined,
+      },
+    );
+
+    if (templateError || !templateId) {
+      console.error('Error obteniendo template del mes:', templateError);
+      return {
+        success: false,
+        error: 'No se pudo obtener el presupuesto del mes',
+      };
+    }
+
+    // Valores por defecto de clasificación, control y estado
+    const [classificationResult, controlResult, statusResult] =
+      await Promise.all([
+        supabase
+          .from('classifications')
+          .select('id')
+          .eq('is_active', true)
+          .order('name')
+          .limit(1)
+          .single(),
+        supabase
+          .from('controls')
+          .select('id')
+          .eq('is_active', true)
+          .order('name')
+          .limit(1)
+          .single(),
+        supabase
+          .from('budget_statuses')
+          .select('id')
+          .eq('name', 'Activo')
+          .single(),
+      ]);
+
+    if (
+      classificationResult.error ||
+      controlResult.error ||
+      statusResult.error
+    ) {
+      console.error('Error obteniendo valores por defecto:', {
+        classificationResult: classificationResult.error,
+        controlResult: controlResult.error,
+        statusResult: statusResult.error,
+      });
+      return {
+        success: false,
+        error: 'No se pudieron obtener los valores por defecto del ítem',
+      };
+    }
+
+    const { error: insertError } = await supabase.from('budget_items').insert({
+      user_id: user.id,
+      template_id: templateId,
+      category_id: categoryId,
+      classification_id: classificationResult.data.id,
+      control_id: controlResult.data.id,
+      status_id: statusResult.data.id,
+      name: categoryName,
+      budgeted_amount: 0,
+      real_amount: 0,
+      due_date: null,
+      deuda_id: null,
+      is_active: true,
+    });
+
+    if (insertError) {
+      console.error('Error creando ítem por defecto:', insertError);
+      return { success: false, error: 'No se pudo crear el ítem por defecto' };
+    }
+
+    revalidatePath('/presupuesto');
+    return { success: true };
+  } catch (error) {
+    console.error('Error en createDefaultBudgetItemForCategory:', error);
+    return { success: false, error: 'Error interno del servidor' };
+  }
+}

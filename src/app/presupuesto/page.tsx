@@ -644,6 +644,7 @@ export default function PresupuestoPage() {
         isOpen={showCategoryModal}
         onClose={() => setShowCategoryModal(false)}
         onCategoryCreated={handleCategoryCreated}
+        selectedMonth={selectedMonth}
       />
 
       {/* Modal de confirmación de eliminación */}

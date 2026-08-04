@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   createCategory,
+  createDefaultBudgetItemForCategory,
   type CreateCategoryInput,
 } from '@/lib/actions/categories';
 
@@ -40,12 +41,15 @@ interface CategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCategoryCreated?: () => void;
+  /** Mes seleccionado (YYYY-MM): donde se crea el ítem por defecto de la categoría. */
+  selectedMonth?: string;
 }
 
 export default function CategoryModal({
   isOpen,
   onClose,
   onCategoryCreated,
+  selectedMonth,
 }: CategoryModalProps) {
   const [isCreating, setIsCreating] = useState(false);
 
@@ -56,6 +60,24 @@ export default function CategoryModal({
       const result = await createCategory(data);
 
       if (result.success) {
+        // Crear un ítem por defecto con el mismo nombre para que la categoría
+        // quede lista para clasificar gastos de inmediato (el panel/clasificador
+        // trabajan a nivel de ítem, no de categoría).
+        const createdId = (result.data as { id?: string } | undefined)?.id;
+        if (createdId && selectedMonth) {
+          const itemResult = await createDefaultBudgetItemForCategory(
+            createdId,
+            data.name,
+            selectedMonth,
+          );
+          if (!itemResult.success) {
+            console.error(
+              'Categoría creada, pero falló el ítem por defecto:',
+              itemResult.error,
+            );
+          }
+        }
+
         toast.success('Categoría creada exitosamente', {
           description: `La categoría "${data.name}" ha sido agregada al presupuesto.`,
         });
