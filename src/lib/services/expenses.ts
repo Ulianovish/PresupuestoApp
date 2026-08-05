@@ -22,6 +22,7 @@ export interface ExpenseTransaction {
   account_name: string;
   place?: string;
   created_at: string;
+  budget_item_id?: string | null;
 }
 
 export interface ExpenseFormData {

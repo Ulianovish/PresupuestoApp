@@ -9,7 +9,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 import Button from '@/components/atoms/Button/Button';
-import { ExpenseTransaction } from '@/lib/services/expenses';
+import {
+  ExpenseTransaction,
+  type BudgetItemRef,
+} from '@/lib/services/expenses';
 
 interface ExpenseRowProps {
   transaction: ExpenseTransaction;
@@ -21,6 +24,13 @@ interface ExpenseRowProps {
     transactionId: string,
     categoryName: string,
   ) => Promise<void>;
+  /** Ítems del presupuesto del mes, para asignar el gasto a un ítem. */
+  budgetItems?: BudgetItemRef[];
+  /** Asigna el gasto a un ítem ('' = sin asignar). */
+  onAssignItem?: (
+    transactionId: string,
+    itemId: string,
+  ) => void | Promise<void>;
 }
 
 function InlineCombobox({
@@ -148,6 +158,8 @@ export default function ExpenseRow({
   onDelete,
   categories,
   onCategoryChange,
+  budgetItems,
+  onAssignItem,
 }: ExpenseRowProps) {
   const handleEdit = () => {
     onEdit(transaction);
@@ -175,6 +187,30 @@ export default function ExpenseRow({
           />
         ) : (
           <span className="text-blue-300">{transaction.category_name}</span>
+        )}
+      </td>
+
+      {/* Ítem de presupuesto — asignable/reasignable */}
+      <td className="px-4 py-2">
+        {budgetItems && budgetItems.length > 0 && onAssignItem ? (
+          <select
+            value={transaction.budget_item_id ?? ''}
+            onChange={e => onAssignItem(transaction.id, e.target.value)}
+            className={`bg-slate-700/60 border rounded-lg text-xs px-2 py-1 max-w-[190px] ${
+              transaction.budget_item_id
+                ? 'border-slate-600 text-white'
+                : 'border-red-500/50 text-red-300'
+            }`}
+          >
+            <option value="">Sin asignar</option>
+            {budgetItems.map(it => (
+              <option key={it.id} value={it.id}>
+                {it.category_name} · {it.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-gray-400 text-xs">—</span>
         )}
       </td>
 

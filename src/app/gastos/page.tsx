@@ -9,7 +9,7 @@
  */
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -32,6 +32,9 @@ import {
   formatCurrency,
   formatMonthName,
   ExpenseTransaction,
+  getBudgetItemsForMonth,
+  assignExpenseToBudgetItem,
+  type BudgetItemRef,
 } from '@/lib/services/expenses';
 
 // Mapa de palabras clave para auto-categorizar gastos por descripción
@@ -161,6 +164,32 @@ export default function GastosPage() {
   // Cargar categorías dinámicas desde la BD
   const { categories: budgetCategories } = useCategories();
   const categoryNames = budgetCategories.map(c => c.name.toUpperCase());
+
+  // Ítems del presupuesto del mes, para asignar cada gasto a un ítem
+  const [budgetItems, setBudgetItems] = useState<BudgetItemRef[]>([]);
+  useEffect(() => {
+    let active = true;
+    getBudgetItemsForMonth(selectedMonth)
+      .then(items => {
+        if (active) setBudgetItems(items);
+      })
+      .catch(() => {
+        if (active) setBudgetItems([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedMonth]);
+
+  const handleAssignItem = async (transactionId: string, itemId: string) => {
+    try {
+      await assignExpenseToBudgetItem(transactionId, itemId || null, 'manual');
+      await refreshExpenses();
+    } catch (err) {
+      console.error('Error asignando ítem al gasto:', err);
+      toast.error('No se pudo asignar el ítem al gasto');
+    }
+  };
 
   // Estado y ref para importar Excel
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -597,6 +626,8 @@ export default function GastosPage() {
             onCategoryChange={async (id, categoryName) => {
               await updateExpense(id, { category_name: categoryName });
             }}
+            budgetItems={budgetItems}
+            onAssignItem={handleAssignItem}
           />
         ) : undefined
       }

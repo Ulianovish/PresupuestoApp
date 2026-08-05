@@ -36,6 +36,7 @@ import ExpenseRow from '@/components/molecules/ExpenseRow/ExpenseRow';
 import {
   ExpenseTransaction,
   MonthlyExpenseData,
+  type BudgetItemRef,
 } from '@/lib/services/expenses';
 
 interface ExpenseTableProps {
@@ -51,6 +52,11 @@ interface ExpenseTableProps {
     transactionId: string,
     categoryName: string,
   ) => Promise<void>;
+  budgetItems?: BudgetItemRef[];
+  onAssignItem?: (
+    transactionId: string,
+    itemId: string,
+  ) => void | Promise<void>;
 }
 
 export default function ExpenseTable({
@@ -63,6 +69,8 @@ export default function ExpenseTable({
   onAddFirst,
   categories,
   onCategoryChange,
+  budgetItems,
+  onAssignItem,
 }: ExpenseTableProps) {
   return (
     <Card variant="glass" className="p-6">
@@ -98,6 +106,9 @@ export default function ExpenseTable({
                     Categoría
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
+                    Ítem presupuesto
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
                     Cuenta
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
@@ -123,6 +134,8 @@ export default function ExpenseTable({
                     onDelete={onDelete}
                     categories={categories}
                     onCategoryChange={onCategoryChange}
+                    budgetItems={budgetItems}
+                    onAssignItem={onAssignItem}
                   />
                 ))}
               </tbody>
