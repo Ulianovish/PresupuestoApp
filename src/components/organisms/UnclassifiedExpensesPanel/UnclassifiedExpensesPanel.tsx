@@ -28,6 +28,12 @@ export default function UnclassifiedExpensesPanel({
   const [expenses, setExpenses] = useState<UnclassifiedExpense[]>([]);
   const [items, setItems] = useState<BudgetItemRef[]>([]);
   const [isBusy, setIsBusy] = useState(false);
+  // Selección manual por gasto (sobrescribe el ítem sugerido por categoría)
+  const [selected, setSelected] = useState<Record<string, string>>({});
+
+  /** Ítem sugerido por defecto: el primero de la misma categoría del gasto. */
+  const suggestedItemId = (categoryName: string) =>
+    items.find(i => i.category_name === categoryName)?.id ?? '';
 
   const load = useCallback(async () => {
     const [exp, its] = await Promise.all([
@@ -101,20 +107,36 @@ export default function UnclassifiedExpensesPanel({
                 {exp.category_name} · {formatCurrency(Number(exp.amount))}
               </p>
             </div>
-            <select
-              defaultValue=""
-              onChange={e => handleAssign(exp.id, e.target.value)}
-              className="bg-slate-700/60 border border-slate-600 rounded-lg text-white text-sm px-2 py-1"
-            >
-              <option value="" disabled>
-                Asignar a ítem…
-              </option>
-              {items.map(it => (
-                <option key={it.id} value={it.id}>
-                  {it.category_name} · {it.name}
-                </option>
-              ))}
-            </select>
+            {(() => {
+              const value =
+                selected[exp.id] ?? suggestedItemId(exp.category_name);
+              return (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <select
+                    value={value}
+                    onChange={e =>
+                      setSelected(s => ({ ...s, [exp.id]: e.target.value }))
+                    }
+                    className="bg-slate-700/60 border border-slate-600 rounded-lg text-white text-sm px-2 py-1 max-w-[220px]"
+                  >
+                    <option value="">Sin asignar</option>
+                    {items.map(it => (
+                      <option key={it.id} value={it.id}>
+                        {it.category_name} · {it.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleAssign(exp.id, value)}
+                    disabled={!value}
+                  >
+                    Asignar
+                  </Button>
+                </div>
+              );
+            })()}
           </div>
         ))}
       </div>
