@@ -31,9 +31,16 @@ export default function UnclassifiedExpensesPanel({
   // Selección manual por gasto (sobrescribe el ítem sugerido por categoría)
   const [selected, setSelected] = useState<Record<string, string>>({});
 
-  /** Ítem sugerido por defecto: el primero de la misma categoría del gasto. */
+  /** Ítem sugerido por defecto: el primero de la misma categoría del gasto
+   * (comparando sin distinguir mayúsculas ni acentos). */
+  const normalize = (s: string) =>
+    s
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase();
   const suggestedItemId = (categoryName: string) =>
-    items.find(i => i.category_name === categoryName)?.id ?? '';
+    items.find(i => normalize(i.category_name) === normalize(categoryName))
+      ?.id ?? '';
 
   const load = useCallback(async () => {
     const [exp, its] = await Promise.all([

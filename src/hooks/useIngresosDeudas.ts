@@ -42,7 +42,7 @@ interface UseIngresosDeudasReturn {
   agregarIngreso: (nuevoIngreso: NuevoIngreso) => Promise<void>;
 
   // Funciones para deudas
-  agregarDeuda: (nuevaDeuda: NuevaDeuda) => Promise<void>;
+  agregarDeuda: (nuevaDeuda: NuevaDeuda) => Promise<Deuda>;
   editarDeuda: (
     id: string,
     datos: Partial<NuevaDeuda> & { pagada?: boolean },
@@ -195,7 +195,7 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
       const nuevoResumen = await obtenerResumenFinanciero();
       setResumen(nuevoResumen);
 
-      // console.log('Deuda agregada exitosamente:', deudaCreada);
+      return deudaCreada;
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Error al agregar deuda';

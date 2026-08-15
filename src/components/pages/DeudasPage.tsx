@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useIngresosDeudas } from '@/hooks/useIngresosDeudas';
+import { createBudgetItemsForDeuda } from '@/lib/actions/deudas-budget';
 import {
   actualizarDeuda,
   eliminarDeuda,
@@ -179,8 +180,16 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
         await actualizarDeuda(editingId, deudaData);
         toast.success('Deuda actualizada');
       } else {
-        await agregarDeuda(deudaData);
+        const nuevaDeuda = await agregarDeuda(deudaData);
         toast.success('Deuda agregada');
+        // Crear el ítem de presupuesto (categoría DEUDAS) para poder clasificar
+        // gastos hacia esta deuda. Best-effort: no bloquea si falla.
+        if (nuevaDeuda?.id) {
+          const itemName = nuevaDeuda.acreedor
+            ? `${nuevaDeuda.descripcion} · ${nuevaDeuda.acreedor}`
+            : nuevaDeuda.descripcion;
+          await createBudgetItemsForDeuda(nuevaDeuda.id, itemName);
+        }
       }
       setModalOpen(false);
       resetForm();
