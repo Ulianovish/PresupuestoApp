@@ -28,19 +28,9 @@ export default function UnclassifiedExpensesPanel({
   const [expenses, setExpenses] = useState<UnclassifiedExpense[]>([]);
   const [items, setItems] = useState<BudgetItemRef[]>([]);
   const [isBusy, setIsBusy] = useState(false);
-  // Selección manual por gasto (sobrescribe el ítem sugerido por categoría)
+  const [isAssigning, setIsAssigning] = useState(false);
+  // Selección manual por gasto (el ítem elegido en el desplegable, aún sin asignar)
   const [selected, setSelected] = useState<Record<string, string>>({});
-
-  /** Ítem sugerido por defecto: el primero de la misma categoría del gasto
-   * (comparando sin distinguir mayúsculas ni acentos). */
-  const normalize = (s: string) =>
-    s
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
-      .toLowerCase();
-  const suggestedItemId = (categoryName: string) =>
-    items.find(i => normalize(i.category_name) === normalize(categoryName))
-      ?.id ?? '';
 
   const load = useCallback(async () => {
     const [exp, its] = await Promise.all([
@@ -55,11 +45,25 @@ export default function UnclassifiedExpensesPanel({
     load();
   }, [load]);
 
-  const handleAssign = async (expenseId: string, itemId: string) => {
-    if (!itemId) return;
-    await assignExpenseToBudgetItem(expenseId, itemId, 'manual');
-    await load();
-    onChanged?.();
+  // Asigna en lote todos los gastos con un ítem elegido en el desplegable.
+  // Los que queden en "Sin asignar" permanecen pendientes.
+  const handleAssignSelected = async () => {
+    const entries = expenses
+      .map(exp => [exp.id, selected[exp.id]] as const)
+      .filter(([, itemId]) => !!itemId);
+    if (entries.length === 0) return;
+
+    setIsAssigning(true);
+    try {
+      for (const [expenseId, itemId] of entries) {
+        await assignExpenseToBudgetItem(expenseId, itemId, 'manual');
+      }
+      setSelected({});
+      await load();
+      onChanged?.();
+    } finally {
+      setIsAssigning(false);
+    }
   };
 
   const handleClassifyAll = async () => {
@@ -76,29 +80,42 @@ export default function UnclassifiedExpensesPanel({
   if (expenses.length === 0) return null;
 
   const total = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const selectedCount = expenses.filter(e => selected[e.id]).length;
 
   return (
     <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/5 p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2 text-red-300">
           <AlertTriangle className="w-4 h-4" />
           <span className="font-semibold">
             Gastos sin clasificar ({expenses.length})
           </span>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleClassifyAll}
-          disabled={isBusy}
-        >
-          {isBusy ? 'Clasificando...' : 'Clasificar con IA'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleClassifyAll}
+            disabled={isBusy || isAssigning}
+          >
+            {isBusy ? 'Clasificando...' : 'Clasificar con IA'}
+          </Button>
+          <Button
+            size="sm"
+            variant="gradient"
+            onClick={handleAssignSelected}
+            disabled={isAssigning || isBusy || selectedCount === 0}
+          >
+            {isAssigning ? 'Asignando...' : `Asignar (${selectedCount})`}
+          </Button>
+        </div>
       </div>
 
       <p className="text-xs text-red-300/80 mb-3">
-        Estos gastos aún NO suman en el Presupuesto Real. Asígnalos a un ítem
-        para que se cuenten. Total sin contar:{' '}
+        Elige el ítem de cada gasto que quieras clasificar y presiona{' '}
+        <span className="font-semibold">Asignar</span> para asignar todos los
+        seleccionados; los que dejes en “Sin asignar” quedan pendientes. Estos
+        gastos aún NO suman en el Presupuesto Real. Total sin contar:{' '}
         <span className="font-semibold">{formatCurrency(total)}</span>
       </p>
 
@@ -114,36 +131,20 @@ export default function UnclassifiedExpensesPanel({
                 {exp.category_name} · {formatCurrency(Number(exp.amount))}
               </p>
             </div>
-            {(() => {
-              const value =
-                selected[exp.id] ?? suggestedItemId(exp.category_name);
-              return (
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <select
-                    value={value}
-                    onChange={e =>
-                      setSelected(s => ({ ...s, [exp.id]: e.target.value }))
-                    }
-                    className="bg-slate-700/60 border border-slate-600 rounded-lg text-white text-sm px-2 py-1 max-w-[220px]"
-                  >
-                    <option value="">Sin asignar</option>
-                    {items.map(it => (
-                      <option key={it.id} value={it.id}>
-                        {it.category_name} · {it.name}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleAssign(exp.id, value)}
-                    disabled={!value}
-                  >
-                    Asignar
-                  </Button>
-                </div>
-              );
-            })()}
+            <select
+              value={selected[exp.id] ?? ''}
+              onChange={e =>
+                setSelected(s => ({ ...s, [exp.id]: e.target.value }))
+              }
+              className="bg-slate-700/60 border border-slate-600 rounded-lg text-white text-sm px-2 py-1 max-w-[240px] flex-shrink-0"
+            >
+              <option value="">Sin asignar</option>
+              {items.map(it => (
+                <option key={it.id} value={it.id}>
+                  {it.category_name} · {it.name}
+                </option>
+              ))}
+            </select>
           </div>
         ))}
       </div>
