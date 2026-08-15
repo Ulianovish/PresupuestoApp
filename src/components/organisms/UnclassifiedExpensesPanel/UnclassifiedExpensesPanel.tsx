@@ -29,8 +29,23 @@ export default function UnclassifiedExpensesPanel({
   const [items, setItems] = useState<BudgetItemRef[]>([]);
   const [isBusy, setIsBusy] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
-  // Selección manual por gasto (el ítem elegido en el desplegable, aún sin asignar)
+  // Selección por gasto (el ítem elegido en el desplegable, aún sin asignar).
+  // Si no hay entrada para un gasto, se usa el ítem sugerido por su categoría.
   const [selected, setSelected] = useState<Record<string, string>>({});
+
+  /** Ítem sugerido por defecto: el primero de la misma categoría del gasto
+   * (comparando sin distinguir mayúsculas ni acentos). */
+  const normalize = (s: string) =>
+    s
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase();
+  const suggestedItemId = (categoryName: string) =>
+    items.find(i => normalize(i.category_name) === normalize(categoryName))
+      ?.id ?? '';
+  /** Valor efectivo del desplegable: lo elegido, o la sugerencia por categoría. */
+  const effectiveItemId = (exp: UnclassifiedExpense) =>
+    selected[exp.id] ?? suggestedItemId(exp.category_name);
 
   const load = useCallback(async () => {
     const [exp, its] = await Promise.all([
@@ -49,7 +64,7 @@ export default function UnclassifiedExpensesPanel({
   // Los que queden en "Sin asignar" permanecen pendientes.
   const handleAssignSelected = async () => {
     const entries = expenses
-      .map(exp => [exp.id, selected[exp.id]] as const)
+      .map(exp => [exp.id, effectiveItemId(exp)] as const)
       .filter(([, itemId]) => !!itemId);
     if (entries.length === 0) return;
 
@@ -80,7 +95,7 @@ export default function UnclassifiedExpensesPanel({
   if (expenses.length === 0) return null;
 
   const total = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-  const selectedCount = expenses.filter(e => selected[e.id]).length;
+  const selectedCount = expenses.filter(e => effectiveItemId(e)).length;
 
   return (
     <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/5 p-4">
@@ -112,11 +127,11 @@ export default function UnclassifiedExpensesPanel({
       </div>
 
       <p className="text-xs text-red-300/80 mb-3">
-        Elige el ítem de cada gasto que quieras clasificar y presiona{' '}
-        <span className="font-semibold">Asignar</span> para asignar todos los
-        seleccionados; los que dejes en “Sin asignar” quedan pendientes. Estos
-        gastos aún NO suman en el Presupuesto Real. Total sin contar:{' '}
-        <span className="font-semibold">{formatCurrency(total)}</span>
+        Cada gasto viene con un ítem sugerido de su categoría. Ajusta el que
+        quieras y presiona <span className="font-semibold">Asignar</span> para
+        asignar todos de una vez; los que dejes en “Sin asignar” quedan
+        pendientes. Estos gastos aún NO suman en el Presupuesto Real. Total sin
+        contar: <span className="font-semibold">{formatCurrency(total)}</span>
       </p>
 
       <div className="space-y-2">
@@ -132,7 +147,7 @@ export default function UnclassifiedExpensesPanel({
               </p>
             </div>
             <select
-              value={selected[exp.id] ?? ''}
+              value={effectiveItemId(exp)}
               onChange={e =>
                 setSelected(s => ({ ...s, [exp.id]: e.target.value }))
               }
