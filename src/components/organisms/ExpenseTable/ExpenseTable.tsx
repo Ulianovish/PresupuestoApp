@@ -52,6 +52,11 @@ interface ExpenseTableProps {
     transactionId: string,
     categoryName: string,
   ) => Promise<void>;
+  accounts?: string[];
+  onAccountChange?: (
+    transactionId: string,
+    accountName: string,
+  ) => Promise<void>;
   budgetItems?: BudgetItemRef[];
   onAssignItem?: (
     transactionId: string,
@@ -69,6 +74,8 @@ export default function ExpenseTable({
   onAddFirst,
   categories,
   onCategoryChange,
+  accounts,
+  onAccountChange,
   budgetItems,
   onAssignItem,
 }: ExpenseTableProps) {
@@ -134,6 +141,8 @@ export default function ExpenseTable({
                     onDelete={onDelete}
                     categories={categories}
                     onCategoryChange={onCategoryChange}
+                    accounts={accounts}
+                    onAccountChange={onAccountChange}
                     budgetItems={budgetItems}
                     onAssignItem={onAssignItem}
                   />

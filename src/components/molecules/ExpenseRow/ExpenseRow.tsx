@@ -24,6 +24,12 @@ interface ExpenseRowProps {
     transactionId: string,
     categoryName: string,
   ) => Promise<void>;
+  /** Cuentas disponibles, para editar la cuenta inline. */
+  accounts?: string[];
+  onAccountChange?: (
+    transactionId: string,
+    accountName: string,
+  ) => Promise<void>;
   /** Ítems del presupuesto del mes, para asignar el gasto a un ítem. */
   budgetItems?: BudgetItemRef[];
   /** Asigna el gasto a un ítem ('' = sin asignar). */
@@ -158,6 +164,8 @@ export default function ExpenseRow({
   onDelete,
   categories,
   onCategoryChange,
+  accounts,
+  onAccountChange,
   budgetItems,
   onAssignItem,
 }: ExpenseRowProps) {
@@ -214,8 +222,18 @@ export default function ExpenseRow({
         )}
       </td>
 
-      {/* Cuenta */}
-      <td className="px-4 py-2 text-white">{transaction.account_name}</td>
+      {/* Cuenta — editable inline si hay cuentas y callback */}
+      <td className="px-4 py-2">
+        {accounts && accounts.length > 0 && onAccountChange ? (
+          <InlineCombobox
+            value={transaction.account_name}
+            options={accounts}
+            onSelect={name => onAccountChange(transaction.id, name)}
+          />
+        ) : (
+          <span className="text-white">{transaction.account_name}</span>
+        )}
+      </td>
 
       {/* Lugar */}
       <td className="px-4 py-2 text-white">{transaction.place || '-'}</td>

@@ -34,6 +34,7 @@ import {
   ExpenseTransaction,
   getBudgetItemsForMonth,
   assignExpenseToBudgetItem,
+  getUserAccounts,
   type BudgetItemRef,
 } from '@/lib/services/expenses';
 
@@ -190,6 +191,22 @@ export default function GastosPage() {
       toast.error('No se pudo asignar el ítem al gasto');
     }
   };
+
+  // Cuentas del usuario, para editar la cuenta de cada gasto inline
+  const [accountNames, setAccountNames] = useState<string[]>([]);
+  useEffect(() => {
+    let active = true;
+    getUserAccounts()
+      .then(accts => {
+        if (active) setAccountNames(accts.map(a => a.name));
+      })
+      .catch(() => {
+        if (active) setAccountNames([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Estado y ref para importar Excel
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -625,6 +642,10 @@ export default function GastosPage() {
             categories={categoryNames}
             onCategoryChange={async (id, categoryName) => {
               await updateExpense(id, { category_name: categoryName });
+            }}
+            accounts={accountNames}
+            onAccountChange={async (id, accountName) => {
+              await updateExpense(id, { account_name: accountName });
             }}
             budgetItems={budgetItems}
             onAssignItem={handleAssignItem}
