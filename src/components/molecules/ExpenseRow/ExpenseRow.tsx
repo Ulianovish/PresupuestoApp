@@ -157,6 +157,19 @@ function InlineCombobox({
   );
 }
 
+/** Agrupa los ítems por categoría, conservando el orden de llegada. */
+function groupItemsByCategory(
+  items: BudgetItemRef[],
+): Array<[string, BudgetItemRef[]]> {
+  const groups = new Map<string, BudgetItemRef[]>();
+  for (const it of items) {
+    const arr = groups.get(it.category_name) ?? [];
+    arr.push(it);
+    groups.set(it.category_name, arr);
+  }
+  return Array.from(groups.entries());
+}
+
 export default function ExpenseRow({
   transaction,
   formatCurrency,
@@ -211,10 +224,14 @@ export default function ExpenseRow({
             }`}
           >
             <option value="">Sin asignar</option>
-            {budgetItems.map(it => (
-              <option key={it.id} value={it.id}>
-                {it.category_name} · {it.name}
-              </option>
+            {groupItemsByCategory(budgetItems).map(([cat, its]) => (
+              <optgroup key={cat} label={cat}>
+                {its.map(it => (
+                  <option key={it.id} value={it.id}>
+                    {it.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         ) : (
