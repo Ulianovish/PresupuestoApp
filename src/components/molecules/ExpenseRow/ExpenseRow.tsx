@@ -37,6 +37,8 @@ interface ExpenseRowProps {
     transactionId: string,
     itemId: string,
   ) => void | Promise<void>;
+  /** Abre el modal para crear un ítem nuevo y asignárselo a este gasto. */
+  onCreateItem?: (transaction: ExpenseTransaction) => void;
 }
 
 function InlineCombobox({
@@ -181,6 +183,7 @@ export default function ExpenseRow({
   onAccountChange,
   budgetItems,
   onAssignItem,
+  onCreateItem,
 }: ExpenseRowProps) {
   const handleEdit = () => {
     onEdit(transaction);
@@ -216,7 +219,13 @@ export default function ExpenseRow({
         {budgetItems && budgetItems.length > 0 && onAssignItem ? (
           <select
             value={transaction.budget_item_id ?? ''}
-            onChange={e => onAssignItem(transaction.id, e.target.value)}
+            onChange={e => {
+              if (e.target.value === '__create__') {
+                onCreateItem?.(transaction);
+                return;
+              }
+              onAssignItem(transaction.id, e.target.value);
+            }}
             className={`bg-slate-700/60 border rounded-lg text-xs px-2 py-1 max-w-[190px] ${
               transaction.budget_item_id
                 ? 'border-slate-600 text-white'
@@ -224,6 +233,9 @@ export default function ExpenseRow({
             }`}
           >
             <option value="">Sin asignar</option>
+            {onCreateItem && (
+              <option value="__create__">➕ Crear nuevo ítem…</option>
+            )}
             {groupItemsByCategory(budgetItems).map(([cat, its]) => (
               <optgroup key={cat} label={cat}>
                 {its.map(it => (

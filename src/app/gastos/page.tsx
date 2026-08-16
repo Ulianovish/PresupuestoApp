@@ -9,13 +9,14 @@
  */
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
 import ConfirmModal from '@/components/atoms/ConfirmModal/ConfirmModal';
 import ExpenseFloatingButton from '@/components/molecules/ExpenseFloatingButton/ExpenseFloatingButton';
+import CreateBudgetItemModal from '@/components/organisms/CreateBudgetItemModal/CreateBudgetItemModal';
 import ExpenseHeader from '@/components/organisms/ExpenseHeader/ExpenseHeader';
 import ExpenseModal from '@/components/organisms/ExpenseModal/ExpenseModal';
 import ExpenseStatusPanels from '@/components/organisms/ExpenseStatusPanels/ExpenseStatusPanels';
@@ -25,6 +26,7 @@ import PendingInvoicesPanel from '@/components/organisms/PendingInvoicesPanel/Pe
 import ExpensePageTemplate from '@/components/templates/ExpensePageTemplate/ExpensePageTemplate';
 import { useCategories } from '@/hooks/useCategories';
 import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
+import { createBudgetItemInMonth } from '@/lib/actions/categories';
 import {
   ACCOUNT_TYPES,
   createExpenseTransaction,
@@ -168,19 +170,16 @@ export default function GastosPage() {
 
   // Ítems del presupuesto del mes, para asignar cada gasto a un ítem
   const [budgetItems, setBudgetItems] = useState<BudgetItemRef[]>([]);
-  useEffect(() => {
-    let active = true;
-    getBudgetItemsForMonth(selectedMonth)
-      .then(items => {
-        if (active) setBudgetItems(items);
-      })
-      .catch(() => {
-        if (active) setBudgetItems([]);
-      });
-    return () => {
-      active = false;
-    };
+  const loadBudgetItems = useCallback(async () => {
+    try {
+      setBudgetItems(await getBudgetItemsForMonth(selectedMonth));
+    } catch {
+      setBudgetItems([]);
+    }
   }, [selectedMonth]);
+  useEffect(() => {
+    loadBudgetItems();
+  }, [loadBudgetItems]);
 
   const handleAssignItem = async (transactionId: string, itemId: string) => {
     try {
@@ -189,6 +188,37 @@ export default function GastosPage() {
     } catch (err) {
       console.error('Error asignando ítem al gasto:', err);
       toast.error('No se pudo asignar el ítem al gasto');
+    }
+  };
+
+  // Modal para crear un ítem nuevo y asignárselo a un gasto
+  const [createItemFor, setCreateItemFor] = useState<ExpenseTransaction | null>(
+    null,
+  );
+
+  const handleCreateAndAssign = async (categoryId: string, name: string) => {
+    if (!createItemFor) return;
+    try {
+      const result = await createBudgetItemInMonth(
+        categoryId,
+        name,
+        selectedMonth,
+      );
+      if (!result.success || !result.itemId) {
+        toast.error(result.error || 'No se pudo crear el ítem');
+        return;
+      }
+      await assignExpenseToBudgetItem(
+        createItemFor.id,
+        result.itemId,
+        'manual',
+      );
+      await Promise.all([loadBudgetItems(), refreshExpenses()]);
+      toast.success('Ítem creado y asignado');
+      setCreateItemFor(null);
+    } catch (err) {
+      console.error('Error creando/asignando ítem:', err);
+      toast.error('No se pudo crear el ítem');
     }
   };
 
@@ -649,6 +679,7 @@ export default function GastosPage() {
             }}
             budgetItems={budgetItems}
             onAssignItem={handleAssignItem}
+            onCreateItem={setCreateItemFor}
           />
         ) : undefined
       }
@@ -689,6 +720,22 @@ export default function GastosPage() {
         onConfirm={executeDeleteExpense}
         title="Eliminar gasto"
         message={`¿Estás seguro de que deseas eliminar "${confirmDelete.name}"? Esta acción no se puede deshacer.`}
+      />
+
+      {/* Modal para crear un ítem de presupuesto y asignarlo al gasto */}
+      <CreateBudgetItemModal
+        isOpen={!!createItemFor}
+        onClose={() => setCreateItemFor(null)}
+        categories={budgetCategories.map(c => ({ id: c.id, name: c.name }))}
+        defaultCategoryId={
+          budgetCategories.find(
+            c =>
+              c.name.toUpperCase() ===
+              (createItemFor?.category_name || '').toUpperCase(),
+          )?.id
+        }
+        defaultName={createItemFor?.description || ''}
+        onCreate={handleCreateAndAssign}
       />
     </ExpensePageTemplate>
   );

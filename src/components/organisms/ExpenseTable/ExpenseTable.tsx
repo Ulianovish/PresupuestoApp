@@ -62,6 +62,7 @@ interface ExpenseTableProps {
     transactionId: string,
     itemId: string,
   ) => void | Promise<void>;
+  onCreateItem?: (transaction: ExpenseTransaction) => void;
 }
 
 export default function ExpenseTable({
@@ -78,6 +79,7 @@ export default function ExpenseTable({
   onAccountChange,
   budgetItems,
   onAssignItem,
+  onCreateItem,
 }: ExpenseTableProps) {
   return (
     <Card variant="glass" className="p-6">
@@ -145,6 +147,7 @@ export default function ExpenseTable({
                     onAccountChange={onAccountChange}
                     budgetItems={budgetItems}
                     onAssignItem={onAssignItem}
+                    onCreateItem={onCreateItem}
                   />
                 ))}
               </tbody>
