@@ -159,6 +159,37 @@ function InlineCombobox({
   );
 }
 
+/** Normaliza texto para comparar sin acentos ni mayúsculas. */
+function normalizeText(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+}
+
+/**
+ * Ítems visibles en el desplegable: solo los de la categoría del gasto.
+ * Si esa categoría no tiene ítems, se muestran todos (para no dejar al usuario
+ * sin opciones). El ítem ya asignado siempre se incluye, aunque sea de otra
+ * categoría, para que el selector pueda mostrarlo.
+ */
+function visibleItemsForExpense(
+  items: BudgetItemRef[],
+  categoryName: string,
+  assignedItemId?: string | null,
+): BudgetItemRef[] {
+  const inCategory = items.filter(
+    i => normalizeText(i.category_name) === normalizeText(categoryName || ''),
+  );
+  const base = inCategory.length > 0 ? inCategory : items;
+
+  if (assignedItemId && !base.some(i => i.id === assignedItemId)) {
+    const assigned = items.find(i => i.id === assignedItemId);
+    if (assigned) return [assigned, ...base];
+  }
+  return base;
+}
+
 /** Agrupa los ítems por categoría, conservando el orden de llegada. */
 function groupItemsByCategory(
   items: BudgetItemRef[],
@@ -236,7 +267,13 @@ export default function ExpenseRow({
             {onCreateItem && (
               <option value="__create__">➕ Crear nuevo ítem…</option>
             )}
-            {groupItemsByCategory(budgetItems).map(([cat, its]) => (
+            {groupItemsByCategory(
+              visibleItemsForExpense(
+                budgetItems,
+                transaction.category_name,
+                transaction.budget_item_id,
+              ),
+            ).map(([cat, its]) => (
               <optgroup key={cat} label={cat}>
                 {its.map(it => (
                   <option key={it.id} value={it.id}>
