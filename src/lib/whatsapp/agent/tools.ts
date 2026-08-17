@@ -24,6 +24,36 @@ function normalizar(s: string): string {
     .trim();
 }
 
+export type ResolucionCuenta =
+  | { kind: 'ok'; cuenta: string }
+  | { kind: 'ambigua'; candidatas: string[] }
+  | { kind: 'no-existe' };
+
+/**
+ * Resuelve el texto de cuenta que propone el modelo contra las cuentas reales del usuario.
+ *
+ * 1. Coincidencia exacta primero: si el texto coincide carácter por carácter con una
+ *    cuenta, esa gana sin ambigüedad posible (el caso común, porque el prompt le pasa
+ *    los nombres exactos).
+ * 2. Si no hay exacta, coincidencia normalizada (ignora mayúsculas, tildes y espacios).
+ * 3. Si la normalización coincide con más de una cuenta (p. ej. "Davivienda" y
+ *    "DAVIVIENDA" normalizan igual), no se elige ninguna: es ambigua y hay que
+ *    preguntarle al usuario.
+ */
+export function resolverCuenta(
+  texto: string,
+  accounts: string[],
+): ResolucionCuenta {
+  const exacta = accounts.find(a => a === texto);
+  if (exacta) return { kind: 'ok', cuenta: exacta };
+
+  const norm = normalizar(texto);
+  const candidatas = accounts.filter(a => normalizar(a) === norm);
+  if (candidatas.length === 1) return { kind: 'ok', cuenta: candidatas[0] };
+  if (candidatas.length > 1) return { kind: 'ambigua', candidatas };
+  return { kind: 'no-existe' };
+}
+
 export function validateGasto(
   input: GastoInput,
   accounts: string[],
@@ -55,16 +85,20 @@ export function validateGasto(
 
   let cuenta: string | undefined;
   if (input.cuenta) {
-    const encontrada = accounts.find(
-      a => normalizar(a) === normalizar(input.cuenta as string),
-    );
-    if (!encontrada) {
+    const resolucion = resolverCuenta(input.cuenta, accounts);
+    if (resolucion.kind === 'no-existe') {
       return {
         ok: false,
         error: `La cuenta "${input.cuenta}" no existe. Las cuentas del usuario son: ${accounts.join(', ')}. Preguntale cuál usó.`,
       };
     }
-    cuenta = encontrada;
+    if (resolucion.kind === 'ambigua') {
+      return {
+        ok: false,
+        error: `La cuenta "${input.cuenta}" es ambigua: puede ser ${resolucion.candidatas.join(' o ')}. Preguntale al usuario cuál.`,
+      };
+    }
+    cuenta = resolucion.cuenta;
   }
 
   return {

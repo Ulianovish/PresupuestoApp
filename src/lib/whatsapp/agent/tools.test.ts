@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { TOOL_DEFINITIONS, validateGasto } from './tools';
+import { TOOL_DEFINITIONS, resolverCuenta, validateGasto } from './tools';
 
 const CUENTAS = ['Efectivo', 'Davivienda Crédito', 'Nequi'];
 
@@ -57,6 +57,44 @@ describe('validateGasto', () => {
       CUENTAS,
     );
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('resolverCuenta', () => {
+  const CUENTAS_AMBIGUAS = ['Davivienda', 'DAVIVIENDA'];
+
+  it('la coincidencia exacta gana aunque otra cuenta normalice igual', () => {
+    const r = resolverCuenta('Davivienda', CUENTAS_AMBIGUAS);
+    expect(r).toEqual({ kind: 'ok', cuenta: 'Davivienda' });
+  });
+
+  it('sin coincidencia exacta, usa la coincidencia normalizada única', () => {
+    const r = resolverCuenta('davivienda credito', CUENTAS);
+    expect(r).toEqual({ kind: 'ok', cuenta: 'Davivienda Crédito' });
+  });
+
+  it('si normaliza a más de una cuenta, no elige ninguna: es ambigua', () => {
+    const r = resolverCuenta('davivienda', CUENTAS_AMBIGUAS);
+    expect(r.kind).toBe('ambigua');
+    if (r.kind === 'ambigua') {
+      expect(r.candidatas).toEqual(['Davivienda', 'DAVIVIENDA']);
+    }
+  });
+});
+
+describe('validateGasto — ambigüedad de cuentas', () => {
+  const CUENTAS_AMBIGUAS = ['Davivienda', 'DAVIVIENDA'];
+
+  it('no elige ninguna cuenta ambigua, y el mensaje nombra las candidatas', () => {
+    const r = validateGasto(
+      { monto: 1000, descripcion: 'x', cuenta: 'davivienda' },
+      CUENTAS_AMBIGUAS,
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toContain('Davivienda');
+      expect(r.error).toContain('DAVIVIENDA');
+    }
   });
 });
 
