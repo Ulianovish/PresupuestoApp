@@ -766,7 +766,7 @@ export type Validation<T> =
 function normalizar(s: string): string {
   return s
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')  // quita tildes
     .toLowerCase()
     .trim();
 }
@@ -1721,7 +1721,7 @@ Agregar a `src/lib/whatsapp/handle-image.ts`:
 function normalizar(s: string): string {
   return s
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')  // quita tildes
     .toLowerCase();
 }
 
@@ -2017,6 +2017,248 @@ vercel inspect <url> | grep status   # DEBE decir "● Ready"
 Mandarle un CUFE real al bot: debe procesarlo, **preguntar la cuenta**,
 registrarlo al responder, y aparecer en Gastos con su ítem de presupuesto
 asignado. Nunca se probó el CUFE por WhatsApp de punta a punta.
+
+---
+
+### Task 10: Corregir el último gasto y consultar gastos
+
+Las Tasks 6 y 7 dejaron `correctLast` y `queryExpenses` como stubs. Sin esto,
+dos de las cuatro capacidades del agente serían no-ops que devuelven error.
+
+**Files:**
+- Create: `src/lib/services/whatsapp-queries.ts`
+- Test: `src/lib/services/whatsapp-queries.test.ts`
+- Modify: `src/lib/whatsapp/agent/turn.ts` (reemplazar los stubs)
+
+**Interfaces:**
+- Consumes: `LastEntity` (Task 1), `ToolDeps` (Task 6).
+- Produces: `applyCorrection(entity, campo, valor)`, `correctLastExpense(userId, entity, campo, valor)`, `queryExpenseTotal(userId, q)`.
+
+- [ ] **Step 1: Escribir el test que falla**
+
+```ts
+// src/lib/services/whatsapp-queries.test.ts
+import { describe, it, expect } from 'vitest';
+
+import { applyCorrection } from '@/lib/services/whatsapp-queries';
+
+const ULTIMO = {
+  kind: 'expense' as const,
+  transactionId: 'tx-1',
+  amount: 45000,
+  description: 'mercado',
+  accountName: 'Efectivo',
+  category: 'MERCADO',
+  date: '2026-08-17',
+};
+
+describe('applyCorrection', () => {
+  it('corrige el monto interpretando "30 mil"', () => {
+    const r = applyCorrection(ULTIMO, 'monto', '30 mil');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.patch.amount).toBe(30000);
+  });
+
+  it('corrige el monto interpretando "30k"', () => {
+    const r = applyCorrection(ULTIMO, 'monto', '30k');
+    if (r.ok) expect(r.patch.amount).toBe(30000);
+  });
+
+  it('rechaza un monto que no se puede interpretar', () => {
+    expect(applyCorrection(ULTIMO, 'monto', 'como cinco').ok).toBe(false);
+  });
+
+  it('corrige la descripción', () => {
+    const r = applyCorrection(ULTIMO, 'descripcion', 'mercado del mes');
+    if (r.ok) expect(r.patch.description).toBe('mercado del mes');
+  });
+
+  it('corrige la cuenta', () => {
+    const r = applyCorrection(ULTIMO, 'cuenta', 'Nequi');
+    if (r.ok) expect(r.patch.accountName).toBe('Nequi');
+  });
+
+  it('corrige la fecha solo en formato válido', () => {
+    expect(applyCorrection(ULTIMO, 'fecha', '2026-08-16').ok).toBe(true);
+    expect(applyCorrection(ULTIMO, 'fecha', '16/08/2026').ok).toBe(false);
+  });
+
+  it('rechaza un campo desconocido', () => {
+    expect(applyCorrection(ULTIMO, 'color', 'rojo').ok).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 2: Correr el test y verificar que falla**
+
+Run: `bunx vitest run src/lib/services/whatsapp-queries.test.ts`
+Expected: FAIL — no existe el módulo
+
+- [ ] **Step 3: Implementar**
+
+```ts
+// src/lib/services/whatsapp-queries.ts
+// Correcciones y consultas del agente de WhatsApp. `applyCorrection` es pura
+// para poder testear la interpretación sin base.
+
+import { createAdminClient } from '@/lib/supabase/server';
+import type { LastEntity } from '@/lib/whatsapp/agent/state';
+
+export interface CorrectionPatch {
+  amount?: number;
+  description?: string;
+  accountName?: string;
+  category?: string;
+  date?: string;
+}
+
+export type CorrectionResult =
+  | { ok: true; patch: CorrectionPatch }
+  | { ok: false; error: string };
+
+/** Interpreta un monto escrito a mano: "30 mil", "30k", "30000". */
+function parseMonto(valor: string): number | null {
+  const t = valor.toLowerCase().replace(/\$/g, '').trim();
+  const conMil = t.match(/^([\d.,]+)\s*(k|mil)$/);
+  if (conMil) {
+    const base = Number(conMil[1].replace(/\./g, '').replace(',', '.'));
+    return Number.isFinite(base) && base > 0 ? Math.round(base * 1000) : null;
+  }
+  const n = Number(t.replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+
+export function applyCorrection(
+  entity: LastEntity,
+  campo: string,
+  valor: string,
+): CorrectionResult {
+  if (campo === 'monto') {
+    const monto = parseMonto(valor);
+    if (monto === null) return { ok: false, error: `No pude interpretar "${valor}" como monto.` };
+    return { ok: true, patch: { amount: monto } };
+  }
+  if (campo === 'descripcion') {
+    const d = valor.trim();
+    if (!d) return { ok: false, error: 'La descripción no puede quedar vacía.' };
+    return { ok: true, patch: { description: d } };
+  }
+  if (campo === 'cuenta') return { ok: true, patch: { accountName: valor } };
+  if (campo === 'categoria') return { ok: true, patch: { category: valor } };
+  if (campo === 'fecha') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+      return { ok: false, error: 'La fecha debe venir en formato YYYY-MM-DD.' };
+    }
+    return { ok: true, patch: { date: valor } };
+  }
+  return { ok: false, error: `No sé corregir el campo "${campo}".` };
+}
+
+/**
+ * Aplica la corrección en la base. Si se corrige la categoría, el vínculo con
+ * el ítem de presupuesto se marca 'manual': la reclasificación por IA respeta
+ * lo manual y así no revierte lo que el usuario acaba de corregir.
+ */
+export async function correctLastExpense(
+  userId: string,
+  entity: LastEntity,
+  campo: string,
+  valor: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const r = applyCorrection(entity, campo, valor);
+  if (!r.ok) return { ok: false, error: r.error };
+
+  const supabase = createAdminClient();
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (r.patch.amount !== undefined) update.amount = r.patch.amount;
+  if (r.patch.description !== undefined) update.description = r.patch.description;
+  if (r.patch.category !== undefined) {
+    update.category_name = r.patch.category;
+    update.budget_item_source = 'manual';
+  }
+  if (r.patch.date !== undefined) {
+    update.transaction_date = r.patch.date;
+    update.month_year = r.patch.date.slice(0, 7);
+  }
+
+  if (r.patch.accountName !== undefined) {
+    const { data: cuenta } = await supabase
+      .from('accounts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('name', r.patch.accountName)
+      .maybeSingle();
+    if (!cuenta) return { ok: false, error: `No encontré la cuenta ${r.patch.accountName}.` };
+    update.account_id = (cuenta as { id: string }).id;
+  }
+
+  const { error } = await supabase
+    .from('transactions')
+    .update(update)
+    .eq('id', entity.transactionId)
+    .eq('user_id', userId);
+
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+/** Suma gastos del período. Solo lectura. */
+export async function queryExpenseTotal(
+  userId: string,
+  q: { categoria?: string; desde?: string; hasta?: string },
+): Promise<{ total: number; categoria?: string }> {
+  const supabase = createAdminClient();
+  let query = supabase
+    .from('transactions')
+    .select('amount, category_name, transaction_date')
+    .eq('user_id', userId);
+
+  if (q.categoria) query = query.eq('category_name', q.categoria);
+  if (q.desde) query = query.gte('transaction_date', q.desde);
+  if (q.hasta) query = query.lte('transaction_date', q.hasta);
+
+  const { data } = await query;
+  const total = (data ?? []).reduce(
+    (s: number, r: { amount: number | null }) => s + Number(r.amount ?? 0),
+    0,
+  );
+  return { total, categoria: q.categoria };
+}
+```
+
+- [ ] **Step 4: Correr el test y verificar que pasa**
+
+Run: `bunx vitest run src/lib/services/whatsapp-queries.test.ts`
+Expected: PASS (7 tests)
+
+- [ ] **Step 5: Reemplazar los stubs en `turn.ts`**
+
+```ts
+    correctLast: async (campo: string, valor: string) => {
+      if (!estado.lastEntity) {
+        return { ok: false, error: 'No tengo un gasto reciente para corregir.' };
+      }
+      return correctLastExpense(ctx.userId, estado.lastEntity, campo, valor);
+    },
+    queryExpenses: async q => queryExpenseTotal(ctx.userId, q),
+```
+
+Agregar el import correspondiente en el grupo `@/`.
+
+- [ ] **Step 6: Verificar y commitear**
+
+```bash
+bunx tsc --noEmit && bunx vitest run && bunx next lint --quiet
+git add src/lib/services/whatsapp-queries.ts src/lib/services/whatsapp-queries.test.ts src/lib/whatsapp/agent/turn.ts
+git commit -m "feat(agente): corregir el último gasto y consultar totales"
+```
+
+- [ ] **Step 7: Prueba manual**
+
+| Mensaje | Esperado |
+|---|---|
+| `20k taxi` y después `no, eran 30 mil` | el gasto queda en $30.000 |
+| `ese fue con la Nequi` | cambia la cuenta del último gasto |
+| `¿cuánto llevo en mercado?` | responde un total, no "no te entendí" |
 
 ---
 
