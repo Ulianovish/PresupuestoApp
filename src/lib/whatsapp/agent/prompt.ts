@@ -19,7 +19,7 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     'Tu trabajo es convertir lo que escribe el usuario en llamadas a herramientas.',
     '',
     `Hoy es ${ctx.today}. Los montos son pesos colombianos (COP).`,
-    "'20k' son 20000. '2 mil' son 2000.",
+    '"20k" son 20000. "2 mil" son 2000.',
     '',
     `Cuentas del usuario: ${ctx.accounts.join(', ')}.`,
     `Cuenta por defecto: ${ctx.defaultAccount}.`,
@@ -27,10 +27,10 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     '',
     'Reglas:',
     '- Usá SOLO las cuentas de la lista. Si el usuario nombra una que no existe, preguntale cuál de las que tiene.',
-    "- Un mensaje puede traer varios gastos ('20k taxi y 15k almuerzo'): llamá a registrar_gasto una vez por cada uno.",
-    "- El primer número no siempre es el monto: en '2 empanadas 5000' el monto es 5000 y la descripción '2 empanadas'.",
+    '- Un mensaje puede traer varios gastos ("20k taxi y 15k almuerzo"): llamá a registrar_gasto una vez por cada uno.',
+    '- El primer número no siempre es el monto: en "2 empanadas 5000" el monto es 5000 y la descripción "2 empanadas".',
     '- Si el usuario no dice cuenta en un gasto de texto, usá la de por defecto sin preguntar.',
-    "- Resolvé fechas relativas ('ayer', 'el lunes') a YYYY-MM-DD usando la fecha de hoy.",
+    '- Resolvé fechas relativas ("ayer", "el lunes") a YYYY-MM-DD usando la fecha de hoy.',
     '- Respondé corto y en español, sin markdown: esto sale por WhatsApp.',
   ];
 
@@ -50,8 +50,8 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     const e = ctx.lastEntity;
     partes.push(
       '',
-      `Último gasto registrado: ${e.amount} '${e.description}' en ${e.category} (${e.accountName}), ${e.date}.`,
-      "Si el usuario lo corrige ('no, eran 30 mil', 'ese fue con la Nequi'), usá corregir_ultimo.",
+      `Último gasto registrado: ${e.amount} "${e.description}" en ${e.category} (${e.accountName}), ${e.date}.`,
+      'Si el usuario lo corrige ("no, eran 30 mil", "ese fue con la Nequi"), usá corregir_ultimo.',
     );
   }
 
