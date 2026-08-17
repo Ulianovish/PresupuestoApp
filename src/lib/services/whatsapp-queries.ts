@@ -3,6 +3,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server';
 import type { LastEntity } from '@/lib/whatsapp/agent/state';
+import { MAX_AMOUNT } from '@/lib/whatsapp/agent/tools';
 
 export interface CorrectionPatch {
   amount?: number;
@@ -37,6 +38,14 @@ export function applyCorrection(
     const monto = parseMonto(valor);
     if (monto === null)
       return { ok: false, error: `No pude interpretar "${valor}" como monto.` };
+    // Mismo tope que `validateGasto` (tools.ts): un monto absurdo no puede
+    // colarse por la puerta de la corrección cuando el alta lo rechaza.
+    if (monto > MAX_AMOUNT) {
+      return {
+        ok: false,
+        error: `El monto ${monto} supera el tope de ${MAX_AMOUNT}. Confirmá el valor con el usuario.`,
+      };
+    }
     return { ok: true, patch: { amount: monto } };
   }
   if (campo === 'descripcion') {
@@ -101,13 +110,27 @@ export async function correctLastExpense(
     update.account_id = (cuenta as { id: string }).id;
   }
 
-  const { error } = await supabase
+  // `.select('id')` es lo que permite distinguir "actualizó 0 filas" de un
+  // error real: Supabase NO devuelve `error` cuando el `.eq()` no matchea
+  // ninguna fila (p. ej. el usuario borró el gasto desde la app entre que se
+  // registró y que lo corrigió por chat — `lastEntity` no vence, así que esto
+  // puede pasar días después). Sin este chequeo, se reportaba éxito y encima
+  // se guardaba en `last_entity` una corrección que nunca se aplicó.
+  const { data, error } = await supabase
     .from('transactions')
     .update(update)
     .eq('id', entity.transactionId)
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .select('id');
 
-  return error ? { ok: false, error: error.message } : { ok: true };
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) {
+    return {
+      ok: false,
+      error: 'Ese gasto ya no existe (puede que lo hayas borrado en la app).',
+    };
+  }
+  return { ok: true };
 }
 
 /** Suma gastos del período. Solo lectura. */

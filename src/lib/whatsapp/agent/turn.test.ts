@@ -391,6 +391,49 @@ describe('handleAgentTurn — corregir_ultimo y consultar_gastos', () => {
     });
   });
 
+  it('si correctLastExpense falla (p. ej. el gasto ya no existe), no toca last_entity', async () => {
+    const ultimo = {
+      kind: 'expense' as const,
+      transactionId: 'tx-1',
+      amount: 20000,
+      description: 'taxi',
+      accountName: 'Nequi',
+      category: 'TRANSPORTE',
+      date: '2026-08-17',
+    };
+    mockedReadState.mockResolvedValue({
+      turns: [],
+      pending: null,
+      lastEntity: ultimo,
+    });
+    mockedCorrectLastExpense.mockResolvedValue({
+      ok: false,
+      error: 'Ese gasto ya no existe (puede que lo hayas borrado en la app).',
+    });
+    mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
+      const out = await deps.executeTool('corregir_ultimo', {
+        campo: 'monto',
+        valor: '30 mil',
+      });
+      return { text: out.summary, calls: [] };
+    });
+
+    await handleAgentTurn({
+      userId: 'u1',
+      phone: '+57300',
+      body: 'no, eran 30 mil',
+    });
+
+    // Sin `lastEntity` en el patch: la corrección que falló no puede
+    // contaminar `last_entity` con un valor que nunca se aplicó.
+    expect(mockedWriteState).toHaveBeenCalledWith('+57300', 'u1', {
+      turns: [
+        { role: 'user', content: 'no, eran 30 mil' },
+        { role: 'assistant', content: expect.any(String) },
+      ],
+    });
+  });
+
   it('sin gasto reciente, corregir_ultimo no llama a correctLastExpense ni escribe last_entity', async () => {
     mockedReadState.mockResolvedValue(ESTADO_VACIO);
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {

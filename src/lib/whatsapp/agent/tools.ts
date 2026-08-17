@@ -3,8 +3,13 @@
 
 import type { ToolOutcome } from './run';
 
-/** Un gasto por texto de más de 100 millones es casi siempre un typo ("999999k"). */
-const MAX_AMOUNT = 100_000_000;
+/**
+ * Un gasto por texto de más de 100 millones es casi siempre un typo
+ * ("999999k"). Exportada: `applyCorrection` (whatsapp-queries.ts) aplica el
+ * mismo tope al corregir el monto, para no dejar una puerta trasera que
+ * acepte por corrección lo que el alta rechaza.
+ */
+export const MAX_AMOUNT = 100_000_000;
 
 export interface GastoInput {
   monto: number;
@@ -206,9 +211,7 @@ export interface ToolDeps {
     transactionId?: string;
     error?: string;
   }>;
-  registerInvoice: (
-    accountName: string,
-  ) => Promise<{
+  registerInvoice: (accountName: string) => Promise<{
     ok: boolean;
     itemsFound: number;
     totalItems: number;
