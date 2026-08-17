@@ -132,7 +132,7 @@ function depsFalsas(over: Partial<ToolDeps> = {}): ToolDeps {
       category: 'MERCADO',
       transactionId: 'tx-1',
     }),
-    registerInvoice: async () => ({ ok: true, itemsFound: 3 }),
+    registerInvoice: async () => ({ ok: true, itemsFound: 3, totalItems: 3 }),
     correctLast: async () => ({ ok: true }),
     queryExpenses: async () => ({ total: 412000, categoria: 'MERCADO' }),
     onExpenseCreated: async () => {},
@@ -235,7 +235,7 @@ describe('executeTool', () => {
       const deps = depsFalsas({
         registerInvoice: async () => {
           escribio = true;
-          return { ok: true, itemsFound: 1 };
+          return { ok: true, itemsFound: 1, totalItems: 1 };
         },
       });
       const r = await executeTool(
@@ -254,7 +254,7 @@ describe('executeTool', () => {
         accounts: ['Davivienda', 'DAVIVIENDA'],
         registerInvoice: async () => {
           escribio = true;
-          return { ok: true, itemsFound: 1 };
+          return { ok: true, itemsFound: 1, totalItems: 1 };
         },
       });
       const r = await executeTool(
@@ -266,6 +266,24 @@ describe('executeTool', () => {
       expect(r.ok).toBe(false);
       expect(r.summary).toContain('Davivienda');
       expect(r.summary).toContain('DAVIVIENDA');
+    });
+
+    it('fallo parcial: el resumen dice cuántos se guardaron, no que no pasó nada', async () => {
+      // Los ítems ya guardados son transacciones reales. Si el resumen dijera
+      // "no se pudo guardar la factura" el modelo podría sugerirle al usuario
+      // reenviar la foto, duplicando esos ítems.
+      const deps = depsFalsas({
+        registerInvoice: async () => ({
+          ok: false,
+          itemsFound: 2,
+          totalItems: 5,
+        }),
+      });
+      const r = await executeTool('registrar_factura', { cuenta: 'Nequi' }, deps);
+      expect(r.ok).toBe(false);
+      expect(r.summary).toContain('2');
+      expect(r.summary).toContain('5');
+      expect(r.summary).not.toMatch(/no se pudo guardar/i);
     });
   });
 

@@ -2,7 +2,6 @@
 // analiza con visión y enruta: transferencia → gasto directo; recibo →
 // registro directo (o pregunta la cuenta si no se puede resolver).
 
-import type { PendingInvoice } from '@/lib/whatsapp/agent/state';
 import { resolverCuenta } from '@/lib/whatsapp/agent/tools';
 import { formatCOP } from '@/lib/whatsapp/format';
 import type { VisionResult } from '@/lib/whatsapp/vision';
@@ -65,6 +64,13 @@ export function resolveAccountFromMessage(
   return null;
 }
 
+export interface ReceiptDraftInput {
+  supplier: string | null;
+  date: string;
+  items: Array<{ description: string; amount: number }>;
+  total: number | null;
+}
+
 export interface ImageDeps {
   sendMessage: (to: string, body: string) => Promise<{ ok: boolean }>;
   downloadMedia: (url: string) => Promise<{ base64: string; mime: string } | null>;
@@ -76,13 +82,24 @@ export interface ImageDeps {
   ) => Promise<{ ok: boolean; category: string; error?: string }>;
   /** Cuentas activas del usuario, para resolver con cuál se pagó una factura. */
   accounts: string[];
-  /** Guarda la factura leída, esperando que el usuario diga con qué cuenta pagó. */
-  savePending: (inv: PendingInvoice) => Promise<void>;
-  /** Registra la factura ya resuelta (sin aprobación manual). */
+  /**
+   * Persiste la factura leída como borrador (`pending_review`) en
+   * `electronic_invoices`. Se llama SIEMPRE que la visión lee un recibo,
+   * resuelva o no la cuenta en este mismo mensaje: así la factura sobrevive
+   * al TTL de la conversación y a una segunda foto que llegue antes de la
+   * respuesta — antes solo vivía en `pending`, que vence y se pisa.
+   */
+  createReceiptDraft: (
+    userId: string,
+    input: ReceiptDraftInput,
+  ) => Promise<{ ok: boolean; itemsFound: number; invoiceId?: string; error?: string }>;
+  /** Guarda el id de la factura ya persistida, esperando que el usuario diga con qué cuenta pagó. */
+  savePending: (invoiceId: string) => Promise<void>;
+  /** Registra la factura ya persistida y resuelta (sin aprobación manual). */
   registerInvoice: (
-    inv: PendingInvoice,
+    invoiceId: string,
     accountName: string,
-  ) => Promise<{ ok: boolean; itemsFound: number; error?: string }>;
+  ) => Promise<{ ok: boolean; itemsFound: number; totalItems: number; error?: string }>;
   resolveDefaultAccount: (phone: string) => Promise<string>;
   today: () => string;
 }
@@ -93,6 +110,12 @@ export interface ImageContext {
   mediaUrl: string;
   /** Texto que acompañó la imagen (p. ej. "con la Davivienda"). */
   body: string;
+  /**
+   * Id de la factura que ya estaba esperando cuenta ANTES de esta foto, si
+   * la había. Sirve para avisar en vez de pisarla en silencio si esta foto
+   * también necesita preguntar.
+   */
+  existingPendingId: string | null;
 }
 
 export async function handleImageMessage(
@@ -134,32 +157,65 @@ export async function handleImageMessage(
   }
 
   if (result.kind === 'receipt') {
-    const invoice: PendingInvoice = {
-      source: 'vision_receipt',
-      cufe: null,
+    // Persistir SIEMPRE, antes de decidir si hay que preguntar: si no se
+    // guarda acá, la factura solo existiría en `pending` (vence a los 30 min,
+    // y una segunda foto lo pisa) y podría desaparecer sin que el usuario se
+    // entere de que "ya está guardada" fue mentira.
+    const draft = await deps.createReceiptDraft(ctx.userId, {
       supplier: result.supplier,
       date: result.date ?? deps.today(),
-      total: result.total,
       items: result.items,
-    };
-
-    const cuenta = resolveAccountFromMessage(ctx.body, null, deps.accounts);
-    if (!cuenta) {
-      await deps.savePending(invoice);
+      total: result.total,
+    });
+    if (!draft.ok || !draft.invoiceId) {
       await deps.sendMessage(
         ctx.phone,
-        `🧾 Leí tu factura${result.supplier ? ` de ${result.supplier}` : ''} (${result.items.length} ítems). ¿Con qué cuenta la pagaste?`,
+        `❌ No pude guardar la factura: ${draft.error ?? 'error desconocido'}.`,
       );
       return;
     }
 
-    const res = await deps.registerInvoice(invoice, cuenta);
-    await deps.sendMessage(
-      ctx.phone,
-      res.ok
-        ? `✅ Registré tu factura${result.supplier ? ` de ${result.supplier}` : ''} (${res.itemsFound} ítems) en ${cuenta}.`
-        : `❌ No pude guardar la factura: ${res.error ?? 'error desconocido'}.`,
-    );
+    const supplierTexto = result.supplier ? ` de ${result.supplier}` : '';
+    const totalTexto = result.total != null ? ` por ${formatCOP(result.total)}` : '';
+    const cuenta = resolveAccountFromMessage(ctx.body, null, deps.accounts);
+
+    if (!cuenta) {
+      if (ctx.existingPendingId) {
+        // No pisar en silencio: la factura anterior sigue existiendo como
+        // borrador en la app (nunca se pierde), pero el agente deja de
+        // preguntar por ella en el chat en cuanto pregunta por esta nueva.
+        await deps.sendMessage(
+          ctx.phone,
+          '📝 Ya tenías otra factura esperando cuenta; quedó guardada como borrador en la app, la podés completar ahí cuando quieras.',
+        );
+      }
+      await deps.savePending(draft.invoiceId);
+      await deps.sendMessage(
+        ctx.phone,
+        `🧾 Leí tu factura${supplierTexto}${totalTexto} (${result.items.length} ítems). ¿Con qué cuenta la pagaste?`,
+      );
+      return;
+    }
+
+    const res = await deps.registerInvoice(draft.invoiceId, cuenta);
+    if (res.ok) {
+      await deps.sendMessage(
+        ctx.phone,
+        `✅ Registré tu factura${supplierTexto}${totalTexto} (${res.itemsFound} ítems) en ${cuenta}.`,
+      );
+    } else if (res.itemsFound > 0) {
+      // Fallo a mitad de camino: esos ítems YA son transacciones reales. Decir
+      // "no pude guardar la factura" empujaría a reenviar la foto y duplicarlos.
+      await deps.sendMessage(
+        ctx.phone,
+        `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta}; el resto falló. Revisala en la app, no reenvíes la foto.`,
+      );
+    } else {
+      await deps.sendMessage(
+        ctx.phone,
+        `❌ No pude guardar la factura: ${res.error ?? 'error desconocido'}.`,
+      );
+    }
     return;
   }
 

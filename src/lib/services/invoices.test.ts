@@ -4,72 +4,87 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
   createAdminClient: vi.fn(),
 }));
-vi.mock('@/lib/dian/categorizer', () => ({
-  categorizeInvoiceItems: vi.fn(async () => ['MERCADO']),
-}));
 
-import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
 import { createAdminClient } from '@/lib/supabase/server';
+import type { ElectronicInvoice, StoredInvoiceItem } from '@/types/invoices';
 
-import { createInvoiceDirect } from './invoices';
+import { createInvoiceDirect, getPendingInvoiceSummary } from './invoices';
+
 
 const mockedAdmin = createAdminClient as unknown as ReturnType<typeof vi.fn>;
 
-/** Arma un mock de Supabase que distingue `categories` (lectura) de `electronic_invoices` (insert). */
+const ITEM_ARROZ: StoredInvoiceItem = {
+  description: 'arroz',
+  quantity: 1,
+  unit_price: 5000,
+  total_price: 5000,
+  total_with_tax: 5000,
+  suggested_category: 'MERCADO',
+  category: 'MERCADO',
+};
+
+const ITEM_LECHE: StoredInvoiceItem = {
+  description: 'leche',
+  quantity: 1,
+  unit_price: 3000,
+  total_price: 3000,
+  total_with_tax: 3000,
+  suggested_category: 'MERCADO',
+  category: 'MERCADO',
+};
+
+function invoiceRow(overrides: Partial<ElectronicInvoice> = {}): Partial<ElectronicInvoice> {
+  return {
+    id: 'inv-1',
+    user_id: 'user-1',
+    cufe_code: null,
+    source: 'vision_receipt',
+    supplier_name: 'ÉXITO',
+    invoice_date: '2026-08-17',
+    total_amount: 8000,
+    items: [ITEM_ARROZ, ITEM_LECHE],
+    status: 'pending_review',
+    ...overrides,
+  };
+}
+
+/** Arma un mock de Supabase que distingue `select` (fetch por id) de `update`. */
 function makeSupabaseMock(opts: {
-  categoryNames?: string[];
+  row: Partial<ElectronicInvoice> | null;
   rpc: ReturnType<typeof vi.fn>;
-  insert?: ReturnType<typeof vi.fn>;
+  update?: ReturnType<typeof vi.fn>;
 }) {
-  const insert = opts.insert ?? vi.fn().mockResolvedValue({ error: null });
-  const from = vi.fn((table: string) => {
-    if (table === 'categories') {
-      return {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        order: vi
-          .fn()
-          .mockResolvedValue({ data: (opts.categoryNames ?? []).map(name => ({ name })) }),
-      };
-    }
-    return { insert };
-  });
-  return { rpc: opts.rpc, from, insert };
+  const update = opts.update ?? vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+  const from = vi.fn(() => ({
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: opts.row, error: null }),
+    update,
+  }));
+  return { rpc: opts.rpc, from, update };
 }
 
 describe('createInvoiceDirect', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('clasifica los ítems del presupuesto, igual que hacía la aprobación', async () => {
+  it('registra todos los ítems, clasifica y marca la factura como approved', async () => {
     // El riesgo del cambio: classifyApprovedExpenses corría al aprobar. Si el
     // registro directo no lo llama, cada factura entra entera sin clasificar.
     const rpc = vi.fn().mockResolvedValue({ data: 'tx-1', error: null });
-    const { from, insert } = makeSupabaseMock({ categoryNames: ['MERCADO'], rpc });
+    const { from, update } = makeSupabaseMock({ row: invoiceRow(), rpc });
     mockedAdmin.mockReturnValue({ rpc, from });
 
     let clasificado = false;
-    const res = await createInvoiceDirect(
-      'user-1',
-      {
-        source: 'vision_receipt',
-        cufe: null,
-        supplier: 'ÉXITO',
-        date: '2026-08-17',
-        total: 5000,
-        items: [{ description: 'arroz', amount: 5000 }],
+    const res = await createInvoiceDirect('user-1', 'inv-1', 'Nequi', {
+      classify: async () => {
+        clasificado = true;
       },
-      'Nequi',
-      {
-        classify: async () => {
-          clasificado = true;
-        },
-      },
-    );
+    });
 
     expect(res.ok).toBe(true);
-    expect(res.itemsFound).toBe(1);
+    expect(res.itemsFound).toBe(2);
+    expect(res.totalItems).toBe(2);
     expect(clasificado).toBe(true);
-    expect(categorizeInvoiceItems).toHaveBeenCalled();
     expect(rpc).toHaveBeenCalledWith('upsert_monthly_expense', {
       p_user_id: 'user-1',
       p_description: 'arroz',
@@ -79,43 +94,97 @@ describe('createInvoiceDirect', () => {
       p_account_name: 'Nequi',
       p_place: 'ÉXITO',
     });
-    expect(insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-1',
-        source: 'vision_receipt',
-        status: 'approved',
-        selected_account_name: 'Nequi',
-      }),
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'approved', selected_account_name: 'Nequi' }),
     );
   });
 
-  it('devuelve ok:false si el RPC falla, y no llega a clasificar', async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: 'boom' } });
-    const { from, insert } = makeSupabaseMock({ categoryNames: [], rpc });
+  it('fallo a mitad de camino: reporta el conteo real, no cero, y marca la factura en error', async () => {
+    // Este es el hallazgo crítico: un usuario que cree que no se guardó nada
+    // reenvía la foto y duplica los ítems que sí se registraron.
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({ data: 'tx-1', error: null }) // arroz: ok
+      .mockResolvedValueOnce({ data: null, error: { message: 'boom' } }); // leche: falla
+    const { from, update } = makeSupabaseMock({ row: invoiceRow(), rpc });
     mockedAdmin.mockReturnValue({ rpc, from });
 
     let clasificado = false;
-    const res = await createInvoiceDirect(
-      'user-1',
-      {
-        source: 'vision_receipt',
-        cufe: null,
-        supplier: null,
-        date: '2026-08-17',
-        total: null,
-        items: [{ description: 'algo', amount: 1000 }],
+    const res = await createInvoiceDirect('user-1', 'inv-1', 'Nequi', {
+      classify: async () => {
+        clasificado = true;
       },
-      'Efectivo',
-      {
-        classify: async () => {
-          clasificado = true;
-        },
-      },
-    );
+    });
 
     expect(res.ok).toBe(false);
-    expect(res.error).toBe('boom');
-    expect(clasificado).toBe(false);
-    expect(insert).not.toHaveBeenCalled();
+    expect(res.itemsFound).toBe(1); // el arroz sí se guardó
+    expect(res.totalItems).toBe(2);
+    expect(res.error).toMatch(/1 de 2/);
+    expect(clasificado).toBe(true); // clasifica lo que sí se creó, best-effort
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'error' }),
+    );
+  });
+
+  it('no reintenta una factura que ya no está en pending_review (evita duplicar)', async () => {
+    const rpc = vi.fn();
+    const { from } = makeSupabaseMock({ row: invoiceRow({ status: 'approved' }), rpc });
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    const res = await createInvoiceDirect('user-1', 'inv-1', 'Nequi');
+
+    expect(res.ok).toBe(false);
+    expect(res.itemsFound).toBe(0);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('factura inexistente → ok:false sin tocar el RPC', async () => {
+    const rpc = vi.fn();
+    const { from } = makeSupabaseMock({ row: null, rpc });
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    const res = await createInvoiceDirect('user-1', 'inv-inexistente', 'Nequi');
+
+    expect(res.ok).toBe(false);
+    expect(res.itemsFound).toBe(0);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('getPendingInvoiceSummary', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('mapea la fila a la vista que consume el prompt', async () => {
+    const from = vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: invoiceRow(), error: null }),
+    }));
+    mockedAdmin.mockReturnValue({ from });
+
+    const res = await getPendingInvoiceSummary('user-1', 'inv-1');
+
+    expect(res).toEqual({
+      source: 'vision_receipt',
+      cufe: null,
+      supplier: 'ÉXITO',
+      date: '2026-08-17',
+      total: 8000,
+      items: [
+        { description: 'arroz', amount: 5000 },
+        { description: 'leche', amount: 3000 },
+      ],
+    });
+  });
+
+  it('devuelve null si no existe (o es de otro usuario)', async () => {
+    const from = vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    }));
+    mockedAdmin.mockReturnValue({ from });
+
+    expect(await getPendingInvoiceSummary('user-1', 'inv-x')).toBeNull();
   });
 });

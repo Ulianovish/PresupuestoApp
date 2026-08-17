@@ -213,7 +213,10 @@ describe('createVisionReceiptDraft', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('categoriza ítems e inserta un borrador con source vision_receipt', async () => {
-    const insert = vi.fn().mockResolvedValue({ error: null });
+    const single = vi.fn().mockResolvedValue({ data: { id: 'inv-1' }, error: null });
+    const insert = vi
+      .fn()
+      .mockReturnValue({ select: vi.fn().mockReturnThis(), single });
     const catFrom = vi.fn((table: string) => {
       if (table === 'categories') {
         return {
@@ -239,6 +242,7 @@ describe('createVisionReceiptDraft', () => {
 
     expect(res.ok).toBe(true);
     expect(res.itemsFound).toBe(2);
+    expect(res.invoiceId).toBe('inv-1');
     const row = insert.mock.calls[0][0];
     expect(row.user_id).toBe('user-1');
     expect(row.source).toBe('vision_receipt');
@@ -254,7 +258,12 @@ describe('createVisionReceiptDraft', () => {
   });
 
   it('devuelve ok:false si el insert falla', async () => {
-    const insert = vi.fn().mockResolvedValue({ error: { message: 'boom' } });
+    const single = vi
+      .fn()
+      .mockResolvedValue({ data: null, error: { message: 'boom' } });
+    const insert = vi
+      .fn()
+      .mockReturnValue({ select: vi.fn().mockReturnThis(), single });
     const catFrom = vi.fn((table: string) => {
       if (table === 'categories') {
         return {

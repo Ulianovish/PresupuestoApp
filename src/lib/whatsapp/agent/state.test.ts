@@ -21,7 +21,7 @@ describe('applyTtl', () => {
     const s = applyTtl(
       {
         turns: [{ role: 'user', content: '45k mercado' }],
-        pending: { kind: 'invoice_account', invoice: null },
+        pending: { kind: 'invoice_account', invoiceId: 'inv-1' },
         last_entity: ENTIDAD,
         updated_at: HACE_5_MIN,
       },
@@ -35,7 +35,7 @@ describe('applyTtl', () => {
     const s = applyTtl(
       {
         turns: [{ role: 'user', content: 'hola' }],
-        pending: { kind: 'invoice_account', invoice: null },
+        pending: { kind: 'invoice_account', invoiceId: 'inv-1' },
         last_entity: ENTIDAD,
         updated_at: HACE_40_MIN,
       },

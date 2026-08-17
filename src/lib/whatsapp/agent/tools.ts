@@ -208,7 +208,12 @@ export interface ToolDeps {
   }>;
   registerInvoice: (
     accountName: string,
-  ) => Promise<{ ok: boolean; itemsFound: number; error?: string }>;
+  ) => Promise<{
+    ok: boolean;
+    itemsFound: number;
+    totalItems: number;
+    error?: string;
+  }>;
   correctLast: (
     campo: string,
     valor: string,
@@ -283,14 +288,24 @@ export async function executeTool(
         return { ok: false, summary: mensajeCuentaNoResuelta(cuenta, deps) };
       }
       const res = await deps.registerInvoice(resolucion.cuenta);
-      if (!res.ok)
+      if (res.ok) {
+        return {
+          ok: true,
+          summary: `Factura guardada con ${res.itemsFound} ítems en ${resolucion.cuenta}.`,
+        };
+      }
+      // Fallo parcial: algunos ítems SÍ quedaron guardados (son transacciones
+      // reales). Decirle al modelo "no se guardó nada" lo empujaría a
+      // ofrecerle al usuario reenviar la foto, duplicando esos ítems.
+      if (res.itemsFound > 0) {
         return {
           ok: false,
-          summary: `No se pudo guardar la factura: ${res.error ?? 'error'}`,
+          summary: `Se registraron ${res.itemsFound} de ${res.totalItems} ítems en ${resolucion.cuenta}; el resto falló. Decile al usuario que revise la factura en la app, NO le sugieras reenviar la foto.`,
         };
+      }
       return {
-        ok: true,
-        summary: `Factura guardada con ${res.itemsFound} ítems en ${resolucion.cuenta}.`,
+        ok: false,
+        summary: `No se pudo guardar la factura: ${res.error ?? 'error'}`,
       };
     }
 

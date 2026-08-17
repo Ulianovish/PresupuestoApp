@@ -13,6 +13,7 @@ import {
 import { createInvoiceDirect, resolveUserCategoryNames } from '@/lib/services/invoices';
 import {
   createDirectExpense,
+  createVisionReceiptDraft,
   resolveDefaultAccount,
 } from '@/lib/services/whatsapp-expenses';
 import {
@@ -20,7 +21,7 @@ import {
   redeemLinkCode,
 } from '@/lib/services/whatsapp-links';
 import { createAdminClient } from '@/lib/supabase/server';
-import { writeState } from '@/lib/whatsapp/agent/state';
+import { readState, writeState } from '@/lib/whatsapp/agent/state';
 import { handleAgentTurn, listarCuentas } from '@/lib/whatsapp/agent/turn';
 import { ackMessage, classifyText, simpleReply } from '@/lib/whatsapp/classify';
 import {
@@ -121,9 +122,18 @@ export async function POST(request: NextRequest) {
     const userId = link.userId;
     after(async () => {
       try {
-        const accounts = await listarCuentas(userId);
+        const [accounts, estado] = await Promise.all([
+          listarCuentas(userId),
+          readState(phone),
+        ]);
         await handleImageMessage(
-          { userId, phone, mediaUrl, body },
+          {
+            userId,
+            phone,
+            mediaUrl,
+            body,
+            existingPendingId: estado.pending?.invoiceId ?? null,
+          },
           {
             sendMessage: sendWhatsAppMessage,
             downloadMedia: downloadTwilioMedia,
@@ -132,12 +142,13 @@ export async function POST(request: NextRequest) {
             resolveDefaultAccount,
             today: todayYmd,
             accounts,
-            savePending: inv =>
+            createReceiptDraft: createVisionReceiptDraft,
+            savePending: invoiceId =>
               writeState(phone, userId, {
-                pending: { kind: 'invoice_account', invoice: inv },
+                pending: { kind: 'invoice_account', invoiceId },
               }),
-            registerInvoice: (inv, accountName) =>
-              createInvoiceDirect(userId, inv, accountName),
+            registerInvoice: (invoiceId, accountName) =>
+              createInvoiceDirect(userId, invoiceId, accountName),
           },
         );
       } catch (err) {

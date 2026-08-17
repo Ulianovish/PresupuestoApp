@@ -167,6 +167,8 @@ export interface VisionReceiptInput {
 export interface VisionReceiptResult {
   ok: boolean;
   itemsFound: number;
+  /** Id de la fila creada; solo viene si `ok`. La usa el agente para referenciar la factura sin cargarla entera en el estado de la conversación. */
+  invoiceId?: string;
   error?: string;
 }
 
@@ -175,6 +177,11 @@ export interface VisionReceiptResult {
  * Categoriza los ítems con IA y los guarda en electronic_invoices con
  * source='vision_receipt' y status='pending_review' → aparece en la bandeja y se
  * aprueba con el flujo existente.
+ *
+ * Se llama SIEMPRE que la visión lee un recibo, resuelva o no la cuenta en el
+ * mismo mensaje: la factura queda persistida desde este momento, no solo en
+ * el estado de la conversación (que vence a los 30 min y una segunda foto lo
+ * pisa).
  */
 export async function createVisionReceiptDraft(
   userId: string,
@@ -201,20 +208,28 @@ export async function createVisionReceiptDraft(
   const totalAmount =
     input.total ?? storedItems.reduce((sum, it) => sum + it.total_price, 0);
 
-  const { error } = await supabase.from('electronic_invoices').insert({
-    user_id: userId,
-    cufe_code: null,
-    source: 'vision_receipt',
-    supplier_name: input.supplier,
-    invoice_date: input.date,
-    total_amount: totalAmount,
-    items: storedItems,
-    status: 'pending_review',
-    processed_at: new Date().toISOString(),
-  });
+  const { data, error } = await supabase
+    .from('electronic_invoices')
+    .insert({
+      user_id: userId,
+      cufe_code: null,
+      source: 'vision_receipt',
+      supplier_name: input.supplier,
+      invoice_date: input.date,
+      total_amount: totalAmount,
+      items: storedItems,
+      status: 'pending_review',
+      processed_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
 
   if (error) {
     return { ok: false, itemsFound: 0, error: error.message };
   }
-  return { ok: true, itemsFound: storedItems.length };
+  return {
+    ok: true,
+    itemsFound: storedItems.length,
+    invoiceId: (data as { id: string }).id,
+  };
 }

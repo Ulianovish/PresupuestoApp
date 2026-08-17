@@ -6,7 +6,11 @@ import { createAdminClient } from '@/lib/supabase/server';
 
 export type Turn = { role: 'user' | 'assistant'; content: string };
 
-/** Factura ya extraída, esperando que el usuario diga con qué cuenta pagó. */
+/**
+ * Vista de una factura pendiente, para mostrarla en el prompt del agente.
+ * NO es lo que se persiste en `pending` (ver `Pending`) — se reconstruye por
+ * `invoiceId` desde `electronic_invoices` (`getPendingInvoiceSummary`).
+ */
 export interface PendingInvoice {
   source: 'dian_cufe' | 'vision_receipt';
   cufe: string | null;
@@ -16,7 +20,15 @@ export interface PendingInvoice {
   items: Array<{ description: string; amount: number }>;
 }
 
-export type Pending = { kind: 'invoice_account'; invoice: PendingInvoice | null };
+/**
+ * Solo guarda el id de la factura, no la factura entera: la fila real vive en
+ * `electronic_invoices` (status `pending_review`, la crea
+ * `createVisionReceiptDraft`) desde el momento en que la visión la lee. Así
+ * la factura sobrevive aunque venza el TTL de 30 min de esta conversación o
+ * llegue una segunda foto antes de que el usuario conteste con qué cuenta
+ * pagó — antes se perdía porque `pending` era el único lugar donde vivía.
+ */
+export type Pending = { kind: 'invoice_account'; invoiceId: string };
 
 export interface LastEntity {
   kind: 'expense';

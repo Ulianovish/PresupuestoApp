@@ -3,7 +3,11 @@
 // cae a `parseQuickExpense` para no dejar al usuario sin nada: un gasto
 // simple se sigue registrando con el LLM caído.
 
-import { createInvoiceDirect, resolveUserCategoryNames } from '@/lib/services/invoices';
+import {
+  createInvoiceDirect,
+  getPendingInvoiceSummary,
+  resolveUserCategoryNames,
+} from '@/lib/services/invoices';
 import {
   createDirectExpense,
   resolveDefaultAccount,
@@ -17,7 +21,7 @@ import { callGatewayReal, runAgent } from './run';
 import { readState, writeState } from './state';
 import { executeTool, type ToolDeps } from './tools';
 
-import type { ConversationState, Turn } from './state';
+import type { ConversationState, PendingInvoice, Turn } from './state';
 
 // Cuenta de último recurso cuando ni siquiera se pudo resolver la cuenta por
 // defecto del usuario (p. ej. `resolveDefaultAccount` fue justo lo que
@@ -93,6 +97,11 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
   let cuentas: string[];
   let categorias: string[];
   let cuentaDefecto: string;
+  // Vista de la factura pendiente para el prompt ("HAY UNA FACTURA
+  // ESPERANDO CUENTA..."). `estado.pending` solo guarda el id (ver
+  // `agent/state.ts`); la factura real vive en `electronic_invoices` desde
+  // que la visión la leyó, así que hay que ir a buscarla.
+  let facturaPendiente: PendingInvoice | null = null;
 
   try {
     estado = await readState(ctx.phone);
@@ -101,6 +110,12 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
       resolveUserCategoryNames(createAdminClient(), ctx.userId),
       resolveDefaultAccount(ctx.phone),
     ]);
+    if (estado.pending) {
+      facturaPendiente = await getPendingInvoiceSummary(
+        ctx.userId,
+        estado.pending.invoiceId,
+      );
+    }
   } catch (err) {
     // Una falla de base al armar el contexto no puede dejar al usuario sin
     // nada: el mismo modo degradado que cubre al Gateway caído cubre esto.
@@ -118,13 +133,24 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
     today: hoyBogota,
     createExpense: async input => createDirectExpense(ctx.userId, ctx.phone, input),
     registerInvoice: async (accountName: string) => {
-      const inv = estado.pending?.invoice;
-      if (!inv) return { ok: false, itemsFound: 0, error: 'no hay factura pendiente' };
-      const res = await createInvoiceDirect(ctx.userId, inv, accountName);
-      // Limpiar el pendiente pase lo que pase: si falló, reintentar con la misma
-      // factura vieja confundiría más de lo que ayuda.
+      const invoiceId = estado.pending?.invoiceId;
+      if (!invoiceId) {
+        return {
+          ok: false,
+          itemsFound: 0,
+          totalItems: 0,
+          error: 'no hay factura pendiente',
+        };
+      }
+      // Anular el pendiente EN MEMORIA ya, no solo en la base: si el modelo
+      // llama registrar_factura dos veces en la misma vuelta (o en vueltas
+      // sucesivas del mismo turno), la segunda no puede volver a encontrar
+      // la factura y registrarla de nuevo. `createInvoiceDirect` además
+      // rechaza una fila que ya no esté en pending_review, como refuerzo
+      // por si la llamada viniera de otro turno concurrente.
+      estado = { ...estado, pending: null };
       await writeState(ctx.phone, ctx.userId, { pending: null });
-      return res;
+      return createInvoiceDirect(ctx.userId, invoiceId, accountName);
     },
     // Stub: la Task 10 implementa la corrección del último gasto.
     correctLast: async () => ({
@@ -143,7 +169,7 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
       categories: categorias,
       defaultAccount: cuentaDefecto,
       today: hoyBogota(),
-      pendingInvoice: estado.pending?.invoice ?? null,
+      pendingInvoice: facturaPendiente,
       lastEntity: estado.lastEntity,
       turns: estado.turns,
     },

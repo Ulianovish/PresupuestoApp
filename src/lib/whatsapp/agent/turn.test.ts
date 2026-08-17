@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/services/invoices', () => ({
   resolveUserCategoryNames: vi.fn(),
+  createInvoiceDirect: vi.fn(),
+  getPendingInvoiceSummary: vi.fn(),
 }));
 vi.mock('@/lib/services/whatsapp-expenses', () => ({
   createDirectExpense: vi.fn(),
@@ -22,7 +24,11 @@ vi.mock('./state', () => ({
   writeState: vi.fn(),
 }));
 
-import { resolveUserCategoryNames } from '@/lib/services/invoices';
+import {
+  createInvoiceDirect,
+  getPendingInvoiceSummary,
+  resolveUserCategoryNames,
+} from '@/lib/services/invoices';
 import {
   createDirectExpense,
   resolveDefaultAccount,
@@ -35,6 +41,8 @@ import { readState, writeState } from './state';
 import { handleAgentTurn } from './turn';
 
 const mockedResolveCategoryNames = vi.mocked(resolveUserCategoryNames);
+const mockedCreateInvoiceDirect = vi.mocked(createInvoiceDirect);
+const mockedGetPendingInvoiceSummary = vi.mocked(getPendingInvoiceSummary);
 const mockedCreateDirectExpense = vi.mocked(createDirectExpense);
 const mockedResolveDefaultAccount = vi.mocked(resolveDefaultAccount);
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
@@ -149,5 +157,100 @@ describe('handleAgentTurn', () => {
     });
     expect(mockedSendWhatsAppMessage).toHaveBeenCalled();
     expect(mockedWriteState).toHaveBeenCalled();
+  });
+});
+
+// `runAgent` sigue mockeado (no hay Gateway real), pero acá la implementación
+// del mock LLAMA al `deps.executeTool` que le pasa `turn.ts` — que es el real
+// `executeTool` de `./tools` (sin mockear) corriendo con el `registerInvoice`
+// real de `handleAgentTurn`. Así se ejercita la ruta completa
+// registrar_factura → executeTool → registerInvoice → createInvoiceDirect,
+// que antes no tenía ninguna cobertura (el mock de `@/lib/services/invoices`
+// no exponía `createInvoiceDirect` ni `getPendingInvoiceSummary`, así que
+// ningún test la recorría).
+describe('handleAgentTurn — registrar_factura', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedResolveCategoryNames.mockResolvedValue(['MERCADO', 'TRANSPORTE']);
+    mockedResolveDefaultAccount.mockResolvedValue('Nequi');
+    mockedCreateAdminClient.mockReturnValue(
+      fakeAdmin(['Efectivo', 'Nequi']) as unknown as ReturnType<
+        typeof createAdminClient
+      >,
+    );
+    mockedSendWhatsAppMessage.mockResolvedValue({ ok: true });
+    mockedWriteState.mockResolvedValue(undefined);
+    mockedReadState.mockResolvedValue({
+      turns: [],
+      pending: { kind: 'invoice_account', invoiceId: 'inv-1' },
+      lastEntity: null,
+    });
+    mockedGetPendingInvoiceSummary.mockResolvedValue({
+      source: 'vision_receipt',
+      cufe: null,
+      supplier: 'ÉXITO',
+      date: '2026-08-17',
+      total: 8000,
+      items: [{ description: 'arroz', amount: 8000 }],
+    });
+  });
+
+  it('registro exitoso: createInvoiceDirect se llama con el invoiceId del pending, y el pending se limpia', async () => {
+    mockedCreateInvoiceDirect.mockResolvedValue({
+      ok: true,
+      itemsFound: 1,
+      totalItems: 1,
+    });
+    mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
+      const out = await deps.executeTool('registrar_factura', { cuenta: 'Nequi' });
+      return { text: out.summary, calls: [] };
+    });
+
+    await handleAgentTurn({ userId: 'u1', phone: '+57300', body: 'con Nequi' });
+
+    expect(mockedCreateInvoiceDirect).toHaveBeenCalledWith('u1', 'inv-1', 'Nequi');
+    expect(mockedCreateInvoiceDirect).toHaveBeenCalledTimes(1);
+    expect(mockedWriteState).toHaveBeenCalledWith('+57300', 'u1', { pending: null });
+  });
+
+  it('fallo parcial: el mensaje final dice cuántos ítems se registraron, no que no se guardó nada', async () => {
+    // El hallazgo crítico: un usuario que cree que no se guardó nada reenvía
+    // la foto y duplica los ítems que sí se registraron.
+    mockedCreateInvoiceDirect.mockResolvedValue({
+      ok: false,
+      itemsFound: 2,
+      totalItems: 5,
+      error: 'boom',
+    });
+    mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
+      const out = await deps.executeTool('registrar_factura', { cuenta: 'Nequi' });
+      return { text: out.summary, calls: [] };
+    });
+
+    await handleAgentTurn({ userId: 'u1', phone: '+57300', body: 'con Nequi' });
+
+    const mensaje = mockedSendWhatsAppMessage.mock.calls[0][1];
+    expect(mensaje).toContain('2');
+    expect(mensaje).toContain('5');
+    expect(mensaje).not.toMatch(/no se pudo guardar/i);
+  });
+
+  it('un segundo registrar_factura en la misma vuelta no registra la factura dos veces', async () => {
+    mockedCreateInvoiceDirect.mockResolvedValue({
+      ok: true,
+      itemsFound: 1,
+      totalItems: 1,
+    });
+    mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
+      await deps.executeTool('registrar_factura', { cuenta: 'Nequi' });
+      // Segunda llamada, mismo turno: el pending ya se anuló en memoria tras
+      // la primera, así que esta no debería volver a llamar createInvoiceDirect.
+      const segundo = await deps.executeTool('registrar_factura', { cuenta: 'Nequi' });
+      return { text: segundo.summary, calls: [] };
+    });
+
+    await handleAgentTurn({ userId: 'u1', phone: '+57300', body: 'con Nequi' });
+
+    expect(mockedCreateInvoiceDirect).toHaveBeenCalledTimes(1);
   });
 });

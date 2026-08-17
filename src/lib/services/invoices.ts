@@ -1,7 +1,6 @@
 // Servicio para gestionar facturas electrónicas DIAN (tabla electronic_invoices)
 
 import { EXPENSE_CATEGORIES } from '@/lib/constants/expense-categories';
-import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
 import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
 import { mapInvoiceItemToExpenseArgs } from '@/lib/dian/invoice-mapper';
 import { resolveItemNameToId } from '@/lib/services/expenses-rollup';
@@ -238,86 +237,183 @@ export async function approveInvoice(
 }
 
 /**
- * Registra una factura directamente, sin aprobación manual. Reemplaza el par
- * `approveInvoice` + pantalla: la cuenta ahora la pregunta el agente de
- * WhatsApp (`resolveAccountFromMessage`), que era la única razón de ese paso.
+ * Resumen de una factura pendiente, para mostrarla en el prompt del agente
+ * ("HAY UNA FACTURA ESPERANDO CUENTA..."). Se busca por id porque `pending`
+ * en la conversación solo guarda el id, no la factura entera (ver
+ * `Pending` en `agent/state.ts`) — así sobrevive al TTL de 30 min y a una
+ * segunda foto que llegue antes de que el usuario conteste.
+ */
+export async function getPendingInvoiceSummary(
+  userId: string,
+  invoiceId: string,
+): Promise<PendingInvoice | null> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from('electronic_invoices')
+    .select('*')
+    .eq('id', invoiceId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!data) return null;
+
+  const inv = data as ElectronicInvoice;
+  return {
+    source: inv.source === 'dian_cufe' ? 'dian_cufe' : 'vision_receipt',
+    cufe: inv.cufe_code,
+    supplier: inv.supplier_name,
+    date: inv.invoice_date ?? '',
+    total: inv.total_amount,
+    items: (inv.items || []).map(it => ({
+      description: it.description,
+      amount: it.total_with_tax ?? it.total_price,
+    })),
+  };
+}
+
+/**
+ * Registra una factura ya persistida (por `createVisionReceiptDraft` o el
+ * flujo CUFE), sin aprobación manual. Reemplaza el par `approveInvoice` +
+ * pantalla: la cuenta ahora la pregunta el agente de WhatsApp
+ * (`resolveAccountFromMessage`), que era la única razón de ese paso.
  *
- * Usa `createAdminClient` porque corre en background (`after()` del webhook),
- * sin sesión de navegador — mismo patrón que `createDirectExpense` en
- * `whatsapp-expenses.ts`. `classifyApprovedExpenses` se sigue llamando: es lo
- * que asigna el ítem de presupuesto de cada línea; sin esto la factura entera
- * entra "sin clasificar".
+ * A propósito NO recibe los datos de la factura sueltos: los lee de la fila
+ * por `invoiceId`, la misma que `createVisionReceiptDraft` dejó en
+ * `pending_review` con los ítems ya categorizados. Eso es lo que hace que la
+ * factura sobreviva aunque venza el TTL de la conversación o llegue una
+ * segunda foto antes de que el usuario responda — antes `pending` era el
+ * único lugar donde vivía y se perdía en ambos casos.
+ *
+ * Si la fila ya no está en `pending_review` (se registró antes, o quedó en
+ * error), no se reintenta a ciegas: evita duplicar ítems que ya son
+ * transacciones reales — p. ej. si el modelo llama `registrar_factura` dos
+ * veces en la misma vuelta.
+ *
+ * Si un ítem falla a mitad de camino, los gastos ya creados NO se revierten
+ * (son transacciones reales vía `upsert_monthly_expense`, que no dedupe) y el
+ * resultado lo dice: `itemsFound` es el conteo real, nunca cero solo porque
+ * el último ítem falló. Decirle al usuario "no se guardó nada" cuando sí se
+ * guardó una parte lo empuja a reenviar la foto y duplicar esos ítems.
+ *
+ * Usa `createAdminClient` porque corre en background (`after()` del
+ * webhook), sin sesión de navegador — mismo patrón que `createDirectExpense`
+ * en `whatsapp-expenses.ts`. `classifyApprovedExpenses` se sigue llamando
+ * (best-effort, con lo que sí se creó): es lo que asigna el ítem de
+ * presupuesto de cada línea; sin esto la factura entera entra "sin
+ * clasificar".
  */
 export async function createInvoiceDirect(
   userId: string,
-  invoice: PendingInvoice,
+  invoiceId: string,
   accountName: string,
   deps: { classify?: typeof classifyApprovedExpenses } = {},
-): Promise<{ ok: boolean; itemsFound: number; error?: string }> {
+): Promise<{ ok: boolean; itemsFound: number; totalItems: number; error?: string }> {
   const supabase = createAdminClient();
+  const clasificar = deps.classify ?? classifyApprovedExpenses;
 
-  const categoryNames = await resolveUserCategoryNames(supabase, userId);
-  const categorias = await categorizeInvoiceItems(
-    invoice.items.map(it => ({ description: it.description })),
-    categoryNames,
-  );
+  const { data: invoiceRow, error: fetchError } = await supabase
+    .from('electronic_invoices')
+    .select('*')
+    .eq('id', invoiceId)
+    .eq('user_id', userId)
+    .maybeSingle();
 
+  if (fetchError || !invoiceRow) {
+    return {
+      ok: false,
+      itemsFound: 0,
+      totalItems: 0,
+      error: 'Factura no encontrada.',
+    };
+  }
+
+  const typed = invoiceRow as ElectronicInvoice;
+  if (typed.status !== 'pending_review') {
+    return {
+      ok: false,
+      itemsFound: 0,
+      totalItems: typed.items?.length ?? 0,
+      error: `La factura ya está en estado "${typed.status}"; no se vuelve a registrar.`,
+    };
+  }
+
+  const items = typed.items || [];
+  const fecha = typed.invoice_date ?? '';
   const createdExpenses: Array<{
     id: string;
     description: string;
     categoryName: string;
     monthYear: string;
   }> = [];
-  for (let i = 0; i < invoice.items.length; i++) {
-    const it = invoice.items[i];
-    const categoria = categorias[i] ?? 'OTROS';
+
+  for (const item of items) {
     const { data, error } = await supabase.rpc('upsert_monthly_expense', {
       p_user_id: userId,
-      p_description: it.description,
-      p_amount: it.amount,
-      p_transaction_date: invoice.date,
-      p_category_name: categoria,
+      p_description: item.description,
+      p_amount: item.total_with_tax ?? item.total_price,
+      p_transaction_date: fecha,
+      p_category_name: item.category,
       p_account_name: accountName,
-      p_place: invoice.supplier ?? 'WhatsApp',
+      p_place: typed.supplier_name ?? 'WhatsApp',
     });
-    if (error) return { ok: false, itemsFound: 0, error: error.message };
+
+    if (error) {
+      // Corte a mitad de camino: lo ya creado son transacciones reales, no se
+      // revierte. Se clasifica lo que sí se pudo (best-effort) y se marca la
+      // fila en error con el conteo real, para que el llamador no le mienta
+      // al usuario diciendo que no se guardó nada.
+      if (createdExpenses.length > 0) {
+        await clasificar(supabase, userId, createdExpenses);
+      }
+      const mensaje = `Registro parcial: ${createdExpenses.length} de ${items.length} ítems ("${item.description}" falló: ${error.message}).`;
+      const { error: updateError } = await supabase
+        .from('electronic_invoices')
+        .update({ status: 'error', error_message: mensaje })
+        .eq('id', invoiceId);
+      if (updateError) {
+        console.error(
+          'createInvoiceDirect: no se pudo marcar la factura en error:',
+          updateError.message,
+        );
+      }
+      return {
+        ok: false,
+        itemsFound: createdExpenses.length,
+        totalItems: items.length,
+        error: mensaje,
+      };
+    }
+
     if (typeof data === 'string') {
       createdExpenses.push({
         id: data,
-        description: it.description,
-        categoryName: categoria,
-        monthYear: invoice.date.slice(0, 7),
+        description: item.description,
+        categoryName: item.category,
+        monthYear: fecha.slice(0, 7),
       });
     }
   }
 
-  const storedItems: StoredInvoiceItem[] = invoice.items.map((it, i) => ({
-    description: it.description,
-    quantity: 1,
-    unit_price: it.amount,
-    total_price: it.amount,
-    total_with_tax: it.amount,
-    suggested_category: categorias[i] ?? 'OTROS',
-    category: categorias[i] ?? 'OTROS',
-  }));
-
-  await supabase.from('electronic_invoices').insert({
-    user_id: userId,
-    cufe_code: invoice.cufe,
-    source: invoice.source,
-    supplier_name: invoice.supplier,
-    invoice_date: invoice.date,
-    total_amount: invoice.total ?? invoice.items.reduce((s, it) => s + it.amount, 0),
-    items: storedItems,
-    status: 'approved',
-    selected_account_name: accountName,
-    processed_at: new Date().toISOString(),
-  });
-
-  const clasificar = deps.classify ?? classifyApprovedExpenses;
   await clasificar(supabase, userId, createdExpenses);
 
-  return { ok: true, itemsFound: invoice.items.length };
+  const { error: updateError } = await supabase
+    .from('electronic_invoices')
+    .update({
+      status: 'approved',
+      selected_account_name: accountName,
+      approved_at: new Date().toISOString(),
+    })
+    .eq('id', invoiceId);
+  if (updateError) {
+    // Los gastos YA están guardados: que no se haya podido marcar la fila
+    // como aprobada no puede convertirse en un "no pude guardar la factura"
+    // que empuje al usuario a reenviar la foto y duplicar los gastos.
+    console.error(
+      'createInvoiceDirect: no se pudo marcar la factura como aprobada:',
+      updateError.message,
+    );
+  }
+
+  return { ok: true, itemsFound: items.length, totalItems: items.length };
 }
 
 /**
