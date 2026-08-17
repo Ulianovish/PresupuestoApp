@@ -12,6 +12,11 @@ import {
   createDirectExpense,
   resolveDefaultAccount,
 } from '@/lib/services/whatsapp-expenses';
+import {
+  applyCorrection,
+  correctLastExpense,
+  queryExpenseTotal,
+} from '@/lib/services/whatsapp-queries';
 import { createAdminClient } from '@/lib/supabase/server';
 import { formatCOP } from '@/lib/whatsapp/format';
 import { parseQuickExpense } from '@/lib/whatsapp/quick-expense';
@@ -21,7 +26,12 @@ import { callGatewayReal, runAgent } from './run';
 import { readState, writeState } from './state';
 import { executeTool, type ToolDeps } from './tools';
 
-import type { ConversationState, PendingInvoice, Turn } from './state';
+import type {
+  ConversationState,
+  LastEntity,
+  PendingInvoice,
+  Turn,
+} from './state';
 
 // Cuenta de último recurso cuando ni siquiera se pudo resolver la cuenta por
 // defecto del usuario (p. ej. `resolveDefaultAccount` fue justo lo que
@@ -76,11 +86,19 @@ async function intentarModoDegradado(
     : '❌ No pude registrar el gasto. Intentá de nuevo en un momento.';
 }
 
-/** Manda la respuesta y guarda el turno, más allá de qué camino la generó. */
+/**
+ * Manda la respuesta y guarda el turno, más allá de qué camino la generó.
+ *
+ * `lastEntity` es opcional y solo se incluye en el patch cuando el turno
+ * efectivamente lo tocó (gasto nuevo o corrección aplicada): así el camino
+ * feliz sin cambios de entidad no pisa el `last_entity` ya guardado con el
+ * mismo valor innecesariamente.
+ */
 async function responderYGuardar(
   ctx: TurnCtx,
   turnosPrevios: Turn[],
   texto: string,
+  lastEntity?: LastEntity | null,
 ): Promise<void> {
   await sendWhatsAppMessage(ctx.phone, texto);
   await writeState(ctx.phone, ctx.userId, {
@@ -89,6 +107,7 @@ async function responderYGuardar(
       { role: 'user', content: ctx.body },
       { role: 'assistant', content: texto },
     ],
+    ...(lastEntity !== undefined ? { lastEntity } : {}),
   });
 }
 
@@ -127,11 +146,37 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
     return;
   }
 
+  // Se prende cuando `createExpense` o `correctLast` tocan `estado.lastEntity`,
+  // para que solo esos turnos lo incluyan en el patch final (ver
+  // `responderYGuardar`).
+  let lastEntityDirty = false;
+
   const deps: ToolDeps = {
     accounts: cuentas,
     defaultAccount: cuentaDefecto,
     today: hoyBogota,
-    createExpense: async input => createDirectExpense(ctx.userId, ctx.phone, input),
+    createExpense: async input => {
+      const res = await createDirectExpense(ctx.userId, ctx.phone, input);
+      // El último gasto registrado queda disponible para "no, eran 30 mil":
+      // si el mensaje trae varios gastos, el último en guardarse gana, que es
+      // el comportamiento esperado de "lo último".
+      if (res.ok && res.transactionId) {
+        estado = {
+          ...estado,
+          lastEntity: {
+            kind: 'expense',
+            transactionId: res.transactionId,
+            amount: input.amount,
+            description: input.description,
+            accountName: input.accountName,
+            category: res.category,
+            date: input.date,
+          },
+        };
+        lastEntityDirty = true;
+      }
+      return res;
+    },
     registerInvoice: async (accountName: string) => {
       const invoiceId = estado.pending?.invoiceId;
       if (!invoiceId) {
@@ -152,13 +197,35 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
       await writeState(ctx.phone, ctx.userId, { pending: null });
       return createInvoiceDirect(ctx.userId, invoiceId, accountName);
     },
-    // Stub: la Task 10 implementa la corrección del último gasto.
-    correctLast: async () => ({
-      ok: false,
-      error: 'todavía no implementado',
-    }),
-    // Stub: la Task 10 implementa la consulta de gastos.
-    queryExpenses: async () => ({ total: 0 }),
+    correctLast: async (campo: string, valor: string) => {
+      if (!estado.lastEntity) {
+        return {
+          ok: false,
+          error: 'No tengo un gasto reciente para corregir.',
+        };
+      }
+      const res = await correctLastExpense(
+        ctx.userId,
+        estado.lastEntity,
+        campo,
+        valor,
+      );
+      if (res.ok) {
+        // Recalcular el patch (puro, ya validado por `correctLastExpense`) para
+        // mantener `estado.lastEntity` al día: sin esto, una segunda corrección
+        // en la misma conversación vería el valor viejo en el prompt.
+        const r = applyCorrection(estado.lastEntity, campo, valor);
+        if (r.ok) {
+          estado = {
+            ...estado,
+            lastEntity: { ...estado.lastEntity, ...r.patch },
+          };
+          lastEntityDirty = true;
+        }
+      }
+      return res;
+    },
+    queryExpenses: async q => queryExpenseTotal(ctx.userId, q),
     onExpenseCreated: async () => {},
   };
 
@@ -183,10 +250,20 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
   // rendirse — con el LLM abajo, "20k taxi" se sigue registrando.
   if ('kind' in respuesta) {
     const texto = await intentarModoDegradado(ctx, cuentaDefecto);
-    await responderYGuardar(ctx, estado.turns, texto);
+    await responderYGuardar(
+      ctx,
+      estado.turns,
+      texto,
+      lastEntityDirty ? estado.lastEntity : undefined,
+    );
     return;
   }
 
   const texto = respuesta.text || 'Listo.';
-  await responderYGuardar(ctx, estado.turns, texto);
+  await responderYGuardar(
+    ctx,
+    estado.turns,
+    texto,
+    lastEntityDirty ? estado.lastEntity : undefined,
+  );
 }
