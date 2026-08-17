@@ -13,6 +13,7 @@ import { createAdminClient } from '@/lib/supabase/server';
 import {
   createDirectExpense,
   createVisionReceiptDraft,
+  pickBudgetItemId,
   resolveDefaultAccount,
 } from './whatsapp-expenses';
 
@@ -25,7 +26,9 @@ describe('resolveDefaultAccount', () => {
     const from = vi.fn(() => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: { default_account_name: 'Nequi' } }),
+      maybeSingle: vi
+        .fn()
+        .mockResolvedValue({ data: { default_account_name: 'Nequi' } }),
     }));
     mockedAdmin.mockReturnValue({ from });
     expect(await resolveDefaultAccount('+573001234567')).toBe('Nequi');
@@ -35,7 +38,9 @@ describe('resolveDefaultAccount', () => {
     const from = vi.fn(() => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: { default_account_name: null } }),
+      maybeSingle: vi
+        .fn()
+        .mockResolvedValue({ data: { default_account_name: null } }),
     }));
     mockedAdmin.mockReturnValue({ from });
     expect(await resolveDefaultAccount('+573001234567')).toBe('Efectivo');
@@ -160,5 +165,42 @@ describe('createVisionReceiptDraft', () => {
       total: 100,
     });
     expect(res.ok).toBe(false);
+  });
+});
+
+describe('pickBudgetItemId', () => {
+  const ITEMS = [
+    { id: 'i1', name: 'Carnes', category_name: 'MERCADO' },
+    { id: 'i2', name: 'Aseo', category_name: 'MERCADO' },
+    { id: 'i3', name: 'Gasolina', category_name: 'TRANSPORTE' },
+  ];
+
+  it('elige el ítem dentro de la categoría del gasto', async () => {
+    const clasificar = async () => ['Carnes'];
+    const id = await pickBudgetItemId('pernil', 'MERCADO', ITEMS, clasificar);
+    expect(id).toBe('i1');
+  });
+
+  it('solo le ofrece al clasificador los ítems de esa categoría', async () => {
+    let ofrecidos: string[] = [];
+    const clasificar = async (_: unknown, nombres: string[]) => {
+      ofrecidos = nombres;
+      return ['Carnes'];
+    };
+    await pickBudgetItemId('pernil', 'MERCADO', ITEMS, clasificar);
+    expect(ofrecidos).toEqual(['Carnes', 'Aseo']);
+    expect(ofrecidos).not.toContain('Gasolina');
+  });
+
+  it('devuelve null si la categoría no tiene ítems: no se adivina', async () => {
+    const clasificar = async () => ['Carnes'];
+    const id = await pickBudgetItemId('algo', 'VIVIENDA', ITEMS, clasificar);
+    expect(id).toBeNull();
+  });
+
+  it('devuelve null si el clasificador no reconoce nada', async () => {
+    const clasificar = async () => [null];
+    const id = await pickBudgetItemId('xyz', 'MERCADO', ITEMS, clasificar);
+    expect(id).toBeNull();
   });
 });
