@@ -11,3 +11,19 @@ export function formatCOP(amount: number): string {
     minimumFractionDigits: 0,
   }).format(amount);
 }
+
+/**
+ * Fecha "hoy" en horario de Colombia (no UTC): `en-CA` formatea YYYY-MM-DD.
+ * Evita adelantar el día para gastos enviados de noche (UTC-5).
+ *
+ * Única definición del repo: antes vivía duplicada como `hoyBogota` (el turno
+ * del agente) y `todayYmd` (el webhook), idénticas y con riesgo de divergir.
+ */
+export function todayBogota(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+}
+
+/** Primer día del mes de una fecha YYYY-MM-DD (o del mes en curso). */
+export function primerDiaDelMes(ymd: string): string {
+  return `${ymd.slice(0, 7)}-01`;
+}

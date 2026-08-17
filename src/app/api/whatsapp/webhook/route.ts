@@ -19,6 +19,7 @@ import {
 import { readState, writeState } from '@/lib/whatsapp/agent/state';
 import { handleAgentTurn, listarCuentas } from '@/lib/whatsapp/agent/turn';
 import { ackMessage, classifyText, simpleReply } from '@/lib/whatsapp/classify';
+import { todayBogota } from '@/lib/whatsapp/format';
 import { handleAgentMessage } from '@/lib/whatsapp/handle-agent';
 import { handleImageMessage } from '@/lib/whatsapp/handle-image';
 import { handleLinkingMessage } from '@/lib/whatsapp/handle-linking';
@@ -41,12 +42,6 @@ function xml(body: string, status = 200): Response {
     status,
     headers: { 'Content-Type': 'text/xml; charset=utf-8' },
   });
-}
-
-function todayYmd(): string {
-  // Fecha "hoy" en horario de Colombia (no UTC): en-CA formatea YYYY-MM-DD.
-  // Evita adelantar el día para gastos enviados de noche (UTC-5).
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 }
 
 export async function POST(request: NextRequest) {
@@ -114,7 +109,7 @@ export async function POST(request: NextRequest) {
             analyzeImage,
             createDirectExpense,
             resolveDefaultAccount,
-            today: todayYmd,
+            today: todayBogota,
             accounts,
             createReceiptDraft: createVisionReceiptDraft,
             savePending: invoiceId =>
@@ -126,10 +121,14 @@ export async function POST(request: NextRequest) {
           },
         );
       } catch (err) {
+        // No se puede saber en qué punto reventó: puede haber sido antes de
+        // leer la foto o después de registrar la mitad de sus ítems. Una foto
+        // NO tiene dedup (a diferencia del CUFE, que se reconoce por su
+        // código), así que invitar a reenviarla duplicaría la factura entera.
         console.error('Error en handleImageMessage (background):', err);
         await sendWhatsAppMessage(
           phone,
-          '❌ Tuve un problema leyendo tu imagen. Inténtalo de nuevo.',
+          '❌ Tuve un problema leyendo tu imagen. Puede que algo se haya alcanzado a registrar: revisá en la app antes de reenviarla, para no duplicarla.',
         );
       }
     });
@@ -167,14 +166,19 @@ export async function POST(request: NextRequest) {
       } catch (err) {
         // Red de seguridad: si algo lanza en background (DB/red), el usuario ya
         // recibió el ACK; sin esto se quedaría sin respuesta final.
+        //
+        // El CUFE sí tiene dedup por código, pero el registro de sus ítems no:
+        // si reventó DESPUÉS de leer la factura, reenviarlo puede duplicar lo
+        // ya escrito. Por eso el reintento se condiciona a lo que el usuario
+        // vio, en vez de ofrecerse a ciegas.
         console.error('Error en handleAgentMessage (background):', err);
         await sendWhatsAppMessage(
           phone,
-          '❌ Tuve un problema interno procesando tu mensaje. Inténtalo de nuevo en un momento.',
+          '❌ Tuve un problema interno procesando tu factura. Si ya te había dicho que la leí, revisala en la app antes de reenviar el CUFE.',
         );
       }
     });
-    return xml(twimlMessage(ackMessage(decision)));
+    return xml(twimlMessage(ackMessage()));
   }
 
   if (decision === 'agent') {
@@ -183,10 +187,14 @@ export async function POST(request: NextRequest) {
       try {
         await handleAgentTurn({ userId, phone, body });
       } catch (err) {
+        // Mismo criterio que la imagen: acá adentro corren las herramientas
+        // que escriben gastos, y desde afuera no hay forma de saber si alguna
+        // alcanzó a hacerlo. "Inténtalo de nuevo" invitaba a registrar el
+        // mismo gasto dos veces.
         console.error('Error en handleAgentTurn (background):', err);
         await sendWhatsAppMessage(
           phone,
-          '❌ Tuve un problema procesando tu mensaje. Inténtalo de nuevo en un momento.',
+          '❌ Tuve un problema procesando tu mensaje. Puede que algo se haya alcanzado a registrar: revisá en la app antes de reenviarlo, para no duplicarlo.',
         );
       }
     });

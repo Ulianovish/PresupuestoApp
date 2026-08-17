@@ -33,9 +33,14 @@ export function classifyText(body: string, numMedia: number): Decision {
   return 'agent';
 }
 
-/** Respuesta inmediata (TwiML) para los casos que siguen en background. */
-export function ackMessage(_decision: 'cufe'): string {
-  return '🧾 Recibí tu factura, la estoy procesando (~1 min). Te aviso cuando esté lista para revisar.';
+/**
+ * Respuesta inmediata (TwiML) para el CUFE, el único caso que sigue en
+ * background con un ACK propio. Sin parámetro: recibía la decisión y no la
+ * usaba. El texto tampoco habla ya de dejarla "lista para revisar": esa
+ * pantalla de aprobación se eliminó, ahora el bot pregunta la cuenta y registra.
+ */
+export function ackMessage(): string {
+  return '🧾 Recibí tu factura, la estoy consultando en la DIAN (~1 min). Después te pregunto con qué cuenta la pagaste.';
 }
 
 /** Respuesta completa (TwiML) para los casos que NO necesitan background. */

@@ -10,6 +10,7 @@ import {
 import type { ToolDeps } from './tools';
 
 const CUENTAS = ['Efectivo', 'Davivienda Crédito', 'Nequi'];
+const CATEGORIAS = ['MERCADO', 'TRANSPORTE', 'OTROS'];
 
 describe('validateGasto', () => {
   it('acepta un gasto normal', () => {
@@ -120,11 +121,30 @@ describe('TOOL_DEFINITIONS', () => {
       expect(t.input_schema.type).toBe('object');
     }
   });
+
+  it('corregir_ultimo declara los seis campos del spec, incluido item', () => {
+    const corregir = TOOL_DEFINITIONS.find(t => t.name === 'corregir_ultimo');
+    const campo = corregir?.input_schema.properties.campo as { enum: string[] };
+    expect(campo.enum).toEqual([
+      'monto',
+      'descripcion',
+      'cuenta',
+      'categoria',
+      'item',
+      'fecha',
+    ]);
+  });
+
+  it('consultar_gastos avisa que sin fechas la ventana es el mes en curso', () => {
+    const consultar = TOOL_DEFINITIONS.find(t => t.name === 'consultar_gastos');
+    expect(consultar?.description).toMatch(/mes en curso/i);
+  });
 });
 
 function depsFalsas(over: Partial<ToolDeps> = {}): ToolDeps {
   return {
     accounts: CUENTAS,
+    categories: CATEGORIAS,
     defaultAccount: 'Efectivo',
     today: () => '2026-08-17',
     createExpense: async () => ({
@@ -134,7 +154,13 @@ function depsFalsas(over: Partial<ToolDeps> = {}): ToolDeps {
     }),
     registerInvoice: async () => ({ ok: true, itemsFound: 3, totalItems: 3 }),
     correctLast: async () => ({ ok: true }),
-    queryExpenses: async () => ({ total: 412000, categoria: 'MERCADO' }),
+    queryExpenses: async () => ({
+      total: 412000,
+      categoria: 'MERCADO',
+      desde: '2026-08-01',
+      hasta: '2026-08-17',
+      mesEnCurso: true,
+    }),
     onExpenseCreated: async () => {},
     ...over,
   };
@@ -315,6 +341,61 @@ describe('executeTool', () => {
       expect(corregidoA).toBe('Nequi');
     });
 
+    it('no escribe una categoría que el usuario no tiene: quedaría fuera de todo reporte', async () => {
+      // El silencio es lo grave: `category_name` acepta cualquier string, así
+      // que una categoría inventada por el modelo se guardaba sin error y el
+      // gasto desaparecía de los reportes.
+      let escribio = false;
+      const deps = depsFalsas({
+        correctLast: async () => {
+          escribio = true;
+          return { ok: true };
+        },
+      });
+      const r = await executeTool(
+        'corregir_ultimo',
+        { campo: 'categoria', valor: 'SUPERMERCADOS' },
+        deps,
+      );
+      expect(escribio).toBe(false);
+      expect(r.ok).toBe(false);
+      expect(r.summary).toContain('MERCADO');
+    });
+
+    it('canonicaliza la categoría contra las reales (mayúsculas y tildes)', async () => {
+      let corregidoA = '';
+      const deps = depsFalsas({
+        correctLast: async (_campo, valor) => {
+          corregidoA = valor;
+          return { ok: true };
+        },
+      });
+      const r = await executeTool(
+        'corregir_ultimo',
+        { campo: 'categoria', valor: 'mercado' },
+        deps,
+      );
+      expect(r.ok).toBe(true);
+      expect(corregidoA).toBe('MERCADO');
+    });
+
+    it('acepta el campo item (el ítem del presupuesto, que el spec pide y faltaba)', async () => {
+      let recibido: [string, string] = ['', ''];
+      const deps = depsFalsas({
+        correctLast: async (campo, valor) => {
+          recibido = [campo, valor];
+          return { ok: true };
+        },
+      });
+      const r = await executeTool(
+        'corregir_ultimo',
+        { campo: 'item', valor: 'Mercado quincenal' },
+        deps,
+      );
+      expect(r.ok).toBe(true);
+      expect(recibido).toEqual(['item', 'Mercado quincenal']);
+    });
+
     it('no escribe si la cuenta nueva es ambigua', async () => {
       let escribio = false;
       const deps = depsFalsas({
@@ -339,7 +420,12 @@ describe('executeTool', () => {
   describe('consultar_gastos', () => {
     it('devuelve el total', async () => {
       const deps = depsFalsas({
-        queryExpenses: async () => ({ total: 999 }),
+        queryExpenses: async () => ({
+          total: 999,
+          desde: '2026-08-01',
+          hasta: '2026-08-17',
+          mesEnCurso: true,
+        }),
       });
       const r = await executeTool('consultar_gastos', {}, deps);
       expect(r.ok).toBe(true);
@@ -348,7 +434,13 @@ describe('executeTool', () => {
 
     it('el summary menciona la categoría cuando se pidió una', async () => {
       const deps = depsFalsas({
-        queryExpenses: async () => ({ total: 412000, categoria: 'MERCADO' }),
+        queryExpenses: async () => ({
+          total: 412000,
+          categoria: 'MERCADO',
+          desde: '2026-08-01',
+          hasta: '2026-08-17',
+          mesEnCurso: true,
+        }),
       });
       const r = await executeTool(
         'consultar_gastos',
@@ -358,6 +450,59 @@ describe('executeTool', () => {
       expect(r.ok).toBe(true);
       expect(r.summary).toContain('MERCADO');
       expect(r.summary).toContain('412000');
+    });
+
+    it('el summary dice el período: un total sin ventana se lee como "este mes"', async () => {
+      const deps = depsFalsas();
+      const r = await executeTool(
+        'consultar_gastos',
+        { categoria: 'MERCADO' },
+        deps,
+      );
+      expect(r.summary).toMatch(/este mes/i);
+      // Y el texto para el usuario trae el monto formateado.
+      expect(r.userSummary).toMatch(/412\.000/);
+    });
+
+    it('con fechas explícitas nombra el rango, no "este mes"', async () => {
+      const deps = depsFalsas({
+        queryExpenses: async () => ({
+          total: 1000,
+          desde: '2026-07-01',
+          hasta: '2026-07-31',
+          mesEnCurso: false,
+        }),
+      });
+      const r = await executeTool(
+        'consultar_gastos',
+        { desde: '2026-07-01', hasta: '2026-07-31' },
+        deps,
+      );
+      expect(r.summary).toContain('2026-07-01');
+      expect(r.summary).not.toMatch(/este mes/i);
+    });
+
+    it('una categoría inventada no consulta nada: devolvería $0 y el usuario lo leería como "no gasté"', async () => {
+      let consultado = false;
+      const deps = depsFalsas({
+        queryExpenses: async () => {
+          consultado = true;
+          return {
+            total: 0,
+            desde: '2026-08-01',
+            hasta: '2026-08-17',
+            mesEnCurso: true,
+          };
+        },
+      });
+      const r = await executeTool(
+        'consultar_gastos',
+        { categoria: 'SUPERMERCADOS' },
+        deps,
+      );
+      expect(consultado).toBe(false);
+      expect(r.ok).toBe(false);
+      expect(r.summary).toContain('MERCADO');
     });
   });
 });

@@ -1,6 +1,8 @@
 // Definiciones de herramientas + validación. El modelo propone; acá se decide
 // si se puede. Una cuenta inventada o un monto absurdo mueren en esta capa.
 
+import { formatCOP } from '@/lib/whatsapp/format';
+
 import type { ToolOutcome } from './run';
 
 /**
@@ -22,13 +24,47 @@ export type Validation<T> =
   | { ok: true; value: T }
   | { ok: false; error: string };
 
-/** Compara nombres de cuenta ignorando mayúsculas, tildes y espacios de más. */
-function normalizar(s: string): string {
+/**
+ * Compara nombres ignorando mayúsculas, tildes y espacios de más.
+ *
+ * Exportada: es la ÚNICA definición del repo. `handle-image.ts` tenía su propia
+ * copia sin `.trim()`, con el riesgo de que las dos divergieran y un mismo
+ * nombre resolviera distinto según por qué camino entró.
+ */
+export function normalizar(s: string): string {
   return s
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // quita tildes
     .toLowerCase()
     .trim();
+}
+
+export type Resolucion =
+  | { kind: 'ok'; valor: string }
+  | { kind: 'ambigua'; candidatas: string[] }
+  | { kind: 'no-existe' };
+
+/**
+ * Resuelve un texto libre del modelo contra los nombres reales del usuario
+ * (cuentas, categorías).
+ *
+ * 1. Coincidencia exacta primero: si el texto coincide carácter por carácter con un
+ *    nombre, ese gana sin ambigüedad posible (el caso común, porque el prompt le pasa
+ *    los nombres exactos).
+ * 2. Si no hay exacta, coincidencia normalizada (ignora mayúsculas, tildes y espacios).
+ * 3. Si la normalización coincide con más de un nombre (p. ej. "Davivienda" y
+ *    "DAVIVIENDA" normalizan igual), no se elige ninguno: es ambiguo y hay que
+ *    preguntarle al usuario.
+ */
+export function resolverNombre(texto: string, nombres: string[]): Resolucion {
+  const exacta = nombres.find(n => n === texto);
+  if (exacta) return { kind: 'ok', valor: exacta };
+
+  const norm = normalizar(texto);
+  const candidatas = nombres.filter(n => normalizar(n) === norm);
+  if (candidatas.length === 1) return { kind: 'ok', valor: candidatas[0] };
+  if (candidatas.length > 1) return { kind: 'ambigua', candidatas };
+  return { kind: 'no-existe' };
 }
 
 export type ResolucionCuenta =
@@ -37,28 +73,15 @@ export type ResolucionCuenta =
   | { kind: 'no-existe' };
 
 /**
- * Resuelve el texto de cuenta que propone el modelo contra las cuentas reales del usuario.
- *
- * 1. Coincidencia exacta primero: si el texto coincide carácter por carácter con una
- *    cuenta, esa gana sin ambigüedad posible (el caso común, porque el prompt le pasa
- *    los nombres exactos).
- * 2. Si no hay exacta, coincidencia normalizada (ignora mayúsculas, tildes y espacios).
- * 3. Si la normalización coincide con más de una cuenta (p. ej. "Davivienda" y
- *    "DAVIVIENDA" normalizan igual), no se elige ninguna: es ambigua y hay que
- *    preguntarle al usuario.
+ * `resolverNombre` para cuentas. Conserva el campo `cuenta` que ya leen los
+ * llamadores en vez de obligarlos a hablar de "valor".
  */
 export function resolverCuenta(
   texto: string,
   accounts: string[],
 ): ResolucionCuenta {
-  const exacta = accounts.find(a => a === texto);
-  if (exacta) return { kind: 'ok', cuenta: exacta };
-
-  const norm = normalizar(texto);
-  const candidatas = accounts.filter(a => normalizar(a) === norm);
-  if (candidatas.length === 1) return { kind: 'ok', cuenta: candidatas[0] };
-  if (candidatas.length > 1) return { kind: 'ambigua', candidatas };
-  return { kind: 'no-existe' };
+  const r = resolverNombre(texto, accounts);
+  return r.kind === 'ok' ? { kind: 'ok', cuenta: r.valor } : r;
 }
 
 export function validateGasto(
@@ -172,7 +195,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {
         campo: {
           type: 'string',
-          enum: ['monto', 'descripcion', 'cuenta', 'categoria', 'fecha'],
+          // 'item' es el ítem del presupuesto al que se imputa el gasto (lo
+          // asigna la IA al registrarlo y a veces se equivoca). Corregirlo por
+          // chat lo marca como manual, para que la reclasificación no lo pise.
+          enum: ['monto', 'descripcion', 'cuenta', 'categoria', 'item', 'fecha'],
         },
         valor: { type: 'string', description: 'El valor nuevo, como texto.' },
       },
@@ -181,7 +207,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'consultar_gastos',
-    description: 'Consulta cuánto se gastó. Solo lectura.',
+    description:
+      'Consulta cuánto se gastó. Solo lectura. Sin desde/hasta se responde por el MES EN CURSO, no por toda la historia.',
     input_schema: {
       type: 'object',
       properties: {
@@ -189,8 +216,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: 'string',
           description: 'Categoría a consultar. Omitir para el total.',
         },
-        desde: { type: 'string', description: 'YYYY-MM-DD' },
-        hasta: { type: 'string', description: 'YYYY-MM-DD' },
+        desde: {
+          type: 'string',
+          description: 'YYYY-MM-DD. Omitir para el mes en curso.',
+        },
+        hasta: {
+          type: 'string',
+          description: 'YYYY-MM-DD. Omitir para el mes en curso.',
+        },
       },
     },
   },
@@ -198,6 +231,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 
 export interface ToolDeps {
   accounts: string[];
+  /**
+   * Categorías reales del usuario. Sin esto, una categoría inventada por el
+   * modelo se escribía tal cual en `category_name` y el gasto quedaba fuera de
+   * todo reporte, en silencio.
+   */
+  categories: string[];
   defaultAccount: string;
   today: () => string;
   createExpense: (input: {
@@ -215,6 +254,8 @@ export interface ToolDeps {
     ok: boolean;
     itemsFound: number;
     totalItems: number;
+    /** Suma de lo que EFECTIVAMENTE quedó en `transactions` (ver I3). */
+    totalAmount?: number;
     error?: string;
   }>;
   correctLast: (
@@ -225,7 +266,14 @@ export interface ToolDeps {
     categoria?: string;
     desde?: string;
     hasta?: string;
-  }) => Promise<{ total: number; categoria?: string }>;
+  }) => Promise<{
+    total: number;
+    categoria?: string;
+    desde: string;
+    hasta: string;
+    /** true si el período lo puso el default (mes en curso), no el modelo. */
+    mesEnCurso: boolean;
+  }>;
   /** Se llama tras cada gasto creado. Enganche para las alertas de presupuesto. */
   onExpenseCreated: (categoria: string) => Promise<void>;
 }
@@ -242,6 +290,19 @@ function mensajeCuentaNoResuelta(texto: string, deps: ToolDeps): string {
     return `La cuenta "${texto}" es ambigua: puede ser ${resolucion.candidatas.join(' o ')}. Preguntale al usuario cuál.`;
   }
   return `La cuenta "${texto}" no existe. Son: ${deps.accounts.join(', ')}. Preguntale cuál usó.`;
+}
+
+/**
+ * Mensaje para cuando la categoría que mandó el modelo no es una de las reales
+ * del usuario. Escribirla igual dejaría el gasto fuera de todo reporte sin que
+ * nadie se entere: es preferible que el modelo pregunte.
+ */
+function mensajeCategoriaNoResuelta(texto: string, deps: ToolDeps): string {
+  const resolucion = resolverNombre(texto, deps.categories);
+  if (resolucion.kind === 'ambigua') {
+    return `La categoría "${texto}" es ambigua: puede ser ${resolucion.candidatas.join(' o ')}. Preguntale al usuario cuál.`;
+  }
+  return `La categoría "${texto}" no existe. Son: ${deps.categories.join(', ')}. Preguntale cuál corresponde.`;
 }
 
 export async function executeTool(
@@ -278,9 +339,12 @@ export async function executeTool(
           errAlerta,
         );
       }
+      const cuentaUsada = v.value.cuenta ?? deps.defaultAccount;
       return {
         ok: true,
-        summary: `Guardado: ${v.value.monto} "${v.value.descripcion}" en ${res.category} (${v.value.cuenta ?? deps.defaultAccount}).`,
+        wrote: true,
+        summary: `Guardado: ${v.value.monto} "${v.value.descripcion}" en ${res.category} (${cuentaUsada}).`,
+        userSummary: `✅ Anotado ${formatCOP(v.value.monto)} en ${res.category} (${cuentaUsada}) · ${v.value.descripcion}.`,
       };
     }
 
@@ -292,9 +356,16 @@ export async function executeTool(
       }
       const res = await deps.registerInvoice(resolucion.cuenta);
       if (res.ok) {
+        // El total que se confirma es el que EFECTIVAMENTE se registró (suma
+        // de los ítems), no el de la cabecera de la factura: con descuentos o
+        // redondeos difieren y el usuario ve un número que no está en la app.
+        const totalTexto =
+          res.totalAmount != null ? ` por ${formatCOP(res.totalAmount)}` : '';
         return {
           ok: true,
-          summary: `Factura guardada con ${res.itemsFound} ítems en ${resolucion.cuenta}.`,
+          wrote: true,
+          summary: `Factura guardada con ${res.itemsFound} ítems en ${resolucion.cuenta}${res.totalAmount != null ? ` (total registrado ${res.totalAmount})` : ''}.`,
+          userSummary: `✅ Registré tu factura${totalTexto} (${res.itemsFound} ítems) en ${resolucion.cuenta}.`,
         };
       }
       // Fallo parcial: algunos ítems SÍ quedaron guardados (son transacciones
@@ -303,7 +374,9 @@ export async function executeTool(
       if (res.itemsFound > 0) {
         return {
           ok: false,
+          wrote: true,
           summary: `Se registraron ${res.itemsFound} de ${res.totalItems} ítems en ${resolucion.cuenta}; el resto falló. Decile al usuario que revise la factura en la app, NO le sugieras reenviar la foto.`,
+          userSummary: `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura en ${resolucion.cuenta}; el resto falló. Revisala en la app, no la reenvíes.`,
         };
       }
       return {
@@ -315,37 +388,77 @@ export async function executeTool(
     if (name === 'corregir_ultimo') {
       const campo = String(input.campo ?? '');
       const valor = String(input.valor ?? '');
-      if (campo === 'cuenta') {
-        const resolucion = resolverCuenta(valor, deps.accounts);
+      // Cuenta y categoría se canonicalizan contra lo que el usuario tiene de
+      // verdad: un nombre inventado se escribía tal cual y el gasto quedaba
+      // fuera de todo reporte (categoría) o apuntando a nada (cuenta).
+      if (campo === 'cuenta' || campo === 'categoria') {
+        const opciones = campo === 'cuenta' ? deps.accounts : deps.categories;
+        const resolucion = resolverNombre(valor, opciones);
         if (resolucion.kind !== 'ok') {
-          return { ok: false, summary: mensajeCuentaNoResuelta(valor, deps) };
+          return {
+            ok: false,
+            summary:
+              campo === 'cuenta'
+                ? mensajeCuentaNoResuelta(valor, deps)
+                : mensajeCategoriaNoResuelta(valor, deps),
+          };
         }
-        const res = await deps.correctLast(campo, resolucion.cuenta);
+        const res = await deps.correctLast(campo, resolucion.valor);
         // `||` y no `??`: un `error: ''` no puede colar un summary vacío.
         return res.ok
-          ? { ok: true, summary: `Corregido: cuenta = ${resolucion.cuenta}.` }
+          ? {
+              ok: true,
+              wrote: true,
+              summary: `Corregido: ${campo} = ${resolucion.valor}.`,
+              userSummary: `✅ Corregido: ${campo} = ${resolucion.valor}.`,
+            }
           : {
               ok: false,
-              summary: res.error || 'No se pudo corregir la cuenta.',
+              summary: res.error || `No se pudo corregir ${campo}.`,
             };
       }
       const res = await deps.correctLast(campo, valor);
       return res.ok
-        ? { ok: true, summary: `Corregido: ${campo} = ${valor}.` }
+        ? {
+            ok: true,
+            wrote: true,
+            summary: `Corregido: ${campo} = ${valor}.`,
+            userSummary: `✅ Corregido: ${campo} = ${valor}.`,
+          }
         : { ok: false, summary: res.error || `No se pudo corregir ${campo}.` };
     }
 
     if (name === 'consultar_gastos') {
+      const pedida = input.categoria as string | undefined;
+      let categoria: string | undefined;
+      if (pedida) {
+        const resolucion = resolverNombre(pedida, deps.categories);
+        if (resolucion.kind !== 'ok') {
+          return {
+            ok: false,
+            summary: mensajeCategoriaNoResuelta(pedida, deps),
+          };
+        }
+        categoria = resolucion.valor;
+      }
       const r = await deps.queryExpenses({
-        categoria: input.categoria as string | undefined,
+        categoria,
         desde: input.desde as string | undefined,
         hasta: input.hasta as string | undefined,
       });
+      // El período SIEMPRE se dice: un total sin ventana temporal se lee como
+      // "lo de este mes" y puede ser 10 veces más.
+      const periodo = r.mesEnCurso
+        ? 'este mes'
+        : `entre ${r.desde} y ${r.hasta}`;
       return {
         ok: true,
         summary: r.categoria
-          ? `Total en ${r.categoria}: ${r.total}.`
-          : `Total: ${r.total}.`,
+          ? `Total en ${r.categoria} ${periodo}: ${r.total}.`
+          : `Total ${periodo}: ${r.total}.`,
+        userSummary: r.categoria
+          ? `Total en ${r.categoria} ${periodo}: ${formatCOP(r.total)}.`
+          : `Total ${periodo}: ${formatCOP(r.total)}.`,
       };
     }
 

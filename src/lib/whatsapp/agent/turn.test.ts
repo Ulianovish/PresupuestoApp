@@ -53,7 +53,7 @@ import {
 import { createAdminClient } from '@/lib/supabase/server';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/transport';
 
-import { runAgent } from './run';
+import { callGatewayReal, runAgent } from './run';
 import { readState, writeState } from './state';
 import { handleAgentTurn } from './turn';
 
@@ -67,6 +67,7 @@ const mockedResolveDefaultAccount = vi.mocked(resolveDefaultAccount);
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
 const mockedSendWhatsAppMessage = vi.mocked(sendWhatsAppMessage);
 const mockedRunAgent = vi.mocked(runAgent);
+const mockedCallGatewayReal = vi.mocked(callGatewayReal);
 const mockedReadState = vi.mocked(readState);
 const mockedWriteState = vi.mocked(writeState);
 
@@ -123,7 +124,10 @@ describe('handleAgentTurn', () => {
   });
 
   it('Gateway caído + parser que acierta: registra el gasto con monto formateado y descripción, y guarda estado', async () => {
-    mockedRunAgent.mockResolvedValue({ kind: 'service_error' });
+    mockedRunAgent.mockResolvedValue({
+      kind: 'service_error',
+      huboEscrituras: false,
+    });
     mockedCreateDirectExpense.mockResolvedValue({
       ok: true,
       category: 'TRANSPORTE',
@@ -151,7 +155,10 @@ describe('handleAgentTurn', () => {
   });
 
   it('Gateway caído + parser que no acierta: mensaje honesto, no culpa al usuario', async () => {
-    mockedRunAgent.mockResolvedValue({ kind: 'service_error' });
+    mockedRunAgent.mockResolvedValue({
+      kind: 'service_error',
+      huboEscrituras: false,
+    });
 
     await handleAgentTurn({
       userId: 'u1',
@@ -163,6 +170,45 @@ describe('handleAgentTurn', () => {
     const mensaje = mockedSendWhatsAppMessage.mock.calls[0][1];
     expect(mensaje).toMatch(/fallando|asistente/i);
     expect(mockedWriteState).toHaveBeenCalled();
+  });
+
+  it('Gateway caído DESPUÉS de que la herramienta escribió: NO reintenta, avisa y no duplica', async () => {
+    // Regresión del hallazgo crítico. Acá corre el `runAgent` REAL (con el
+    // `executeTool` real que arma `turn.ts`): la vuelta 0 del Gateway pide
+    // registrar_gasto —que escribe— y la vuelta 1 se cae. Antes, el
+    // service_error pelado hacía correr el modo degradado con el mismo "20k
+    // taxi" y `createDirectExpense` se llamaba DOS veces, con un solo mensaje
+    // de confirmación para el usuario.
+    mockedCreateDirectExpense.mockResolvedValue({
+      ok: true,
+      category: 'TRANSPORTE',
+      transactionId: 'tx-1',
+    });
+    mockedCallGatewayReal
+      .mockResolvedValueOnce({
+        stop_reason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tu_1',
+            name: 'registrar_gasto',
+            input: { monto: 20000, descripcion: 'taxi' },
+          },
+        ],
+      })
+      .mockRejectedValueOnce(new Error('429 Too Many Requests'));
+    mockedRunAgent.mockImplementation(async (mensaje, ctx, deps) => {
+      const real = await vi.importActual<typeof import('./run')>('./run');
+      return real.runAgent(mensaje, ctx, deps);
+    });
+
+    await handleAgentTurn({ userId: 'u1', phone: '+57300', body: '20k taxi' });
+
+    expect(mockedCreateDirectExpense).toHaveBeenCalledTimes(1);
+    const mensaje = mockedSendWhatsAppMessage.mock.calls[0][1];
+    expect(mensaje).toMatch(/cort/i);
+    // No puede invitar a reenviar: el gasto ya está escrito.
+    expect(mensaje).not.toMatch(/probá en un minuto|intentá de nuevo/i);
   });
 
   it('falla de base al armar el contexto: cae al parser en vez del error genérico', async () => {
@@ -223,6 +269,7 @@ describe('handleAgentTurn — registrar_factura', () => {
       ok: true,
       itemsFound: 1,
       totalItems: 1,
+      totalAmount: 8000,
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
       const out = await deps.executeTool('registrar_factura', {
@@ -251,6 +298,7 @@ describe('handleAgentTurn — registrar_factura', () => {
       ok: false,
       itemsFound: 2,
       totalItems: 5,
+      totalAmount: 3000,
       error: 'boom',
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
@@ -268,11 +316,61 @@ describe('handleAgentTurn — registrar_factura', () => {
     expect(mensaje).not.toMatch(/no se pudo guardar/i);
   });
 
+  it('tras registrar la factura, corregir_ultimo no toca la transacción vieja', async () => {
+    // Secuencia real: foto → "Davivienda" → registrada → "no, esa fue con la
+    // Nequi". El `lastEntity` que sobrevivía era un gasto de texto de hace
+    // días: se modificaba una transacción no relacionada y encima se contestaba
+    // "Corregido". Dos gastos mal atribuidos.
+    const GASTO_VIEJO = {
+      kind: 'expense' as const,
+      transactionId: 'tx-vieja',
+      amount: 12000,
+      description: 'café',
+      accountName: 'Efectivo',
+      category: 'OTROS',
+      date: '2026-08-14',
+    };
+    mockedReadState.mockResolvedValue({
+      turns: [],
+      pending: { kind: 'invoice_account', invoiceId: 'inv-1' },
+      lastEntity: GASTO_VIEJO,
+    });
+    mockedCreateInvoiceDirect.mockResolvedValue({
+      ok: true,
+      itemsFound: 1,
+      totalItems: 1,
+      totalAmount: 8000,
+    });
+    mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
+      await deps.executeTool('registrar_factura', { cuenta: 'Nequi' });
+      const out = await deps.executeTool('corregir_ultimo', {
+        campo: 'cuenta',
+        valor: 'Nequi',
+      });
+      return { text: out.summary, calls: [] };
+    });
+
+    await handleAgentTurn({
+      userId: 'u1',
+      phone: '+57300',
+      body: 'con Davivienda... no, esa fue con la Nequi',
+    });
+
+    expect(mockedCorrectLastExpense).not.toHaveBeenCalled();
+    // Y el estado guardado deja de apuntar al gasto viejo.
+    expect(mockedWriteState).toHaveBeenCalledWith(
+      '+57300',
+      'u1',
+      expect.objectContaining({ lastEntity: null }),
+    );
+  });
+
   it('un segundo registrar_factura en la misma vuelta no registra la factura dos veces', async () => {
     mockedCreateInvoiceDirect.mockResolvedValue({
       ok: true,
       itemsFound: 1,
       totalItems: 1,
+      totalAmount: 8000,
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
       await deps.executeTool('registrar_factura', { cuenta: 'Nequi' });
@@ -464,6 +562,9 @@ describe('handleAgentTurn — corregir_ultimo y consultar_gastos', () => {
     mockedQueryExpenseTotal.mockResolvedValue({
       total: 412000,
       categoria: 'MERCADO',
+      desde: '2026-08-01',
+      hasta: '2026-08-17',
+      mesEnCurso: true,
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
       const out = await deps.executeTool('consultar_gastos', {

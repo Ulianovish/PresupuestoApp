@@ -20,11 +20,30 @@ export interface ToolOutcome {
   ok: boolean;
   /** Texto corto que se le devuelve al modelo como resultado. */
   summary: string;
+  /**
+   * Texto para el USUARIO (montos formateados, sin instrucciones al modelo).
+   * Se usa cuando hay que responder sin que el modelo redacte: se agotaron las
+   * vueltas o el Gateway se cayó a mitad del bucle.
+   */
+  userSummary?: string;
+  /**
+   * true si la herramienta escribió en la base — incluido el fallo parcial de
+   * una factura, donde los ítems ya creados son transacciones reales.
+   *
+   * Es el dato que evita el gasto duplicado: sin él, un Gateway que falla
+   * DESPUÉS de que una herramienta escribió se veía igual que un Gateway que
+   * nunca respondió, y el modo degradado volvía a registrar lo mismo.
+   */
+  wrote?: boolean;
 }
 
 export type AgentReply =
   | { text: string; calls: ToolCall[] }
-  | { kind: 'service_error' };
+  | {
+      kind: 'service_error';
+      /** Si es true, NO se puede reintentar nada: ya hay escrituras hechas. */
+      huboEscrituras: boolean;
+    };
 
 type GatewayMessage = { role: 'user' | 'assistant'; content: unknown };
 
@@ -128,8 +147,17 @@ export async function runAgent(
   } catch (err) {
     // No es culpa del usuario: el llamador debe decirlo así y no pedirle que
     // reformule el mensaje.
+    //
+    // El try envuelve TODO el bucle, así que esto también cubre el caso feo:
+    // la vuelta 0 anduvo, una herramienta ESCRIBIÓ el gasto, y la vuelta 1
+    // falló. Por eso se reporta si hubo escrituras: sin ese dato el llamador
+    // corría el modo degradado con el mismo mensaje y registraba el gasto por
+    // segunda vez.
     console.error('runAgent: falló el Gateway:', err);
-    return { kind: 'service_error' };
+    return {
+      kind: 'service_error',
+      huboEscrituras: resultadosHerramientas.some(r => r.wrote),
+    };
   }
 
   // Si el cierre fue genuino y trajo texto, ese es el mensaje. Si no (se
@@ -139,12 +167,18 @@ export async function runAgent(
   // que le haga creer al usuario que no pasó nada.
   let textoFinal = terminoNaturalmente ? ultimoTexto : '';
   if (!textoFinal) {
-    const exitosos = resultadosHerramientas
-      .filter(r => r.ok)
-      .map(r => r.summary);
+    // Se incluye TODO lo que escribió, no solo lo que salió `ok`: un
+    // `registrar_factura` parcial es `ok:false` y aun así dejó transacciones
+    // reales. Dejarlo afuera hacía que el fallback dijera "No pude completar la
+    // acción. Probá de nuevo" — exactamente lo que empuja a duplicar la
+    // factura, y lo contrario de lo que el summary de esa herramienta se
+    // esfuerza en explicar.
+    const conEfecto = resultadosHerramientas.filter(r => r.ok || r.wrote);
+    // `userSummary` y no `summary`: el segundo está escrito PARA EL MODELO
+    // (montos crudos, instrucciones tipo "decile al usuario que...").
     textoFinal =
-      exitosos.length > 0
-        ? exitosos.join('\n')
+      conEfecto.length > 0
+        ? conEfecto.map(r => r.userSummary ?? r.summary).join('\n')
         : 'No pude completar la acción. Probá de nuevo.';
   }
 

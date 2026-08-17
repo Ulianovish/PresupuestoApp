@@ -106,7 +106,10 @@ describe('classifyText — enrutado al agente', () => {
 
 describe('ackMessage', () => {
   it('cufe tiene ack interino', () => {
-    expect(ackMessage('cufe')).toMatch(/factura|proces/i);
+    expect(ackMessage()).toMatch(/factura|consult/i);
+    // La pantalla de aprobación se eliminó: el ack no puede seguir prometiendo
+    // dejarla "lista para revisar".
+    expect(ackMessage()).not.toMatch(/revisar/i);
   });
 });
 

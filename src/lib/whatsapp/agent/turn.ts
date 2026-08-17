@@ -18,7 +18,7 @@ import {
   queryExpenseTotal,
 } from '@/lib/services/whatsapp-queries';
 import { createAdminClient } from '@/lib/supabase/server';
-import { formatCOP } from '@/lib/whatsapp/format';
+import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
 import { parseQuickExpense } from '@/lib/whatsapp/quick-expense';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/transport';
 
@@ -38,9 +38,14 @@ import type {
 // falló). Mismo valor que FALLBACK_ACCOUNT en whatsapp-expenses.ts.
 const CUENTA_DE_EMERGENCIA = 'Efectivo';
 
-function hoyBogota(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
-}
+/**
+ * Aviso para cuando el Gateway se cae DESPUÉS de que una herramienta ya
+ * escribió. No se puede reintentar nada (ni por el modo degradado ni pidiéndole
+ * al usuario que reenvíe): lo escrito son transacciones reales y volver a
+ * pasar el mismo mensaje las duplicaría.
+ */
+const AVISO_CORTE_CON_ESCRITURAS =
+  '⚠️ Registré lo que me pediste, pero se me cortó la conversación antes de terminar. Revisá en la app si algo quedó a medias — no me lo reenvíes, se duplicaría.';
 
 /** Cuentas activas del usuario. Compartida con el flujo de imágenes del webhook. */
 export async function listarCuentas(userId: string): Promise<string[]> {
@@ -79,7 +84,7 @@ async function intentarModoDegradado(
     amount: rapido.amount,
     description: rapido.description,
     accountName: cuentaDefecto,
-    date: hoyBogota(),
+    date: todayBogota(),
   });
   return res.ok
     ? `✅ Anotado ${formatCOP(rapido.amount)} en ${res.category} (${cuentaDefecto}) · ${rapido.description}. Si algo está mal, edítalo en la app.`
@@ -153,8 +158,9 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
 
   const deps: ToolDeps = {
     accounts: cuentas,
+    categories: categorias,
     defaultAccount: cuentaDefecto,
-    today: hoyBogota,
+    today: todayBogota,
     createExpense: async input => {
       const res = await createDirectExpense(ctx.userId, ctx.phone, input);
       // El último gasto registrado queda disponible para "no, eran 30 mil":
@@ -193,7 +199,15 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
       // la factura y registrarla de nuevo. `createInvoiceDirect` además
       // rechaza una fila que ya no esté en pending_review, como refuerzo
       // por si la llamada viniera de otro turno concurrente.
-      estado = { ...estado, pending: null };
+      //
+      // `lastEntity: null` en la misma movida: registrar una factura NO deja
+      // un "último gasto" corregible (una factura son N transacciones, no
+      // una). Si se dejara el gasto de texto anterior, un "no, esa fue con la
+      // Nequi" justo después de la factura corregiría una transacción vieja y
+      // ajena, y encima contestaría "Corregido". Con null, `corregir_ultimo`
+      // responde honestamente que no hay nada reciente que corregir.
+      estado = { ...estado, pending: null, lastEntity: null };
+      lastEntityDirty = true;
       await writeState(ctx.phone, ctx.userId, { pending: null });
       return createInvoiceDirect(ctx.userId, invoiceId, accountName);
     },
@@ -235,7 +249,7 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
       accounts: cuentas,
       categories: categorias,
       defaultAccount: cuentaDefecto,
-      today: hoyBogota(),
+      today: todayBogota(),
       pendingInvoice: facturaPendiente,
       lastEntity: estado.lastEntity,
       turns: estado.turns,
@@ -248,8 +262,15 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
 
   // Gateway caído: no es culpa del usuario. Se intenta el parser viejo antes de
   // rendirse — con el LLM abajo, "20k taxi" se sigue registrando.
+  //
+  // Salvo que alguna herramienta YA haya escrito antes de que el Gateway se
+  // cayera: ahí el modo degradado le pasaría el MISMO mensaje a
+  // `parseQuickExpense` y registraría el gasto por segunda vez. Con escrituras
+  // hechas se responde la verdad y no se toca nada más.
   if ('kind' in respuesta) {
-    const texto = await intentarModoDegradado(ctx, cuentaDefecto);
+    const texto = respuesta.huboEscrituras
+      ? AVISO_CORTE_CON_ESCRITURAS
+      : await intentarModoDegradado(ctx, cuentaDefecto);
     await responderYGuardar(
       ctx,
       estado.turns,
