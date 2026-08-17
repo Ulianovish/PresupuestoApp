@@ -1,6 +1,7 @@
 // Orquesta un turno del agente: lee estado, corre el bucle, responde y guarda.
-// Si el Gateway falla, cae a `parseQuickExpense` para no dejar al usuario sin
-// nada: un gasto simple se sigue registrando con el LLM caído.
+// Si el Gateway falla —o si ni siquiera se pudo armar el contexto (DB abajo)—
+// cae a `parseQuickExpense` para no dejar al usuario sin nada: un gasto
+// simple se sigue registrando con el LLM caído.
 
 import { resolveUserCategoryNames } from '@/lib/services/invoices';
 import {
@@ -8,12 +9,20 @@ import {
   resolveDefaultAccount,
 } from '@/lib/services/whatsapp-expenses';
 import { createAdminClient } from '@/lib/supabase/server';
+import { formatCOP } from '@/lib/whatsapp/format';
 import { parseQuickExpense } from '@/lib/whatsapp/quick-expense';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/transport';
 
 import { callGatewayReal, runAgent } from './run';
 import { readState, writeState } from './state';
 import { executeTool, type ToolDeps } from './tools';
+
+import type { ConversationState, Turn } from './state';
+
+// Cuenta de último recurso cuando ni siquiera se pudo resolver la cuenta por
+// defecto del usuario (p. ej. `resolveDefaultAccount` fue justo lo que
+// falló). Mismo valor que FALLBACK_ACCOUNT en whatsapp-expenses.ts.
+const CUENTA_DE_EMERGENCIA = 'Efectivo';
 
 function hoyBogota(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
@@ -29,17 +38,78 @@ async function listarCuentas(userId: string): Promise<string[]> {
   return (data ?? []).map((r: { name: string }) => r.name);
 }
 
-export async function handleAgentTurn(ctx: {
+interface TurnCtx {
   userId: string;
   phone: string;
   body: string;
-}): Promise<void> {
-  const estado = await readState(ctx.phone);
-  const [cuentas, categorias, cuentaDefecto] = await Promise.all([
-    listarCuentas(ctx.userId),
-    resolveUserCategoryNames(createAdminClient(), ctx.userId),
-    resolveDefaultAccount(ctx.phone),
-  ]);
+}
+
+/**
+ * Modo degradado: si `parseQuickExpense` reconoce el mensaje, registra el
+ * gasto igual y responde con el mismo formato que `handle-agent.ts` usa para
+ * quick_expense (monto formateado + descripción). Incluir la descripción
+ * importa: `parseQuickExpense` es el parser que acierta mal en silencio
+ * ("2 empanadas 5000" -> $2), y solo viéndola el usuario puede pescar el
+ * error justo en el camino donde ese parser volvió a decidir.
+ */
+async function intentarModoDegradado(
+  ctx: TurnCtx,
+  cuentaDefecto: string,
+): Promise<string> {
+  const rapido = parseQuickExpense(ctx.body);
+  if (!rapido) {
+    return '⚠️ Mi asistente está fallando ahora mismo (no es tu mensaje). Probá en un minuto, o escribí el gasto simple: "20k taxi".';
+  }
+  const res = await createDirectExpense(ctx.userId, ctx.phone, {
+    amount: rapido.amount,
+    description: rapido.description,
+    accountName: cuentaDefecto,
+    date: hoyBogota(),
+  });
+  return res.ok
+    ? `✅ Anotado ${formatCOP(rapido.amount)} en ${res.category} (${cuentaDefecto}) · ${rapido.description}. Si algo está mal, edítalo en la app.`
+    : '❌ No pude registrar el gasto. Intentá de nuevo en un momento.';
+}
+
+/** Manda la respuesta y guarda el turno, más allá de qué camino la generó. */
+async function responderYGuardar(
+  ctx: TurnCtx,
+  turnosPrevios: Turn[],
+  texto: string,
+): Promise<void> {
+  await sendWhatsAppMessage(ctx.phone, texto);
+  await writeState(ctx.phone, ctx.userId, {
+    turns: [
+      ...turnosPrevios,
+      { role: 'user', content: ctx.body },
+      { role: 'assistant', content: texto },
+    ],
+  });
+}
+
+export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
+  let estado: ConversationState;
+  let cuentas: string[];
+  let categorias: string[];
+  let cuentaDefecto: string;
+
+  try {
+    estado = await readState(ctx.phone);
+    [cuentas, categorias, cuentaDefecto] = await Promise.all([
+      listarCuentas(ctx.userId),
+      resolveUserCategoryNames(createAdminClient(), ctx.userId),
+      resolveDefaultAccount(ctx.phone),
+    ]);
+  } catch (err) {
+    // Una falla de base al armar el contexto no puede dejar al usuario sin
+    // nada: el mismo modo degradado que cubre al Gateway caído cubre esto.
+    // Sin `estado` ni `cuentaDefecto` resueltos, se arranca de cero y se usa
+    // la cuenta de emergencia.
+    console.error('handleAgentTurn: falló al armar el contexto:', err);
+    const texto = await intentarModoDegradado(ctx, CUENTA_DE_EMERGENCIA);
+    await responderYGuardar(ctx, [], texto);
+    return;
+  }
 
   const deps: ToolDeps = {
     accounts: cuentas,
@@ -82,36 +152,11 @@ export async function handleAgentTurn(ctx: {
   // Gateway caído: no es culpa del usuario. Se intenta el parser viejo antes de
   // rendirse — con el LLM abajo, "20k taxi" se sigue registrando.
   if ('kind' in respuesta) {
-    const rapido = parseQuickExpense(ctx.body);
-    if (rapido) {
-      const res = await createDirectExpense(ctx.userId, ctx.phone, {
-        amount: rapido.amount,
-        description: rapido.description,
-        accountName: cuentaDefecto,
-        date: hoyBogota(),
-      });
-      await sendWhatsAppMessage(
-        ctx.phone,
-        res.ok
-          ? `✅ Anotado ${rapido.amount} en ${res.category} (${cuentaDefecto}).`
-          : '❌ No pude registrar el gasto. Intentá de nuevo en un momento.',
-      );
-      return;
-    }
-    await sendWhatsAppMessage(
-      ctx.phone,
-      '⚠️ Mi asistente está fallando ahora mismo (no es tu mensaje). Probá en un minuto, o escribí el gasto simple: "20k taxi".',
-    );
+    const texto = await intentarModoDegradado(ctx, cuentaDefecto);
+    await responderYGuardar(ctx, estado.turns, texto);
     return;
   }
 
   const texto = respuesta.text || 'Listo.';
-  await sendWhatsAppMessage(ctx.phone, texto);
-  await writeState(ctx.phone, ctx.userId, {
-    turns: [
-      ...estado.turns,
-      { role: 'user', content: ctx.body },
-      { role: 'assistant', content: texto },
-    ],
-  });
+  await responderYGuardar(ctx, estado.turns, texto);
 }
