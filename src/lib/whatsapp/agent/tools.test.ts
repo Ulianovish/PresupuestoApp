@@ -204,4 +204,142 @@ describe('executeTool', () => {
     const r = await executeTool('volar', {}, depsFalsas());
     expect(r.ok).toBe(false);
   });
+
+  it('si onExpenseCreated lanza, igual devuelve ok:true: el gasto ya quedó guardado', async () => {
+    const deps = depsFalsas({
+      onExpenseCreated: async () => {
+        throw new Error('boom');
+      },
+    });
+    const r = await executeTool(
+      'registrar_gasto',
+      { monto: 1000, descripcion: 'x' },
+      deps,
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  describe('registrar_factura', () => {
+    it('guarda la factura con una cuenta válida', async () => {
+      const r = await executeTool(
+        'registrar_factura',
+        { cuenta: 'Nequi' },
+        depsFalsas(),
+      );
+      expect(r.ok).toBe(true);
+      expect(r.summary).toContain('Nequi');
+    });
+
+    it('no llama a registerInvoice si la cuenta no existe', async () => {
+      let escribio = false;
+      const deps = depsFalsas({
+        registerInvoice: async () => {
+          escribio = true;
+          return { ok: true, itemsFound: 1 };
+        },
+      });
+      const r = await executeTool(
+        'registrar_factura',
+        { cuenta: 'Bancolombia' },
+        deps,
+      );
+      expect(escribio).toBe(false);
+      expect(r.ok).toBe(false);
+      expect(r.summary).toContain('Bancolombia');
+    });
+
+    it('no elige ninguna cuenta ambigua, no escribe, y el mensaje nombra las candidatas', async () => {
+      let escribio = false;
+      const deps = depsFalsas({
+        accounts: ['Davivienda', 'DAVIVIENDA'],
+        registerInvoice: async () => {
+          escribio = true;
+          return { ok: true, itemsFound: 1 };
+        },
+      });
+      const r = await executeTool(
+        'registrar_factura',
+        { cuenta: 'davivienda' },
+        deps,
+      );
+      expect(escribio).toBe(false);
+      expect(r.ok).toBe(false);
+      expect(r.summary).toContain('Davivienda');
+      expect(r.summary).toContain('DAVIVIENDA');
+    });
+  });
+
+  describe('corregir_ultimo', () => {
+    it('corrige un campo que no es cuenta', async () => {
+      const r = await executeTool(
+        'corregir_ultimo',
+        { campo: 'descripcion', valor: 'taxi' },
+        depsFalsas(),
+      );
+      expect(r.ok).toBe(true);
+      expect(r.summary).toContain('taxi');
+    });
+
+    it('corrige la cuenta con una cuenta válida', async () => {
+      let corregidoA = '';
+      const deps = depsFalsas({
+        correctLast: async (_campo, valor) => {
+          corregidoA = valor;
+          return { ok: true };
+        },
+      });
+      const r = await executeTool(
+        'corregir_ultimo',
+        { campo: 'cuenta', valor: 'nequi' },
+        deps,
+      );
+      expect(r.ok).toBe(true);
+      expect(corregidoA).toBe('Nequi');
+    });
+
+    it('no escribe si la cuenta nueva es ambigua', async () => {
+      let escribio = false;
+      const deps = depsFalsas({
+        accounts: ['Davivienda', 'DAVIVIENDA'],
+        correctLast: async () => {
+          escribio = true;
+          return { ok: true };
+        },
+      });
+      const r = await executeTool(
+        'corregir_ultimo',
+        { campo: 'cuenta', valor: 'davivienda' },
+        deps,
+      );
+      expect(escribio).toBe(false);
+      expect(r.ok).toBe(false);
+      expect(r.summary).toContain('Davivienda');
+      expect(r.summary).toContain('DAVIVIENDA');
+    });
+  });
+
+  describe('consultar_gastos', () => {
+    it('devuelve el total', async () => {
+      const deps = depsFalsas({
+        queryExpenses: async () => ({ total: 999 }),
+      });
+      const r = await executeTool('consultar_gastos', {}, deps);
+      expect(r.ok).toBe(true);
+      expect(r.summary).toContain('999');
+    });
+
+    it('el summary menciona la categoría cuando se pidió una', async () => {
+      const deps = depsFalsas({
+        queryExpenses: async () => ({ total: 412000, categoria: 'MERCADO' }),
+      });
+      const r = await executeTool(
+        'consultar_gastos',
+        { categoria: 'MERCADO' },
+        deps,
+      );
+      expect(r.ok).toBe(true);
+      expect(r.summary).toContain('MERCADO');
+      expect(r.summary).toContain('412000');
+    });
+  });
 });

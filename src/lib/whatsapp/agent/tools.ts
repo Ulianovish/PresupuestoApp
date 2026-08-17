@@ -258,7 +258,18 @@ export async function executeTool(
           summary: `No se pudo guardar: ${res.error ?? 'error desconocido'}`,
         };
 
-      await deps.onExpenseCreated(res.category);
+      // Best-effort: el gasto YA está guardado. Si el enganche de alertas
+      // (futuro) lanza, no puede convertir un gasto real en un "no se pudo
+      // guardar" que empuje al modelo a reintentar y duplicarlo (mismo
+      // criterio que la asignación de ítem de presupuesto en createDirectExpense).
+      try {
+        await deps.onExpenseCreated(res.category);
+      } catch (errAlerta) {
+        console.error(
+          'executeTool(registrar_gasto): onExpenseCreated falló:',
+          errAlerta,
+        );
+      }
       return {
         ok: true,
         summary: `Guardado: ${v.value.monto} "${v.value.descripcion}" en ${res.category} (${v.value.cuenta ?? deps.defaultAccount}).`,
