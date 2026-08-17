@@ -21,6 +21,7 @@ import {
   redeemLinkCode,
 } from '@/lib/services/whatsapp-links';
 import { createAdminClient } from '@/lib/supabase/server';
+import { handleAgentTurn } from '@/lib/whatsapp/agent/turn';
 import { ackMessage, classifyText, simpleReply } from '@/lib/whatsapp/classify';
 import {
   handleAgentMessage,
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
   if (decision === 'image') {
     const mediaUrl = params.MediaUrl0 || '';
     if (!mediaUrl) {
-      return xml(twimlMessage(simpleReply('unknown')));
+      return xml(twimlMessage(simpleReply('help')));
     }
     const userId = link.userId;
     after(async () => {
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
     return xml(twimlMessage('📷 Recibí tu imagen, la estoy leyendo (~30s)...'));
   }
 
-  if (decision === 'cufe' || decision === 'quick_expense') {
+  if (decision === 'cufe') {
     const userId = link.userId;
     after(async () => {
       try {
@@ -171,6 +172,22 @@ export async function POST(request: NextRequest) {
     return xml(twimlMessage(ackMessage(decision)));
   }
 
-  // help / unknown → respuesta completa síncrona (image se maneja arriba).
+  if (decision === 'agent') {
+    const userId = link.userId;
+    after(async () => {
+      try {
+        await handleAgentTurn({ userId, phone, body });
+      } catch (err) {
+        console.error('Error en handleAgentTurn (background):', err);
+        await sendWhatsAppMessage(
+          phone,
+          '❌ Tuve un problema procesando tu mensaje. Inténtalo de nuevo en un momento.',
+        );
+      }
+    });
+    return xml(twimlMessage('✍️ Un momento...'));
+  }
+
+  // help → respuesta completa síncrona (image/cufe/agent se manejan arriba).
   return xml(twimlMessage(simpleReply(decision)));
 }

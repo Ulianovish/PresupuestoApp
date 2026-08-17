@@ -74,18 +74,39 @@ describe('classifyText', () => {
     expect(classifyText('ayuda', 0)).toBe('help');
     expect(classifyText('HELP', 0)).toBe('help');
   });
-  it('gasto rápido → quick_expense', () => {
-    expect(classifyText('20k taxi', 0)).toBe('quick_expense');
+  it('gasto de texto → agent', () => {
+    expect(classifyText('20k taxi', 0)).toBe('agent');
   });
-  it('no entendible → unknown', () => {
-    expect(classifyText('hola', 0)).toBe('unknown');
+  it('no entendible → agent', () => {
+    expect(classifyText('hola', 0)).toBe('agent');
+  });
+});
+
+describe('classifyText — enrutado al agente', () => {
+  it('el CUFE sigue siendo determinista, no pasa por el agente', () => {
+    expect(classifyText('a'.repeat(96), 0)).toBe('cufe');
+  });
+
+  it('manda al agente lo que antes caía en unknown', () => {
+    expect(classifyText('¿cuánto llevo en mercado?', 0)).toBe('agent');
+  });
+
+  it('manda al agente los gastos de texto: el parser acertaba mal en silencio', () => {
+    expect(classifyText('2 empanadas 5000', 0)).toBe('agent');
+  });
+
+  it('"ayuda" sigue siendo respuesta fija: no gasta tokens', () => {
+    expect(classifyText('ayuda', 0)).toBe('help');
+  });
+
+  it('una imagen sigue siendo imagen', () => {
+    expect(classifyText('con la Davivienda', 1)).toBe('image');
   });
 });
 
 describe('ackMessage', () => {
-  it('cufe y quick_expense tienen ack interino', () => {
+  it('cufe tiene ack interino', () => {
     expect(ackMessage('cufe')).toMatch(/factura|proces/i);
-    expect(ackMessage('quick_expense')).toMatch(/anot|registr|gast/i);
   });
 });
 
@@ -95,8 +116,5 @@ describe('simpleReply', () => {
   });
   it('help lista lo que puede hacer', () => {
     expect(simpleReply('help')).toMatch(/CUFE/i);
-  });
-  it('unknown orienta al usuario', () => {
-    expect(simpleReply('unknown')).toMatch(/CUFE|gasto/i);
   });
 });
