@@ -126,6 +126,33 @@ describe('createInvoiceDirect', () => {
     );
   });
 
+  it('falla sin crear ningún gasto → vuelve a pending_review (reintentable, sin riesgo de duplicar)', async () => {
+    // Distinto del caso "a mitad de camino": si no se creó ni un gasto, no
+    // hay nada que duplicar reintentando. Dejarla en 'error' la sacaría de la
+    // vista de rescate ("Facturas sin completar" solo lista pending_review y
+    // error, pero solo pending_review ofrece el botón de completar).
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: { message: 'boom' } }); // arroz: falla de entrada
+    const { from, update } = makeSupabaseMock({ row: invoiceRow(), rpc });
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    let clasificado = false;
+    const res = await createInvoiceDirect('user-1', 'inv-1', 'Nequi', {
+      classify: async () => {
+        clasificado = true;
+      },
+    });
+
+    expect(res.ok).toBe(false);
+    expect(res.itemsFound).toBe(0);
+    expect(res.totalItems).toBe(2);
+    expect(clasificado).toBe(false); // nada que clasificar, no se creó nada
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'pending_review' }),
+    );
+  });
+
   it('no reintenta una factura que ya no está en pending_review (evita duplicar)', async () => {
     const rpc = vi.fn();
     const { from } = makeSupabaseMock({ row: invoiceRow({ status: 'approved' }), rpc });

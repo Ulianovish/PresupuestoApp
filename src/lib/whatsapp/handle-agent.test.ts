@@ -8,9 +8,6 @@ function makeDeps(overrides = {}) {
   return {
     sendMessage: vi.fn(async () => ({ ok: true as const })),
     processCufe: vi.fn(async () => ({ ok: true as const, itemsFound: 3 })),
-    createDirectExpense: vi.fn(async () => ({ ok: true as const, category: 'MERCADO' })),
-    resolveDefaultAccount: vi.fn(async () => 'Nequi'),
-    today: () => '2026-06-11',
     ...overrides,
   };
 }
@@ -74,32 +71,5 @@ describe('handleAgentMessage', () => {
       '+57300',
       expect.stringMatching(/no pude|error|falló/i),
     );
-  });
-
-  it('quick_expense → crea gasto y confirma con monto y categoría', async () => {
-    const deps = makeDeps();
-    await handleAgentMessage(
-      'quick_expense',
-      { userId: 'u1', phone: '+573001234567', body: '20k mercado' },
-      deps,
-    );
-    expect(deps.resolveDefaultAccount).toHaveBeenCalledWith('+573001234567');
-    expect(deps.createDirectExpense).toHaveBeenCalledWith('u1', '+573001234567', {
-      amount: 20000,
-      description: 'mercado',
-      accountName: 'Nequi',
-      date: '2026-06-11',
-    });
-    expect(deps.sendMessage).toHaveBeenCalledWith(
-      '+573001234567',
-      expect.stringMatching(/20.?000/),
-    );
-  });
-
-  it('quick_expense con texto no parseable → pide reformular (no crea gasto)', async () => {
-    const deps = makeDeps();
-    await handleAgentMessage('quick_expense', { userId: 'u1', phone: '+57300', body: 'hola' }, deps);
-    expect(deps.createDirectExpense).not.toHaveBeenCalled();
-    expect(deps.sendMessage).toHaveBeenCalled();
   });
 });

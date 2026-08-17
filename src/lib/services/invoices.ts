@@ -2,7 +2,6 @@
 
 import { EXPENSE_CATEGORIES } from '@/lib/constants/expense-categories';
 import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
-import { mapInvoiceItemToExpenseArgs } from '@/lib/dian/invoice-mapper';
 import { resolveItemNameToId } from '@/lib/services/expenses-rollup';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import type { PendingInvoice } from '@/lib/whatsapp/agent/state';
@@ -154,89 +153,6 @@ export async function listDraftInvoices(
 }
 
 /**
- * Aprueba una factura: crea un gasto por ítem vía upsert_monthly_expense y
- * marca la factura como approved.
- */
-export async function approveInvoice(
-  userId: string,
-  invoiceId: string,
-  accountName: string,
-  categoryOverrides?: Record<number, string>,
-): Promise<{ success: boolean; created: number; error?: string }> {
-  const supabase = await createClient();
-
-  const { data: invoice, error } = await supabase
-    .from('electronic_invoices')
-    .select('*')
-    .eq('id', invoiceId)
-    .eq('user_id', userId)
-    .single();
-
-  if (error || !invoice) {
-    return { success: false, created: 0, error: 'Factura no encontrada' };
-  }
-  if ((invoice as ElectronicInvoice).status !== 'pending_review') {
-    return {
-      success: false,
-      created: 0,
-      error: 'La factura no está pendiente de revisión',
-    };
-  }
-
-  const typed = invoice as ElectronicInvoice;
-  const items = (typed.items || []).map((it, idx) => ({
-    ...it,
-    category: categoryOverrides?.[idx] ?? it.category,
-  }));
-
-  const createdExpenses: Array<{
-    id: string;
-    description: string;
-    categoryName: string;
-    monthYear: string;
-  }> = [];
-  let created = 0;
-  for (const item of items) {
-    const args = mapInvoiceItemToExpenseArgs(item, typed, userId, accountName);
-    const { data: transactionId, error: rpcError } = await supabase.rpc(
-      'upsert_monthly_expense',
-      args,
-    );
-    if (rpcError) {
-      return {
-        success: false,
-        created,
-        error: `Error creando gasto "${item.description}": ${rpcError.message}`,
-      };
-    }
-    if (transactionId) {
-      createdExpenses.push({
-        id: transactionId as string,
-        description: args.p_description,
-        categoryName: args.p_category_name,
-        monthYear: (args.p_transaction_date || '').slice(0, 7),
-      });
-    }
-    created++;
-  }
-
-  // Clasificación best-effort: asigna cada gasto creado a un ítem del presupuesto.
-  await classifyApprovedExpenses(supabase, userId, createdExpenses);
-
-  await supabase
-    .from('electronic_invoices')
-    .update({
-      status: 'approved',
-      selected_account_name: accountName,
-      items,
-      approved_at: new Date().toISOString(),
-    })
-    .eq('id', invoiceId);
-
-  return { success: true, created };
-}
-
-/**
  * Resumen de una factura pendiente, para mostrarla en el prompt del agente
  * ("HAY UNA FACTURA ESPERANDO CUENTA..."). Se busca por id porque `pending`
  * en la conversación solo guarda el id, no la factura entera (ver
@@ -272,9 +188,11 @@ export async function getPendingInvoiceSummary(
 
 /**
  * Registra una factura ya persistida (por `createVisionReceiptDraft` o el
- * flujo CUFE), sin aprobación manual. Reemplaza el par `approveInvoice` +
- * pantalla: la cuenta ahora la pregunta el agente de WhatsApp
- * (`resolveAccountFromMessage`), que era la única razón de ese paso.
+ * flujo CUFE), sin aprobación manual: la cuenta la pregunta el agente de
+ * WhatsApp (`resolveAccountFromMessage`), y ese era el único paso que
+ * justificaba una pantalla de aprobación. También la usa la vista de rescate
+ * ("Facturas sin completar") cuando el usuario nunca contestó la cuenta por
+ * WhatsApp y la completa desde la app.
  *
  * A propósito NO recibe los datos de la factura sueltos: los lee de la fila
  * por `invoiceId`, la misma que `createVisionReceiptDraft` dejó en
@@ -284,15 +202,18 @@ export async function getPendingInvoiceSummary(
  * único lugar donde vivía y se perdía en ambos casos.
  *
  * Si la fila ya no está en `pending_review` (se registró antes, o quedó en
- * error), no se reintenta a ciegas: evita duplicar ítems que ya son
- * transacciones reales — p. ej. si el modelo llama `registrar_factura` dos
- * veces en la misma vuelta.
+ * error tras un fallo parcial), no se reintenta a ciegas: evita duplicar
+ * ítems que ya son transacciones reales — p. ej. si el modelo llama
+ * `registrar_factura` dos veces en la misma vuelta.
  *
  * Si un ítem falla a mitad de camino, los gastos ya creados NO se revierten
  * (son transacciones reales vía `upsert_monthly_expense`, que no dedupe) y el
  * resultado lo dice: `itemsFound` es el conteo real, nunca cero solo porque
  * el último ítem falló. Decirle al usuario "no se guardó nada" cuando sí se
- * guardó una parte lo empuja a reenviar la foto y duplicar esos ítems.
+ * guardó una parte lo empuja a reenviar la foto y duplicar esos ítems. Por
+ * eso la fila solo vuelve a `pending_review` (reintentable) cuando
+ * `itemsFound` sigue en cero; si ya se creó algo, queda en `error` para que
+ * no se vuelva a intentar sola.
  *
  * Usa `createAdminClient` porque corre en background (`after()` del
  * webhook), sin sesión de navegador — mismo patrón que `createDirectExpense`
@@ -358,20 +279,28 @@ export async function createInvoiceDirect(
 
     if (error) {
       // Corte a mitad de camino: lo ya creado son transacciones reales, no se
-      // revierte. Se clasifica lo que sí se pudo (best-effort) y se marca la
-      // fila en error con el conteo real, para que el llamador no le mienta
-      // al usuario diciendo que no se guardó nada.
+      // revierte. Se clasifica lo que sí se pudo (best-effort).
       if (createdExpenses.length > 0) {
         await clasificar(supabase, userId, createdExpenses);
       }
-      const mensaje = `Registro parcial: ${createdExpenses.length} de ${items.length} ítems ("${item.description}" falló: ${error.message}).`;
+      // Si no se creó ningún gasto todavía no hay riesgo de duplicar: la fila
+      // vuelve a pending_review para que la vista de rescate pueda
+      // reintentarla. Si ya se creó aunque sea uno, sí queda en error —
+      // reintentar duplicaría los ítems que ya son transacciones reales.
+      const sinGastosCreados = createdExpenses.length === 0;
+      const mensaje = sinGastosCreados
+        ? `No se pudo registrar ningún ítem ("${item.description}" falló: ${error.message}). Se puede reintentar.`
+        : `Registro parcial: ${createdExpenses.length} de ${items.length} ítems ("${item.description}" falló: ${error.message}).`;
       const { error: updateError } = await supabase
         .from('electronic_invoices')
-        .update({ status: 'error', error_message: mensaje })
+        .update({
+          status: sinGastosCreados ? 'pending_review' : 'error',
+          error_message: mensaje,
+        })
         .eq('id', invoiceId);
       if (updateError) {
         console.error(
-          'createInvoiceDirect: no se pudo marcar la factura en error:',
+          'createInvoiceDirect: no se pudo actualizar el estado de la factura tras el fallo:',
           updateError.message,
         );
       }

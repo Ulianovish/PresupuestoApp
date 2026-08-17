@@ -172,9 +172,6 @@ export async function POST(request: NextRequest) {
           {
             sendMessage: sendWhatsAppMessage,
             processCufe: processCufeForWhatsApp,
-            createDirectExpense,
-            resolveDefaultAccount,
-            today: todayYmd,
           },
         );
       } catch (err) {

@@ -686,7 +686,7 @@ export default function GastosPage() {
       migrationPanel={
         <PendingInvoicesPanel
           refreshToken={invoiceRefresh}
-          onApproved={refreshExpenses}
+          onCompleted={refreshExpenses}
         />
       }
       modal={

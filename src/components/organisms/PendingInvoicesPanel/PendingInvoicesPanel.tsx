@@ -5,36 +5,47 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import Button from '@/components/atoms/Button/Button';
-import { useCategories } from '@/hooks/useCategories';
-import {
-  ACCOUNT_TYPES,
-  EXPENSE_CATEGORIES,
-  formatCurrency,
-} from '@/lib/services/expenses';
+import { formatCurrency, getUserAccounts } from '@/lib/services/expenses';
 import type { ElectronicInvoice } from '@/types/invoices';
 
 interface PendingInvoicesPanelProps {
   refreshToken: number; // cambia para forzar recarga
-  onApproved: () => void; // refrescar la tabla de gastos
+  onCompleted: () => void; // refrescar la tabla de gastos
 }
 
+/**
+ * Vista de rescate: ya no hay un trámite de aprobación (el bot de WhatsApp
+ * pregunta la cuenta y registra directo). Este panel solo lista facturas que
+ * quedaron sin completar — `pending_review` (esperando que el usuario diga
+ * la cuenta) o `error` — para que no se pierdan si el usuario nunca contestó
+ * por WhatsApp o si el registro falló.
+ */
 export default function PendingInvoicesPanel({
   refreshToken,
-  onApproved,
+  onCompleted,
 }: PendingInvoicesPanelProps) {
   const [invoices, setInvoices] = useState<ElectronicInvoice[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [account, setAccount] = useState<string>([...ACCOUNT_TYPES][0]);
-  const [cats, setCats] = useState<Record<number, string>>({});
-  const [approving, setApproving] = useState(false);
+  const [accountNames, setAccountNames] = useState<string[]>([]);
+  const [account, setAccount] = useState<string>('');
+  const [completing, setCompleting] = useState(false);
 
-  // Categorías activas del usuario (mismas que el tab de presupuesto).
-  // Fallback a la lista fija mientras cargan o si no hay ninguna.
-  const { categories: userCategories } = useCategories();
-  const categoryOptions =
-    userCategories.length > 0
-      ? userCategories.map(c => c.name)
-      : [...EXPENSE_CATEGORIES];
+  // Cuentas reales del usuario (tabla `accounts`), no la lista fija de
+  // ACCOUNT_TYPES: con esa, rescatar una factura la registraría con una
+  // cuenta que puede no existir para el usuario.
+  useEffect(() => {
+    let active = true;
+    getUserAccounts()
+      .then(accts => {
+        if (active) setAccountNames(accts.map(a => a.name));
+      })
+      .catch(() => {
+        if (active) setAccountNames([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     const res = await fetch('/api/invoices/pending');
@@ -59,30 +70,31 @@ export default function PendingInvoicesPanel({
 
   const openInvoice = (inv: ElectronicInvoice) => {
     setOpenId(inv.id);
-    setAccount([...ACCOUNT_TYPES][0]);
-    const initial: Record<number, string> = {};
-    inv.items.forEach((it, idx) => (initial[idx] = it.category));
-    setCats(initial);
+    setAccount(accountNames[0] ?? '');
   };
 
-  const approve = async (inv: ElectronicInvoice) => {
-    setApproving(true);
+  const complete = async (inv: ElectronicInvoice) => {
+    if (!account) {
+      toast.error('No hay cuentas disponibles para registrar la factura');
+      return;
+    }
+    setCompleting(true);
     try {
-      const res = await fetch(`/api/invoices/${inv.id}/approve`, {
+      const res = await fetch(`/api/invoices/${inv.id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountName: account, categoryOverrides: cats }),
+        body: JSON.stringify({ accountName: account }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error aprobando');
-      toast.success(`${data.created} gastos creados`);
+      if (!res.ok) throw new Error(data.error || 'Error registrando la factura');
+      toast.success(`${data.itemsFound} gastos registrados`);
       setOpenId(null);
       await load();
-      onApproved();
+      onCompleted();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error aprobando');
+      toast.error(err instanceof Error ? err.message : 'Error registrando la factura');
     } finally {
-      setApproving(false);
+      setCompleting(false);
     }
   };
 
@@ -91,7 +103,7 @@ export default function PendingInvoicesPanel({
   return (
     <div className="mb-6 rounded-lg border border-amber-600/40 bg-amber-950/20 p-4">
       <h3 className="mb-3 font-medium text-amber-300">
-        Facturas por aprobar ({invoices.length})
+        Facturas sin completar ({invoices.length})
       </h3>
 
       <div className="space-y-2">
@@ -135,7 +147,7 @@ export default function PendingInvoicesPanel({
                     openId === inv.id ? setOpenId(null) : openInvoice(inv)
                   }
                 >
-                  {openId === inv.id ? 'Cerrar' : 'Revisar'}
+                  {openId === inv.id ? 'Cerrar' : 'Completar'}
                 </Button>
               )}
             </div>
@@ -151,7 +163,10 @@ export default function PendingInvoicesPanel({
                     onChange={e => setAccount(e.target.value)}
                     className="w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-white"
                   >
-                    {[...ACCOUNT_TYPES].map(a => (
+                    {accountNames.length === 0 && (
+                      <option value="">Sin cuentas disponibles</option>
+                    )}
+                    {accountNames.map(a => (
                       <option key={a} value={a}>
                         {a}
                       </option>
@@ -171,29 +186,19 @@ export default function PendingInvoicesPanel({
                       <span className="text-slate-400">
                         {formatCurrency(it.total_with_tax ?? it.total_price)}
                       </span>
-                      <select
-                        value={cats[idx]}
-                        onChange={e =>
-                          setCats(prev => ({ ...prev, [idx]: e.target.value }))
-                        }
-                        className="rounded border border-slate-700 bg-slate-800 px-1 py-0.5 text-xs text-white"
-                      >
-                        {categoryOptions.map(c => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
+                      <span className="text-xs text-slate-500">
+                        {it.category}
+                      </span>
                     </div>
                   ))}
                 </div>
 
                 <Button
                   size="sm"
-                  onClick={() => approve(inv)}
-                  disabled={approving}
+                  onClick={() => complete(inv)}
+                  disabled={completing || !account}
                 >
-                  {approving ? 'Aprobando...' : 'Aprobar y crear gastos'}
+                  {completing ? 'Registrando...' : 'Registrar factura'}
                 </Button>
               </div>
             )}
