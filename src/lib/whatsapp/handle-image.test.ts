@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { handleImageMessage } from './handle-image';
+import { handleImageMessage, resolveAccountFromMessage } from './handle-image';
 
 function makeDeps(overrides = {}) {
   return {
@@ -8,14 +8,16 @@ function makeDeps(overrides = {}) {
     downloadMedia: vi.fn(async () => ({ base64: 'b64', mime: 'image/png' })),
     analyzeImage: vi.fn(),
     createDirectExpense: vi.fn(async () => ({ ok: true, category: 'OTROS' })),
-    createVisionReceiptDraft: vi.fn(async () => ({ ok: true, itemsFound: 2 })),
     resolveDefaultAccount: vi.fn(async () => 'Efectivo'),
     today: () => '2026-06-12',
+    accounts: ['Efectivo', 'Nequi', 'Davivienda Crédito'],
+    savePending: vi.fn(async () => {}),
+    registerInvoice: vi.fn(async () => ({ ok: true, itemsFound: 2 })),
     ...overrides,
   };
 }
 
-const ctx = { userId: 'u1', phone: '+57300', mediaUrl: 'https://m/0' };
+const ctx = { userId: 'u1', phone: '+57300', mediaUrl: 'https://m/0', body: '' };
 
 describe('handleImageMessage', () => {
   it('transferencia → gasto directo con la cuenta deducida', async () => {
@@ -60,7 +62,7 @@ describe('handleImageMessage', () => {
     });
   });
 
-  it('recibo → borrador y avisa', async () => {
+  it('recibo con cuenta en el texto → registra directo, sin preguntar', async () => {
     const deps = makeDeps({
       analyzeImage: vi.fn(async () => ({
         kind: 'receipt',
@@ -71,21 +73,77 @@ describe('handleImageMessage', () => {
         confidence: 0.8,
       })),
     });
-    await handleImageMessage(ctx, deps);
-    expect(deps.createVisionReceiptDraft).toHaveBeenCalledWith('u1', {
+    await handleImageMessage({ ...ctx, body: 'pagué con Nequi' }, deps);
+    expect(deps.registerInvoice).toHaveBeenCalledWith(
+      {
+        source: 'vision_receipt',
+        cufe: null,
+        supplier: 'D1',
+        date: '2026-06-12',
+        total: 6000,
+        items: [{ description: 'Arroz', amount: 6000 }],
+      },
+      'Nequi',
+    );
+    expect(deps.savePending).not.toHaveBeenCalled();
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringMatching(/registr/i),
+    );
+  });
+
+  it('recibo sin cuenta reconocible en el texto → guarda pendiente y pregunta', async () => {
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'receipt',
+        supplier: 'D1',
+        date: '2026-06-12',
+        items: [{ description: 'Arroz', amount: 6000 }],
+        total: 6000,
+        confidence: 0.8,
+      })),
+    });
+    await handleImageMessage({ ...ctx, body: '' }, deps);
+    expect(deps.savePending).toHaveBeenCalledWith({
+      source: 'vision_receipt',
+      cufe: null,
       supplier: 'D1',
       date: '2026-06-12',
-      items: [{ description: 'Arroz', amount: 6000 }],
       total: 6000,
+      items: [{ description: 'Arroz', amount: 6000 }],
     });
-    expect(deps.sendMessage).toHaveBeenCalledWith('+57300', expect.stringMatching(/revisar|aprobar|lista/i));
+    expect(deps.registerInvoice).not.toHaveBeenCalled();
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringMatching(/qué cuenta/i),
+    );
+  });
+
+  it('recibo con cuenta resuelta pero el registro falla → avisa el error', async () => {
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'receipt',
+        supplier: null,
+        date: '2026-06-12',
+        items: [{ description: 'x', amount: 1000 }],
+        total: 1000,
+        confidence: 0.5,
+      })),
+      registerInvoice: vi.fn(async () => ({ ok: false, itemsFound: 0, error: 'boom' })),
+    });
+    await handleImageMessage({ ...ctx, body: 'con Nequi' }, deps);
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringMatching(/no pude guardar la factura/i),
+    );
   });
 
   it('unknown → pide reenviar/escribir (no crea nada)', async () => {
     const deps = makeDeps({ analyzeImage: vi.fn(async () => ({ kind: 'unknown' })) });
     await handleImageMessage(ctx, deps);
     expect(deps.createDirectExpense).not.toHaveBeenCalled();
-    expect(deps.createVisionReceiptDraft).not.toHaveBeenCalled();
+    expect(deps.registerInvoice).not.toHaveBeenCalled();
+    expect(deps.savePending).not.toHaveBeenCalled();
     expect(deps.sendMessage).toHaveBeenCalledWith('+57300', expect.stringMatching(/no pude|reenv|escrib/i));
   });
 
@@ -95,7 +153,7 @@ describe('handleImageMessage', () => {
     });
     await handleImageMessage(ctx, deps);
     expect(deps.createDirectExpense).not.toHaveBeenCalled();
-    expect(deps.createVisionReceiptDraft).not.toHaveBeenCalled();
+    expect(deps.registerInvoice).not.toHaveBeenCalled();
     const [, msg] = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
       .calls[0] as [string, string];
     expect(msg).toMatch(/no es tu foto|fallando/i);
@@ -108,5 +166,53 @@ describe('handleImageMessage', () => {
     await handleImageMessage(ctx, deps);
     expect(deps.analyzeImage).not.toHaveBeenCalled();
     expect(deps.sendMessage).toHaveBeenCalled();
+  });
+});
+
+describe('resolveAccountFromMessage', () => {
+  const CUENTAS = ['Efectivo', 'Davivienda Crédito', 'Nequi'];
+
+  it('usa el texto que vino con la imagen', () => {
+    expect(resolveAccountFromMessage('con la Davivienda', null, CUENTAS)).toBe(
+      'Davivienda Crédito',
+    );
+  });
+
+  it('cae a la cuenta que detectó la visión si el texto no dice nada', () => {
+    expect(resolveAccountFromMessage('', 'Nequi', CUENTAS)).toBe('Nequi');
+  });
+
+  it('el texto le gana a la visión: el usuario sabe más que la foto', () => {
+    expect(resolveAccountFromMessage('fue con Nequi', 'Efectivo', CUENTAS)).toBe('Nequi');
+  });
+
+  it('devuelve null si no hay nada que resolver, para que el bot pregunte', () => {
+    expect(resolveAccountFromMessage('', null, CUENTAS)).toBeNull();
+  });
+
+  it('ignora una cuenta que el usuario no tiene', () => {
+    expect(resolveAccountFromMessage('con Bancolombia', null, CUENTAS)).toBeNull();
+  });
+
+  it('una cuenta ambigua por texto se trata como no resuelta, nunca se elige al azar', () => {
+    // Escenario real: "Davivienda" y "DAVIVIENDA" coexisten como cuentas
+    // distintas del usuario (colisión de datos real, ver memoria del proyecto).
+    const CUENTAS_AMBIGUAS = ['Davivienda', 'DAVIVIENDA', 'Nequi'];
+    expect(
+      resolveAccountFromMessage('pagué con davivienda', null, CUENTAS_AMBIGUAS),
+    ).toBeNull();
+  });
+
+  it('la visión también trata la ambigüedad como no resuelta', () => {
+    const CUENTAS_AMBIGUAS = ['Davivienda', 'DAVIVIENDA', 'Nequi'];
+    expect(resolveAccountFromMessage('', 'davivienda', CUENTAS_AMBIGUAS)).toBeNull();
+  });
+
+  it('varias cuentas que comparten la misma palabra distintiva también son ambiguas', () => {
+    // Con ~23 cuentas reales, varias comparten palabra (8 variantes de "Nu").
+    const CUENTAS_COMPARTIDAS = ['Banco Falabella', 'Falabella Crédito', 'Nequi'];
+    expect(
+      resolveAccountFromMessage('pagué con Falabella', null, CUENTAS_COMPARTIDAS),
+    ).toBeNull();
   });
 });

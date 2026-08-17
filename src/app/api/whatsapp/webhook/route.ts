@@ -10,10 +10,9 @@ import {
   prepareInvoiceProcessing,
   runInvoiceProcessing,
 } from '@/lib/dian/process-invoice';
-import { resolveUserCategoryNames } from '@/lib/services/invoices';
+import { createInvoiceDirect, resolveUserCategoryNames } from '@/lib/services/invoices';
 import {
   createDirectExpense,
-  createVisionReceiptDraft,
   resolveDefaultAccount,
 } from '@/lib/services/whatsapp-expenses';
 import {
@@ -21,7 +20,8 @@ import {
   redeemLinkCode,
 } from '@/lib/services/whatsapp-links';
 import { createAdminClient } from '@/lib/supabase/server';
-import { handleAgentTurn } from '@/lib/whatsapp/agent/turn';
+import { writeState } from '@/lib/whatsapp/agent/state';
+import { handleAgentTurn, listarCuentas } from '@/lib/whatsapp/agent/turn';
 import { ackMessage, classifyText, simpleReply } from '@/lib/whatsapp/classify';
 import {
   handleAgentMessage,
@@ -121,16 +121,23 @@ export async function POST(request: NextRequest) {
     const userId = link.userId;
     after(async () => {
       try {
+        const accounts = await listarCuentas(userId);
         await handleImageMessage(
-          { userId, phone, mediaUrl },
+          { userId, phone, mediaUrl, body },
           {
             sendMessage: sendWhatsAppMessage,
             downloadMedia: downloadTwilioMedia,
             analyzeImage,
             createDirectExpense,
-            createVisionReceiptDraft,
             resolveDefaultAccount,
             today: todayYmd,
+            accounts,
+            savePending: inv =>
+              writeState(phone, userId, {
+                pending: { kind: 'invoice_account', invoice: inv },
+              }),
+            registerInvoice: (inv, accountName) =>
+              createInvoiceDirect(userId, inv, accountName),
           },
         );
       } catch (err) {

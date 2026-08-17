@@ -3,7 +3,7 @@
 // cae a `parseQuickExpense` para no dejar al usuario sin nada: un gasto
 // simple se sigue registrando con el LLM caído.
 
-import { resolveUserCategoryNames } from '@/lib/services/invoices';
+import { createInvoiceDirect, resolveUserCategoryNames } from '@/lib/services/invoices';
 import {
   createDirectExpense,
   resolveDefaultAccount,
@@ -28,7 +28,8 @@ function hoyBogota(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 }
 
-async function listarCuentas(userId: string): Promise<string[]> {
+/** Cuentas activas del usuario. Compartida con el flujo de imágenes del webhook. */
+export async function listarCuentas(userId: string): Promise<string[]> {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from('accounts')
@@ -116,12 +117,15 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
     defaultAccount: cuentaDefecto,
     today: hoyBogota,
     createExpense: async input => createDirectExpense(ctx.userId, ctx.phone, input),
-    // Stub: la Task 8 implementa el registro de facturas.
-    registerInvoice: async () => ({
-      ok: false,
-      itemsFound: 0,
-      error: 'todavía no implementado',
-    }),
+    registerInvoice: async (accountName: string) => {
+      const inv = estado.pending?.invoice;
+      if (!inv) return { ok: false, itemsFound: 0, error: 'no hay factura pendiente' };
+      const res = await createInvoiceDirect(ctx.userId, inv, accountName);
+      // Limpiar el pendiente pase lo que pase: si falló, reintentar con la misma
+      // factura vieja confundiría más de lo que ayuda.
+      await writeState(ctx.phone, ctx.userId, { pending: null });
+      return res;
+    },
     // Stub: la Task 10 implementa la corrección del último gasto.
     correctLast: async () => ({
       ok: false,
