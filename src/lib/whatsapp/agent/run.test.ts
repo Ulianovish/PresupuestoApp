@@ -140,4 +140,75 @@ describe('runAgent', () => {
     await runAgent('20k taxi y 15k almuerzo', CTX, deps);
     expect(n).toBe(2);
   });
+
+  it('no devuelve el comentario de una vuelta vieja si las últimas vueltas solo ejecutan herramientas', async () => {
+    const respuestas = [
+      {
+        stop_reason: 'tool_use',
+        content: [
+          { type: 'text', text: 'Dejame revisar eso...' },
+          {
+            type: 'tool_use',
+            id: 'a',
+            name: 'registrar_gasto',
+            input: { monto: 20000, descripcion: 'taxi' },
+          },
+        ],
+      },
+      conHerramienta('registrar_gasto', {
+        monto: 15000,
+        descripcion: 'almuerzo',
+      }),
+      conHerramienta('registrar_gasto', { monto: 10000, descripcion: 'cafe' }),
+    ];
+    const deps: AgentRunDeps = {
+      callGateway: async () => respuestas.shift(),
+      executeTool: async () => ({ ok: true, summary: 'Registré el gasto.' }),
+    };
+
+    const r = await runAgent('varios gastos', CTX, deps);
+    if (!('text' in r)) throw new Error('se esperaba texto, no service_error');
+    expect(r.text).not.toBe('Dejame revisar eso...');
+    expect(r.text).toContain('Registré');
+  });
+
+  it('si se agotan las vueltas con herramientas exitosas, arma el texto final con lo que se registró', async () => {
+    const deps: AgentRunDeps = {
+      callGateway: async () =>
+        conHerramienta('registrar_gasto', { monto: 1, descripcion: 'x' }),
+      executeTool: async () => ({ ok: true, summary: 'Registré 1 en x.' }),
+    };
+
+    const r = await runAgent('loop', CTX, deps);
+    if (!('text' in r)) throw new Error('se esperaba texto, no service_error');
+    expect(r.text).not.toBe('');
+    expect(r.text).toContain('Registré');
+  });
+
+  it('una herramienta que lanza excepción no es un service_error: el modelo recibe el error y el bucle sigue', async () => {
+    const respuestas = [
+      conHerramienta('registrar_gasto', { monto: 1000, descripcion: 'x' }),
+      conTexto('Tuve un problema, pero seguimos.'),
+    ];
+    let recibioErrorControlado = false;
+    const deps: AgentRunDeps = {
+      callGateway: async mensajes => {
+        const ultimo = mensajes[mensajes.length - 1];
+        if (Array.isArray(ultimo?.content)) {
+          const res = ultimo.content.find(
+            (c: { type?: string }) => c?.type === 'tool_result',
+          ) as { is_error?: boolean } | undefined;
+          if (res?.is_error) recibioErrorControlado = true;
+        }
+        return respuestas.shift();
+      },
+      executeTool: async () => {
+        throw new Error('boom: bug de programación en la herramienta');
+      },
+    };
+
+    const r = await runAgent('1000 x', CTX, deps);
+    expect('kind' in r).toBe(false);
+    expect(recibioErrorControlado).toBe(true);
+  });
 });

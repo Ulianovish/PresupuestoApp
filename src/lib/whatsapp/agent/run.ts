@@ -53,7 +53,14 @@ export async function runAgent(
   ];
 
   const ejecutadas: ToolCall[] = [];
-  let textoFinal = '';
+  const resultadosHerramientas: ToolOutcome[] = [];
+  // Texto de la última vuelta, se pisa en cada iteración (a diferencia de
+  // `textoFinal`, nunca queda "viejo" de una vuelta anterior).
+  let ultimoTexto = '';
+  // Solo es un cierre genuino si el modelo dejó de pedir herramientas. Si el
+  // bucle termina porque se acabaron las vueltas, `ultimoTexto` pertenece a
+  // una respuesta a mitad de camino y no se le puede mostrar al usuario.
+  let terminoNaturalmente = false;
 
   try {
     for (let vuelta = 0; vuelta < MAX_ITERACIONES; vuelta++) {
@@ -68,7 +75,7 @@ export async function runAgent(
         .map(b => b.text)
         .join('')
         .trim();
-      if (texto) textoFinal = texto;
+      ultimoTexto = texto;
 
       const llamadas = bloques.filter(
         (
@@ -81,14 +88,34 @@ export async function runAgent(
         } => (b as { type?: string })?.type === 'tool_use',
       );
 
-      if (llamadas.length === 0) break;
+      if (llamadas.length === 0) {
+        terminoNaturalmente = true;
+        break;
+      }
 
       messages.push({ role: 'assistant', content: bloques });
 
       const resultados: unknown[] = [];
       for (const ll of llamadas) {
-        const out = await deps.executeTool(ll.name, ll.input ?? {});
+        // Una excepción acá es un bug de la herramienta, no una falla del
+        // Gateway: no puede caer en el catch grande ni reportarse como
+        // service_error. El modelo recibe un tool_result de error y puede
+        // reaccionar (reintentar, avisar, pedir otro dato).
+        let out: ToolOutcome;
+        try {
+          out = await deps.executeTool(ll.name, ll.input ?? {});
+        } catch (errHerramienta) {
+          console.error(
+            `runAgent: la herramienta "${ll.name}" lanzó una excepción:`,
+            errHerramienta,
+          );
+          out = {
+            ok: false,
+            summary: 'Hubo un error interno ejecutando esa acción.',
+          };
+        }
         ejecutadas.push({ id: ll.id, name: ll.name, input: ll.input ?? {} });
+        resultadosHerramientas.push(out);
         resultados.push({
           type: 'tool_result',
           tool_use_id: ll.id,
@@ -103,6 +130,22 @@ export async function runAgent(
     // reformule el mensaje.
     console.error('runAgent: falló el Gateway:', err);
     return { kind: 'service_error' };
+  }
+
+  // Si el cierre fue genuino y trajo texto, ese es el mensaje. Si no (se
+  // agotaron las vueltas a mitad de una tanda de herramientas, o el modelo
+  // cerró sin texto), componemos la respuesta con lo que sí se ejecutó: nunca
+  // devolvemos el comentario viejo de una vuelta anterior ni una cadena vacía
+  // que le haga creer al usuario que no pasó nada.
+  let textoFinal = terminoNaturalmente ? ultimoTexto : '';
+  if (!textoFinal) {
+    const exitosos = resultadosHerramientas
+      .filter(r => r.ok)
+      .map(r => r.summary);
+    textoFinal =
+      exitosos.length > 0
+        ? exitosos.join('\n')
+        : 'No pude completar la acción. Probá de nuevo.';
   }
 
   return { text: textoFinal, calls: ejecutadas };
