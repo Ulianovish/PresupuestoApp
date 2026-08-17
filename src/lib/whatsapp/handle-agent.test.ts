@@ -111,6 +111,55 @@ describe('handleAgentMessage', () => {
     );
   });
 
+  it('cufe de una factura registrada a medias → explica y manda a la app, sin invitar a reintentar', async () => {
+    const deps = makeDeps({
+      processCufe: vi.fn(async () => ({ ok: false, reason: 'partial' })),
+    });
+    await handleAgentMessage(
+      'cufe',
+      { userId: 'u1', phone: '+57300', body: CUFE, existingPendingId: null },
+      deps,
+    );
+    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as string;
+    expect(mensaje).toMatch(/a medias|duplicar/i);
+    expect(mensaje).not.toMatch(/reintentar|de nuevo/i);
+  });
+
+  it('el total que confirma es el REGISTRADO, no el de la cabecera de la factura', async () => {
+    // Con descuentos o redondeos difieren: el bot decía "$312.400" y en la app
+    // aparecían "$298.000".
+    const deps = makeDeps({
+      processCufe: vi.fn(async () => ({
+        ok: true as const,
+        itemsFound: 2,
+        invoiceId: 'inv-1',
+        supplier: 'D1',
+        total: 312400,
+      })),
+      registerInvoice: vi.fn(async () => ({
+        ok: true,
+        itemsFound: 2,
+        totalItems: 2,
+        totalAmount: 298000,
+      })),
+    });
+    await handleAgentMessage(
+      'cufe',
+      {
+        userId: 'u1',
+        phone: '+57300',
+        body: `${CUFE} con la Nequi`,
+        existingPendingId: null,
+      },
+      deps,
+    );
+    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as string;
+    expect(mensaje).toMatch(/298\.000/);
+    expect(mensaje).not.toMatch(/312\.400/);
+  });
+
   it('cufe error → avisa el error', async () => {
     const deps = makeDeps({
       processCufe: vi.fn(async () => ({ ok: false, reason: 'error', message: 'DIAN caído' })),

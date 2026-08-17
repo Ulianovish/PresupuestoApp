@@ -8,7 +8,11 @@ vi.mock('@/lib/supabase/server', () => ({
 import { createAdminClient } from '@/lib/supabase/server';
 import type { ElectronicInvoice, StoredInvoiceItem } from '@/types/invoices';
 
-import { createInvoiceDirect, getPendingInvoiceSummary } from './invoices';
+import {
+  createInvoiceDirect,
+  esRegistroParcial,
+  getPendingInvoiceSummary,
+} from './invoices';
 
 
 const mockedAdmin = createAdminClient as unknown as ReturnType<typeof vi.fn>;
@@ -165,6 +169,55 @@ describe('createInvoiceDirect', () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it('devuelve el total REGISTRADO (suma de los ítems), no el de la cabecera', async () => {
+    // La cabecera dice 8000 (con descuento); los ítems suman 8000 acá, pero el
+    // contrato importa cuando difieren: se confirma lo que quedó en la base.
+    const rpc = vi.fn().mockResolvedValue({ data: 'tx-1', error: null });
+    const { from } = makeSupabaseMock({
+      row: invoiceRow({ total_amount: 312400 }),
+      rpc,
+    });
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    const res = await createInvoiceDirect('user-1', 'inv-1', 'Nequi', {
+      classify: async () => {},
+    });
+
+    expect(res.totalAmount).toBe(8000); // 5000 arroz + 3000 leche
+  });
+
+  it('en un registro parcial, el total refleja solo lo que se alcanzó a escribir', async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({ data: 'tx-1', error: null }) // arroz: ok
+      .mockResolvedValueOnce({ data: null, error: { message: 'boom' } }); // leche: falla
+    const { from } = makeSupabaseMock({ row: invoiceRow(), rpc });
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    const res = await createInvoiceDirect('user-1', 'inv-1', 'Nequi', {
+      classify: async () => {},
+    });
+
+    expect(res.totalAmount).toBe(5000);
+    // Y el mensaje que queda en la fila es el que `esRegistroParcial`
+    // reconoce: es el acoplamiento del que depende no re-scrapear el CUFE.
+    expect(esRegistroParcial(res.error ?? null)).toBe(true);
+  });
+
+  it('un error sin gastos creados NO se reconoce como registro parcial (sí se puede reintentar)', async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: { message: 'boom' } });
+    const { from } = makeSupabaseMock({ row: invoiceRow(), rpc });
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    const res = await createInvoiceDirect('user-1', 'inv-1', 'Nequi', {
+      classify: async () => {},
+    });
+
+    expect(esRegistroParcial(res.error ?? null)).toBe(false);
+  });
+
   it('factura inexistente → ok:false sin tocar el RPC', async () => {
     const rpc = vi.fn();
     const { from } = makeSupabaseMock({ row: null, rpc });
@@ -202,6 +255,22 @@ describe('getPendingInvoiceSummary', () => {
         { description: 'leche', amount: 3000 },
       ],
     });
+  });
+
+  it('solo mira facturas que SIGUEN esperando cuenta', async () => {
+    // Si se completó desde la app, el prompt seguía anunciando "HAY UNA
+    // FACTURA ESPERANDO CUENTA" por una factura que ya no espera nada.
+    const eq = vi.fn().mockReturnThis();
+    const from = vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq,
+      maybeSingle: vi.fn().mockResolvedValue({ data: invoiceRow(), error: null }),
+    }));
+    mockedAdmin.mockReturnValue({ from });
+
+    await getPendingInvoiceSummary('user-1', 'inv-1');
+
+    expect(eq).toHaveBeenCalledWith('status', 'pending_review');
   });
 
   it('devuelve null si no existe (o es de otro usuario)', async () => {

@@ -47,6 +47,18 @@ describe('processCufeForWhatsApp', () => {
     expect(mockedSummary).not.toHaveBeenCalled();
   });
 
+  it('factura con registro parcial → no re-scrapea ni vuelve a registrar (duplicaría los ítems ya creados)', async () => {
+    mockedPrepare.mockResolvedValueOnce({
+      kind: 'partial_registration',
+      invoice: { id: 'inv-parcial', status: 'error' } as never,
+    });
+
+    const out = await processCufeForWhatsApp('u1', 'CUFE123');
+
+    expect(out).toEqual({ ok: false, reason: 'partial' });
+    expect(mockedRun).not.toHaveBeenCalled();
+  });
+
   it('factura en pending_review (nadie contestó la cuenta) → retoma sin volver a scrapear', async () => {
     mockedPrepare.mockResolvedValueOnce({
       kind: 'awaiting_account',

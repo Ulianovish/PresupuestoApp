@@ -7,6 +7,7 @@ import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
 import { parseSSEEventLine } from '@/lib/dian/sse';
 import {
   createProcessingInvoice,
+  esRegistroParcial,
   getInvoiceByCufe,
   markInvoiceError,
   resetInvoiceToProcessing,
@@ -34,6 +35,12 @@ export type PrepareResult =
    * id para preguntar de nuevo.
    */
   | { kind: 'awaiting_account'; invoice: ElectronicInvoice }
+  /**
+   * La factura se registró a medias: parte de sus ítems YA son transacciones
+   * reales. No se puede reintentar (re-scrapear y volver a recorrer los ítems
+   * los duplicaría), hay que completarla a mano en la app.
+   */
+  | { kind: 'partial_registration'; invoice: ElectronicInvoice }
   | { kind: 'ready'; invoiceId: string }
   | { kind: 'error'; message: string };
 
@@ -87,6 +94,14 @@ export async function prepareInvoiceProcessing(
   }
   if (existing && existing.status === 'pending_review') {
     return { kind: 'awaiting_account', invoice: existing };
+  }
+  // Una fila en 'error' se reintenta... salvo que el error sea un registro
+  // parcial: ahí ya hay gastos creados. Reiniciarla a 'processing' la manda a
+  // re-scrapear y después `createInvoiceDirect` recorre TODOS los ítems otra
+  // vez, duplicando los que ya son transacciones reales. Reenviar el mismo
+  // CUFE es justo lo que hace un usuario que vio "el resto falló".
+  if (existing && esRegistroParcial(existing.error_message)) {
+    return { kind: 'partial_registration', invoice: existing };
   }
 
   let invoiceId: string | null;

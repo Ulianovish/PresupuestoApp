@@ -58,6 +58,19 @@ export async function POST(request: NextRequest) {
       { status: 409 },
     );
   }
+  // Registro parcial: parte de sus ítems ya son gastos reales. Reprocesarla
+  // los duplicaría; hay que completarla en "Facturas sin completar".
+  if (prep.kind === 'partial_registration') {
+    return Response.json(
+      {
+        error:
+          'Esta factura quedó registrada a medias: algunos ítems ya son gastos. Complétala en "Facturas sin completar" en vez de reprocesarla.',
+        invoiceId: prep.invoice.id,
+        status: prep.invoice.status,
+      },
+      { status: 409 },
+    );
+  }
   if (prep.kind === 'error') {
     return Response.json({ error: prep.message }, { status: 500 });
   }

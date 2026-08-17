@@ -6,6 +6,11 @@ vi.mock('@/lib/services/invoices', () => ({
   getInvoiceByCufe: vi.fn(),
   createProcessingInvoice: vi.fn(),
   resetInvoiceToProcessing: vi.fn(async () => undefined),
+  // Predicado puro: se replica en vez de mockearse con vi.fn para que el test
+  // ejercite la decisión real. Que el prefijo coincida con el que escribe
+  // `createInvoiceDirect` lo verifica `invoices.test.ts`.
+  esRegistroParcial: (m: string | null) =>
+    (m ?? '').startsWith('Registro parcial:'),
 }));
 vi.mock('@/lib/dian/categorizer', () => ({
   categorizeInvoiceItems: vi.fn(
@@ -241,6 +246,25 @@ describe('prepareInvoiceProcessing', () => {
     const res = await prepareInvoiceProcessing('user-1', 'CUFE123');
 
     expect(res).toEqual({ kind: 'duplicate', invoice });
+  });
+
+  it('una factura en error por REGISTRO PARCIAL no se reinicia: reprocesarla duplicaría los ítems ya creados', async () => {
+    // Reenviar el CUFE es justo lo que hace un usuario que leyó "registré 2 de
+    // 5 ítems". Antes caía al camino viejo: reset a processing → re-scrape →
+    // `createInvoiceDirect` recorría los 5 ítems otra vez y los 2 primeros
+    // quedaban duplicados como transacciones reales.
+    const invoice = {
+      ...fakeInvoice('error', 'inv-parcial'),
+      error_message:
+        'Registro parcial: 2 de 5 ítems ("leche" falló: boom).',
+    };
+    getInvoiceByCufeMock.mockResolvedValueOnce(invoice);
+
+    const res = await prepareInvoiceProcessing('user-1', 'CUFE123');
+
+    expect(res).toEqual({ kind: 'partial_registration', invoice });
+    expect(resetInvoiceToProcessingMock).not.toHaveBeenCalled();
+    expect(createProcessingInvoiceMock).not.toHaveBeenCalled();
   });
 
   it('reinicia una factura en error y la deja ready', async () => {

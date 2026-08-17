@@ -48,6 +48,12 @@ export async function processCufeForWhatsApp(
   const prep = await prepareInvoiceProcessing(userId, cufe, admin);
   if (prep.kind === 'duplicate') return { ok: false, reason: 'duplicate' };
   if (prep.kind === 'error') return { ok: false, reason: 'error', message: prep.message };
+  // Factura registrada a medias: no se re-scrapea ni se vuelve a registrar
+  // (duplicaría los ítems ya creados). Se le explica al usuario y se lo manda
+  // a completarla en la app.
+  if (prep.kind === 'partial_registration') {
+    return { ok: false, reason: 'partial' };
+  }
 
   if (prep.kind === 'awaiting_account') {
     // Reenvío del mismo CUFE mientras la factura seguía en pending_review:

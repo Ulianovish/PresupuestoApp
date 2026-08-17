@@ -27,6 +27,11 @@ export type CufeOutcome =
       total?: number | null;
     }
   | { ok: false; reason: 'duplicate' }
+  /**
+   * La factura quedó registrada a medias en un intento anterior: parte de sus
+   * ítems ya son gastos reales. Reprocesarla los duplicaría.
+   */
+  | { ok: false; reason: 'partial' }
   | { ok: false; reason: 'error'; message: string };
 
 export interface AgentDeps {
@@ -40,7 +45,14 @@ export interface AgentDeps {
   registerInvoice: (
     invoiceId: string,
     accountName: string,
-  ) => Promise<{ ok: boolean; itemsFound: number; totalItems: number; error?: string }>;
+  ) => Promise<{
+    ok: boolean;
+    itemsFound: number;
+    totalItems: number;
+    /** Suma de lo que EFECTIVAMENTE quedó registrado (ver `createInvoiceDirect`). */
+    totalAmount?: number;
+    error?: string;
+  }>;
 }
 
 export interface AgentContext {
@@ -73,6 +85,8 @@ export async function handleAgentMessage(
   if (out.ok) {
     const supplierTexto = out.supplier ? ` de ${out.supplier}` : '';
     const totalTexto = out.total != null ? ` por ${formatCOP(out.total)}` : '';
+    // Un CUFE no trae cuenta detectada por visión: solo puede resolverse por
+    // el texto que el usuario escribió junto al código.
     const cuenta = resolveAccountFromMessage(ctx.body, null, deps.accounts);
 
     if (!cuenta) {
@@ -95,9 +109,15 @@ export async function handleAgentMessage(
 
     const res = await deps.registerInvoice(out.invoiceId, cuenta);
     if (res.ok) {
+      // El total que se confirma es el REGISTRADO (suma de los ítems que
+      // entraron en transactions), no el de la cabecera de la factura: con
+      // descuentos o redondeos difieren y el usuario veía en la app un número
+      // distinto del que le confirmó el bot.
+      const totalRegistradoTexto =
+        res.totalAmount != null ? ` por ${formatCOP(res.totalAmount)}` : totalTexto;
       await deps.sendMessage(
         ctx.phone,
-        `✅ Registré tu factura${supplierTexto}${totalTexto} (${res.itemsFound} ítems) en ${cuenta}.`,
+        `✅ Registré tu factura${supplierTexto}${totalRegistradoTexto} (${res.itemsFound} ítems) en ${cuenta}.`,
       );
     } else if (res.itemsFound > 0) {
       // Fallo a mitad de camino: esos ítems YA son transacciones reales. Decir
@@ -117,6 +137,11 @@ export async function handleAgentMessage(
 
   if (out.reason === 'duplicate') {
     await deps.sendMessage(ctx.phone, 'Esa factura ya la había procesado. 👍');
+  } else if (out.reason === 'partial') {
+    await deps.sendMessage(
+      ctx.phone,
+      '⚠️ Esa factura quedó registrada a medias: algunos ítems ya son gastos tuyos y otros no. No la vuelvo a procesar porque duplicaría los que ya están. Completala desde la app, en "Facturas sin completar".',
+    );
   } else {
     await deps.sendMessage(
       ctx.phone,

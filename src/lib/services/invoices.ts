@@ -92,6 +92,21 @@ export async function resolveUserCategoryNames(
   return [...EXPENSE_CATEGORIES];
 }
 
+/**
+ * Prefijo del `error_message` que deja `createInvoiceDirect` cuando se cortó a
+ * mitad de camino y algunos ítems YA son transacciones reales.
+ *
+ * Es la marca que hace reconocible ese estado desde afuera: una fila así no se
+ * puede reintentar (volver a recorrer los ítems duplicaría los ya creados), a
+ * diferencia de una fila en error por un scrape fallido.
+ */
+const PREFIJO_REGISTRO_PARCIAL = 'Registro parcial:';
+
+/** ¿Esta factura quedó a medias con gastos ya creados? (ver `PREFIJO_REGISTRO_PARCIAL`). */
+export function esRegistroParcial(errorMessage: string | null): boolean {
+  return (errorMessage ?? '').startsWith(PREFIJO_REGISTRO_PARCIAL);
+}
+
 /** Marca la factura como error con un mensaje. */
 export async function markInvoiceError(
   invoiceId: string,
@@ -167,6 +182,10 @@ export async function getPendingInvoiceSummary(
   const { data } = await supabase
     .from('electronic_invoices')
     .select('*')
+    // Solo si SIGUE esperando cuenta: si se completó desde la app (o quedó en
+    // error), el prompt seguía anunciando "HAY UNA FACTURA ESPERANDO CUENTA"
+    // por una factura que ya no espera nada.
+    .eq('status', 'pending_review')
     .eq('id', invoiceId)
     .eq('user_id', userId)
     .maybeSingle();
@@ -227,7 +246,19 @@ export async function createInvoiceDirect(
   invoiceId: string,
   accountName: string,
   deps: { classify?: typeof classifyApprovedExpenses } = {},
-): Promise<{ ok: boolean; itemsFound: number; totalItems: number; error?: string }> {
+): Promise<{
+  ok: boolean;
+  itemsFound: number;
+  totalItems: number;
+  /**
+   * Suma de lo que EFECTIVAMENTE se escribió en `transactions` (los
+   * `total_with_tax` de los ítems creados), que es lo que hay que confirmarle
+   * al usuario. El `total_amount` de la cabecera puede diferir por descuentos
+   * o redondeos: el bot decía "$312.400" y en la app aparecían "$298.000".
+   */
+  totalAmount: number;
+  error?: string;
+}> {
   const supabase = createAdminClient();
   const clasificar = deps.classify ?? classifyApprovedExpenses;
 
@@ -243,6 +274,7 @@ export async function createInvoiceDirect(
       ok: false,
       itemsFound: 0,
       totalItems: 0,
+      totalAmount: 0,
       error: 'Factura no encontrada.',
     };
   }
@@ -253,6 +285,7 @@ export async function createInvoiceDirect(
       ok: false,
       itemsFound: 0,
       totalItems: typed.items?.length ?? 0,
+      totalAmount: 0,
       error: `La factura ya está en estado "${typed.status}"; no se vuelve a registrar.`,
     };
   }
@@ -265,12 +298,16 @@ export async function createInvoiceDirect(
     categoryName: string;
     monthYear: string;
   }> = [];
+  // Se acumula sobre lo que de verdad se escribió, ítem por ítem: si el
+  // registro se corta a la mitad, el total refleja esa mitad y no la cabecera.
+  let totalRegistrado = 0;
 
   for (const item of items) {
+    const monto = item.total_with_tax ?? item.total_price;
     const { data, error } = await supabase.rpc('upsert_monthly_expense', {
       p_user_id: userId,
       p_description: item.description,
-      p_amount: item.total_with_tax ?? item.total_price,
+      p_amount: monto,
       p_transaction_date: fecha,
       p_category_name: item.category,
       p_account_name: accountName,
@@ -290,7 +327,7 @@ export async function createInvoiceDirect(
       const sinGastosCreados = createdExpenses.length === 0;
       const mensaje = sinGastosCreados
         ? `No se pudo registrar ningún ítem ("${item.description}" falló: ${error.message}). Se puede reintentar.`
-        : `Registro parcial: ${createdExpenses.length} de ${items.length} ítems ("${item.description}" falló: ${error.message}).`;
+        : `${PREFIJO_REGISTRO_PARCIAL} ${createdExpenses.length} de ${items.length} ítems ("${item.description}" falló: ${error.message}).`;
       const { error: updateError } = await supabase
         .from('electronic_invoices')
         .update({
@@ -308,6 +345,7 @@ export async function createInvoiceDirect(
         ok: false,
         itemsFound: createdExpenses.length,
         totalItems: items.length,
+        totalAmount: totalRegistrado,
         error: mensaje,
       };
     }
@@ -319,6 +357,7 @@ export async function createInvoiceDirect(
         categoryName: item.category,
         monthYear: fecha.slice(0, 7),
       });
+      totalRegistrado += Number(monto ?? 0);
     }
   }
 
@@ -342,7 +381,12 @@ export async function createInvoiceDirect(
     );
   }
 
-  return { ok: true, itemsFound: items.length, totalItems: items.length };
+  return {
+    ok: true,
+    itemsFound: items.length,
+    totalItems: items.length,
+    totalAmount: totalRegistrado,
+  };
 }
 
 /**

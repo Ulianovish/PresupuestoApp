@@ -73,6 +73,93 @@ describe('handleImageMessage', () => {
     });
   });
 
+  it('transferencia: la cuenta que leyó la visión se canonicaliza contra las reales, no se usa cruda', async () => {
+    // `upsert_monthly_expense` CREA la cuenta si el nombre no matchea exacto:
+    // un "Nequi" leído contra un "NEQUI" real inventaba una cuenta nueva en
+    // silencio, que después entraba al prompt de todos los mensajes. (Parte de
+    // las ~23 cuentas casi duplicadas que tiene hoy el usuario.)
+    const deps = makeDeps({
+      accounts: ['Efectivo', 'NEQUI'],
+      analyzeImage: vi.fn(async () => ({
+        kind: 'transfer',
+        amount: 50000,
+        date: '2026-06-11',
+        account: 'Nequi',
+        description: 'Juan',
+        confidence: 0.9,
+      })),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.createDirectExpense).toHaveBeenCalledWith(
+      'u1',
+      '+57300',
+      expect.objectContaining({ accountName: 'NEQUI' }),
+    );
+  });
+
+  it('transferencia: una cuenta que el usuario no tiene cae a la por defecto, no se inventa', async () => {
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'transfer',
+        amount: 50000,
+        date: '2026-06-11',
+        account: 'Bancolombia Ahorros',
+        description: 'Juan',
+        confidence: 0.9,
+      })),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.resolveDefaultAccount).toHaveBeenCalledWith('+57300');
+    expect(deps.createDirectExpense).toHaveBeenCalledWith(
+      'u1',
+      '+57300',
+      expect.objectContaining({ accountName: 'Efectivo' }),
+    );
+  });
+
+  it('transferencia: el texto del usuario le gana a la cuenta que leyó la visión', async () => {
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'transfer',
+        amount: 50000,
+        date: '2026-06-11',
+        account: 'Efectivo',
+        description: 'Juan',
+        confidence: 0.9,
+      })),
+    });
+    await handleImageMessage({ ...ctx, body: 'fue con la Nequi' }, deps);
+    expect(deps.createDirectExpense).toHaveBeenCalledWith(
+      'u1',
+      '+57300',
+      expect.objectContaining({ accountName: 'Nequi' }),
+    );
+  });
+
+  it('el total que confirma de una factura es el REGISTRADO, no el que leyó la visión', async () => {
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'receipt',
+        supplier: 'D1',
+        date: '2026-06-12',
+        items: [{ description: 'Arroz', amount: 6000 }],
+        total: 312400,
+        confidence: 0.8,
+      })),
+      registerInvoice: vi.fn(async () => ({
+        ok: true,
+        itemsFound: 1,
+        totalItems: 1,
+        totalAmount: 298000,
+      })),
+    });
+    await handleImageMessage({ ...ctx, body: 'pagué con Nequi' }, deps);
+    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as string;
+    expect(mensaje).toMatch(/298\.000/);
+    expect(mensaje).not.toMatch(/312\.400/);
+  });
+
   it('recibo → se persiste SIEMPRE como borrador, antes de decidir si hay que preguntar', async () => {
     const deps = makeDeps({
       analyzeImage: vi.fn(async () => ({

@@ -2,17 +2,9 @@
 // analiza con visión y enruta: transferencia → gasto directo; recibo →
 // registro directo (o pregunta la cuenta si no se puede resolver).
 
-import { resolverCuenta } from '@/lib/whatsapp/agent/tools';
+import { normalizar, resolverCuenta } from '@/lib/whatsapp/agent/tools';
 import { formatCOP } from '@/lib/whatsapp/format';
 import type { VisionResult } from '@/lib/whatsapp/vision';
-
-/** Compara texto libre contra nombres de cuenta ignorando mayúsculas y tildes. */
-function normalizar(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // quita tildes
-    .toLowerCase();
-}
 
 /**
  * Busca en el texto libre la palabra más distintiva de cada cuenta (p. ej.
@@ -99,7 +91,14 @@ export interface ImageDeps {
   registerInvoice: (
     invoiceId: string,
     accountName: string,
-  ) => Promise<{ ok: boolean; itemsFound: number; totalItems: number; error?: string }>;
+  ) => Promise<{
+    ok: boolean;
+    itemsFound: number;
+    totalItems: number;
+    /** Suma de lo que EFECTIVAMENTE quedó registrado (ver `createInvoiceDirect`). */
+    totalAmount?: number;
+    error?: string;
+  }>;
   resolveDefaultAccount: (phone: string) => Promise<string>;
   today: () => string;
 }
@@ -134,8 +133,15 @@ export async function handleImageMessage(
   const result = await deps.analyzeImage(media.base64, media.mime);
 
   if (result.kind === 'transfer') {
+    // `result.account` es texto crudo de la visión y NO se puede pasar tal cual
+    // al RPC: `upsert_monthly_expense` CREA la cuenta si el nombre no matchea
+    // exacto, así que un "Nequi" leído contra un "NEQUI" real inventaba una
+    // cuenta nueva en silencio que después aparecía en el prompt de todos los
+    // mensajes. Se canonicaliza igual que la rama de recibo (el texto del
+    // usuario le gana a la visión) y, si no resuelve, se usa la por defecto.
     const accountName =
-      result.account ?? (await deps.resolveDefaultAccount(ctx.phone));
+      resolveAccountFromMessage(ctx.body, result.account, deps.accounts) ??
+      (await deps.resolveDefaultAccount(ctx.phone));
     const res = await deps.createDirectExpense(ctx.userId, ctx.phone, {
       amount: result.amount,
       description: result.description ?? 'Transferencia',
@@ -199,9 +205,15 @@ export async function handleImageMessage(
 
     const res = await deps.registerInvoice(draft.invoiceId, cuenta);
     if (res.ok) {
+      // El total que se confirma es el REGISTRADO (suma de los ítems que
+      // entraron en transactions), no el que leyó la visión en la cabecera:
+      // con descuentos o redondeos difieren y el usuario veía en la app un
+      // número distinto del que le confirmó el bot.
+      const totalRegistradoTexto =
+        res.totalAmount != null ? ` por ${formatCOP(res.totalAmount)}` : totalTexto;
       await deps.sendMessage(
         ctx.phone,
-        `✅ Registré tu factura${supplierTexto}${totalTexto} (${res.itemsFound} ítems) en ${cuenta}.`,
+        `✅ Registré tu factura${supplierTexto}${totalRegistradoTexto} (${res.itemsFound} ítems) en ${cuenta}.`,
       );
     } else if (res.itemsFound > 0) {
       // Fallo a mitad de camino: esos ítems YA son transacciones reales. Decir
