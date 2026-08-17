@@ -6,6 +6,9 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/dian/categorizer', () => ({
   categorizeInvoiceItems: vi.fn(async () => ['MERCADO']),
 }));
+vi.mock('@/lib/dian/expense-item-classifier', () => ({
+  classifyExpensesToItems: vi.fn(async () => ['Carnes']),
+}));
 
 import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
 import { createAdminClient } from '@/lib/supabase/server';
@@ -97,6 +100,83 @@ describe('createDirectExpense', () => {
     });
 
     expect(res.ok).toBe(false);
+  });
+
+  const budgetItemsRows = [
+    { item_id: 'i1', item_name: 'Carnes', category_name: 'MERCADO' },
+    { item_id: 'i2', item_name: 'Aseo', category_name: 'MERCADO' },
+  ];
+
+  function mockAdminWithRpc(
+    rpcImpl: (
+      name: string,
+      args: unknown,
+    ) => Promise<{ data?: unknown; error?: unknown }>,
+  ) {
+    const rpc = vi.fn(rpcImpl);
+    const catFrom = vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [{ name: 'MERCADO' }] }),
+    }));
+    mockedAdmin.mockReturnValue({ rpc, from: catFrom });
+    return rpc;
+  }
+
+  it('captura el id del gasto y asigna el ítem del presupuesto', async () => {
+    const rpc = mockAdminWithRpc(async name => {
+      if (name === 'upsert_monthly_expense')
+        return { data: 'tx-123', error: null };
+      if (name === 'get_budget_items_for_month')
+        return { data: budgetItemsRows, error: null };
+      if (name === 'assign_expense_budget_item') return { error: null };
+      throw new Error(`rpc inesperado: ${name}`);
+    });
+
+    const res = await createDirectExpense('user-1', '+573001234567', {
+      amount: 20000,
+      description: 'pernil',
+      accountName: 'Nequi',
+      date: '2026-06-11',
+    });
+
+    expect(res.transactionId).toBe('tx-123');
+    expect(res.budgetItemId).toBe('i1');
+    expect(rpc).toHaveBeenCalledWith('assign_expense_budget_item', {
+      p_user_id: 'user-1',
+      p_transaction_id: 'tx-123',
+      p_budget_item_id: 'i1',
+      p_source: 'ai',
+    });
+  });
+
+  it('si falla la asignación del ítem, budgetItemId vuelve null pero el gasto queda guardado', async () => {
+    const rpc = mockAdminWithRpc(async name => {
+      if (name === 'upsert_monthly_expense')
+        return { data: 'tx-123', error: null };
+      if (name === 'get_budget_items_for_month')
+        return { data: budgetItemsRows, error: null };
+      if (name === 'assign_expense_budget_item')
+        return { error: { message: 'boom' } };
+      throw new Error(`rpc inesperado: ${name}`);
+    });
+
+    const res = await createDirectExpense('user-1', '+573001234567', {
+      amount: 20000,
+      description: 'pernil',
+      accountName: 'Nequi',
+      date: '2026-06-11',
+    });
+
+    expect(rpc).toHaveBeenCalledWith('assign_expense_budget_item', {
+      p_user_id: 'user-1',
+      p_transaction_id: 'tx-123',
+      p_budget_item_id: 'i1',
+      p_source: 'ai',
+    });
+    expect(res.ok).toBe(true);
+    expect(res.transactionId).toBe('tx-123');
+    expect(res.budgetItemId).toBeNull();
   });
 });
 

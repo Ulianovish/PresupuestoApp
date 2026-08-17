@@ -127,12 +127,22 @@ export async function createDirectExpense(
         items,
       );
       if (budgetItemId) {
-        await supabase.rpc('assign_expense_budget_item', {
-          p_user_id: userId,
-          p_transaction_id: transactionId,
-          p_budget_item_id: budgetItemId,
-          p_source: 'ai',
-        });
+        const { error: assignError } = await supabase.rpc(
+          'assign_expense_budget_item',
+          {
+            p_user_id: userId,
+            p_transaction_id: transactionId,
+            p_budget_item_id: budgetItemId,
+            p_source: 'ai',
+          },
+        );
+        if (assignError) {
+          console.error(
+            'No se pudo asignar el ítem de presupuesto:',
+            assignError,
+          );
+          budgetItemId = null;
+        }
       }
     } catch (err) {
       console.error('No se pudo asignar el ítem de presupuesto:', err);
