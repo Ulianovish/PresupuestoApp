@@ -46,3 +46,6 @@ next-env.d.ts
 
 # claude code (worktrees y settings locales)
 .claude/
+
+# Scratch de superpowers (ledger, briefs, reportes de revisión)
+.superpowers/
