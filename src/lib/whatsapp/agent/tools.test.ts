@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 
-import { TOOL_DEFINITIONS, resolverCuenta, validateGasto } from './tools';
+import {
+  TOOL_DEFINITIONS,
+  executeTool,
+  resolverCuenta,
+  validateGasto,
+} from './tools';
+
+import type { ToolDeps } from './tools';
 
 const CUENTAS = ['Efectivo', 'Davivienda Crédito', 'Nequi'];
 
@@ -112,5 +119,89 @@ describe('TOOL_DEFINITIONS', () => {
     for (const t of TOOL_DEFINITIONS) {
       expect(t.input_schema.type).toBe('object');
     }
+  });
+});
+
+function depsFalsas(over: Partial<ToolDeps> = {}): ToolDeps {
+  return {
+    accounts: CUENTAS,
+    defaultAccount: 'Efectivo',
+    today: () => '2026-08-17',
+    createExpense: async () => ({
+      ok: true,
+      category: 'MERCADO',
+      transactionId: 'tx-1',
+    }),
+    registerInvoice: async () => ({ ok: true, itemsFound: 3 }),
+    correctLast: async () => ({ ok: true }),
+    queryExpenses: async () => ({ total: 412000, categoria: 'MERCADO' }),
+    onExpenseCreated: async () => {},
+    ...over,
+  };
+}
+
+describe('executeTool', () => {
+  it('registra un gasto y avisa qué quedó guardado', async () => {
+    const r = await executeTool(
+      'registrar_gasto',
+      { monto: 45000, descripcion: 'mercado' },
+      depsFalsas(),
+    );
+    expect(r.ok).toBe(true);
+    expect(r.summary).toContain('45000');
+  });
+
+  it('usa la cuenta por defecto si el modelo no mandó ninguna', async () => {
+    let usada = '';
+    const deps = depsFalsas({
+      createExpense: async input => {
+        usada = input.accountName;
+        return { ok: true, category: 'MERCADO', transactionId: 'tx-1' };
+      },
+    });
+    await executeTool(
+      'registrar_gasto',
+      { monto: 1000, descripcion: 'x' },
+      deps,
+    );
+    expect(usada).toBe('Efectivo');
+  });
+
+  it('no escribe nada si la cuenta no existe y le explica al modelo', async () => {
+    let escribio = false;
+    const deps = depsFalsas({
+      createExpense: async () => {
+        escribio = true;
+        return { ok: true, category: 'X', transactionId: 't' };
+      },
+    });
+    const r = await executeTool(
+      'registrar_gasto',
+      { monto: 1000, descripcion: 'x', cuenta: 'Bancolombia' },
+      deps,
+    );
+    expect(escribio).toBe(false);
+    expect(r.ok).toBe(false);
+    expect(r.summary).toContain('Bancolombia');
+  });
+
+  it('avisa al llamador del gasto creado, para poder disparar alertas después', async () => {
+    let avisado = '';
+    const deps = depsFalsas({
+      onExpenseCreated: async cat => {
+        avisado = cat;
+      },
+    });
+    await executeTool(
+      'registrar_gasto',
+      { monto: 1000, descripcion: 'x' },
+      deps,
+    );
+    expect(avisado).toBe('MERCADO');
+  });
+
+  it('devuelve un error legible si la herramienta no existe', async () => {
+    const r = await executeTool('volar', {}, depsFalsas());
+    expect(r.ok).toBe(false);
   });
 });
