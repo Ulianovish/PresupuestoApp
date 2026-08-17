@@ -146,6 +146,11 @@ export async function createDirectExpense(
       }
     } catch (err) {
       console.error('No se pudo asignar el ítem de presupuesto:', err);
+      // Si el RPC lanzó (p.ej. timeout de red) en vez de resolver con
+      // { error }, el contrato no debe mentir: sin confirmación de que
+      // quedó asignado, budgetItemId vuelve a null. Si la excepción ocurrió
+      // antes de elegir un id, esto es un no-op inocuo.
+      budgetItemId = null;
     }
   }
 

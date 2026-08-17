@@ -178,6 +178,35 @@ describe('createDirectExpense', () => {
     expect(res.transactionId).toBe('tx-123');
     expect(res.budgetItemId).toBeNull();
   });
+
+  it('si la asignación del ítem lanza (p.ej. timeout), budgetItemId vuelve null pero el gasto queda guardado', async () => {
+    const rpc = mockAdminWithRpc(async name => {
+      if (name === 'upsert_monthly_expense')
+        return { data: 'tx-123', error: null };
+      if (name === 'get_budget_items_for_month')
+        return { data: budgetItemsRows, error: null };
+      if (name === 'assign_expense_budget_item')
+        throw new Error('timeout de red');
+      throw new Error(`rpc inesperado: ${name}`);
+    });
+
+    const res = await createDirectExpense('user-1', '+573001234567', {
+      amount: 20000,
+      description: 'pernil',
+      accountName: 'Nequi',
+      date: '2026-06-11',
+    });
+
+    expect(rpc).toHaveBeenCalledWith('assign_expense_budget_item', {
+      p_user_id: 'user-1',
+      p_transaction_id: 'tx-123',
+      p_budget_item_id: 'i1',
+      p_source: 'ai',
+    });
+    expect(res.ok).toBe(true);
+    expect(res.transactionId).toBe('tx-123');
+    expect(res.budgetItemId).toBeNull();
+  });
 });
 
 describe('createVisionReceiptDraft', () => {
