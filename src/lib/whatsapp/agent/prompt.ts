@@ -40,8 +40,13 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     partes.push(
       '',
       `HAY UNA FACTURA ESPERANDO CUENTA: ${desc}, ${f.items.length} ítems, total ${f.total ?? 'desconocido'}.`,
-      'Si el usuario nombra una cuenta, llamá a registrar_factura con esa cuenta.',
-      'Si dice cualquier otra cosa, volvé a preguntarle con cuál de sus cuentas la pagó.',
+      'Si el usuario nombra una cuenta (y nada más), llamá a registrar_factura con esa cuenta.',
+      // Sin esta línea la factura pendiente secuestraba la conversación: un
+      // "20k taxi" se contestaba con "¿con qué cuenta pagaste la factura?" y
+      // el gasto se perdía, contradiciendo la regla de arriba de que un
+      // mensaje puede traer varios gastos.
+      'Si el mensaje es claramente otro gasto ("20k taxi", "20k taxi con la Nequi"), registralo con registrar_gasto y recién después recordale que la factura sigue esperando cuenta. La cuenta que nombre ahí es la del gasto, NO la de la factura.',
+      'Solo si el mensaje no trae ni cuenta ni gasto nuevo, volvé a preguntarle con cuál de sus cuentas pagó la factura.',
       'NO llames a registrar_gasto por esta factura: sus ítems ya están guardados.',
     );
   }

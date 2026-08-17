@@ -28,7 +28,18 @@ export interface PendingInvoice {
  * llegue una segunda foto antes de que el usuario conteste con qué cuenta
  * pagó — antes se perdía porque `pending` era el único lugar donde vivía.
  */
-export type Pending = { kind: 'invoice_account'; invoiceId: string };
+export type Pending = {
+  kind: 'invoice_account';
+  invoiceId: string;
+  /**
+   * Momento en que se creó el pendiente (ISO). El TTL se mide contra esto y NO
+   * contra `updated_at` de la fila: `writeState` pisa `updated_at` en cada
+   * turno, así que un pendiente nunca vencía mientras el usuario siguiera
+   * escribiendo cualquier cosa. Lo estampa `writeState` cuando el pendiente
+   * entra sin él (las filas viejas caen a `updated_at`).
+   */
+  createdAt?: string;
+};
 
 export interface LastEntity {
   kind: 'expense';
@@ -64,16 +75,30 @@ const TTL_MS = 30 * 60 * 1000;
  * casi seguro habla de otra cosa, y actuar sobre un `pending` viejo escribiría
  * un gasto que el usuario no pidió. `lastEntity` NO vence: "corregí lo último"
  * sigue teniendo sentido al otro día, y solo se pisa con un gasto nuevo.
+ *
+ * Cada uno se mide contra SU propio reloj: los turnos contra `updated_at` (la
+ * conversación sigue viva mientras se escriba), el pendiente contra el momento
+ * en que se creó. Midiendo el pendiente contra `updated_at` no vencía nunca:
+ * cada mensaje lo refrescaba, y la factura de hace horas seguía secuestrando
+ * el prompt.
  */
 export function applyTtl(row: StateRow | null, nowMs: number): ConversationState {
   if (!row) return { turns: [], pending: null, lastEntity: null };
 
   const updatedMs = row.updated_at ? Date.parse(row.updated_at) : 0;
-  const vencido = !updatedMs || nowMs - updatedMs > TTL_MS;
+  const turnosVencidos = !updatedMs || nowMs - updatedMs > TTL_MS;
+
+  const pending = row.pending ?? null;
+  // Sin `createdAt` (filas escritas antes de este cambio) se cae a
+  // `updated_at`: el comportamiento viejo, nunca algo más permisivo.
+  const pendingMs = pending?.createdAt
+    ? Date.parse(pending.createdAt)
+    : updatedMs;
+  const pendingVencido = !pendingMs || nowMs - pendingMs > TTL_MS;
 
   return {
-    turns: vencido ? [] : (row.turns ?? []),
-    pending: vencido ? null : (row.pending ?? null),
+    turns: turnosVencidos ? [] : (row.turns ?? []),
+    pending: pendingVencido ? null : pending,
     lastEntity: row.last_entity ?? null,
   };
 }
@@ -92,6 +117,11 @@ export async function readState(phone: string): Promise<ConversationState> {
  * Guarda el estado. Los campos ausentes en `patch` no se tocan, salvo `pending`,
  * que se puede limpiar pasando `null` explícito (es lo que hace falta al
  * resolver una pregunta pendiente).
+ *
+ * Un `pending` nuevo se estampa acá con `createdAt` (ver `Pending`): así el
+ * TTL de 30 min lo mide contra su propia creación y ningún llamador se puede
+ * olvidar de ponerlo. Si el pendiente ya lo trae, se respeta — refrescarlo en
+ * cada guardado sería volver al bug de que nunca vence.
  */
 export async function writeState(
   phone: string,
@@ -105,7 +135,14 @@ export async function writeState(
     updated_at: new Date().toISOString(),
   };
   if (patch.turns !== undefined) fila.turns = patch.turns.slice(-MAX_TURNS);
-  if (patch.pending !== undefined) fila.pending = patch.pending;
+  if (patch.pending !== undefined) {
+    fila.pending = patch.pending
+      ? {
+          ...patch.pending,
+          createdAt: patch.pending.createdAt ?? new Date().toISOString(),
+        }
+      : null;
+  }
   if (patch.lastEntity !== undefined) fila.last_entity = patch.lastEntity;
 
   const { error } = await supabase
