@@ -6,15 +6,7 @@
 
 import { after, NextRequest } from 'next/server';
 
-import {
-  prepareInvoiceProcessing,
-  runInvoiceProcessing,
-} from '@/lib/dian/process-invoice';
-import {
-  createInvoiceDirect,
-  getPendingInvoiceSummary,
-  resolveUserCategoryNames,
-} from '@/lib/services/invoices';
+import { createInvoiceDirect } from '@/lib/services/invoices';
 import {
   createDirectExpense,
   createVisionReceiptDraft,
@@ -24,17 +16,14 @@ import {
   getLinkByPhone,
   redeemLinkCode,
 } from '@/lib/services/whatsapp-links';
-import { createAdminClient } from '@/lib/supabase/server';
 import { readState, writeState } from '@/lib/whatsapp/agent/state';
 import { handleAgentTurn, listarCuentas } from '@/lib/whatsapp/agent/turn';
 import { ackMessage, classifyText, simpleReply } from '@/lib/whatsapp/classify';
-import {
-  handleAgentMessage,
-  type CufeOutcome,
-} from '@/lib/whatsapp/handle-agent';
+import { handleAgentMessage } from '@/lib/whatsapp/handle-agent';
 import { handleImageMessage } from '@/lib/whatsapp/handle-image';
 import { handleLinkingMessage } from '@/lib/whatsapp/handle-linking';
 import { normalizeWhatsappFrom } from '@/lib/whatsapp/message';
+import { processCufeForWhatsApp } from '@/lib/whatsapp/process-cufe';
 import {
   downloadTwilioMedia,
   sendWhatsAppMessage,
@@ -52,38 +41,6 @@ function xml(body: string, status = 200): Response {
     status,
     headers: { 'Content-Type': 'text/xml; charset=utf-8' },
   });
-}
-
-/** Procesa un CUFE para WhatsApp con service-role; mapea el resultado a CufeOutcome. */
-async function processCufeForWhatsApp(
-  userId: string,
-  cufe: string,
-): Promise<CufeOutcome> {
-  const admin = createAdminClient();
-  const prep = await prepareInvoiceProcessing(userId, cufe, admin);
-  if (prep.kind === 'duplicate') return { ok: false, reason: 'duplicate' };
-  if (prep.kind === 'error') return { ok: false, reason: 'error', message: prep.message };
-
-  const categoryNames = await resolveUserCategoryNames(admin, userId);
-  const run = await runInvoiceProcessing(prep.invoiceId, cufe, {
-    categoryNames,
-    client: admin,
-  });
-  if (!run.ok) return { ok: false, reason: 'error', message: run.message };
-
-  // La factura ya quedó persistida como `pending_review` (la creó
-  // `saveProcessedInvoice`); se relee para poder confirmarle al usuario el
-  // proveedor y el total, igual que hace la vía de imagen con la lectura de
-  // la visión. `handleAgentMessage` necesita el id para resolver la cuenta o
-  // guardar el `pending`, no la factura entera.
-  const resumen = await getPendingInvoiceSummary(userId, prep.invoiceId);
-  return {
-    ok: true,
-    itemsFound: run.itemsFound,
-    invoiceId: prep.invoiceId,
-    supplier: resumen?.supplier ?? null,
-    total: resumen?.total ?? null,
-  };
 }
 
 function todayYmd(): string {

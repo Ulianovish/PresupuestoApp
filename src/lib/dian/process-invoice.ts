@@ -25,6 +25,15 @@ type DBClient = SupabaseClient<Database>;
 
 export type PrepareResult =
   | { kind: 'duplicate'; invoice: ElectronicInvoice }
+  /**
+   * La factura ya se scrapeó y quedó en `pending_review`, pero todavía nadie
+   * dijo con qué cuenta se pagó (el usuario reenvió el mismo CUFE por las
+   * dudas, o nunca contestó la pregunta). NO es un duplicado real — a
+   * diferencia de `approved`, acá no hay nada que perder por retomarla: no
+   * hace falta volver a scrapear (ni gastar otro captcha), solo recuperar el
+   * id para preguntar de nuevo.
+   */
+  | { kind: 'awaiting_account'; invoice: ElectronicInvoice }
   | { kind: 'ready'; invoiceId: string }
   | { kind: 'error'; message: string };
 
@@ -73,11 +82,11 @@ export async function prepareInvoiceProcessing(
   client?: DBClient,
 ): Promise<PrepareResult> {
   const existing = await getInvoiceByCufe(userId, cufe, client);
-  if (
-    existing &&
-    (existing.status === 'pending_review' || existing.status === 'approved')
-  ) {
+  if (existing && existing.status === 'approved') {
     return { kind: 'duplicate', invoice: existing };
+  }
+  if (existing && existing.status === 'pending_review') {
+    return { kind: 'awaiting_account', invoice: existing };
   }
 
   let invoiceId: string | null;

@@ -223,13 +223,13 @@ function fakeInvoice(status: string, id = 'inv-existing') {
 describe('prepareInvoiceProcessing', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('devuelve duplicate para una factura en pending_review sin crear/reiniciar', async () => {
+  it('devuelve awaiting_account para una factura en pending_review sin crear/reiniciar (no es duplicado real: nadie contestó la cuenta)', async () => {
     const invoice = fakeInvoice('pending_review');
     getInvoiceByCufeMock.mockResolvedValueOnce(invoice);
 
     const res = await prepareInvoiceProcessing('user-1', 'CUFE123');
 
-    expect(res).toEqual({ kind: 'duplicate', invoice });
+    expect(res).toEqual({ kind: 'awaiting_account', invoice });
     expect(createProcessingInvoiceMock).not.toHaveBeenCalled();
     expect(resetInvoiceToProcessingMock).not.toHaveBeenCalled();
   });

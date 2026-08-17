@@ -40,7 +40,7 @@ export interface AgentDeps {
   registerInvoice: (
     invoiceId: string,
     accountName: string,
-  ) => Promise<{ ok: boolean; itemsFound: number; totalItems?: number; error?: string }>;
+  ) => Promise<{ ok: boolean; itemsFound: number; totalItems: number; error?: string }>;
 }
 
 export interface AgentContext {
@@ -52,7 +52,7 @@ export interface AgentContext {
    * la había. Sirve para avisar en vez de pisarla en silencio si este CUFE
    * también necesita preguntar (mismo criterio que `handle-image.ts`).
    */
-  existingPendingId?: string | null;
+  existingPendingId: string | null;
 }
 
 export async function handleAgentMessage(
@@ -104,7 +104,7 @@ export async function handleAgentMessage(
       // "no pude guardar la factura" empujaría a reenviar el CUFE y duplicarlos.
       await deps.sendMessage(
         ctx.phone,
-        `⚠️ Registré ${res.itemsFound} de ${res.totalItems ?? res.itemsFound} ítems de tu factura${supplierTexto} en ${cuenta}; el resto falló. Revisala en la app, no vuelvas a mandar el CUFE.`,
+        `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta}; el resto falló. Revisala en la app, no vuelvas a mandar el CUFE.`,
       );
     } else {
       await deps.sendMessage(

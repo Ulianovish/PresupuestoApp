@@ -44,7 +44,11 @@ export async function POST(request: NextRequest) {
   }
 
   const prep = await prepareInvoiceProcessing(user.id, cufe);
-  if (prep.kind === 'duplicate') {
+  // `awaiting_account` (pending_review sin cuenta contestada) se trata igual
+  // que `duplicate` acá: la fila ya tiene los datos, no hace falta volver a
+  // scrapear (ni gastar otro captcha) — se completa desde "Facturas sin
+  // completar" o por WhatsApp, no reprocesando.
+  if (prep.kind === 'duplicate' || prep.kind === 'awaiting_account') {
     return Response.json(
       {
         error: 'Esta factura ya fue procesada',

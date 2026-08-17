@@ -24,7 +24,7 @@ describe('handleAgentMessage', () => {
     const deps = makeDeps();
     await handleAgentMessage(
       'cufe',
-      { userId: 'u1', phone: '+573001234567', body: CUFE },
+      { userId: 'u1', phone: '+573001234567', body: CUFE, existingPendingId: null },
       deps,
     );
     expect(deps.processCufe).toHaveBeenCalledWith('u1', CUFE);
@@ -44,7 +44,7 @@ describe('handleAgentMessage', () => {
     const deps = makeDeps();
     await handleAgentMessage(
       'cufe',
-      { userId: 'u1', phone: '+57300', body: `${CUFE} con la Nequi` },
+      { userId: 'u1', phone: '+57300', body: `${CUFE} con la Nequi`, existingPendingId: null },
       deps,
     );
     expect(deps.registerInvoice).toHaveBeenCalledWith('inv-1', 'Nequi');
@@ -79,7 +79,7 @@ describe('handleAgentMessage', () => {
     const deps = makeDeps();
     await handleAgentMessage(
       'cufe',
-      { userId: 'u1', phone: '+57300', body: qrBlock },
+      { userId: 'u1', phone: '+57300', body: qrBlock, existingPendingId: null },
       deps,
     );
     expect(deps.processCufe).toHaveBeenCalledWith('u1', realCufe);
@@ -89,18 +89,22 @@ describe('handleAgentMessage', () => {
     const deps = makeDeps();
     await handleAgentMessage(
       'cufe',
-      { userId: 'u1', phone: '+57300', body: 'texto sin cufe' },
+      { userId: 'u1', phone: '+57300', body: 'texto sin cufe', existingPendingId: null },
       deps,
     );
     expect(deps.processCufe).not.toHaveBeenCalled();
     expect(deps.sendMessage).toHaveBeenCalled();
   });
 
-  it('cufe duplicado → avisa que ya estaba procesada', async () => {
+  it('cufe duplicado (factura approved) → avisa que ya estaba procesada', async () => {
     const deps = makeDeps({
       processCufe: vi.fn(async () => ({ ok: false, reason: 'duplicate' })),
     });
-    await handleAgentMessage('cufe', { userId: 'u1', phone: '+57300', body: CUFE }, deps);
+    await handleAgentMessage(
+      'cufe',
+      { userId: 'u1', phone: '+57300', body: CUFE, existingPendingId: null },
+      deps,
+    );
     expect(deps.sendMessage).toHaveBeenCalledWith(
       '+57300',
       expect.stringMatching(/ya/i),
@@ -111,7 +115,11 @@ describe('handleAgentMessage', () => {
     const deps = makeDeps({
       processCufe: vi.fn(async () => ({ ok: false, reason: 'error', message: 'DIAN caído' })),
     });
-    await handleAgentMessage('cufe', { userId: 'u1', phone: '+57300', body: CUFE }, deps);
+    await handleAgentMessage(
+      'cufe',
+      { userId: 'u1', phone: '+57300', body: CUFE, existingPendingId: null },
+      deps,
+    );
     expect(deps.sendMessage).toHaveBeenCalledWith(
       '+57300',
       expect.stringMatching(/no pude|error|falló/i),
