@@ -10,7 +10,11 @@ import {
   prepareInvoiceProcessing,
   runInvoiceProcessing,
 } from '@/lib/dian/process-invoice';
-import { createInvoiceDirect, resolveUserCategoryNames } from '@/lib/services/invoices';
+import {
+  createInvoiceDirect,
+  getPendingInvoiceSummary,
+  resolveUserCategoryNames,
+} from '@/lib/services/invoices';
 import {
   createDirectExpense,
   createVisionReceiptDraft,
@@ -65,8 +69,21 @@ async function processCufeForWhatsApp(
     categoryNames,
     client: admin,
   });
-  if (run.ok) return { ok: true, itemsFound: run.itemsFound };
-  return { ok: false, reason: 'error', message: run.message };
+  if (!run.ok) return { ok: false, reason: 'error', message: run.message };
+
+  // La factura ya quedó persistida como `pending_review` (la creó
+  // `saveProcessedInvoice`); se relee para poder confirmarle al usuario el
+  // proveedor y el total, igual que hace la vía de imagen con la lectura de
+  // la visión. `handleAgentMessage` necesita el id para resolver la cuenta o
+  // guardar el `pending`, no la factura entera.
+  const resumen = await getPendingInvoiceSummary(userId, prep.invoiceId);
+  return {
+    ok: true,
+    itemsFound: run.itemsFound,
+    invoiceId: prep.invoiceId,
+    supplier: resumen?.supplier ?? null,
+    total: resumen?.total ?? null,
+  };
 }
 
 function todayYmd(): string {
@@ -166,12 +183,28 @@ export async function POST(request: NextRequest) {
     const userId = link.userId;
     after(async () => {
       try {
+        const [accounts, estado] = await Promise.all([
+          listarCuentas(userId),
+          readState(phone),
+        ]);
         await handleAgentMessage(
           decision,
-          { userId, phone, body },
+          {
+            userId,
+            phone,
+            body,
+            existingPendingId: estado.pending?.invoiceId ?? null,
+          },
           {
             sendMessage: sendWhatsAppMessage,
             processCufe: processCufeForWhatsApp,
+            accounts,
+            savePending: invoiceId =>
+              writeState(phone, userId, {
+                pending: { kind: 'invoice_account', invoiceId },
+              }),
+            registerInvoice: (invoiceId, accountName) =>
+              createInvoiceDirect(userId, invoiceId, accountName),
           },
         );
       } catch (err) {
