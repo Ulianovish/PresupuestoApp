@@ -7,6 +7,7 @@ vi.mock('@/lib/supabase/server', () => ({
 import {
   applyCorrection,
   correctLastExpense,
+  queryExpenseTotal,
 } from '@/lib/services/whatsapp-queries';
 import { createAdminClient } from '@/lib/supabase/server';
 
@@ -65,6 +66,16 @@ describe('applyCorrection', () => {
   it('rechaza un campo desconocido', () => {
     expect(applyCorrection(ULTIMO, 'color', 'rojo').ok).toBe(false);
   });
+
+  it('acepta el campo item con un patch vacío: el ítem no vive en LastEntity', () => {
+    const r = applyCorrection(ULTIMO, 'item', 'Mercado quincenal');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.patch).toEqual({});
+  });
+
+  it('rechaza un item vacío', () => {
+    expect(applyCorrection(ULTIMO, 'item', '  ').ok).toBe(false);
+  });
 });
 
 describe('correctLastExpense', () => {
@@ -112,5 +123,132 @@ describe('correctLastExpense', () => {
 
     expect(res.ok).toBe(false);
     expect(from).not.toHaveBeenCalled();
+  });
+
+  it('corregir el item asigna el ítem del mes y lo marca manual (la IA no lo revierte)', async () => {
+    const chain = fakeTransactionsUpdate({
+      data: [{ id: 'tx-1' }],
+      error: null,
+    });
+    const rpc = vi.fn().mockResolvedValue({
+      data: [
+        {
+          item_id: 'item-9',
+          item_name: 'Mercado quincenal',
+          category_name: 'MERCADO',
+        },
+      ],
+      error: null,
+    });
+    mockedAdmin.mockReturnValue({ from: vi.fn(() => chain), rpc });
+
+    // Sin tildes ni mayúsculas exactas: igual tiene que resolver.
+    const res = await correctLastExpense(
+      'user-1',
+      ULTIMO,
+      'item',
+      'mercado quincenal',
+    );
+
+    expect(res.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith('get_budget_items_for_month', {
+      p_user_id: 'user-1',
+      p_month_year: '2026-08',
+    });
+    expect(chain.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        budget_item_id: 'item-9',
+        budget_item_source: 'manual',
+      }),
+    );
+  });
+
+  it('un item que no está en el presupuesto del mes no se inventa: falla y lista los reales', async () => {
+    const chain = fakeTransactionsUpdate({
+      data: [{ id: 'tx-1' }],
+      error: null,
+    });
+    const rpc = vi.fn().mockResolvedValue({
+      data: [
+        {
+          item_id: 'item-9',
+          item_name: 'Mercado quincenal',
+          category_name: 'MERCADO',
+        },
+      ],
+      error: null,
+    });
+    mockedAdmin.mockReturnValue({ from: vi.fn(() => chain), rpc });
+
+    const res = await correctLastExpense('user-1', ULTIMO, 'item', 'Antojos');
+
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain('Mercado quincenal');
+    expect(chain.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('queryExpenseTotal', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  /** Cadena de `select().eq().eq().gte().lte()` (y `eq` extra por categoría). */
+  function fakeSelect(rows: Array<{ amount: number }>) {
+    const filtros: Array<[string, unknown]> = [];
+    const chain: Record<string, unknown> = { data: rows, error: null };
+    chain.select = vi.fn(() => chain);
+    chain.eq = vi.fn((col: string, val: unknown) => {
+      filtros.push([col, val]);
+      return chain;
+    });
+    chain.gte = vi.fn((col: string, val: unknown) => {
+      filtros.push([`gte:${col}`, val]);
+      return chain;
+    });
+    chain.lte = vi.fn((col: string, val: unknown) => {
+      filtros.push([`lte:${col}`, val]);
+      return chain;
+    });
+    chain.then = (resolve: (v: unknown) => unknown) =>
+      Promise.resolve(resolve({ data: rows, error: null }));
+    return { chain, filtros };
+  }
+
+  it('sin fechas acota al mes en curso y lo reporta: "¿cuánto llevo en mercado?" es de este mes', async () => {
+    // Sin este default se sumaba TODA la historia y el usuario recibía un
+    // número que podía ser diez veces el real, sin ninguna señal.
+    const { chain, filtros } = fakeSelect([{ amount: 10000 }, { amount: 5000 }]);
+    mockedAdmin.mockReturnValue({ from: vi.fn(() => chain) });
+
+    const res = await queryExpenseTotal('user-1', { categoria: 'MERCADO' });
+
+    expect(res.total).toBe(15000);
+    expect(res.mesEnCurso).toBe(true);
+    expect(res.desde.endsWith('-01')).toBe(true);
+    expect(res.desde.slice(0, 7)).toBe(res.hasta.slice(0, 7));
+    expect(filtros).toContainEqual(['gte:transaction_date', res.desde]);
+    expect(filtros).toContainEqual(['lte:transaction_date', res.hasta]);
+  });
+
+  it('filtra por tipo Gasto: un ingreso no puede entrar al total de gastos', async () => {
+    const { chain, filtros } = fakeSelect([]);
+    mockedAdmin.mockReturnValue({ from: vi.fn(() => chain) });
+
+    await queryExpenseTotal('user-1', {});
+
+    expect(filtros).toContainEqual(['transaction_types.name', 'Gasto']);
+  });
+
+  it('respeta las fechas que sí manda el modelo y no dice "mes en curso"', async () => {
+    const { chain, filtros } = fakeSelect([{ amount: 1000 }]);
+    mockedAdmin.mockReturnValue({ from: vi.fn(() => chain) });
+
+    const res = await queryExpenseTotal('user-1', {
+      desde: '2026-07-01',
+      hasta: '2026-07-31',
+    });
+
+    expect(res.mesEnCurso).toBe(false);
+    expect(res.desde).toBe('2026-07-01');
+    expect(filtros).toContainEqual(['lte:transaction_date', '2026-07-31']);
   });
 });

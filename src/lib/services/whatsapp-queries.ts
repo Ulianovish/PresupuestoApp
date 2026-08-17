@@ -1,9 +1,14 @@
 // Correcciones y consultas del agente de WhatsApp. `applyCorrection` es pura
 // para poder testear la interpretación sin base.
 
+import {
+  resolveItemNameToId,
+  type BudgetItemRef,
+} from '@/lib/services/expenses-rollup';
 import { createAdminClient } from '@/lib/supabase/server';
 import type { LastEntity } from '@/lib/whatsapp/agent/state';
-import { MAX_AMOUNT } from '@/lib/whatsapp/agent/tools';
+import { MAX_AMOUNT, normalizar } from '@/lib/whatsapp/agent/tools';
+import { primerDiaDelMes, todayBogota } from '@/lib/whatsapp/format';
 
 export interface CorrectionPatch {
   amount?: number;
@@ -56,6 +61,15 @@ export function applyCorrection(
   }
   if (campo === 'cuenta') return { ok: true, patch: { accountName: valor } };
   if (campo === 'categoria') return { ok: true, patch: { category: valor } };
+  if (campo === 'item') {
+    // El ítem de presupuesto no vive en `LastEntity` (es un vínculo en la
+    // transacción, no un dato del gasto), así que el patch va vacío: quien lo
+    // resuelve contra los ítems del mes es `correctLastExpense`. Acá solo se
+    // valida que haya algo que buscar.
+    if (!valor.trim())
+      return { ok: false, error: 'Decime a qué ítem del presupuesto va.' };
+    return { ok: true, patch: {} };
+  }
   if (campo === 'fecha') {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
       return { ok: false, error: 'La fecha debe venir en formato YYYY-MM-DD.' };
@@ -93,6 +107,39 @@ export async function correctLastExpense(
   if (r.patch.date !== undefined) {
     update.transaction_date = r.patch.date;
     update.month_year = r.patch.date.slice(0, 7);
+  }
+
+  // Corregir el ítem de presupuesto: se resuelve el nombre contra los ítems
+  // del MES del gasto (el RPC `assign_expense_budget_item` solo acepta ítems
+  // del mismo mes, así que un ítem de otro mes no serviría igual).
+  if (campo === 'item') {
+    const monthYear = entity.date.slice(0, 7);
+    const { data: filas } = await supabase.rpc('get_budget_items_for_month', {
+      p_user_id: userId,
+      p_month_year: monthYear,
+    });
+    const items: BudgetItemRef[] = (filas ?? []).map(
+      (f: { item_id: string; item_name: string; category_name: string }) => ({
+        id: f.item_id,
+        name: f.item_name,
+        category_name: f.category_name,
+      }),
+    );
+    // El nombre que escribe el usuario rara vez coincide en mayúsculas y
+    // tildes: se busca el ítem normalizando y se resuelve por su nombre exacto.
+    const norm = normalizar(valor);
+    const nombreExacto = items.find(i => normalizar(i.name) === norm)?.name;
+    const candidato = resolveItemNameToId(nombreExacto ?? valor, items);
+    if (!candidato) {
+      return {
+        ok: false,
+        error: `No encontré el ítem "${valor}" en el presupuesto de ${monthYear}. Los ítems son: ${items.map(i => i.name).join(', ') || '(ninguno)'}.`,
+      };
+    }
+    update.budget_item_id = candidato;
+    // Igual que la categoría: marcado como manual para que la
+    // reclasificación por IA no revierta lo que el usuario acaba de corregir.
+    update.budget_item_source = 'manual';
   }
 
   if (r.patch.accountName !== undefined) {
@@ -133,25 +180,50 @@ export async function correctLastExpense(
   return { ok: true };
 }
 
-/** Suma gastos del período. Solo lectura. */
+/**
+ * Suma gastos del período. Solo lectura.
+ *
+ * Sin `desde`/`hasta` se toma el MES EN CURSO, no toda la historia: "¿cuánto
+ * llevo en mercado?" es una pregunta sobre el mes, y si el modelo omitía las
+ * fechas el usuario recibía un número que podía ser diez veces el real, sin
+ * ninguna señal de que estaba sumando años. El período resuelto vuelve en la
+ * respuesta para que el mensaje al usuario lo diga.
+ *
+ * Filtra por tipo 'Gasto' (join con `transaction_types`): era la única consulta
+ * del repo sobre `transactions` que no lo hacía — comparar con
+ * `get_unclassified_expenses` / `get_budget_by_month` en
+ * `20260804120000_gastos_rollup_presupuesto.sql`. Sin el filtro, un ingreso o
+ * un pago de deuda entraban al total de gastos.
+ */
 export async function queryExpenseTotal(
   userId: string,
   q: { categoria?: string; desde?: string; hasta?: string },
-): Promise<{ total: number; categoria?: string }> {
+): Promise<{
+  total: number;
+  categoria?: string;
+  desde: string;
+  hasta: string;
+  mesEnCurso: boolean;
+}> {
   const supabase = createAdminClient();
+
+  const hoy = todayBogota();
+  const mesEnCurso = !q.desde && !q.hasta;
+  const desde = q.desde ?? primerDiaDelMes(hoy);
+  const hasta = q.hasta ?? hoy;
+
   let query = supabase
     .from('transactions')
-    .select('amount, category_name, transaction_date')
-    .eq('user_id', userId);
+    .select('amount, transaction_types!inner(name)')
+    .eq('user_id', userId)
+    .eq('transaction_types.name', 'Gasto')
+    .gte('transaction_date', desde)
+    .lte('transaction_date', hasta);
 
   if (q.categoria) query = query.eq('category_name', q.categoria);
-  if (q.desde) query = query.gte('transaction_date', q.desde);
-  if (q.hasta) query = query.lte('transaction_date', q.hasta);
 
   const { data } = await query;
-  const total = (data ?? []).reduce(
-    (s: number, r: { amount: number | null }) => s + Number(r.amount ?? 0),
-    0,
-  );
-  return { total, categoria: q.categoria };
+  const filas = (data ?? []) as Array<{ amount: number | null }>;
+  const total = filas.reduce((s, r) => s + Number(r.amount ?? 0), 0);
+  return { total, categoria: q.categoria, desde, hasta, mesEnCurso };
 }
