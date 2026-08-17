@@ -218,9 +218,11 @@ export async function handleImageMessage(
     } else if (res.itemsFound > 0) {
       // Fallo a mitad de camino: esos ítems YA son transacciones reales. Decir
       // "no pude guardar la factura" empujaría a reenviar la foto y duplicarlos.
+      // El panel "Facturas sin completar" no tiene botón para esto (solo para
+      // pending_review): la acción real es cargar el resto a mano en Gastos.
       await deps.sendMessage(
         ctx.phone,
-        `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta}; el resto falló. Revisala en la app, no reenvíes la foto.`,
+        `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta} (esos ya están en tus gastos, no se perdieron). Los que faltan, cargalos a mano en Gastos; no reenvíes la foto, duplicaría los que ya quedaron.`,
       );
     } else {
       await deps.sendMessage(

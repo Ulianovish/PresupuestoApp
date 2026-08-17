@@ -51,11 +51,18 @@ describe('processCufeForWhatsApp', () => {
     mockedPrepare.mockResolvedValueOnce({
       kind: 'partial_registration',
       invoice: { id: 'inv-parcial', status: 'error' } as never,
+      itemsFound: 2,
+      totalItems: 5,
     });
 
     const out = await processCufeForWhatsApp('u1', 'CUFE123');
 
-    expect(out).toEqual({ ok: false, reason: 'partial' });
+    expect(out).toEqual({
+      ok: false,
+      reason: 'partial',
+      itemsFound: 2,
+      totalItems: 5,
+    });
     expect(mockedRun).not.toHaveBeenCalled();
   });
 

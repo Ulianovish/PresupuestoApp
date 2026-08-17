@@ -265,7 +265,7 @@ describe('handleImageMessage', () => {
     );
   });
 
-  it('recibo con cuenta resuelta pero el registro falla a mitad de camino → avisa cuántos SÍ quedaron, no reenviar', async () => {
+  it('recibo con cuenta resuelta pero el registro falla a mitad de camino → avisa cuántos SÍ quedaron, que ya son gastos y que cargue el resto a mano, no reenviar', async () => {
     const deps = makeDeps({
       analyzeImage: vi.fn(async () => ({
         kind: 'receipt',
@@ -290,7 +290,10 @@ describe('handleImageMessage', () => {
     expect(mensaje).toContain('1');
     expect(mensaje).toContain('2');
     expect(mensaje).not.toMatch(/no pude guardar la factura/i);
+    expect(mensaje).toMatch(/ya están en tus gastos|no se perdieron/i);
+    expect(mensaje).toMatch(/mano en gastos/i);
     expect(mensaje).toMatch(/no reenv/i);
+    expect(mensaje).not.toMatch(/facturas sin completar/i);
   });
 
   it('recibo cuya persistencia falla → avisa el error y no intenta preguntar ni registrar', async () => {

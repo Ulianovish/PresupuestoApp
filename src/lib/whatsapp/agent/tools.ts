@@ -375,8 +375,8 @@ export async function executeTool(
         return {
           ok: false,
           wrote: true,
-          summary: `Se registraron ${res.itemsFound} de ${res.totalItems} ítems en ${resolucion.cuenta}; el resto falló. Decile al usuario que revise la factura en la app, NO le sugieras reenviar la foto.`,
-          userSummary: `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura en ${resolucion.cuenta}; el resto falló. Revisala en la app, no la reenvíes.`,
+          summary: `Se registraron ${res.itemsFound} de ${res.totalItems} ítems en ${resolucion.cuenta} (esos ya son gastos reales). Decile al usuario que cargue a mano en Gastos los que faltan, NO le sugieras reenviar la factura ni el CUFE.`,
+          userSummary: `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura en ${resolucion.cuenta} (esos ya están en tus gastos, no se perdieron). Los que faltan, cargalos a mano en Gastos; no la reenvíes, duplicaría los que ya quedaron.`,
         };
       }
       return {

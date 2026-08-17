@@ -29,9 +29,10 @@ export type CufeOutcome =
   | { ok: false; reason: 'duplicate' }
   /**
    * La factura quedó registrada a medias en un intento anterior: parte de sus
-   * ítems ya son gastos reales. Reprocesarla los duplicaría.
+   * ítems ya son gastos reales (`itemsFound` de `totalItems`). Reprocesarla
+   * los duplicaría; los que faltan hay que cargarlos a mano en Gastos.
    */
-  | { ok: false; reason: 'partial' }
+  | { ok: false; reason: 'partial'; itemsFound: number; totalItems: number }
   | { ok: false; reason: 'error'; message: string };
 
 export interface AgentDeps {
@@ -122,9 +123,11 @@ export async function handleAgentMessage(
     } else if (res.itemsFound > 0) {
       // Fallo a mitad de camino: esos ítems YA son transacciones reales. Decir
       // "no pude guardar la factura" empujaría a reenviar el CUFE y duplicarlos.
+      // El panel "Facturas sin completar" no tiene botón para esto (solo para
+      // pending_review): la acción real es cargar el resto a mano en Gastos.
       await deps.sendMessage(
         ctx.phone,
-        `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta}; el resto falló. Revisala en la app, no vuelvas a mandar el CUFE.`,
+        `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta} (esos ya están en tus gastos, no se perdieron). Los que faltan, cargalos a mano en Gastos; no vuelvas a mandar el CUFE, duplicaría los que ya quedaron.`,
       );
     } else {
       await deps.sendMessage(
@@ -138,9 +141,11 @@ export async function handleAgentMessage(
   if (out.reason === 'duplicate') {
     await deps.sendMessage(ctx.phone, 'Esa factura ya la había procesado. 👍');
   } else if (out.reason === 'partial') {
+    // El panel "Facturas sin completar" no tiene botón para esto (solo para
+    // pending_review): la acción real es cargar el resto a mano en Gastos.
     await deps.sendMessage(
       ctx.phone,
-      '⚠️ Esa factura quedó registrada a medias: algunos ítems ya son gastos tuyos y otros no. No la vuelvo a procesar porque duplicaría los que ya están. Completala desde la app, en "Facturas sin completar".',
+      `⚠️ Esa factura quedó registrada a medias: ${out.itemsFound} de ${out.totalItems} ítems ya son gastos tuyos (no se perdieron). No la vuelvo a procesar porque duplicaría esos; los que faltan, cargalos a mano en Gastos.`,
     );
   } else {
     await deps.sendMessage(

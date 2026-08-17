@@ -294,7 +294,7 @@ describe('executeTool', () => {
       expect(r.summary).toContain('DAVIVIENDA');
     });
 
-    it('fallo parcial: el resumen dice cuántos se guardaron, no que no pasó nada', async () => {
+    it('fallo parcial: el resumen dice cuántos se guardaron, que ya son gastos reales y que cargue el resto a mano; no que no pasó nada ni que reenvíe', async () => {
       // Los ítems ya guardados son transacciones reales. Si el resumen dijera
       // "no se pudo guardar la factura" el modelo podría sugerirle al usuario
       // reenviar la foto, duplicando esos ítems.
@@ -310,6 +310,12 @@ describe('executeTool', () => {
       expect(r.summary).toContain('2');
       expect(r.summary).toContain('5');
       expect(r.summary).not.toMatch(/no se pudo guardar/i);
+      expect(r.summary).toMatch(/no.*reenv/i);
+      expect(r.userSummary).toContain('2');
+      expect(r.userSummary).toContain('5');
+      expect(r.userSummary).toMatch(/ya están en tus gastos|no se perdieron/i);
+      expect(r.userSummary).toMatch(/mano en gastos/i);
+      expect(r.userSummary).not.toMatch(/facturas sin completar/i);
     });
   });
 

@@ -59,14 +59,16 @@ export async function POST(request: NextRequest) {
     );
   }
   // Registro parcial: parte de sus ítems ya son gastos reales. Reprocesarla
-  // los duplicaría; hay que completarla en "Facturas sin completar".
+  // los duplicaría; los que faltan hay que cargarlos a mano en Gastos (no hay
+  // botón "Completar" para esto: ese es solo para facturas en pending_review).
   if (prep.kind === 'partial_registration') {
     return Response.json(
       {
-        error:
-          'Esta factura quedó registrada a medias: algunos ítems ya son gastos. Complétala en "Facturas sin completar" en vez de reprocesarla.',
+        error: `Esta factura quedó registrada a medias: ${prep.itemsFound} de ${prep.totalItems} ítems ya son gastos tuyos (no se perdieron). Los que faltan, cargalos a mano en Gastos; no la reproceses, duplicaría los que ya quedaron.`,
         invoiceId: prep.invoice.id,
         status: prep.invoice.status,
+        itemsFound: prep.itemsFound,
+        totalItems: prep.totalItems,
       },
       { status: 409 },
     );

@@ -49,10 +49,15 @@ export async function processCufeForWhatsApp(
   if (prep.kind === 'duplicate') return { ok: false, reason: 'duplicate' };
   if (prep.kind === 'error') return { ok: false, reason: 'error', message: prep.message };
   // Factura registrada a medias: no se re-scrapea ni se vuelve a registrar
-  // (duplicaría los ítems ya creados). Se le explica al usuario y se lo manda
-  // a completarla en la app.
+  // (duplicaría los ítems ya creados). Se le explica al usuario cuántos ya
+  // quedaron y que los que faltan van a mano en Gastos.
   if (prep.kind === 'partial_registration') {
-    return { ok: false, reason: 'partial' };
+    return {
+      ok: false,
+      reason: 'partial',
+      itemsFound: prep.itemsFound,
+      totalItems: prep.totalItems,
+    };
   }
 
   if (prep.kind === 'awaiting_account') {

@@ -111,9 +111,14 @@ describe('handleAgentMessage', () => {
     );
   });
 
-  it('cufe de una factura registrada a medias → explica y manda a la app, sin invitar a reintentar', async () => {
+  it('cufe de una factura registrada a medias → dice cuántos quedaron, que ya son gastos y que cargue el resto a mano, sin mandar a "Facturas sin completar" ni invitar a reintentar', async () => {
     const deps = makeDeps({
-      processCufe: vi.fn(async () => ({ ok: false, reason: 'partial' })),
+      processCufe: vi.fn(async () => ({
+        ok: false,
+        reason: 'partial',
+        itemsFound: 2,
+        totalItems: 5,
+      })),
     });
     await handleAgentMessage(
       'cufe',
@@ -123,6 +128,11 @@ describe('handleAgentMessage', () => {
     const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
       .calls[0][1] as string;
     expect(mensaje).toMatch(/a medias|duplicar/i);
+    expect(mensaje).toContain('2');
+    expect(mensaje).toContain('5');
+    expect(mensaje).toMatch(/ya son gastos|no se perdieron/i);
+    expect(mensaje).toMatch(/mano en gastos/i);
+    expect(mensaje).not.toMatch(/facturas sin completar/i);
     expect(mensaje).not.toMatch(/reintentar|de nuevo/i);
   });
 
@@ -158,6 +168,30 @@ describe('handleAgentMessage', () => {
       .calls[0][1] as string;
     expect(mensaje).toMatch(/298\.000/);
     expect(mensaje).not.toMatch(/312\.400/);
+  });
+
+  it('cufe cuyo registro falla a mitad de camino → avisa cuántos SÍ quedaron, que ya son gastos y que cargue el resto a mano, sin mandar a "Facturas sin completar"', async () => {
+    const deps = makeDeps({
+      registerInvoice: vi.fn(async () => ({
+        ok: false,
+        itemsFound: 3,
+        totalItems: 8,
+        error: 'boom',
+      })),
+    });
+    await handleAgentMessage(
+      'cufe',
+      { userId: 'u1', phone: '+57300', body: `${CUFE} con la Nequi`, existingPendingId: null },
+      deps,
+    );
+    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as string;
+    expect(mensaje).toContain('3');
+    expect(mensaje).toContain('8');
+    expect(mensaje).toMatch(/ya están en tus gastos|no se perdieron/i);
+    expect(mensaje).toMatch(/mano en gastos/i);
+    expect(mensaje).toMatch(/no vuelvas a mandar el cufe/i);
+    expect(mensaje).not.toMatch(/facturas sin completar/i);
   });
 
   it('cufe error → avisa el error', async () => {

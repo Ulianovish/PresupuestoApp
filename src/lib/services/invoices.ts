@@ -107,6 +107,21 @@ export function esRegistroParcial(errorMessage: string | null): boolean {
   return (errorMessage ?? '').startsWith(PREFIJO_REGISTRO_PARCIAL);
 }
 
+/**
+ * Extrae cuántos ítems quedaron registrados y cuántos eran, del `error_message`
+ * que deja `createInvoiceDirect` en un registro parcial (mismo formato que
+ * escribe esa función: "Registro parcial: N de M ítems (...)"). Null si el
+ * mensaje no tiene ese formato.
+ */
+export function parseRegistroParcial(
+  errorMessage: string | null,
+): { itemsFound: number; totalItems: number } | null {
+  if (!esRegistroParcial(errorMessage)) return null;
+  const match = (errorMessage ?? '').match(/(\d+) de (\d+) ítems/);
+  if (!match) return null;
+  return { itemsFound: Number(match[1]), totalItems: Number(match[2]) };
+}
+
 /** Marca la factura como error con un mensaje. */
 export async function markInvoiceError(
   invoiceId: string,

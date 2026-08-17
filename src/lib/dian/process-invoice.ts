@@ -10,6 +10,7 @@ import {
   esRegistroParcial,
   getInvoiceByCufe,
   markInvoiceError,
+  parseRegistroParcial,
   resetInvoiceToProcessing,
   saveProcessedInvoice,
 } from '@/lib/services/invoices';
@@ -37,10 +38,16 @@ export type PrepareResult =
   | { kind: 'awaiting_account'; invoice: ElectronicInvoice }
   /**
    * La factura se registró a medias: parte de sus ítems YA son transacciones
-   * reales. No se puede reintentar (re-scrapear y volver a recorrer los ítems
-   * los duplicaría), hay que completarla a mano en la app.
+   * reales (`itemsFound` de `totalItems`). No se puede reintentar (re-scrapear
+   * y volver a recorrer los ítems duplicaría los que ya son gastos); los que
+   * faltan hay que cargarlos a mano en Gastos.
    */
-  | { kind: 'partial_registration'; invoice: ElectronicInvoice }
+  | {
+      kind: 'partial_registration';
+      invoice: ElectronicInvoice;
+      itemsFound: number;
+      totalItems: number;
+    }
   | { kind: 'ready'; invoiceId: string }
   | { kind: 'error'; message: string };
 
@@ -101,7 +108,14 @@ export async function prepareInvoiceProcessing(
   // vez, duplicando los que ya son transacciones reales. Reenviar el mismo
   // CUFE es justo lo que hace un usuario que vio "el resto falló".
   if (existing && esRegistroParcial(existing.error_message)) {
-    return { kind: 'partial_registration', invoice: existing };
+    // El formato del mensaje lo escribe `createInvoiceDirect` (ver
+    // `PREFIJO_REGISTRO_PARCIAL`), así que el parseo siempre matchea; el
+    // fallback es solo defensivo.
+    const conteo = parseRegistroParcial(existing.error_message) ?? {
+      itemsFound: 0,
+      totalItems: existing.items?.length ?? 0,
+    };
+    return { kind: 'partial_registration', invoice: existing, ...conteo };
   }
 
   let invoiceId: string | null;

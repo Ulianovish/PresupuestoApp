@@ -6,11 +6,16 @@ vi.mock('@/lib/services/invoices', () => ({
   getInvoiceByCufe: vi.fn(),
   createProcessingInvoice: vi.fn(),
   resetInvoiceToProcessing: vi.fn(async () => undefined),
-  // Predicado puro: se replica en vez de mockearse con vi.fn para que el test
-  // ejercite la decisión real. Que el prefijo coincida con el que escribe
+  // Predicados/parsers puros: se replican en vez de mockearse con vi.fn para
+  // que el test ejercite la decisión real. Que coincidan con lo que escribe
   // `createInvoiceDirect` lo verifica `invoices.test.ts`.
   esRegistroParcial: (m: string | null) =>
     (m ?? '').startsWith('Registro parcial:'),
+  parseRegistroParcial: (m: string | null) => {
+    if (!(m ?? '').startsWith('Registro parcial:')) return null;
+    const match = (m ?? '').match(/(\d+) de (\d+) ítems/);
+    return match ? { itemsFound: Number(match[1]), totalItems: Number(match[2]) } : null;
+  },
 }));
 vi.mock('@/lib/dian/categorizer', () => ({
   categorizeInvoiceItems: vi.fn(
@@ -262,7 +267,12 @@ describe('prepareInvoiceProcessing', () => {
 
     const res = await prepareInvoiceProcessing('user-1', 'CUFE123');
 
-    expect(res).toEqual({ kind: 'partial_registration', invoice });
+    expect(res).toEqual({
+      kind: 'partial_registration',
+      invoice,
+      itemsFound: 2,
+      totalItems: 5,
+    });
     expect(resetInvoiceToProcessingMock).not.toHaveBeenCalled();
     expect(createProcessingInvoiceMock).not.toHaveBeenCalled();
   });
