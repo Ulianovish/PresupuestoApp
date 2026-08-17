@@ -2262,6 +2262,109 @@ git commit -m "feat(agente): corregir el último gasto y consultar totales"
 
 ---
 
+### Task 11: el CUFE también pregunta la cuenta y registra directo
+
+**Hueco del plan, detectado durante la ejecución.** El spec dice que eliminar la
+aprobación *"también afecta al CUFE, no solo a las fotos"*, y que ambas vías
+deben preguntar la cuenta y registrarse directo — eso fue lo que el usuario
+eligió. La Task 8 lo implementó **solo para las fotos**. El CUFE sigue dejando
+una fila `pending_review` y respondiendo *"quedó lista para completar en la
+app"*: nunca pregunta la cuenta.
+
+Sin esto, la mitad del objetivo del spec no se cumple y quedan dos flujos
+distintos para la misma cosa — justo la inconsistencia que se quería eliminar.
+
+**Files:**
+- Modify: `src/app/api/whatsapp/webhook/route.ts` (rama `'cufe'`)
+- Modify: `src/lib/whatsapp/handle-agent.ts`
+- Modify: `src/components/organisms/CufeScanForm/CufeScanForm.tsx` (texto obsoleto)
+- Test: `src/lib/whatsapp/handle-agent.test.ts`
+
+**Interfaces:**
+- Consumes: el flujo de `pending` de la Task 8, `createInvoiceDirect`, `resolveAccountFromMessage`.
+- Produces: ningún símbolo nuevo; unifica el comportamiento de las dos vías.
+
+- [ ] **Step 1: Escribir el test que falla**
+
+```ts
+// src/lib/whatsapp/handle-agent.test.ts
+it('tras procesar el CUFE, pregunta con qué cuenta se pagó en vez de mandar a la app', async () => {
+  const enviados: string[] = [];
+  let pendingGuardado: string | null = null;
+  await handleAgentMessage(
+    'cufe',
+    { userId: 'u1', phone: '+57300', body: 'a'.repeat(96) },
+    {
+      sendMessage: async (_t, b) => { enviados.push(b); return { ok: true }; },
+      processCufe: async () => ({ ok: true, itemsFound: 6, invoiceId: 'inv-1' }),
+      savePending: async id => { pendingGuardado = id; },
+      accounts: ['Efectivo', 'Nequi'],
+    },
+  );
+  expect(pendingGuardado).toBe('inv-1');
+  expect(enviados.join(' ')).toMatch(/cuenta/i);
+  expect(enviados.join(' ')).not.toMatch(/aprobar/i);
+});
+
+it('si el texto del CUFE ya trae la cuenta, registra sin preguntar', async () => {
+  const enviados: string[] = [];
+  let registrada: string | null = null;
+  await handleAgentMessage(
+    'cufe',
+    { userId: 'u1', phone: '+57300', body: `${'a'.repeat(96)} con la Nequi` },
+    {
+      sendMessage: async (_t, b) => { enviados.push(b); return { ok: true }; },
+      processCufe: async () => ({ ok: true, itemsFound: 6, invoiceId: 'inv-1' }),
+      registerInvoice: async (_id, cuenta) => { registrada = cuenta; return { ok: true, itemsFound: 6 }; },
+      accounts: ['Efectivo', 'Nequi'],
+    },
+  );
+  expect(registrada).toBe('Nequi');
+  expect(enviados.join(' ')).not.toMatch(/¿con qué cuenta/i);
+});
+```
+
+- [ ] **Step 2: Correr el test y verificar que falla**
+
+Run: `bunx vitest run src/lib/whatsapp/handle-agent.test.ts`
+Expected: FAIL — hoy `handleAgentMessage` no acepta `savePending` ni resuelve cuenta.
+
+- [ ] **Step 3: Implementar**
+
+`processCufeForWhatsApp` debe devolver el `invoiceId` (hoy lo descarta). Con eso,
+`handleAgentMessage` en la rama `'cufe'` hace lo mismo que ya hace la rama de
+imagen en `handle-image.ts`:
+
+1. resolver la cuenta con `resolveAccountFromMessage(ctx.body, null, accounts)` —
+   el texto que acompaña al CUFE puede traerla (*"[CUFE] con la Davivienda"*);
+2. si se resolvió, registrar con `createInvoiceDirect` y confirmar con el total;
+3. si no, guardar el `invoiceId` en `pending` y **preguntar** con qué cuenta se pagó.
+
+Reusá los mismos textos de `handle-image.ts` para que las dos vías respondan
+igual. El `pending` ya lo consume `registrar_factura` del agente (Task 8), así
+que la respuesta del usuario se resuelve sola sin código nuevo.
+
+- [ ] **Step 4: Actualizar el texto obsoleto de la app**
+
+`CufeScanForm.tsx:66` todavía dice *"queda como borrador para aprobar"*. Ya no
+hay aprobación: ahora la factura queda pendiente de que digas la cuenta.
+
+- [ ] **Step 5: Correr los tests y verificar que pasan**
+
+Run: `bunx vitest run`
+Expected: PASS. Actualizar el test viejo que afirmaba *"lista para revisar y
+completar en la app"* — ese mensaje ya no corresponde.
+
+- [ ] **Step 6: Verificar y commitear**
+
+```bash
+bunx tsc --noEmit && bunx vitest run && bunx next lint --quiet
+git add src/lib/whatsapp/ src/app/api/whatsapp/webhook/route.ts src/components/organisms/CufeScanForm/
+git commit -m "feat(agente): el CUFE también pregunta la cuenta y se registra directo"
+```
+
+---
+
 ## Planes que siguen
 
 - **`2026-08-XX-alertas-presupuesto.md`** — cálculo desde `transactions`
