@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
+import AccountsPanel from '@/components/organisms/AccountsPanel/AccountsPanel';
 import WhatsAppLinkPanel from '@/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel';
 import { createClient } from '@/lib/supabase/server';
 
@@ -29,6 +30,8 @@ export default async function SettingsPage() {
   return (
     <main className="mx-auto max-w-2xl space-y-6 p-6">
       <h1 className="text-2xl font-semibold text-white">Ajustes</h1>
+
+      <AccountsPanel />
 
       <WhatsAppLinkPanel />
 

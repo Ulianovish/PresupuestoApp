@@ -15,17 +15,18 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import {
-  LayoutDashboard,
-  PieChart,
-  FlaskConical,
-  Wallet,
-  TrendingUp,
-  CreditCard,
-  Menu,
-  User,
-  LogOut,
-  ChevronDown,
   Calendar,
+  ChevronDown,
+  CreditCard,
+  FlaskConical,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  PieChart,
+  Settings,
+  TrendingUp,
+  User,
+  Wallet,
 } from 'lucide-react';
 
 import MobileSidebar from '@/components/molecules/MobileSidebar/MobileSidebar';
@@ -250,6 +251,14 @@ export default function Header() {
                     </div>
 
                     <div className="p-2">
+                      <Link
+                        href="/settings"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors"
+                      >
+                        <Settings size={18} />
+                        <span>Ajustes y cuentas</span>
+                      </Link>
                       <form action={logoutAction}>
                         <button
                           type="submit"
