@@ -321,7 +321,11 @@ export default function GastosPage() {
       closeModal();
     } catch (error) {
       console.error('Error al guardar gasto:', error);
-      console.warn('❌ Error al guardar el gasto');
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo guardar el gasto. Intenta nuevamente.',
+      );
     }
   };
 
@@ -660,7 +664,9 @@ export default function GastosPage() {
         ) : undefined
       }
       expenseTable={
-        expenseData && !loading ? (
+        // Se mantiene montada durante la recarga (no se agrega `!loading`) para
+        // no perder los filtros y el orden de la tabla al editar un gasto.
+        expenseData ? (
           <ExpenseTable
             expenseData={expenseData}
             selectedMonth={selectedMonth}
@@ -695,7 +701,9 @@ export default function GastosPage() {
           isEditing={isEditing}
           formData={form}
           expenseCategories={categoryNames}
-          accountTypes={[...ACCOUNT_TYPES]}
+          accountTypes={Array.from(
+            new Set([...accountNames, ...ACCOUNT_TYPES]),
+          )}
           onFormChange={handleFormChange}
           onSubmit={handleSubmitExpense}
           onClose={handleCloseModal}

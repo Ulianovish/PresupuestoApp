@@ -49,21 +49,40 @@ export async function PATCH(
     // Obtener ID de la cuenta si se está actualizando
     let accountId: string | undefined;
     if (validatedData.account_name) {
-      const { data: accounts, error: accountError } = await supabase
+      const { data: account } = await supabase
         .from('accounts')
         .select('id')
         .eq('user_id', user.id)
         .eq('name', validatedData.account_name)
-        .single();
+        .maybeSingle();
 
-      if (accountError) {
-        return NextResponse.json(
-          { error: 'Cuenta no encontrada' },
-          { status: 400 },
-        );
+      if (account) {
+        accountId = account.id;
+      } else {
+        // La cuenta aún no existe para este usuario: se crea al vuelo, igual
+        // que al registrar un gasto (upsert_monthly_expense). Antes esto
+        // devolvía 400 y la edición fallaba en silencio.
+        const name = validatedData.account_name;
+        const type = /TC|tarjeta|credito/i.test(name)
+          ? 'credit'
+          : /efectivo|cash/i.test(name)
+            ? 'cash'
+            : 'bank';
+        const { data: created, error: createError } = await supabase
+          .from('accounts')
+          .insert({ user_id: user.id, name, type })
+          .select('id')
+          .single();
+
+        if (createError || !created) {
+          console.error('Error creando cuenta:', createError);
+          return NextResponse.json(
+            { error: `No se pudo crear la cuenta "${name}"` },
+            { status: 400 },
+          );
+        }
+        accountId = created.id;
       }
-
-      accountId = accounts?.id;
     }
 
     // Preparar datos de actualización
