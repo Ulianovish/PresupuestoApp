@@ -49,3 +49,4 @@ next-env.d.ts
 
 # Scratch de superpowers (ledger, briefs, reportes de revisión)
 .superpowers/
+.env.vercel-tmp

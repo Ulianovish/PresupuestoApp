@@ -190,11 +190,20 @@ export async function callGatewayReal(
   messages: GatewayMessage[],
   system: string,
 ): Promise<{ stop_reason?: string; content?: unknown[] } | undefined> {
-  const apiKey = process.env.AI_GATEWAY_API_KEY;
-  if (!apiKey) throw new Error('falta AI_GATEWAY_API_KEY');
+  // Mismo encadenado que vision.ts y categorizer.ts: en producción la variable
+  // todavía se llama MINIMAX_API_KEY (quedó del proveedor anterior). Leer solo
+  // AI_GATEWAY_API_KEY haría que el agente lance SIEMPRE, cayera al parser viejo
+  // y pareciera que funciona — el bot respondería igual que antes y nadie se
+  // enteraría de que el agente nunca se ejecutó.
+  const apiKey = process.env.AI_GATEWAY_API_KEY || process.env.MINIMAX_API_KEY;
+  if (!apiKey) {
+    throw new Error('falta AI_GATEWAY_API_KEY (ni MINIMAX_API_KEY como respaldo)');
+  }
 
   const baseUrl =
-    process.env.AI_GATEWAY_BASE_URL || 'https://ai-gateway.vercel.sh';
+    process.env.AI_GATEWAY_BASE_URL ||
+    process.env.MINIMAX_BASE_URL ||
+    'https://ai-gateway.vercel.sh';
   const model = process.env.AGENT_MODEL || 'google/gemini-3-flash';
 
   const res = await fetch(`${baseUrl}/v1/messages`, {
