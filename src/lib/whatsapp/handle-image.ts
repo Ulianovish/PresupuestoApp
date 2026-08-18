@@ -1,15 +1,66 @@
 // Orquestador de mensajes con imagen (corre en after). Descarga la media, la
-// analiza con visión y enruta: transferencia → gasto directo; recibo → borrador.
-// Deps inyectadas para testear sin red ni DB.
+// analiza con visión y enruta: transferencia → gasto directo; recibo →
+// registro directo (o pregunta la cuenta si no se puede resolver).
 
+import { normalizar, resolverCuenta } from '@/lib/whatsapp/agent/tools';
+import { formatCOP } from '@/lib/whatsapp/format';
 import type { VisionResult } from '@/lib/whatsapp/vision';
 
-function formatCOP(amount: number): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    minimumFractionDigits: 0,
-  }).format(amount);
+/**
+ * Busca en el texto libre la palabra más distintiva de cada cuenta (p. ej.
+ * "Davivienda" en "Davivienda Crédito"), para que "con la Davivienda" ande
+ * sin que el usuario tenga que escribir el nombre exacto. Con las ~23 cuentas
+ * reales del usuario varias comparten palabra (8 variantes de "Nu"): si más
+ * de una cuenta matchea, es ambigua y se trata como no resuelta.
+ */
+function resolverPorTexto(texto: string, accounts: string[]): string | null {
+  const t = normalizar(texto || '');
+  if (!t) return null;
+
+  const candidatas = accounts.filter(a =>
+    normalizar(a)
+      .split(/\s+/)
+      .some(palabra => palabra.length >= 4 && t.includes(palabra)),
+  );
+  if (candidatas.length !== 1) return null;
+
+  // La candidata ya es una cuenta real (viene de `accounts`); se pasa por
+  // `resolverCuenta` para canonicalizar con la misma lógica que usa el resto
+  // del agente (y no duplicar el criterio de "qué es una cuenta válida").
+  const resolucion = resolverCuenta(candidatas[0], accounts);
+  return resolucion.kind === 'ok' ? resolucion.cuenta : null;
+}
+
+/**
+ * Resuelve con qué cuenta se pagó, en orden: lo que escribió el usuario junto
+ * a la imagen, después lo que detectó la visión. El texto le gana a la
+ * visión porque el usuario sabe más que la foto. Null = hay que preguntarle.
+ *
+ * Se apoya en `resolverCuenta` (misma que usa el resto del agente): una
+ * ambigüedad real entre cuentas del usuario (p. ej. "Davivienda" y
+ * "DAVIVIENDA" coexistiendo, o varias cuentas que comparten palabra) se
+ * trata como "no resuelto", nunca se elige una candidata al azar.
+ */
+export function resolveAccountFromMessage(
+  texto: string,
+  visionAccount: string | null,
+  accounts: string[],
+): string | null {
+  const porTexto = resolverPorTexto(texto, accounts);
+  if (porTexto) return porTexto;
+
+  if (visionAccount) {
+    const resolucion = resolverCuenta(visionAccount, accounts);
+    if (resolucion.kind === 'ok') return resolucion.cuenta;
+  }
+  return null;
+}
+
+export interface ReceiptDraftInput {
+  supplier: string | null;
+  date: string;
+  items: Array<{ description: string; amount: number }>;
+  total: number | null;
 }
 
 export interface ImageDeps {
@@ -21,15 +72,33 @@ export interface ImageDeps {
     phone: string,
     input: { amount: number; description: string; accountName: string; date: string },
   ) => Promise<{ ok: boolean; category: string; error?: string }>;
-  createVisionReceiptDraft: (
+  /** Cuentas activas del usuario, para resolver con cuál se pagó una factura. */
+  accounts: string[];
+  /**
+   * Persiste la factura leída como borrador (`pending_review`) en
+   * `electronic_invoices`. Se llama SIEMPRE que la visión lee un recibo,
+   * resuelva o no la cuenta en este mismo mensaje: así la factura sobrevive
+   * al TTL de la conversación y a una segunda foto que llegue antes de la
+   * respuesta — antes solo vivía en `pending`, que vence y se pisa.
+   */
+  createReceiptDraft: (
     userId: string,
-    input: {
-      supplier: string | null;
-      date: string;
-      items: Array<{ description: string; amount: number }>;
-      total: number | null;
-    },
-  ) => Promise<{ ok: boolean; itemsFound: number; error?: string }>;
+    input: ReceiptDraftInput,
+  ) => Promise<{ ok: boolean; itemsFound: number; invoiceId?: string; error?: string }>;
+  /** Guarda el id de la factura ya persistida, esperando que el usuario diga con qué cuenta pagó. */
+  savePending: (invoiceId: string) => Promise<void>;
+  /** Registra la factura ya persistida y resuelta (sin aprobación manual). */
+  registerInvoice: (
+    invoiceId: string,
+    accountName: string,
+  ) => Promise<{
+    ok: boolean;
+    itemsFound: number;
+    totalItems: number;
+    /** Suma de lo que EFECTIVAMENTE quedó registrado (ver `createInvoiceDirect`). */
+    totalAmount?: number;
+    error?: string;
+  }>;
   resolveDefaultAccount: (phone: string) => Promise<string>;
   today: () => string;
 }
@@ -38,6 +107,14 @@ export interface ImageContext {
   userId: string;
   phone: string;
   mediaUrl: string;
+  /** Texto que acompañó la imagen (p. ej. "con la Davivienda"). */
+  body: string;
+  /**
+   * Id de la factura que ya estaba esperando cuenta ANTES de esta foto, si
+   * la había. Sirve para avisar en vez de pisarla en silencio si esta foto
+   * también necesita preguntar.
+   */
+  existingPendingId: string | null;
 }
 
 export async function handleImageMessage(
@@ -56,8 +133,15 @@ export async function handleImageMessage(
   const result = await deps.analyzeImage(media.base64, media.mime);
 
   if (result.kind === 'transfer') {
+    // `result.account` es texto crudo de la visión y NO se puede pasar tal cual
+    // al RPC: `upsert_monthly_expense` CREA la cuenta si el nombre no matchea
+    // exacto, así que un "Nequi" leído contra un "NEQUI" real inventaba una
+    // cuenta nueva en silencio que después aparecía en el prompt de todos los
+    // mensajes. Se canonicaliza igual que la rama de recibo (el texto del
+    // usuario le gana a la visión) y, si no resuelve, se usa la por defecto.
     const accountName =
-      result.account ?? (await deps.resolveDefaultAccount(ctx.phone));
+      resolveAccountFromMessage(ctx.body, result.account, deps.accounts) ??
+      (await deps.resolveDefaultAccount(ctx.phone));
     const res = await deps.createDirectExpense(ctx.userId, ctx.phone, {
       amount: result.amount,
       description: result.description ?? 'Transferencia',
@@ -79,16 +163,66 @@ export async function handleImageMessage(
   }
 
   if (result.kind === 'receipt') {
-    const res = await deps.createVisionReceiptDraft(ctx.userId, {
+    // Persistir SIEMPRE, antes de decidir si hay que preguntar: si no se
+    // guarda acá, la factura solo existiría en `pending` (vence a los 30 min,
+    // y una segunda foto lo pisa) y podría desaparecer sin que el usuario se
+    // entere de que "ya está guardada" fue mentira.
+    const draft = await deps.createReceiptDraft(ctx.userId, {
       supplier: result.supplier,
       date: result.date ?? deps.today(),
       items: result.items,
       total: result.total,
     });
-    if (res.ok) {
+    if (!draft.ok || !draft.invoiceId) {
       await deps.sendMessage(
         ctx.phone,
-        `✅ Leí tu factura${result.supplier ? ` de ${result.supplier}` : ''} (${res.itemsFound} ítems). Queda lista para revisar y aprobar en la app.`,
+        `❌ No pude guardar la factura: ${draft.error ?? 'error desconocido'}.`,
+      );
+      return;
+    }
+
+    const supplierTexto = result.supplier ? ` de ${result.supplier}` : '';
+    const totalTexto = result.total != null ? ` por ${formatCOP(result.total)}` : '';
+    const cuenta = resolveAccountFromMessage(ctx.body, null, deps.accounts);
+
+    if (!cuenta) {
+      if (ctx.existingPendingId) {
+        // No pisar en silencio: la factura anterior sigue existiendo como
+        // borrador en la app (nunca se pierde), pero el agente deja de
+        // preguntar por ella en el chat en cuanto pregunta por esta nueva.
+        await deps.sendMessage(
+          ctx.phone,
+          '📝 Ya tenías otra factura esperando cuenta; quedó guardada como borrador en la app, la podés completar ahí cuando quieras.',
+        );
+      }
+      await deps.savePending(draft.invoiceId);
+      await deps.sendMessage(
+        ctx.phone,
+        `🧾 Leí tu factura${supplierTexto}${totalTexto} (${result.items.length} ítems). ¿Con qué cuenta la pagaste?`,
+      );
+      return;
+    }
+
+    const res = await deps.registerInvoice(draft.invoiceId, cuenta);
+    if (res.ok) {
+      // El total que se confirma es el REGISTRADO (suma de los ítems que
+      // entraron en transactions), no el que leyó la visión en la cabecera:
+      // con descuentos o redondeos difieren y el usuario veía en la app un
+      // número distinto del que le confirmó el bot.
+      const totalRegistradoTexto =
+        res.totalAmount != null ? ` por ${formatCOP(res.totalAmount)}` : totalTexto;
+      await deps.sendMessage(
+        ctx.phone,
+        `✅ Registré tu factura${supplierTexto}${totalRegistradoTexto} (${res.itemsFound} ítems) en ${cuenta}.`,
+      );
+    } else if (res.itemsFound > 0) {
+      // Fallo a mitad de camino: esos ítems YA son transacciones reales. Decir
+      // "no pude guardar la factura" empujaría a reenviar la foto y duplicarlos.
+      // El panel "Facturas sin completar" no tiene botón para esto (solo para
+      // pending_review): la acción real es cargar el resto a mano en Gastos.
+      await deps.sendMessage(
+        ctx.phone,
+        `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta} (esos ya están en tus gastos, no se perdieron). Los que faltan, cargalos a mano en Gastos; no reenvíes la foto, duplicaría los que ya quedaron.`,
       );
     } else {
       await deps.sendMessage(

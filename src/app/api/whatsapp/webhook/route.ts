@@ -6,11 +6,7 @@
 
 import { after, NextRequest } from 'next/server';
 
-import {
-  prepareInvoiceProcessing,
-  runInvoiceProcessing,
-} from '@/lib/dian/process-invoice';
-import { resolveUserCategoryNames } from '@/lib/services/invoices';
+import { createInvoiceDirect } from '@/lib/services/invoices';
 import {
   createDirectExpense,
   createVisionReceiptDraft,
@@ -20,15 +16,15 @@ import {
   getLinkByPhone,
   redeemLinkCode,
 } from '@/lib/services/whatsapp-links';
-import { createAdminClient } from '@/lib/supabase/server';
+import { readState, writeState } from '@/lib/whatsapp/agent/state';
+import { handleAgentTurn, listarCuentas } from '@/lib/whatsapp/agent/turn';
 import { ackMessage, classifyText, simpleReply } from '@/lib/whatsapp/classify';
-import {
-  handleAgentMessage,
-  type CufeOutcome,
-} from '@/lib/whatsapp/handle-agent';
+import { todayBogota } from '@/lib/whatsapp/format';
+import { handleAgentMessage } from '@/lib/whatsapp/handle-agent';
 import { handleImageMessage } from '@/lib/whatsapp/handle-image';
 import { handleLinkingMessage } from '@/lib/whatsapp/handle-linking';
 import { normalizeWhatsappFrom } from '@/lib/whatsapp/message';
+import { processCufeForWhatsApp } from '@/lib/whatsapp/process-cufe';
 import {
   downloadTwilioMedia,
   sendWhatsAppMessage,
@@ -46,31 +42,6 @@ function xml(body: string, status = 200): Response {
     status,
     headers: { 'Content-Type': 'text/xml; charset=utf-8' },
   });
-}
-
-/** Procesa un CUFE para WhatsApp con service-role; mapea el resultado a CufeOutcome. */
-async function processCufeForWhatsApp(
-  userId: string,
-  cufe: string,
-): Promise<CufeOutcome> {
-  const admin = createAdminClient();
-  const prep = await prepareInvoiceProcessing(userId, cufe, admin);
-  if (prep.kind === 'duplicate') return { ok: false, reason: 'duplicate' };
-  if (prep.kind === 'error') return { ok: false, reason: 'error', message: prep.message };
-
-  const categoryNames = await resolveUserCategoryNames(admin, userId);
-  const run = await runInvoiceProcessing(prep.invoiceId, cufe, {
-    categoryNames,
-    client: admin,
-  });
-  if (run.ok) return { ok: true, itemsFound: run.itemsFound };
-  return { ok: false, reason: 'error', message: run.message };
-}
-
-function todayYmd(): string {
-  // Fecha "hoy" en horario de Colombia (no UTC): en-CA formatea YYYY-MM-DD.
-  // Evita adelantar el día para gastos enviados de noche (UTC-5).
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 }
 
 export async function POST(request: NextRequest) {
@@ -115,62 +86,121 @@ export async function POST(request: NextRequest) {
   if (decision === 'image') {
     const mediaUrl = params.MediaUrl0 || '';
     if (!mediaUrl) {
-      return xml(twimlMessage(simpleReply('unknown')));
+      return xml(twimlMessage(simpleReply('help')));
     }
     const userId = link.userId;
     after(async () => {
       try {
+        const [accounts, estado] = await Promise.all([
+          listarCuentas(userId),
+          readState(phone),
+        ]);
         await handleImageMessage(
-          { userId, phone, mediaUrl },
+          {
+            userId,
+            phone,
+            mediaUrl,
+            body,
+            existingPendingId: estado.pending?.invoiceId ?? null,
+          },
           {
             sendMessage: sendWhatsAppMessage,
             downloadMedia: downloadTwilioMedia,
             analyzeImage,
             createDirectExpense,
-            createVisionReceiptDraft,
             resolveDefaultAccount,
-            today: todayYmd,
+            today: todayBogota,
+            accounts,
+            createReceiptDraft: createVisionReceiptDraft,
+            savePending: invoiceId =>
+              writeState(phone, userId, {
+                pending: { kind: 'invoice_account', invoiceId },
+              }),
+            registerInvoice: (invoiceId, accountName) =>
+              createInvoiceDirect(userId, invoiceId, accountName),
           },
         );
       } catch (err) {
+        // No se puede saber en qué punto reventó: puede haber sido antes de
+        // leer la foto o después de registrar la mitad de sus ítems. Una foto
+        // NO tiene dedup (a diferencia del CUFE, que se reconoce por su
+        // código), así que invitar a reenviarla duplicaría la factura entera.
         console.error('Error en handleImageMessage (background):', err);
         await sendWhatsAppMessage(
           phone,
-          '❌ Tuve un problema leyendo tu imagen. Inténtalo de nuevo.',
+          '❌ Tuve un problema leyendo tu imagen. Puede que algo se haya alcanzado a registrar: revisá en la app antes de reenviarla, para no duplicarla.',
         );
       }
     });
     return xml(twimlMessage('📷 Recibí tu imagen, la estoy leyendo (~30s)...'));
   }
 
-  if (decision === 'cufe' || decision === 'quick_expense') {
+  if (decision === 'cufe') {
     const userId = link.userId;
     after(async () => {
       try {
+        const [accounts, estado] = await Promise.all([
+          listarCuentas(userId),
+          readState(phone),
+        ]);
         await handleAgentMessage(
           decision,
-          { userId, phone, body },
+          {
+            userId,
+            phone,
+            body,
+            existingPendingId: estado.pending?.invoiceId ?? null,
+          },
           {
             sendMessage: sendWhatsAppMessage,
             processCufe: processCufeForWhatsApp,
-            createDirectExpense,
-            resolveDefaultAccount,
-            today: todayYmd,
+            accounts,
+            savePending: invoiceId =>
+              writeState(phone, userId, {
+                pending: { kind: 'invoice_account', invoiceId },
+              }),
+            registerInvoice: (invoiceId, accountName) =>
+              createInvoiceDirect(userId, invoiceId, accountName),
           },
         );
       } catch (err) {
         // Red de seguridad: si algo lanza en background (DB/red), el usuario ya
         // recibió el ACK; sin esto se quedaría sin respuesta final.
+        //
+        // El CUFE sí tiene dedup por código, pero el registro de sus ítems no:
+        // si reventó DESPUÉS de leer la factura, reenviarlo puede duplicar lo
+        // ya escrito. Por eso el reintento se condiciona a lo que el usuario
+        // vio, en vez de ofrecerse a ciegas.
         console.error('Error en handleAgentMessage (background):', err);
         await sendWhatsAppMessage(
           phone,
-          '❌ Tuve un problema interno procesando tu mensaje. Inténtalo de nuevo en un momento.',
+          '❌ Tuve un problema interno procesando tu factura. Si ya te había dicho que la leí, revisala en la app antes de reenviar el CUFE.',
         );
       }
     });
-    return xml(twimlMessage(ackMessage(decision)));
+    return xml(twimlMessage(ackMessage()));
   }
 
-  // help / unknown → respuesta completa síncrona (image se maneja arriba).
+  if (decision === 'agent') {
+    const userId = link.userId;
+    after(async () => {
+      try {
+        await handleAgentTurn({ userId, phone, body });
+      } catch (err) {
+        // Mismo criterio que la imagen: acá adentro corren las herramientas
+        // que escriben gastos, y desde afuera no hay forma de saber si alguna
+        // alcanzó a hacerlo. "Inténtalo de nuevo" invitaba a registrar el
+        // mismo gasto dos veces.
+        console.error('Error en handleAgentTurn (background):', err);
+        await sendWhatsAppMessage(
+          phone,
+          '❌ Tuve un problema procesando tu mensaje. Puede que algo se haya alcanzado a registrar: revisá en la app antes de reenviarlo, para no duplicarlo.',
+        );
+      }
+    });
+    return xml(twimlMessage('✍️ Un momento...'));
+  }
+
+  // help → respuesta completa síncrona (image/cufe/agent se manejan arriba).
   return xml(twimlMessage(simpleReply(decision)));
 }

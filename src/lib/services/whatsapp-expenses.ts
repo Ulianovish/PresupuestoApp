@@ -2,6 +2,11 @@
 // (sin sesión) con el userId ya resuelto por el vínculo del número.
 
 import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
+import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
+import {
+  resolveItemNameToId,
+  type BudgetItemRef,
+} from '@/lib/services/expenses-rollup';
 import { resolveUserCategoryNames } from '@/lib/services/invoices';
 import { createAdminClient } from '@/lib/supabase/server';
 import type { StoredInvoiceItem } from '@/types/invoices';
@@ -9,7 +14,9 @@ import type { StoredInvoiceItem } from '@/types/invoices';
 const FALLBACK_ACCOUNT = 'Efectivo';
 
 /** Cuenta por defecto del número (columna en whatsapp_links) o 'Efectivo'. */
-export async function resolveDefaultAccount(phoneE164: string): Promise<string> {
+export async function resolveDefaultAccount(
+  phoneE164: string,
+): Promise<string> {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from('whatsapp_links')
@@ -31,7 +38,36 @@ export interface DirectExpenseInput {
 export interface DirectExpenseResult {
   ok: boolean;
   category: string;
+  transactionId?: string;
+  budgetItemId?: string | null;
   error?: string;
+}
+
+type Clasificador = (
+  items: Array<{ description: string }>,
+  itemNames: string[],
+) => Promise<Array<string | null>>;
+
+/**
+ * Elige el ítem de presupuesto para un gasto, acotado a los ítems de SU
+ * categoría. Si la categoría no tiene ítems o el clasificador no reconoce
+ * ninguno, devuelve null: el gasto queda sin clasificar y aparece en el panel
+ * de la app. Adivinar sería peor que no asignar.
+ */
+export async function pickBudgetItemId(
+  description: string,
+  categoryName: string,
+  items: BudgetItemRef[],
+  clasificar: Clasificador = classifyExpensesToItems,
+): Promise<string | null> {
+  const enCategoria = items.filter(i => i.category_name === categoryName);
+  if (enCategoria.length === 0) return null;
+
+  const [nombre] = await clasificar(
+    [{ description }],
+    enCategoria.map(i => i.name),
+  );
+  return resolveItemNameToId(nombre, enCategoria);
 }
 
 /**
@@ -52,7 +88,7 @@ export async function createDirectExpense(
   );
   const finalCategory = category ?? 'OTROS';
 
-  const { error } = await supabase.rpc('upsert_monthly_expense', {
+  const { data, error } = await supabase.rpc('upsert_monthly_expense', {
     p_user_id: userId,
     p_description: input.description,
     p_amount: input.amount,
@@ -65,7 +101,60 @@ export async function createDirectExpense(
   if (error) {
     return { ok: false, category: finalCategory, error: error.message };
   }
-  return { ok: true, category: finalCategory };
+
+  const transactionId = typeof data === 'string' ? data : undefined;
+
+  // Asignar el ítem del presupuesto. Best-effort: si falla, el gasto YA está
+  // guardado y aparece en el panel "Sin clasificar" — nunca se pierde.
+  let budgetItemId: string | null = null;
+  if (transactionId) {
+    try {
+      const monthYear = input.date.slice(0, 7);
+      const { data: filas } = await supabase.rpc('get_budget_items_for_month', {
+        p_user_id: userId,
+        p_month_year: monthYear,
+      });
+      const items: BudgetItemRef[] = (filas ?? []).map(
+        (r: { item_id: string; item_name: string; category_name: string }) => ({
+          id: r.item_id,
+          name: r.item_name,
+          category_name: r.category_name,
+        }),
+      );
+      budgetItemId = await pickBudgetItemId(
+        input.description,
+        finalCategory,
+        items,
+      );
+      if (budgetItemId) {
+        const { error: assignError } = await supabase.rpc(
+          'assign_expense_budget_item',
+          {
+            p_user_id: userId,
+            p_transaction_id: transactionId,
+            p_budget_item_id: budgetItemId,
+            p_source: 'ai',
+          },
+        );
+        if (assignError) {
+          console.error(
+            'No se pudo asignar el ítem de presupuesto:',
+            assignError,
+          );
+          budgetItemId = null;
+        }
+      }
+    } catch (err) {
+      console.error('No se pudo asignar el ítem de presupuesto:', err);
+      // Si el RPC lanzó (p.ej. timeout de red) en vez de resolver con
+      // { error }, el contrato no debe mentir: sin confirmación de que
+      // quedó asignado, budgetItemId vuelve a null. Si la excepción ocurrió
+      // antes de elegir un id, esto es un no-op inocuo.
+      budgetItemId = null;
+    }
+  }
+
+  return { ok: true, category: finalCategory, transactionId, budgetItemId };
 }
 
 export interface VisionReceiptInput {
@@ -78,6 +167,8 @@ export interface VisionReceiptInput {
 export interface VisionReceiptResult {
   ok: boolean;
   itemsFound: number;
+  /** Id de la fila creada; solo viene si `ok`. La usa el agente para referenciar la factura sin cargarla entera en el estado de la conversación. */
+  invoiceId?: string;
   error?: string;
 }
 
@@ -86,6 +177,11 @@ export interface VisionReceiptResult {
  * Categoriza los ítems con IA y los guarda en electronic_invoices con
  * source='vision_receipt' y status='pending_review' → aparece en la bandeja y se
  * aprueba con el flujo existente.
+ *
+ * Se llama SIEMPRE que la visión lee un recibo, resuelva o no la cuenta en el
+ * mismo mensaje: la factura queda persistida desde este momento, no solo en
+ * el estado de la conversación (que vence a los 30 min y una segunda foto lo
+ * pisa).
  */
 export async function createVisionReceiptDraft(
   userId: string,
@@ -112,20 +208,28 @@ export async function createVisionReceiptDraft(
   const totalAmount =
     input.total ?? storedItems.reduce((sum, it) => sum + it.total_price, 0);
 
-  const { error } = await supabase.from('electronic_invoices').insert({
-    user_id: userId,
-    cufe_code: null,
-    source: 'vision_receipt',
-    supplier_name: input.supplier,
-    invoice_date: input.date,
-    total_amount: totalAmount,
-    items: storedItems,
-    status: 'pending_review',
-    processed_at: new Date().toISOString(),
-  });
+  const { data, error } = await supabase
+    .from('electronic_invoices')
+    .insert({
+      user_id: userId,
+      cufe_code: null,
+      source: 'vision_receipt',
+      supplier_name: input.supplier,
+      invoice_date: input.date,
+      total_amount: totalAmount,
+      items: storedItems,
+      status: 'pending_review',
+      processed_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
 
   if (error) {
     return { ok: false, itemsFound: 0, error: error.message };
   }
-  return { ok: true, itemsFound: storedItems.length };
+  return {
+    ok: true,
+    itemsFound: storedItems.length,
+    invoiceId: (data as { id: string }).id,
+  };
 }

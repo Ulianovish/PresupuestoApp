@@ -44,12 +44,31 @@ export async function POST(request: NextRequest) {
   }
 
   const prep = await prepareInvoiceProcessing(user.id, cufe);
-  if (prep.kind === 'duplicate') {
+  // `awaiting_account` (pending_review sin cuenta contestada) se trata igual
+  // que `duplicate` acá: la fila ya tiene los datos, no hace falta volver a
+  // scrapear (ni gastar otro captcha) — se completa desde "Facturas sin
+  // completar" o por WhatsApp, no reprocesando.
+  if (prep.kind === 'duplicate' || prep.kind === 'awaiting_account') {
     return Response.json(
       {
         error: 'Esta factura ya fue procesada',
         invoiceId: prep.invoice.id,
         status: prep.invoice.status,
+      },
+      { status: 409 },
+    );
+  }
+  // Registro parcial: parte de sus ítems ya son gastos reales. Reprocesarla
+  // los duplicaría; los que faltan hay que cargarlos a mano en Gastos (no hay
+  // botón "Completar" para esto: ese es solo para facturas en pending_review).
+  if (prep.kind === 'partial_registration') {
+    return Response.json(
+      {
+        error: `Esta factura quedó registrada a medias: ${prep.itemsFound} de ${prep.totalItems} ítems ya son gastos tuyos (no se perdieron). Los que faltan, cargalos a mano en Gastos; no la reproceses, duplicaría los que ya quedaron.`,
+        invoiceId: prep.invoice.id,
+        status: prep.invoice.status,
+        itemsFound: prep.itemsFound,
+        totalItems: prep.totalItems,
       },
       { status: 409 },
     );

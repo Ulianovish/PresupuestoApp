@@ -63,7 +63,8 @@ export default function CufeScanForm({ onSaved }: CufeScanFormProps) {
         />
         <p className="text-xs text-slate-500">
           Se procesa en segundo plano. Puedes cerrar esta ventana; la factura
-          aparece en la bandeja con su avance y queda como borrador para aprobar.
+          aparece en la bandeja con su avance y queda pendiente de que digas
+          con qué cuenta la pagaste (por WhatsApp o completándola aquí).
         </p>
       </div>
 

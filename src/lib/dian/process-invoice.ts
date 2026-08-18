@@ -7,8 +7,10 @@ import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
 import { parseSSEEventLine } from '@/lib/dian/sse';
 import {
   createProcessingInvoice,
+  esRegistroParcial,
   getInvoiceByCufe,
   markInvoiceError,
+  parseRegistroParcial,
   resetInvoiceToProcessing,
   saveProcessedInvoice,
 } from '@/lib/services/invoices';
@@ -25,6 +27,27 @@ type DBClient = SupabaseClient<Database>;
 
 export type PrepareResult =
   | { kind: 'duplicate'; invoice: ElectronicInvoice }
+  /**
+   * La factura ya se scrapeó y quedó en `pending_review`, pero todavía nadie
+   * dijo con qué cuenta se pagó (el usuario reenvió el mismo CUFE por las
+   * dudas, o nunca contestó la pregunta). NO es un duplicado real — a
+   * diferencia de `approved`, acá no hay nada que perder por retomarla: no
+   * hace falta volver a scrapear (ni gastar otro captcha), solo recuperar el
+   * id para preguntar de nuevo.
+   */
+  | { kind: 'awaiting_account'; invoice: ElectronicInvoice }
+  /**
+   * La factura se registró a medias: parte de sus ítems YA son transacciones
+   * reales (`itemsFound` de `totalItems`). No se puede reintentar (re-scrapear
+   * y volver a recorrer los ítems duplicaría los que ya son gastos); los que
+   * faltan hay que cargarlos a mano en Gastos.
+   */
+  | {
+      kind: 'partial_registration';
+      invoice: ElectronicInvoice;
+      itemsFound: number;
+      totalItems: number;
+    }
   | { kind: 'ready'; invoiceId: string }
   | { kind: 'error'; message: string };
 
@@ -73,11 +96,26 @@ export async function prepareInvoiceProcessing(
   client?: DBClient,
 ): Promise<PrepareResult> {
   const existing = await getInvoiceByCufe(userId, cufe, client);
-  if (
-    existing &&
-    (existing.status === 'pending_review' || existing.status === 'approved')
-  ) {
+  if (existing && existing.status === 'approved') {
     return { kind: 'duplicate', invoice: existing };
+  }
+  if (existing && existing.status === 'pending_review') {
+    return { kind: 'awaiting_account', invoice: existing };
+  }
+  // Una fila en 'error' se reintenta... salvo que el error sea un registro
+  // parcial: ahí ya hay gastos creados. Reiniciarla a 'processing' la manda a
+  // re-scrapear y después `createInvoiceDirect` recorre TODOS los ítems otra
+  // vez, duplicando los que ya son transacciones reales. Reenviar el mismo
+  // CUFE es justo lo que hace un usuario que vio "el resto falló".
+  if (existing && esRegistroParcial(existing.error_message)) {
+    // El formato del mensaje lo escribe `createInvoiceDirect` (ver
+    // `PREFIJO_REGISTRO_PARCIAL`), así que el parseo siempre matchea; el
+    // fallback es solo defensivo.
+    const conteo = parseRegistroParcial(existing.error_message) ?? {
+      itemsFound: 0,
+      totalItems: existing.items?.length ?? 0,
+    };
+    return { kind: 'partial_registration', invoice: existing, ...conteo };
   }
 
   let invoiceId: string | null;

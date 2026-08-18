@@ -1,100 +1,157 @@
 // Orquestador del agente para mensajes de un usuario YA vinculado. Corre en
 // background (after) y manda las respuestas por el transporte saliente. Deps
 // inyectadas para testear sin red ni DB.
+//
+// Solo maneja 'cufe': `classifyText` nunca produce 'quick_expense' (ese
+// enrutado por texto se sacó por acertar mal en silencio, ver classify.ts),
+// así que esa rama quedaba inalcanzable y se eliminó junto con sus deps.
+//
+// El CUFE ya persiste la factura como `pending_review` (la crea el motor de
+// procesamiento, ver `saveProcessedInvoice`), así que a diferencia de la vía
+// de imagen no hace falta crear el borrador acá: solo resolver la cuenta y,
+// o bien registrar con `createInvoiceDirect`, o bien guardar el `pending` y
+// preguntar — el mismo criterio y los mismos textos que usa
+// `handle-image.ts` para que las dos vías respondan igual.
 
 import { extractCufe } from '@/lib/whatsapp/classify';
-import { parseQuickExpense } from '@/lib/whatsapp/quick-expense';
-
-// Formateo COP inline: NO importar de '@/lib/services/expenses' (ese módulo crea
-// un cliente de Supabase de navegador a nivel de módulo y rompería en servidor).
-function formatCOP(amount: number): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    minimumFractionDigits: 0,
-  }).format(amount);
-}
+import { formatCOP } from '@/lib/whatsapp/format';
+import { resolveAccountFromMessage } from '@/lib/whatsapp/handle-image';
 
 export type CufeOutcome =
-  | { ok: true; itemsFound: number }
+  | {
+      ok: true;
+      itemsFound: number;
+      /** Id de la factura ya persistida como `pending_review`. */
+      invoiceId: string;
+      supplier?: string | null;
+      total?: number | null;
+    }
   | { ok: false; reason: 'duplicate' }
+  /**
+   * La factura quedó registrada a medias en un intento anterior: parte de sus
+   * ítems ya son gastos reales (`itemsFound` de `totalItems`). Reprocesarla
+   * los duplicaría; los que faltan hay que cargarlos a mano en Gastos.
+   */
+  | { ok: false; reason: 'partial'; itemsFound: number; totalItems: number }
   | { ok: false; reason: 'error'; message: string };
 
 export interface AgentDeps {
   sendMessage: (to: string, body: string) => Promise<{ ok: boolean }>;
   processCufe: (userId: string, cufe: string) => Promise<CufeOutcome>;
-  createDirectExpense: (
-    userId: string,
-    phone: string,
-    input: { amount: number; description: string; accountName: string; date: string },
-  ) => Promise<{ ok: boolean; category: string; error?: string }>;
-  resolveDefaultAccount: (phone: string) => Promise<string>;
-  today: () => string; // YYYY-MM-DD
+  /** Cuentas activas del usuario, para resolver con cuál se pagó la factura. */
+  accounts: string[];
+  /** Guarda el id de la factura ya persistida, esperando que el usuario diga con qué cuenta pagó. */
+  savePending: (invoiceId: string) => Promise<void>;
+  /** Registra la factura ya persistida y resuelta (sin aprobación manual). */
+  registerInvoice: (
+    invoiceId: string,
+    accountName: string,
+  ) => Promise<{
+    ok: boolean;
+    itemsFound: number;
+    totalItems: number;
+    /** Suma de lo que EFECTIVAMENTE quedó registrado (ver `createInvoiceDirect`). */
+    totalAmount?: number;
+    error?: string;
+  }>;
 }
 
 export interface AgentContext {
   userId: string;
   phone: string;
   body: string;
+  /**
+   * Id de la factura que ya estaba esperando cuenta ANTES de este CUFE, si
+   * la había. Sirve para avisar en vez de pisarla en silencio si este CUFE
+   * también necesita preguntar (mismo criterio que `handle-image.ts`).
+   */
+  existingPendingId: string | null;
 }
 
 export async function handleAgentMessage(
-  decision: 'cufe' | 'quick_expense',
+  decision: 'cufe',
   ctx: AgentContext,
   deps: AgentDeps,
 ): Promise<void> {
-  if (decision === 'cufe') {
-    const cufe = extractCufe(ctx.body);
-    if (!cufe) {
+  const cufe = extractCufe(ctx.body);
+  if (!cufe) {
+    await deps.sendMessage(
+      ctx.phone,
+      'No encontré un CUFE válido en tu mensaje 🤔. Pega el CUFE (96 caracteres) o el texto/QR completo de la factura.',
+    );
+    return;
+  }
+  const out = await deps.processCufe(ctx.userId, cufe);
+
+  if (out.ok) {
+    const supplierTexto = out.supplier ? ` de ${out.supplier}` : '';
+    const totalTexto = out.total != null ? ` por ${formatCOP(out.total)}` : '';
+    // Un CUFE no trae cuenta detectada por visión: solo puede resolverse por
+    // el texto que el usuario escribió junto al código.
+    const cuenta = resolveAccountFromMessage(ctx.body, null, deps.accounts);
+
+    if (!cuenta) {
+      if (ctx.existingPendingId) {
+        // No pisar en silencio: la factura anterior sigue existiendo como
+        // borrador en la app (nunca se pierde), pero el agente deja de
+        // preguntar por ella en el chat en cuanto pregunta por esta nueva.
+        await deps.sendMessage(
+          ctx.phone,
+          '📝 Ya tenías otra factura esperando cuenta; quedó guardada como borrador en la app, la podés completar ahí cuando quieras.',
+        );
+      }
+      await deps.savePending(out.invoiceId);
       await deps.sendMessage(
         ctx.phone,
-        'No encontré un CUFE válido en tu mensaje 🤔. Pega el CUFE (96 caracteres) o el texto/QR completo de la factura.',
+        `🧾 Leí tu factura${supplierTexto}${totalTexto} (${out.itemsFound} ítems). ¿Con qué cuenta la pagaste?`,
       );
       return;
     }
-    const out = await deps.processCufe(ctx.userId, cufe);
-    if (out.ok) {
+
+    const res = await deps.registerInvoice(out.invoiceId, cuenta);
+    if (res.ok) {
+      // El total que se confirma es el REGISTRADO (suma de los ítems que
+      // entraron en transactions), no el de la cabecera de la factura: con
+      // descuentos o redondeos difieren y el usuario veía en la app un número
+      // distinto del que le confirmó el bot.
+      const totalRegistradoTexto =
+        res.totalAmount != null ? ` por ${formatCOP(res.totalAmount)}` : totalTexto;
       await deps.sendMessage(
         ctx.phone,
-        `✅ Tu factura quedó lista para revisar y aprobar en la app (${out.itemsFound} ítems).`,
+        `✅ Registré tu factura${supplierTexto}${totalRegistradoTexto} (${res.itemsFound} ítems) en ${cuenta}.`,
       );
-    } else if (out.reason === 'duplicate') {
-      await deps.sendMessage(ctx.phone, 'Esa factura ya la había procesado. 👍');
+    } else if (res.itemsFound > 0) {
+      // Fallo a mitad de camino: esos ítems YA son transacciones reales. Decir
+      // "no pude guardar la factura" empujaría a reenviar el CUFE y duplicarlos.
+      // El panel "Facturas sin completar" no tiene botón para esto (solo para
+      // pending_review): la acción real es cargar el resto a mano en Gastos.
+      await deps.sendMessage(
+        ctx.phone,
+        `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta} (esos ya están en tus gastos, no se perdieron). Los que faltan, cargalos a mano en Gastos; no vuelvas a mandar el CUFE, duplicaría los que ya quedaron.`,
+      );
     } else {
       await deps.sendMessage(
         ctx.phone,
-        // El mensaje del motor suele venir ya con punto final; no duplicarlo.
-        `❌ No pude procesar la factura: ${out.message.replace(/\.?$/, '.')} Puedes reintentar más tarde.`,
+        `❌ No pude guardar la factura: ${res.error ?? 'error desconocido'}.`,
       );
     }
     return;
   }
 
-  // quick_expense
-  const parsed = parseQuickExpense(ctx.body);
-  if (!parsed) {
+  if (out.reason === 'duplicate') {
+    await deps.sendMessage(ctx.phone, 'Esa factura ya la había procesado. 👍');
+  } else if (out.reason === 'partial') {
+    // El panel "Facturas sin completar" no tiene botón para esto (solo para
+    // pending_review): la acción real es cargar el resto a mano en Gastos.
     await deps.sendMessage(
       ctx.phone,
-      'No logré entender el gasto 🤔. Escríbelo como "20k taxi" o "gasté 35000 en mercado".',
-    );
-    return;
-  }
-  const accountName = await deps.resolveDefaultAccount(ctx.phone);
-  const res = await deps.createDirectExpense(ctx.userId, ctx.phone, {
-    amount: parsed.amount,
-    description: parsed.description,
-    accountName,
-    date: deps.today(),
-  });
-  if (res.ok) {
-    await deps.sendMessage(
-      ctx.phone,
-      `✅ Registré ${formatCOP(parsed.amount)} en ${res.category} (${accountName}) · ${parsed.description}. Si algo está mal, edítalo en la app.`,
+      `⚠️ Esa factura quedó registrada a medias: ${out.itemsFound} de ${out.totalItems} ítems ya son gastos tuyos (no se perdieron). No la vuelvo a procesar porque duplicaría esos; los que faltan, cargalos a mano en Gastos.`,
     );
   } else {
     await deps.sendMessage(
       ctx.phone,
-      `❌ No pude registrar el gasto: ${res.error ?? 'error desconocido'}.`,
+      // El mensaje del motor suele venir ya con punto final; no duplicarlo.
+      `❌ No pude procesar la factura: ${out.message.replace(/\.?$/, '.')} Puedes reintentar más tarde.`,
     );
   }
 }

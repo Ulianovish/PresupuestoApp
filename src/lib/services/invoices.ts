@@ -2,9 +2,9 @@
 
 import { EXPENSE_CATEGORIES } from '@/lib/constants/expense-categories';
 import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
-import { mapInvoiceItemToExpenseArgs } from '@/lib/dian/invoice-mapper';
 import { resolveItemNameToId } from '@/lib/services/expenses-rollup';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient, createClient } from '@/lib/supabase/server';
+import type { PendingInvoice } from '@/lib/whatsapp/agent/state';
 import type { Database } from '@/types/database';
 import type { ElectronicInvoice, StoredInvoiceItem } from '@/types/invoices';
 
@@ -92,6 +92,36 @@ export async function resolveUserCategoryNames(
   return [...EXPENSE_CATEGORIES];
 }
 
+/**
+ * Prefijo del `error_message` que deja `createInvoiceDirect` cuando se cortó a
+ * mitad de camino y algunos ítems YA son transacciones reales.
+ *
+ * Es la marca que hace reconocible ese estado desde afuera: una fila así no se
+ * puede reintentar (volver a recorrer los ítems duplicaría los ya creados), a
+ * diferencia de una fila en error por un scrape fallido.
+ */
+const PREFIJO_REGISTRO_PARCIAL = 'Registro parcial:';
+
+/** ¿Esta factura quedó a medias con gastos ya creados? (ver `PREFIJO_REGISTRO_PARCIAL`). */
+export function esRegistroParcial(errorMessage: string | null): boolean {
+  return (errorMessage ?? '').startsWith(PREFIJO_REGISTRO_PARCIAL);
+}
+
+/**
+ * Extrae cuántos ítems quedaron registrados y cuántos eran, del `error_message`
+ * que deja `createInvoiceDirect` en un registro parcial (mismo formato que
+ * escribe esa función: "Registro parcial: N de M ítems (...)"). Null si el
+ * mensaje no tiene ese formato.
+ */
+export function parseRegistroParcial(
+  errorMessage: string | null,
+): { itemsFound: number; totalItems: number } | null {
+  if (!esRegistroParcial(errorMessage)) return null;
+  const match = (errorMessage ?? '').match(/(\d+) de (\d+) ítems/);
+  if (!match) return null;
+  return { itemsFound: Number(match[1]), totalItems: Number(match[2]) };
+}
+
 /** Marca la factura como error con un mensaje. */
 export async function markInvoiceError(
   invoiceId: string,
@@ -153,86 +183,225 @@ export async function listDraftInvoices(
 }
 
 /**
- * Aprueba una factura: crea un gasto por ítem vía upsert_monthly_expense y
- * marca la factura como approved.
+ * Resumen de una factura pendiente, para mostrarla en el prompt del agente
+ * ("HAY UNA FACTURA ESPERANDO CUENTA..."). Se busca por id porque `pending`
+ * en la conversación solo guarda el id, no la factura entera (ver
+ * `Pending` en `agent/state.ts`) — así sobrevive al TTL de 30 min y a una
+ * segunda foto que llegue antes de que el usuario conteste.
  */
-export async function approveInvoice(
+export async function getPendingInvoiceSummary(
+  userId: string,
+  invoiceId: string,
+): Promise<PendingInvoice | null> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from('electronic_invoices')
+    .select('*')
+    // Solo si SIGUE esperando cuenta: si se completó desde la app (o quedó en
+    // error), el prompt seguía anunciando "HAY UNA FACTURA ESPERANDO CUENTA"
+    // por una factura que ya no espera nada.
+    .eq('status', 'pending_review')
+    .eq('id', invoiceId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!data) return null;
+
+  const inv = data as ElectronicInvoice;
+  return {
+    source: inv.source === 'dian_cufe' ? 'dian_cufe' : 'vision_receipt',
+    cufe: inv.cufe_code,
+    supplier: inv.supplier_name,
+    date: inv.invoice_date ?? '',
+    total: inv.total_amount,
+    items: (inv.items || []).map(it => ({
+      description: it.description,
+      amount: it.total_with_tax ?? it.total_price,
+    })),
+  };
+}
+
+/**
+ * Registra una factura ya persistida (por `createVisionReceiptDraft` o el
+ * flujo CUFE), sin aprobación manual: la cuenta la pregunta el agente de
+ * WhatsApp (`resolveAccountFromMessage`), y ese era el único paso que
+ * justificaba una pantalla de aprobación. También la usa la vista de rescate
+ * ("Facturas sin completar") cuando el usuario nunca contestó la cuenta por
+ * WhatsApp y la completa desde la app.
+ *
+ * A propósito NO recibe los datos de la factura sueltos: los lee de la fila
+ * por `invoiceId`, la misma que `createVisionReceiptDraft` dejó en
+ * `pending_review` con los ítems ya categorizados. Eso es lo que hace que la
+ * factura sobreviva aunque venza el TTL de la conversación o llegue una
+ * segunda foto antes de que el usuario responda — antes `pending` era el
+ * único lugar donde vivía y se perdía en ambos casos.
+ *
+ * Si la fila ya no está en `pending_review` (se registró antes, o quedó en
+ * error tras un fallo parcial), no se reintenta a ciegas: evita duplicar
+ * ítems que ya son transacciones reales — p. ej. si el modelo llama
+ * `registrar_factura` dos veces en la misma vuelta.
+ *
+ * Si un ítem falla a mitad de camino, los gastos ya creados NO se revierten
+ * (son transacciones reales vía `upsert_monthly_expense`, que no dedupe) y el
+ * resultado lo dice: `itemsFound` es el conteo real, nunca cero solo porque
+ * el último ítem falló. Decirle al usuario "no se guardó nada" cuando sí se
+ * guardó una parte lo empuja a reenviar la foto y duplicar esos ítems. Por
+ * eso la fila solo vuelve a `pending_review` (reintentable) cuando
+ * `itemsFound` sigue en cero; si ya se creó algo, queda en `error` para que
+ * no se vuelva a intentar sola.
+ *
+ * Usa `createAdminClient` porque corre en background (`after()` del
+ * webhook), sin sesión de navegador — mismo patrón que `createDirectExpense`
+ * en `whatsapp-expenses.ts`. `classifyApprovedExpenses` se sigue llamando
+ * (best-effort, con lo que sí se creó): es lo que asigna el ítem de
+ * presupuesto de cada línea; sin esto la factura entera entra "sin
+ * clasificar".
+ */
+export async function createInvoiceDirect(
   userId: string,
   invoiceId: string,
   accountName: string,
-  categoryOverrides?: Record<number, string>,
-): Promise<{ success: boolean; created: number; error?: string }> {
-  const supabase = await createClient();
+  deps: { classify?: typeof classifyApprovedExpenses } = {},
+): Promise<{
+  ok: boolean;
+  itemsFound: number;
+  totalItems: number;
+  /**
+   * Suma de lo que EFECTIVAMENTE se escribió en `transactions` (los
+   * `total_with_tax` de los ítems creados), que es lo que hay que confirmarle
+   * al usuario. El `total_amount` de la cabecera puede diferir por descuentos
+   * o redondeos: el bot decía "$312.400" y en la app aparecían "$298.000".
+   */
+  totalAmount: number;
+  error?: string;
+}> {
+  const supabase = createAdminClient();
+  const clasificar = deps.classify ?? classifyApprovedExpenses;
 
-  const { data: invoice, error } = await supabase
+  const { data: invoiceRow, error: fetchError } = await supabase
     .from('electronic_invoices')
     .select('*')
     .eq('id', invoiceId)
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
-  if (error || !invoice) {
-    return { success: false, created: 0, error: 'Factura no encontrada' };
-  }
-  if ((invoice as ElectronicInvoice).status !== 'pending_review') {
+  if (fetchError || !invoiceRow) {
     return {
-      success: false,
-      created: 0,
-      error: 'La factura no está pendiente de revisión',
+      ok: false,
+      itemsFound: 0,
+      totalItems: 0,
+      totalAmount: 0,
+      error: 'Factura no encontrada.',
     };
   }
 
-  const typed = invoice as ElectronicInvoice;
-  const items = (typed.items || []).map((it, idx) => ({
-    ...it,
-    category: categoryOverrides?.[idx] ?? it.category,
-  }));
+  const typed = invoiceRow as ElectronicInvoice;
+  if (typed.status !== 'pending_review') {
+    return {
+      ok: false,
+      itemsFound: 0,
+      totalItems: typed.items?.length ?? 0,
+      totalAmount: 0,
+      error: `La factura ya está en estado "${typed.status}"; no se vuelve a registrar.`,
+    };
+  }
 
+  const items = typed.items || [];
+  const fecha = typed.invoice_date ?? '';
   const createdExpenses: Array<{
     id: string;
     description: string;
     categoryName: string;
     monthYear: string;
   }> = [];
-  let created = 0;
+  // Se acumula sobre lo que de verdad se escribió, ítem por ítem: si el
+  // registro se corta a la mitad, el total refleja esa mitad y no la cabecera.
+  let totalRegistrado = 0;
+
   for (const item of items) {
-    const args = mapInvoiceItemToExpenseArgs(item, typed, userId, accountName);
-    const { data: transactionId, error: rpcError } = await supabase.rpc(
-      'upsert_monthly_expense',
-      args,
-    );
-    if (rpcError) {
+    const monto = item.total_with_tax ?? item.total_price;
+    const { data, error } = await supabase.rpc('upsert_monthly_expense', {
+      p_user_id: userId,
+      p_description: item.description,
+      p_amount: monto,
+      p_transaction_date: fecha,
+      p_category_name: item.category,
+      p_account_name: accountName,
+      p_place: typed.supplier_name ?? 'WhatsApp',
+    });
+
+    if (error) {
+      // Corte a mitad de camino: lo ya creado son transacciones reales, no se
+      // revierte. Se clasifica lo que sí se pudo (best-effort).
+      if (createdExpenses.length > 0) {
+        await clasificar(supabase, userId, createdExpenses);
+      }
+      // Si no se creó ningún gasto todavía no hay riesgo de duplicar: la fila
+      // vuelve a pending_review para que la vista de rescate pueda
+      // reintentarla. Si ya se creó aunque sea uno, sí queda en error —
+      // reintentar duplicaría los ítems que ya son transacciones reales.
+      const sinGastosCreados = createdExpenses.length === 0;
+      const mensaje = sinGastosCreados
+        ? `No se pudo registrar ningún ítem ("${item.description}" falló: ${error.message}). Se puede reintentar.`
+        : `${PREFIJO_REGISTRO_PARCIAL} ${createdExpenses.length} de ${items.length} ítems ("${item.description}" falló: ${error.message}).`;
+      const { error: updateError } = await supabase
+        .from('electronic_invoices')
+        .update({
+          status: sinGastosCreados ? 'pending_review' : 'error',
+          error_message: mensaje,
+        })
+        .eq('id', invoiceId);
+      if (updateError) {
+        console.error(
+          'createInvoiceDirect: no se pudo actualizar el estado de la factura tras el fallo:',
+          updateError.message,
+        );
+      }
       return {
-        success: false,
-        created,
-        error: `Error creando gasto "${item.description}": ${rpcError.message}`,
+        ok: false,
+        itemsFound: createdExpenses.length,
+        totalItems: items.length,
+        totalAmount: totalRegistrado,
+        error: mensaje,
       };
     }
-    if (transactionId) {
+
+    if (typeof data === 'string') {
       createdExpenses.push({
-        id: transactionId as string,
-        description: args.p_description,
-        categoryName: args.p_category_name,
-        monthYear: (args.p_transaction_date || '').slice(0, 7),
+        id: data,
+        description: item.description,
+        categoryName: item.category,
+        monthYear: fecha.slice(0, 7),
       });
+      totalRegistrado += Number(monto ?? 0);
     }
-    created++;
   }
 
-  // Clasificación best-effort: asigna cada gasto creado a un ítem del presupuesto.
-  await classifyApprovedExpenses(supabase, userId, createdExpenses);
+  await clasificar(supabase, userId, createdExpenses);
 
-  await supabase
+  const { error: updateError } = await supabase
     .from('electronic_invoices')
     .update({
       status: 'approved',
       selected_account_name: accountName,
-      items,
       approved_at: new Date().toISOString(),
     })
     .eq('id', invoiceId);
+  if (updateError) {
+    // Los gastos YA están guardados: que no se haya podido marcar la fila
+    // como aprobada no puede convertirse en un "no pude guardar la factura"
+    // que empuje al usuario a reenviar la foto y duplicar los gastos.
+    console.error(
+      'createInvoiceDirect: no se pudo marcar la factura como aprobada:',
+      updateError.message,
+    );
+  }
 
-  return { success: true, created };
+  return {
+    ok: true,
+    itemsFound: items.length,
+    totalItems: items.length,
+    totalAmount: totalRegistrado,
+  };
 }
 
 /**
@@ -243,7 +412,7 @@ export async function approveInvoice(
  * solo asigna cuando hay match. Nunca relanza (si falla, el gasto queda sin
  * clasificar y aparece en el panel rojo del presupuesto).
  */
-async function classifyApprovedExpenses(
+export async function classifyApprovedExpenses(
   supabase: DBClient,
   userId: string,
   expenses: Array<{

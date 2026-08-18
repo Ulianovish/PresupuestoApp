@@ -2,9 +2,7 @@
 // respuesta. No toca DB ni red: el webhook clasifica de forma síncrona para
 // responder un ACK inmediato y decidir qué corre en background.
 
-import { parseQuickExpense } from '@/lib/whatsapp/quick-expense';
-
-export type Decision = 'cufe' | 'quick_expense' | 'image' | 'help' | 'unknown';
+export type Decision = 'cufe' | 'agent' | 'image' | 'help';
 
 /** Un CUFE DIAN es un hash hexadecimal de 96 caracteres. */
 export function isCufe(text: string): boolean {
@@ -25,32 +23,36 @@ export function extractCufe(text: string): string | null {
 export function classifyText(body: string, numMedia: number): Decision {
   if (numMedia > 0) return 'image';
   const text = (body || '').trim();
+  // El CUFE es 96 hex: determinista y gratis. Un LLM acá solo agregaría formas
+  // de fallar.
   if (extractCufe(text)) return 'cufe';
   if (/^(ayuda|help)$/i.test(text)) return 'help';
-  if (parseQuickExpense(text)) return 'quick_expense';
-  return 'unknown';
+  // Todo lo demás va al agente. `parseQuickExpense` ya no decide el enrutado:
+  // acertaba mal en silencio ("2 empanadas 5000" -> $2) y esos casos nunca
+  // llegaban a 'unknown', así que un LLM de respaldo jamás los habría visto.
+  return 'agent';
 }
 
-/** Respuesta inmediata (TwiML) para los casos que siguen en background. */
-export function ackMessage(decision: 'cufe' | 'quick_expense'): string {
-  if (decision === 'cufe') {
-    return '🧾 Recibí tu factura, la estoy procesando (~1 min). Te aviso cuando esté lista para revisar.';
-  }
-  return '✍️ Anotando tu gasto...';
+/**
+ * Respuesta inmediata (TwiML) para el CUFE, el único caso que sigue en
+ * background con un ACK propio. Sin parámetro: recibía la decisión y no la
+ * usaba. El texto tampoco habla ya de dejarla "lista para revisar": esa
+ * pantalla de aprobación se eliminó, ahora el bot pregunta la cuenta y registra.
+ */
+export function ackMessage(): string {
+  return '🧾 Recibí tu factura, la estoy consultando en la DIAN (~1 min). Después te pregunto con qué cuenta la pagaste.';
 }
 
 /** Respuesta completa (TwiML) para los casos que NO necesitan background. */
-export function simpleReply(decision: 'image' | 'help' | 'unknown'): string {
+export function simpleReply(decision: 'image' | 'help'): string {
   if (decision === 'image') {
     return '📷 Recibí una imagen. Envíame la *foto* de una factura o de una transferencia y la registro.';
   }
-  if (decision === 'help') {
-    return [
-      'Puedo registrar tus gastos 💸',
-      '• Pega el *CUFE* de una factura DIAN → la dejo lista para aprobar.',
-      '• Envía una *foto* de una factura o de una transferencia → la leo y la registro.',
-      '• Escribe un gasto: "20k taxi", "gasté 35000 en mercado".',
-    ].join('\n');
-  }
-  return 'No te entendí 🤔. Pega el *CUFE* de una factura, o escribe un gasto como "20k taxi". Escribe *ayuda* para ver qué puedo hacer.';
+  return [
+    'Puedo registrar tus gastos 💸',
+    '• Pega el *CUFE* de una factura DIAN → la dejo lista.',
+    '• Envía una *foto* de una factura o de una transferencia → la leo y la registro.',
+    '• Escribe un gasto: "20k taxi", "gasté 35000 en mercado".',
+    '• Preguntame: "¿cuánto llevo en mercado?"',
+  ].join('\n');
 }
