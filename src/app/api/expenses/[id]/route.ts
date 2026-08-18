@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 // Schema para validar datos de actualización de gastos
 const UpdateExpenseSchema = z.object({
   description: z.string().optional(),
-  amount: z.number().optional(),
+  amount: z.coerce.number().optional(),
   transaction_date: z.string().optional(),
   category_name: z.string().optional(),
   account_name: z.string().optional(),

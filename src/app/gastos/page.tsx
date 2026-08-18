@@ -268,9 +268,12 @@ export default function GastosPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value, type } = e.target;
+    // El monto siempre debe ser número: CurrencyInput envía un evento sintético
+    // sin `type="number"`, y guardarlo como texto hacía que la API lo rechazara.
+    const isNumeric = type === 'number' || name === 'amount';
     setForm(prev => ({
       ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 : value,
+      [name]: isNumeric ? parseFloat(value) || 0 : value,
     }));
   };
 
