@@ -84,6 +84,11 @@ export default function ExpenseTable({
 }: ExpenseTableProps) {
   // Filtros por columna al estilo Excel: null = sin filtro
   const [filters, setFilters] = useState<Record<string, string[] | null>>({});
+  // Orden por columna (como el "Ordenar A-Z / Z-A" de Excel)
+  const [sort, setSort] = useState<{
+    key: string;
+    dir: 'asc' | 'desc';
+  } | null>(null);
 
   const itemNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -130,6 +135,42 @@ export default function ExpenseTable({
     [expenseData.transactions, filters, columnValue],
   );
 
+  /**
+   * Valor comparable para ordenar: número en Valor, fecha en Fecha y texto en
+   * el resto (el texto mostrado no sirve para Valor porque viene formateado).
+   */
+  const sortValue = React.useCallback(
+    (t: ExpenseTransaction, key: string): number | string => {
+      if (key === 'amount') return Number(t.amount) || 0;
+      if (key === 'date') return t.transaction_date || '';
+      return columnValue(t, key).toLowerCase();
+    },
+    [columnValue],
+  );
+
+  const sortedTransactions = useMemo(() => {
+    if (!sort) return visibleTransactions;
+    const factor = sort.dir === 'asc' ? 1 : -1;
+    return [...visibleTransactions].sort((a, b) => {
+      const va = sortValue(a, sort.key);
+      const vb = sortValue(b, sort.key);
+      if (typeof va === 'number' && typeof vb === 'number') {
+        return (va - vb) * factor;
+      }
+      return (
+        String(va).localeCompare(String(vb), 'es', {
+          numeric: true,
+          sensitivity: 'base',
+        }) * factor
+      );
+    });
+  }, [visibleTransactions, sort, sortValue]);
+
+  const setSortFor = (key: string) => (dir: 'asc' | 'desc') =>
+    setSort(current =>
+      current?.key === key && current.dir === dir ? null : { key, dir },
+    );
+
   /** Valores disponibles en una columna, respetando los filtros de las demás. */
   const valuesFor = (key: string) =>
     expenseData.transactions
@@ -152,15 +193,19 @@ export default function ExpenseTable({
       <CardHeader>
         <CardTitle className="flex items-center justify-between gap-3">
           <span>Transacciones de {formatMonthName(selectedMonth)}</span>
-          {activeFilters > 0 && (
+          {(activeFilters > 0 || sort) && (
             <span className="flex items-center gap-2 text-sm font-normal text-gray-300">
-              {visibleTransactions.length} de {expenseData.transactions.length}
+              {activeFilters > 0 &&
+                `${visibleTransactions.length} de ${expenseData.transactions.length}`}
               <button
                 type="button"
-                onClick={() => setFilters({})}
+                onClick={() => {
+                  setFilters({});
+                  setSort(null);
+                }}
                 className="px-2 py-1 text-xs rounded border border-slate-600 text-gray-300 hover:text-white hover:bg-white/10"
               >
-                Limpiar filtros
+                Limpiar
               </button>
             </span>
           )}
@@ -191,6 +236,8 @@ export default function ExpenseTable({
                       values={valuesFor('description')}
                       selected={filters.description ?? null}
                       onChange={setFilter('description')}
+                      sortDir={sort?.key === 'description' ? sort.dir : null}
+                      onSort={setSortFor('description')}
                       alignRight={false}
                     />
                   </th>
@@ -200,6 +247,8 @@ export default function ExpenseTable({
                       values={valuesFor('date')}
                       selected={filters.date ?? null}
                       onChange={setFilter('date')}
+                      sortDir={sort?.key === 'date' ? sort.dir : null}
+                      onSort={setSortFor('date')}
                       alignRight={false}
                     />
                   </th>
@@ -209,6 +258,8 @@ export default function ExpenseTable({
                       values={valuesFor('category')}
                       selected={filters.category ?? null}
                       onChange={setFilter('category')}
+                      sortDir={sort?.key === 'category' ? sort.dir : null}
+                      onSort={setSortFor('category')}
                       alignRight={false}
                     />
                   </th>
@@ -218,6 +269,8 @@ export default function ExpenseTable({
                       values={valuesFor('item')}
                       selected={filters.item ?? null}
                       onChange={setFilter('item')}
+                      sortDir={sort?.key === 'item' ? sort.dir : null}
+                      onSort={setSortFor('item')}
                       alignRight={false}
                     />
                   </th>
@@ -227,6 +280,8 @@ export default function ExpenseTable({
                       values={valuesFor('account')}
                       selected={filters.account ?? null}
                       onChange={setFilter('account')}
+                      sortDir={sort?.key === 'account' ? sort.dir : null}
+                      onSort={setSortFor('account')}
                       alignRight={false}
                     />
                   </th>
@@ -236,6 +291,8 @@ export default function ExpenseTable({
                       values={valuesFor('place')}
                       selected={filters.place ?? null}
                       onChange={setFilter('place')}
+                      sortDir={sort?.key === 'place' ? sort.dir : null}
+                      onSort={setSortFor('place')}
                       alignRight={true}
                     />
                   </th>
@@ -245,6 +302,8 @@ export default function ExpenseTable({
                       values={valuesFor('amount')}
                       selected={filters.amount ?? null}
                       onChange={setFilter('amount')}
+                      sortDir={sort?.key === 'amount' ? sort.dir : null}
+                      onSort={setSortFor('amount')}
                       alignRight={true}
                     />
                   </th>
@@ -256,7 +315,7 @@ export default function ExpenseTable({
 
               {/* Cuerpo de la tabla */}
               <tbody className="divide-y divide-white/10">
-                {visibleTransactions.map(transaction => (
+                {sortedTransactions.map(transaction => (
                   <ExpenseRow
                     key={transaction.id}
                     transaction={transaction}

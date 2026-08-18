@@ -9,7 +9,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-import { Filter } from 'lucide-react';
+import { ArrowDownAZ, ArrowUpAZ, Filter } from 'lucide-react';
 
 interface ColumnFilterProps {
   /** Texto del encabezado. */
@@ -21,6 +21,10 @@ interface ColumnFilterProps {
   onChange: (next: string[] | null) => void;
   /** Alinea el panel a la derecha para que no se salga de la tabla. */
   alignRight?: boolean;
+  /** Dirección de orden activa en esta columna (null = sin ordenar). */
+  sortDir?: 'asc' | 'desc' | null;
+  /** Ordena por esta columna; se llama con la dirección elegida. */
+  onSort?: (dir: 'asc' | 'desc') => void;
 }
 
 export default function ColumnFilter({
@@ -29,6 +33,8 @@ export default function ColumnFilter({
   selected,
   onChange,
   alignRight = false,
+  sortDir = null,
+  onSort,
 }: ColumnFilterProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -100,6 +106,14 @@ export default function ColumnFilter({
   return (
     <div ref={ref} className="relative inline-flex items-center gap-1">
       <span>{label}</span>
+      {sortDir && (
+        <span
+          className="text-blue-400"
+          title={`Orden ${sortDir === 'asc' ? 'ascendente' : 'descendente'}`}
+        >
+          {sortDir === 'asc' ? '▲' : '▼'}
+        </span>
+      )}
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
@@ -119,6 +133,41 @@ export default function ColumnFilter({
             alignRight ? 'right-0' : 'left-0'
           }`}
         >
+          {onSort && (
+            <div className="flex gap-1 mb-2 pb-2 border-b border-white/10">
+              <button
+                type="button"
+                onClick={() => {
+                  onSort('asc');
+                  setOpen(false);
+                }}
+                className={`flex-1 flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-white/10 ${
+                  sortDir === 'asc'
+                    ? 'text-blue-300 bg-blue-500/15'
+                    : 'text-gray-300'
+                }`}
+              >
+                <ArrowUpAZ className="w-3 h-3" />
+                Ascendente
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onSort('desc');
+                  setOpen(false);
+                }}
+                className={`flex-1 flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-white/10 ${
+                  sortDir === 'desc'
+                    ? 'text-blue-300 bg-blue-500/15'
+                    : 'text-gray-300'
+                }`}
+              >
+                <ArrowDownAZ className="w-3 h-3" />
+                Descendente
+              </button>
+            </div>
+          )}
+
           <input
             type="text"
             value={query}
