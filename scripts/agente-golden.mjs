@@ -163,7 +163,14 @@ const { runAgent, callGatewayReal } = await import('../src/lib/whatsapp/agent/ru
 let ok = 0;
 const fallidos = [];
 
-for (const caso of CASOS) {
+// El plan gratuito del Gateway limita por ráfaga: sin pausa, a partir del 3er
+// caso todo devuelve 429 y el conjunto se sabotea solo. `callGatewayReal` ya
+// reintenta, pero espaciar acá evita gastar esos reintentos de entrada.
+const PAUSA_MS = Number(process.env.GOLDEN_PAUSA_MS ?? 8000);
+const dormir = ms => new Promise(r => setTimeout(r, ms));
+
+for (const [i, caso] of CASOS.entries()) {
+  if (i > 0) await dormir(PAUSA_MS);
   const llamadas = [];
   const ctx = {
     accounts: CUENTAS,

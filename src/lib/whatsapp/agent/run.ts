@@ -10,6 +10,15 @@ import type { Turn } from './state';
 /** Tope de vueltas. Un modelo en bucle no puede colgar la función serverless. */
 const MAX_ITERACIONES = 3;
 
+/** Status que vale la pena reintentar: saturación o fallo pasajero del proveedor. */
+const STATUS_REINTENTABLES = new Set([408, 409, 429, 500, 502, 503, 504, 529]);
+const MAX_INTENTOS_GATEWAY = 3;
+const RETRY_BASE_MS = Number(process.env.AGENT_RETRY_DELAY_MS ?? 1500);
+
+function dormir(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export interface ToolCall {
   id: string;
   name: string;
@@ -204,31 +213,49 @@ export async function callGatewayReal(
     process.env.AI_GATEWAY_BASE_URL ||
     process.env.MINIMAX_BASE_URL ||
     'https://ai-gateway.vercel.sh';
-  const model = process.env.AGENT_MODEL || 'google/gemini-3-flash';
+  // El default NO puede ser gemini-3-flash: está limitado en el plan gratuito
+  // del Gateway y devuelve 429 siempre, mientras que los qwen de Alibaba pasan.
+  // Verificado contra la cuenta real: visión (qwen3-vl) y categorizador
+  // (qwen3.7-flash) funcionan; el agente con gemini fallaba en cada mensaje.
+  const model = process.env.AGENT_MODEL || 'alibaba/qwen3.7-flash';
 
-  const res = await fetch(`${baseUrl}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 2048,
-      system,
-      tools: TOOL_DEFINITIONS,
-      messages,
-    }),
-    // Presupuesto de tiempo: un Gateway colgado no puede llevarse la función.
-    // Vercel la mata SIN ejecutar ningún catch, y ahí el usuario se queda sin
-    // respuesta — la misma falla muda que tuvo el CUFE.
-    signal: AbortSignal.timeout(30_000),
-  });
+  // El plan gratuito limita por ráfaga: 2-3 mensajes seguidos alcanzan para
+  // que empiece a devolver 429. `vision.ts` ya reintenta ante esos status y por
+  // eso sobrevive; sin esto, el agente moría al primer tropiezo y el usuario
+  // veía "mi asistente está fallando" por un límite pasajero.
+  let ultimoDetalle = '';
+  for (let intento = 1; intento <= MAX_INTENTOS_GATEWAY; intento++) {
+    const res = await fetch(`${baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 2048,
+        system,
+        tools: TOOL_DEFINITIONS,
+        messages,
+      }),
+      // Presupuesto de tiempo: un Gateway colgado no puede llevarse la función.
+      // Vercel la mata SIN ejecutar ningún catch, y ahí el usuario se queda sin
+      // respuesta — la misma falla muda que tuvo el CUFE.
+      signal: AbortSignal.timeout(30_000),
+    });
 
-  if (!res.ok) {
-    const detalle = await res.text().catch(() => '');
-    throw new Error(`Gateway ${res.status}: ${detalle.slice(0, 300)}`);
+    if (res.ok) return res.json();
+
+    ultimoDetalle = await res.text().catch(() => '');
+    console.error(
+      `callGatewayReal HTTP ${res.status} (intento ${intento}) modelo=${model} body=${ultimoDetalle.slice(0, 300)}`,
+    );
+    if (STATUS_REINTENTABLES.has(res.status) && intento < MAX_INTENTOS_GATEWAY) {
+      await dormir(RETRY_BASE_MS * intento);
+      continue;
+    }
+    throw new Error(`Gateway ${res.status}: ${ultimoDetalle.slice(0, 300)}`);
   }
-  return res.json();
+  throw new Error(`Gateway agotó reintentos: ${ultimoDetalle.slice(0, 300)}`);
 }
