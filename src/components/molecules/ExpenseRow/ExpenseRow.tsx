@@ -122,6 +122,7 @@ export default function ExpenseRow({
             value={transaction.category_name}
             options={categories}
             onSelect={name => onCategoryChange(transaction.id, name)}
+            title="Clic para editar la categoría"
           />
         ) : (
           <span className="text-blue-300">{transaction.category_name}</span>
@@ -178,6 +179,8 @@ export default function ExpenseRow({
             value={transaction.account_name}
             options={accounts}
             onSelect={name => onAccountChange(transaction.id, name)}
+            allowCreate
+            title="Clic para editar o crear una cuenta"
           />
         ) : (
           <span className="text-white">{transaction.account_name}</span>

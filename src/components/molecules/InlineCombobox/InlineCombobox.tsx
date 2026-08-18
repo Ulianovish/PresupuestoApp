@@ -15,10 +15,15 @@ export default function InlineCombobox({
   value,
   options,
   onSelect,
+  allowCreate = false,
+  title = 'Clic para editar',
 }: {
   value: string;
   options: string[];
   onSelect: (name: string) => void;
+  /** Permite crear un valor nuevo escribiendo un nombre que no existe. */
+  allowCreate?: boolean;
+  title?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -29,6 +34,19 @@ export default function InlineCombobox({
   const filtered = options.filter(o =>
     o.toLowerCase().includes(query.toLowerCase()),
   );
+
+  const trimmed = query.trim();
+  const canCreate =
+    allowCreate &&
+    trimmed.length > 0 &&
+    !options.some(o => o.toLowerCase() === trimmed.toLowerCase());
+  /** Opción "Crear ..." al inicio de la lista, cuando aplica. */
+  const rows: Array<{ kind: 'create' | 'option'; label: string }> = [
+    ...(canCreate
+      ? [{ kind: 'create' as const, label: `➕ Crear "${trimmed}"` }]
+      : []),
+    ...filtered.map(o => ({ kind: 'option' as const, label: o })),
+  ];
 
   // Cerrar al hacer click fuera
   useEffect(() => {
@@ -65,13 +83,14 @@ export default function InlineCombobox({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setHighlighted(h => Math.min(h + 1, filtered.length - 1));
+      setHighlighted(h => Math.min(h + 1, rows.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setHighlighted(h => Math.max(h - 1, 0));
     } else if (e.key === 'Tab' || e.key === 'Enter') {
       e.preventDefault();
-      if (filtered[highlighted]) select(filtered[highlighted]);
+      const row = rows[highlighted];
+      if (row) select(row.kind === 'create' ? trimmed : row.label);
     } else if (e.key === 'Escape') {
       setOpen(false);
       setQuery('');
@@ -95,32 +114,34 @@ export default function InlineCombobox({
           type="button"
           onClick={() => setOpen(true)}
           className="inline-flex items-center px-2 py-1 rounded text-xs font-medium text-blue-300 hover:bg-white/10 transition-colors cursor-pointer"
-          title="Click para editar categoría"
+          title={title}
         >
           {value}
         </button>
       )}
 
-      {open && filtered.length > 0 && (
+      {open && rows.length > 0 && (
         <div className="absolute z-50 mt-1 min-w-[160px] max-h-48 overflow-y-auto bg-slate-800 border border-white/20 rounded-lg shadow-xl">
-          {filtered.map((opt, i) => (
+          {rows.map((row, i) => (
             <button
-              key={opt}
+              key={`${row.kind}-${row.label}`}
               type="button"
               onMouseDown={e => {
                 e.preventDefault(); // Evita que el input pierda foco antes del click
-                select(opt);
+                select(row.kind === 'create' ? trimmed : row.label);
               }}
               onMouseEnter={() => setHighlighted(i)}
               className={`w-full text-left px-3 py-2 text-xs transition-colors ${
                 i === highlighted
                   ? 'bg-blue-600/40 text-white'
-                  : opt === value
-                    ? 'bg-white/10 text-blue-300'
-                    : 'text-gray-300 hover:bg-white/5'
+                  : row.kind === 'create'
+                    ? 'text-emerald-300 hover:bg-white/5'
+                    : row.label === value
+                      ? 'bg-white/10 text-blue-300'
+                      : 'text-gray-300 hover:bg-white/5'
               }`}
             >
-              {opt}
+              {row.label}
             </button>
           ))}
         </div>

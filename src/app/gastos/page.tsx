@@ -222,21 +222,19 @@ export default function GastosPage() {
     }
   };
 
-  // Cuentas del usuario, para editar la cuenta de cada gasto inline
+  // Cuentas del usuario, para editar (o crear) la cuenta de cada gasto inline
   const [accountNames, setAccountNames] = useState<string[]>([]);
-  useEffect(() => {
-    let active = true;
-    getUserAccounts()
-      .then(accts => {
-        if (active) setAccountNames(accts.map(a => a.name));
-      })
-      .catch(() => {
-        if (active) setAccountNames([]);
-      });
-    return () => {
-      active = false;
-    };
+  const loadAccounts = useCallback(async () => {
+    try {
+      const accts = await getUserAccounts();
+      setAccountNames(accts.map(a => a.name));
+    } catch {
+      setAccountNames([]);
+    }
   }, []);
+  useEffect(() => {
+    loadAccounts();
+  }, [loadAccounts]);
 
   // Estado y ref para importar Excel
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -685,6 +683,8 @@ export default function GastosPage() {
             accounts={accountNames}
             onAccountChange={async (id, accountName) => {
               await updateExpense(id, { account_name: accountName });
+              // Si la cuenta era nueva, la API la creó: refrescar la lista
+              await loadAccounts();
             }}
             budgetItems={budgetItems}
             onAssignItem={handleAssignItem}
