@@ -5,11 +5,14 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
+import InlineCombobox from '@/components/molecules/InlineCombobox/InlineCombobox';
+import { useCategories } from '@/hooks/useCategories';
 import {
   getUnclassifiedExpenses,
   getBudgetItemsForMonth,
   assignExpenseToBudgetItem,
   classifyUnassignedForMonth,
+  updateExpenseTransaction,
   formatCurrency,
   type UnclassifiedExpense,
   type BudgetItemRef,
@@ -69,6 +72,10 @@ export default function UnclassifiedExpensesPanel({
     return Array.from(groups.entries());
   };
 
+  // Categorías disponibles, para editar la categoría del gasto inline
+  const { categories: budgetCategories } = useCategories();
+  const categoryNames = budgetCategories.map(c => c.name.toUpperCase());
+
   const load = useCallback(async () => {
     const [exp, its] = await Promise.all([
       getUnclassifiedExpenses(monthYear),
@@ -101,6 +108,21 @@ export default function UnclassifiedExpensesPanel({
     } finally {
       setIsAssigning(false);
     }
+  };
+
+  // Cambiar la categoría del gasto: al cambiarla, se descarta la selección
+  // previa para que el ítem sugerido se recalcule con la nueva categoría.
+  const handleCategoryChange = async (
+    expenseId: string,
+    categoryName: string,
+  ) => {
+    await updateExpenseTransaction(expenseId, { category_name: categoryName });
+    setSelected(s => {
+      const next = { ...s };
+      delete next[expenseId];
+      return next;
+    });
+    await load();
   };
 
   const handleClassifyAll = async () => {
@@ -169,10 +191,20 @@ export default function UnclassifiedExpensesPanel({
               </p>
             </div>
 
-            {/* Categoría (como columna, igual que en Gastos) */}
-            <span className="text-xs font-medium text-blue-300 uppercase w-40 flex-shrink-0 truncate">
-              {exp.category_name}
-            </span>
+            {/* Categoría (columna editable inline, igual que en Gastos) */}
+            <div className="w-40 flex-shrink-0">
+              {categoryNames.length > 0 ? (
+                <InlineCombobox
+                  value={exp.category_name}
+                  options={categoryNames}
+                  onSelect={name => handleCategoryChange(exp.id, name)}
+                />
+              ) : (
+                <span className="text-xs font-medium text-blue-300 uppercase truncate">
+                  {exp.category_name}
+                </span>
+              )}
+            </div>
 
             {/* Ítem: solo el nombre; la categoría ya está al lado */}
             <select
