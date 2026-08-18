@@ -47,6 +47,28 @@ export default function UnclassifiedExpensesPanel({
   const effectiveItemId = (exp: UnclassifiedExpense) =>
     selected[exp.id] ?? suggestedItemId(exp.category_name);
 
+  /**
+   * Ítems visibles para un gasto: solo los de su categoría. Si esa categoría no
+   * tiene ítems, se muestran todos para no dejar al usuario sin opciones.
+   */
+  const visibleItems = (categoryName: string) => {
+    const inCategory = items.filter(
+      i => normalize(i.category_name) === normalize(categoryName || ''),
+    );
+    return inCategory.length > 0 ? inCategory : items;
+  };
+
+  /** Agrupa por categoría, para mostrar el encabezado al abrir el desplegable. */
+  const groupByCategory = (list: BudgetItemRef[]) => {
+    const groups = new Map<string, BudgetItemRef[]>();
+    for (const it of list) {
+      const arr = groups.get(it.category_name) ?? [];
+      arr.push(it);
+      groups.set(it.category_name, arr);
+    }
+    return Array.from(groups.entries());
+  };
+
   const load = useCallback(async () => {
     const [exp, its] = await Promise.all([
       getUnclassifiedExpenses(monthYear),
@@ -140,25 +162,38 @@ export default function UnclassifiedExpensesPanel({
             key={exp.id}
             className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2"
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-white text-sm truncate">{exp.description}</p>
               <p className="text-xs text-gray-400">
-                {exp.category_name} · {formatCurrency(Number(exp.amount))}
+                {formatCurrency(Number(exp.amount))}
               </p>
             </div>
+
+            {/* Categoría (como columna, igual que en Gastos) */}
+            <span className="text-xs font-medium text-blue-300 uppercase w-40 flex-shrink-0 truncate">
+              {exp.category_name}
+            </span>
+
+            {/* Ítem: solo el nombre; la categoría ya está al lado */}
             <select
               value={effectiveItemId(exp)}
               onChange={e =>
                 setSelected(s => ({ ...s, [exp.id]: e.target.value }))
               }
-              className="bg-slate-700/60 border border-slate-600 rounded-lg text-white text-sm px-2 py-1 max-w-[240px] flex-shrink-0"
+              className="bg-slate-700/60 border border-slate-600 rounded-lg text-white text-sm px-2 py-1 w-56 flex-shrink-0"
             >
               <option value="">Sin asignar</option>
-              {items.map(it => (
-                <option key={it.id} value={it.id}>
-                  {it.category_name} · {it.name}
-                </option>
-              ))}
+              {groupByCategory(visibleItems(exp.category_name)).map(
+                ([cat, its]) => (
+                  <optgroup key={cat} label={cat}>
+                    {its.map(it => (
+                      <option key={it.id} value={it.id}>
+                        {it.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ),
+              )}
             </select>
           </div>
         ))}
