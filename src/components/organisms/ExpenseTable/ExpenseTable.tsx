@@ -103,7 +103,8 @@ export default function ExpenseTable({
         case 'description':
           return t.description || '';
         case 'date':
-          return t.transaction_date || '';
+          // Solo el día: es lo que se muestra y por lo que se filtra
+          return t.transaction_date?.slice(8, 10) || '';
         case 'category':
           return t.category_name || '';
         case 'item':
@@ -250,7 +251,7 @@ export default function ExpenseTable({
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
                     <ColumnFilter
-                      label="Fecha"
+                      label="Día"
                       values={valuesFor('date')}
                       selected={filters.date ?? null}
                       onChange={setFilter('date')}

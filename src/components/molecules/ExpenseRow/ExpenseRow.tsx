@@ -114,8 +114,11 @@ export default function ExpenseRow({
       {/* Descripción */}
       <td className="px-4 py-2 text-white">{transaction.description}</td>
 
-      {/* Fecha */}
-      <td className="px-4 py-2 text-white">{transaction.transaction_date}</td>
+      {/* Día: solo el día del mes (el mes y el año ya salen en el título) */}
+      <td className="px-4 py-2 text-white">
+        {transaction.transaction_date?.slice(8, 10) ||
+          transaction.transaction_date}
+      </td>
 
       {/* Categoría — editable inline si hay categorías y callback */}
       <td className="px-4 py-2">
