@@ -47,6 +47,16 @@ export default function PendingInvoicesPanel({
     };
   }, []);
 
+  // Mantener la cuenta seleccionada en sincronía con las cuentas cargadas: si
+  // la factura se abre antes de que terminen de cargar, `account` quedaba vacío
+  // (el select se veía con un nombre pero el botón de registrar seguía inactivo).
+  useEffect(() => {
+    if (accountNames.length === 0) return;
+    setAccount(prev =>
+      prev && accountNames.includes(prev) ? prev : accountNames[0],
+    );
+  }, [accountNames]);
+
   const load = useCallback(async () => {
     const res = await fetch('/api/invoices/pending');
     if (res.ok) {
@@ -70,7 +80,9 @@ export default function PendingInvoicesPanel({
 
   const openInvoice = (inv: ElectronicInvoice) => {
     setOpenId(inv.id);
-    setAccount(accountNames[0] ?? '');
+    setAccount(prev =>
+      prev && accountNames.includes(prev) ? prev : (accountNames[0] ?? ''),
+    );
   };
 
   const complete = async (inv: ElectronicInvoice) => {
@@ -86,13 +98,16 @@ export default function PendingInvoicesPanel({
         body: JSON.stringify({ accountName: account }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error registrando la factura');
+      if (!res.ok)
+        throw new Error(data.error || 'Error registrando la factura');
       toast.success(`${data.itemsFound} gastos registrados`);
       setOpenId(null);
       await load();
       onCompleted();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error registrando la factura');
+      toast.error(
+        err instanceof Error ? err.message : 'Error registrando la factura',
+      );
     } finally {
       setCompleting(false);
     }
