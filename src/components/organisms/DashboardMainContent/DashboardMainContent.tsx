@@ -80,11 +80,14 @@ export default function DashboardMainContent({
     );
   }
 
-  // Función para calcular el porcentaje gastado
-  const calculateProgress = (real: number, budgeted: number) => {
-    if (budgeted === 0) return 0;
-    return Math.min((real / budgeted) * 100, 100);
-  };
+  /**
+   * Porcentaje realmente gastado sobre lo presupuestado. No se topa en 100%:
+   * si una categoría se excede se ve cuánto (p. ej. 215.4%). Devuelve null
+   * cuando no hay presupuesto, porque ahí el porcentaje no significa nada
+   * (antes mostraba 0.0% aunque hubiera gasto).
+   */
+  const calculateProgress = (real: number, budgeted: number): number | null =>
+    budgeted > 0 ? (real / budgeted) * 100 : null;
 
   // Función para obtener el color de la barra según el estado
   const getProgressColor = (status: string) => {
@@ -166,12 +169,24 @@ export default function DashboardMainContent({
               <div className="mb-3 flex-shrink-0">
                 <div className="flex justify-between text-xs text-gray-400 mb-1">
                   <span>Progreso</span>
-                  <span>{progress.toFixed(1)}%</span>
+                  <span
+                    className={
+                      progress !== null && progress > 100
+                        ? 'text-red-400 font-semibold'
+                        : undefined
+                    }
+                  >
+                    {progress === null
+                      ? real > 0
+                        ? 'Sin presupuesto'
+                        : '—'
+                      : `${progress.toFixed(1)}%`}
+                  </span>
                 </div>
                 <div className="w-full bg-gray-700 rounded-full h-2">
                   <div
                     className={`h-2 rounded-full transition-all duration-300 ${progressColor}`}
-                    style={{ width: `${progress}%` }}
+                    style={{ width: `${Math.min(progress ?? 0, 100)}%` }}
                   />
                 </div>
               </div>
