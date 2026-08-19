@@ -188,6 +188,13 @@ export default function ExpenseTable({
 
   const activeFilters = Object.values(filters).filter(v => v != null).length;
 
+  // Suma de lo que se ve en pantalla: con filtros aplicados es el total del
+  // subconjunto (p. ej. solo "Regalos"); sin filtros, el total del mes.
+  const visibleTotal = visibleTransactions.reduce(
+    (sum, t) => sum + Number(t.amount || 0),
+    0,
+  );
+
   return (
     <Card variant="glass" className="p-6">
       <CardHeader>
@@ -332,6 +339,24 @@ export default function ExpenseTable({
                   />
                 ))}
               </tbody>
+
+              {/* Total de los valores visibles (respeta los filtros) */}
+              <tfoot>
+                <tr className="border-t-2 border-white/20 bg-white/5">
+                  <td
+                    colSpan={6}
+                    className="px-4 py-3 text-right text-sm font-medium text-gray-300"
+                  >
+                    {activeFilters > 0 ? 'Total filtrado' : 'Total del mes'} (
+                    {visibleTransactions.length}{' '}
+                    {visibleTransactions.length === 1 ? 'gasto' : 'gastos'})
+                  </td>
+                  <td className="px-4 py-3 text-base font-bold text-emerald-300">
+                    {formatCurrency(visibleTotal)}
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
             </table>
             {visibleTransactions.length === 0 && (
               <p className="text-center text-sm text-slate-400 py-6">
