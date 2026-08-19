@@ -17,6 +17,7 @@ import { usePathname } from 'next/navigation';
 
 import {
   Calendar,
+  ChevronsLeft,
   CreditCard,
   FlaskConical,
   LayoutDashboard,
@@ -46,7 +47,13 @@ const NAV_ITEMS = [
   { href: '/test', label: 'Test', icon: FlaskConical },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  /** Oculta la barra lateral en escritorio para ganar espacio. */
+  collapsed?: boolean;
+  onToggle?: () => void;
+}
+
+export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const { summary, formatCurrency, isLoading } = useBudgetData();
@@ -83,15 +90,29 @@ export default function Sidebar() {
   return (
     <>
       {/* Barra lateral (escritorio) */}
-      <aside className="hidden lg:flex fixed left-0 top-0 z-40 h-screen w-64 flex-col border-r border-white/10 bg-slate-800/40 backdrop-blur-md">
-        {/* Logo */}
-        <div className="px-5 py-5">
+      <aside
+        className={`${
+          collapsed ? 'hidden' : 'hidden lg:flex'
+        } fixed left-0 top-0 z-40 h-screen w-64 flex-col border-r border-white/10 bg-slate-800/40 backdrop-blur-md`}
+      >
+        {/* Logo + botón para ocultar */}
+        <div className="flex items-center justify-between px-5 py-5">
           <Link
             href="/dashboard"
             className="text-2xl font-bold tracking-tight text-blue-400 select-none"
           >
             Presupuesto
           </Link>
+          {onToggle && (
+            <button
+              onClick={onToggle}
+              className="rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Ocultar menú"
+              title="Ocultar menú"
+            >
+              <ChevronsLeft size={18} />
+            </button>
+          )}
         </div>
 
         {/* Usuario */}
@@ -197,6 +218,18 @@ export default function Sidebar() {
           )}
         </div>
       </aside>
+
+      {/* Botón flotante para mostrar la barra cuando está oculta (escritorio) */}
+      {collapsed && onToggle && (
+        <button
+          onClick={onToggle}
+          className="hidden lg:flex fixed left-3 top-3 z-40 items-center gap-2 rounded-lg border border-white/20 bg-slate-800/80 px-3 py-2 text-white backdrop-blur-md transition-colors hover:bg-white/10"
+          aria-label="Mostrar menú"
+          title="Mostrar menú"
+        >
+          <Menu size={18} />
+        </button>
+      )}
 
       {/* Barra superior (móvil) */}
       <header className="lg:hidden fixed left-0 right-0 top-0 z-40 border-b border-white/20 bg-slate-800/60 backdrop-blur-md">

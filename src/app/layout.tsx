@@ -1,7 +1,7 @@
 import { Geist, Geist_Mono } from 'next/font/google';
 
 import ToasterProvider from '@/components/atoms/ToasterProvider/ToasterProvider';
-import Sidebar from '@/components/organisms/Sidebar/Sidebar';
+import AppShell from '@/components/organisms/AppShell/AppShell';
 import { MonthProvider } from '@/contexts/MonthContext';
 
 import type { Metadata } from 'next';
@@ -32,11 +32,10 @@ export default function RootLayout({
   return (
     <html lang="es" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} bg-slate-900 text-white min-h-screen pt-16 lg:pt-0 lg:pl-64`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-slate-900 text-white min-h-screen pt-16 lg:pt-0`}
       >
         <MonthProvider>
-          <Sidebar />
-          {children}
+          <AppShell>{children}</AppShell>
           <ToasterProvider />
         </MonthProvider>
       </body>

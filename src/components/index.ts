@@ -15,7 +15,7 @@ export { default as MobileSidebar } from './molecules/MobileSidebar/MobileSideba
 
 // Organisms
 export { default as BudgetTable } from './organisms/BudgetTable/BudgetTable';
-export { default as Header } from './organisms/Header/Header';
+export { default as AppShell } from './organisms/AppShell/AppShell';
 export { default as Sidebar } from './organisms/Sidebar/Sidebar';
 export { default as DashboardHeader } from './organisms/DashboardHeader/DashboardHeader';
 export { default as DashboardSummaryCards } from './organisms/DashboardSummaryCards/DashboardSummaryCards';
