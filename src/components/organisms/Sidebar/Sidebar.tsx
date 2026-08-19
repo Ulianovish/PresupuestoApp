@@ -57,7 +57,14 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const { summary, formatCurrency, isLoading } = useBudgetData();
-  const { selectedYear, setSelectedYear, getAvailableYears } = useMonth();
+  const {
+    selectedYear,
+    setSelectedYear,
+    getAvailableYears,
+    selectedMonth,
+    setSelectedMonth,
+    getAvailableMonths,
+  } = useMonth();
   const pathname = usePathname();
 
   // Usuario autenticado (para mostrar su correo y el cierre de sesión)
@@ -171,6 +178,25 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
               {isLoading ? '...' : formatCurrency(summary.totalSpent)}
             </span>
           </div>
+        </div>
+
+        {/* Mes */}
+        <div className="mx-3 mb-3">
+          <label className="mb-1 flex items-center gap-2 text-xs text-gray-300">
+            <Calendar size={14} className="text-blue-400" />
+            <span>Mes</span>
+          </label>
+          <select
+            value={selectedMonth}
+            onChange={e => setSelectedMonth(e.target.value)}
+            className="w-full rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {getAvailableMonths().map(m => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Año */}

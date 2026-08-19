@@ -55,7 +55,7 @@ interface LookupItem {
 }
 
 export default function PresupuestoPage() {
-  const { selectedMonth, setSelectedMonth, getAvailableMonths } = useMonth();
+  const { selectedMonth, getAvailableMonths } = useMonth();
 
   const {
     budgetData,
@@ -149,19 +149,6 @@ export default function PresupuestoPage() {
     real: 0,
     deuda_id: null,
   });
-
-  // Funciones del modal
-  const handleMonthChange = async (newMonth: string) => {
-    setSelectedMonth(newMonth);
-    if (!categories.length && !isLoading) {
-      const shouldCreate = true;
-      console.warn('Creando presupuesto para mes:', newMonth);
-
-      if (shouldCreate) {
-        await initializeMonth(newMonth);
-      }
-    }
-  };
 
   const openAddModal = (categoriaId: string) => {
     setModalState({
@@ -572,7 +559,6 @@ export default function PresupuestoPage() {
         header={
           <BudgetHeader
             selectedMonth={selectedMonth}
-            onMonthChange={handleMonthChange}
             onRefresh={refreshBudget}
             isLoading={isLoading}
             monthOptions={monthOptions}

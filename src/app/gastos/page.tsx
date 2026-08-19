@@ -150,11 +150,9 @@ export default function GastosPage() {
     loading,
     error,
     selectedMonth,
-    availableMonths,
     isModalOpen,
     isEditing,
     editingTransaction,
-    setSelectedMonth,
     refreshExpenses,
     openModal,
     closeModal,
@@ -642,11 +640,6 @@ export default function GastosPage() {
       header={
         <ExpenseHeader
           selectedMonth={selectedMonth}
-          availableMonths={availableMonths.map(month => ({
-            value: month,
-            label: formatMonthName(month),
-          }))}
-          onMonthChange={setSelectedMonth}
           onRefresh={refreshExpenses}
           onImportExcel={handleImportExcel}
           onAutoRecategorize={handleAutoRecategorize}

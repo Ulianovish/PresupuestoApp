@@ -6,7 +6,6 @@
  * Incluye funcionalidad para agregar nuevas categorías.
  *
  * @param selectedMonth - Mes seleccionado actualmente
- * @param onMonthChange - Función para cambiar el mes
  * @param onRefresh - Función para actualizar los datos
  * @param isLoading - Estado de carga
  * @param monthOptions - Opciones disponibles para el selector de mes
@@ -15,7 +14,6 @@
  * @example
  * <BudgetHeader
  *   selectedMonth="2025-07"
- *   onMonthChange={handleMonthChange}
  *   onRefresh={refreshBudget}
  *   isLoading={false}
  *   monthOptions={monthOptions}
@@ -28,7 +26,6 @@ import React from 'react';
 import { RefreshCw, Copy } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
-import MonthSelector from '@/components/atoms/MonthSelector/MonthSelector';
 
 interface MonthOption {
   value: string;
@@ -37,7 +34,6 @@ interface MonthOption {
 
 interface BudgetHeaderProps {
   selectedMonth: string;
-  onMonthChange: (month: string) => void;
   onRefresh: () => void;
   isLoading: boolean;
   monthOptions: MonthOption[];
@@ -47,7 +43,6 @@ interface BudgetHeaderProps {
 
 export default function BudgetHeader({
   selectedMonth,
-  onMonthChange,
   onRefresh,
   isLoading,
   monthOptions,
@@ -72,15 +67,6 @@ export default function BudgetHeader({
 
       {/* Controles */}
       <div className="flex items-center gap-4">
-        {/* Selector de mes */}
-        <MonthSelector
-          value={selectedMonth}
-          onChange={onMonthChange}
-          options={monthOptions}
-          disabled={isLoading}
-          className="min-w-[200px]"
-        />
-
         {/* Botones de copiar y actualizar (apilados) */}
         <div className="flex flex-col gap-2">
           {onCopyPreviousMonth && (

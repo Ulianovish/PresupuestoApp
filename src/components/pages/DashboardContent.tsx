@@ -44,16 +44,8 @@ export default function DashboardContent({
   user: _user,
 }: DashboardContentProps) {
   // Usar el hook personalizado para obtener datos integrados
-  const {
-    summary,
-    budgetData,
-    isLoading,
-    error,
-    selectedMonth,
-    availableMonths,
-    setSelectedMonth,
-    refreshData,
-  } = useDashboardData();
+  const { summary, budgetData, isLoading, error, refreshData } =
+    useDashboardData();
 
   // Función para formatear moneda
   const formatCurrency = (amount: number): string => {
@@ -119,9 +111,6 @@ export default function DashboardContent({
   const header = (
     <DashboardHeader
       greeting={greeting}
-      selectedMonth={selectedMonth}
-      availableMonths={availableMonths}
-      onMonthChange={setSelectedMonth}
       onRefresh={refreshData}
       isLoading={isLoading}
     />

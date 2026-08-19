@@ -5,8 +5,6 @@
  * Incluye botón para mostrar migración de datos de julio.
  *
  * @param selectedMonth - Mes seleccionado actualmente
- * @param availableMonths - Meses disponibles para seleccionar
- * @param onMonthChange - Función para cambiar el mes
  * @param onRefresh - Función para actualizar los datos
  * @param onShowMigration - Función para mostrar panel de migración
  * @param isLoading - Estado de carga
@@ -14,8 +12,6 @@
  * @example
  * <ExpenseHeader
  *   selectedMonth="2025-07"
- *   availableMonths={monthOptions}
- *   onMonthChange={setSelectedMonth}
  *   onRefresh={refreshExpenses}
  *   onShowMigration={handleShowMigrationPanel}
  *   isLoading={loading}
@@ -27,18 +23,10 @@ import React from 'react';
 import { RefreshCw, Database, Upload, Tags } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
-import MonthSelector from '@/components/atoms/MonthSelector/MonthSelector';
 import { formatMonthName } from '@/lib/services/expenses';
-
-interface MonthOption {
-  value: string;
-  label: string;
-}
 
 interface ExpenseHeaderProps {
   selectedMonth: string;
-  availableMonths: MonthOption[];
-  onMonthChange: (month: string) => void;
   onRefresh: () => void;
   onImportExcel?: () => void;
   onAutoRecategorize?: () => void;
@@ -50,8 +38,6 @@ interface ExpenseHeaderProps {
 
 export default function ExpenseHeader({
   selectedMonth,
-  availableMonths,
-  onMonthChange,
   onRefresh,
   onImportExcel,
   onAutoRecategorize,
@@ -74,15 +60,6 @@ export default function ExpenseHeader({
 
       {/* Controles */}
       <div className="flex items-center gap-4">
-        {/* Selector de mes */}
-        <MonthSelector
-          value={selectedMonth}
-          onChange={onMonthChange}
-          options={availableMonths}
-          disabled={isLoading}
-          className="min-w-[200px]"
-        />
-
         {/* Botón de importar Excel */}
         {onImportExcel && (
           <Button

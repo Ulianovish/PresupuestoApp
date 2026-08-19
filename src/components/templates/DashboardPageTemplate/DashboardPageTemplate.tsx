@@ -22,7 +22,6 @@
  * @example
  * <DashboardPageTemplate
  *   greeting="🌅 Buenos días"
- *   monthSelector={<MonthSelector />}
  *   summaryCards={[<SummaryCard1 />, <SummaryCard2 />]}
  *   quickActions={<QuickActionsButtons />}
  *   mainContent={<BudgetTable />}

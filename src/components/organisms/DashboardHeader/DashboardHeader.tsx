@@ -5,18 +5,12 @@
  * Incluye saludo personalizado, selector de mes y botón de refresh.
  *
  * @param greeting - Mensaje de saludo personalizado
- * @param selectedMonth - Mes seleccionado actualmente
- * @param availableMonths - Lista de meses disponibles
- * @param onMonthChange - Función para cambiar el mes
  * @param onRefresh - Función para refrescar los datos
  * @param isLoading - Estado de carga
  *
  * @example
  * <DashboardHeader
  *   greeting="🌅 Buenos días"
- *   selectedMonth="2024-01"
- *   availableMonths={[{value: "2024-01", label: "Enero 2024"}]}
- *   onMonthChange={(month) => console.log(month)}
  *   onRefresh={() => console.log("refresh")}
  *   isLoading={false}
  * />
@@ -27,27 +21,15 @@ import React from 'react';
 import { RefreshCw } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
-import MonthSelector from '@/components/atoms/MonthSelector/MonthSelector';
-
-interface MonthOption {
-  value: string;
-  label: string;
-}
 
 interface DashboardHeaderProps {
   greeting: string;
-  selectedMonth: string;
-  availableMonths: MonthOption[];
-  onMonthChange: (month: string) => void;
   onRefresh: () => void;
   isLoading: boolean;
 }
 
 export default function DashboardHeader({
   greeting,
-  selectedMonth,
-  availableMonths,
-  onMonthChange,
   onRefresh,
   isLoading,
 }: DashboardHeaderProps) {
@@ -60,11 +42,6 @@ export default function DashboardHeader({
         </p>
       </div>
       <div className="flex items-center gap-4">
-        <MonthSelector
-          value={selectedMonth}
-          options={availableMonths}
-          onChange={onMonthChange}
-        />
         <Button
           variant="glass"
           size="default"
