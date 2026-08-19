@@ -143,7 +143,7 @@ export default function ExpenseRow({
               }
               onAssignItem(transaction.id, e.target.value);
             }}
-            className={`bg-slate-700/60 border rounded-lg text-xs px-2 py-1 max-w-[190px] ${
+            className={`w-[130px] bg-slate-700/60 border rounded-lg text-xs px-2 py-1 ${
               transaction.budget_item_id
                 ? 'border-slate-600 text-white'
                 : 'border-red-500/50 text-red-300'

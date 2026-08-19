@@ -272,7 +272,7 @@ export default function ExpenseTable({
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
                     <ColumnFilter
-                      label="Ítem presupuesto"
+                      label="Ítem"
                       values={valuesFor('item')}
                       selected={filters.item ?? null}
                       onChange={setFilter('item')}
