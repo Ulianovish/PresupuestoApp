@@ -193,7 +193,8 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
           >
             {getAvailableMonths().map(m => (
               <option key={m.value} value={m.value}>
-                {m.label}
+                {/* Solo el mes: el año ya se elige en el selector de abajo */}
+                {m.label.replace(` ${selectedYear}`, '')}
               </option>
             ))}
           </select>

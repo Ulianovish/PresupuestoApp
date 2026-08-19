@@ -145,19 +145,33 @@ export function useMonthlyBudget(monthYear: string): UseMonthlyBudgetReturn {
       categoryId: string,
       item: Omit<BudgetItem, 'id'>,
     ): Promise<boolean> => {
-      if (!budgetData?.template_id) {
-        setError('No hay un template de presupuesto activo');
-        return false;
-      }
-
       setError(null);
 
       try {
-        const newItem = await createBudgetItem(
-          budgetData.template_id,
-          categoryId,
-          item,
-        );
+        // Si el mes aún no tiene presupuesto, se crea al agregar el primer
+        // ítem: así no hace falta un paso previo ni se crean presupuestos
+        // vacíos solo por navegar entre meses.
+        let templateId = budgetData?.template_id;
+        if (!templateId) {
+          templateId = (await createMonthlyBudget(monthYear)) || undefined;
+          if (!templateId) {
+            setError('No se pudo crear el presupuesto del mes');
+            return false;
+          }
+          setBudgetData(prev =>
+            prev
+              ? { ...prev, template_id: templateId as string }
+              : {
+                  template_id: templateId as string,
+                  template_name: `Presupuesto ${monthYear}`,
+                  categories: [],
+                  total_presupuestado: 0,
+                  total_real: 0,
+                },
+          );
+        }
+
+        const newItem = await createBudgetItem(templateId, categoryId, item);
 
         if (newItem) {
           // Actualizar el estado local
@@ -200,7 +214,7 @@ export function useMonthlyBudget(monthYear: string): UseMonthlyBudgetReturn {
         return false;
       }
     },
-    [budgetData?.template_id],
+    [budgetData?.template_id, monthYear],
   );
 
   /**
