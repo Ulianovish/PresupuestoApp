@@ -8,6 +8,8 @@
 
 import React from 'react';
 
+import { Edit, Trash2 } from 'lucide-react';
+
 import Button from '@/components/atoms/Button/Button';
 import InlineCombobox from '@/components/molecules/InlineCombobox/InlineCombobox';
 import {
@@ -199,20 +201,22 @@ export default function ExpenseRow({
       <td className="px-4 py-2">
         <div className="flex gap-2 justify-center">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={handleEdit}
-            className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            className="flex items-center gap-1"
+            title="Editar"
           >
-            ✏️
+            <Edit className="w-3 h-3" />
           </Button>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={handleDelete}
-            className="border-red-600 text-red-300 hover:bg-red-700"
+            className="flex items-center gap-1 text-red-400 hover:text-red-300"
+            title="Eliminar"
           >
-            🗑️
+            <Trash2 className="w-3 h-3" />
           </Button>
         </div>
       </td>
