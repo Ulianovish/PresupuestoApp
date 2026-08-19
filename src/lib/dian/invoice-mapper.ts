@@ -1,3 +1,4 @@
+import { toTitleCase } from '@/lib/text-case';
 import type { ElectronicInvoice, StoredInvoiceItem } from '@/types/invoices';
 
 export interface UpsertExpenseArgs {
@@ -23,11 +24,11 @@ export function mapInvoiceItemToExpenseArgs(
 ): UpsertExpenseArgs {
   return {
     p_user_id: userId,
-    p_description: item.description,
+    p_description: toTitleCase(item.description),
     p_amount: item.total_with_tax ?? item.total_price,
     p_transaction_date: invoice.invoice_date ?? '',
     p_category_name: item.category,
     p_account_name: accountName,
-    p_place: invoice.supplier_name ?? '',
+    p_place: toTitleCase(invoice.supplier_name ?? ''),
   };
 }

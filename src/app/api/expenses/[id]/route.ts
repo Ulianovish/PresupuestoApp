@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
+import { toTitleCase } from '@/lib/text-case';
 
 // Schema para validar datos de actualización de gastos
 const UpdateExpenseSchema = z.object({
@@ -96,7 +97,7 @@ export async function PATCH(
       account_id?: string;
     } = {};
     if (validatedData.description !== undefined) {
-      updateData.description = validatedData.description;
+      updateData.description = toTitleCase(validatedData.description);
     }
     if (validatedData.amount !== undefined) {
       updateData.amount = validatedData.amount;
@@ -109,7 +110,7 @@ export async function PATCH(
       updateData.category_name = validatedData.category_name;
     }
     if (validatedData.place !== undefined) {
-      updateData.place = validatedData.place;
+      updateData.place = toTitleCase(validatedData.place);
     }
     if (accountId) {
       updateData.account_id = accountId;

@@ -33,7 +33,7 @@ describe('mapInvoiceItemToExpenseArgs', () => {
       p_transaction_date: '2026-05-15',
       p_category_name: 'MERCADO',
       p_account_name: 'TC Falabella',
-      p_place: 'Supermercado XYZ',
+      p_place: 'Supermercado Xyz', // normalizado a Título
     });
   });
 

@@ -5,6 +5,7 @@
 
 import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
 import { createClient } from '@/lib/supabase/client';
+import { toTitleCase } from '@/lib/text-case';
 
 import {
   resolveItemNameToId,
@@ -167,12 +168,12 @@ export async function createExpenseTransaction(
 
   const { data, error } = await supabase.rpc('upsert_monthly_expense', {
     p_user_id: user.id,
-    p_description: expenseData.description,
+    p_description: toTitleCase(expenseData.description),
     p_amount: expenseData.amount,
     p_transaction_date: expenseData.transaction_date,
     p_category_name: expenseData.category_name,
     p_account_name: expenseData.account_name,
-    p_place: expenseData.place || null,
+    p_place: expenseData.place ? toTitleCase(expenseData.place) : null,
   });
 
   if (error) {
