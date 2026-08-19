@@ -184,3 +184,68 @@ export async function deactivateAccount(id: string) {
     return { success: false, error: 'Error interno del servidor' };
   }
 }
+
+/**
+ * Nombre de cuenta para una tarjeta de crédito registrada en Deudas.
+ * Usa el acreedor con el prefijo "TC", evitando repetirlo si el acreedor ya
+ * empieza por "Tarjeta"/"TC" (ej. "Tarjeta Nu Bank Milo" -> "TC Nu Bank Milo").
+ */
+export async function accountNameForCard(acreedor: string): Promise<string> {
+  const base = (acreedor || '')
+    .trim()
+    .replace(/^(tarjeta de credito|tarjeta de crédito|tarjeta|tc)\s+/i, '')
+    .trim();
+  return base ? `TC ${base}` : 'TC';
+}
+
+/**
+ * Crea (o reactiva) la cuenta correspondiente a una tarjeta de crédito de
+ * Deudas, porque con esas tarjetas se pagan gastos y deben poder elegirse como
+ * cuenta al registrarlos. Idempotente y best-effort.
+ */
+export async function ensureAccountForCreditCard(acreedor: string) {
+  try {
+    const name = await accountNameForCard(acreedor);
+    if (name === 'TC') return { success: false, error: 'Acreedor vacío' };
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Usuario no autenticado' };
+
+    const { data: existing } = await supabase
+      .from('accounts')
+      .select('id, is_active')
+      .eq('user_id', user.id)
+      .eq('name', name)
+      .maybeSingle();
+
+    if (existing) {
+      // Si existía desactivada, se reactiva para que vuelva a los selectores.
+      if (!existing.is_active) {
+        await supabase
+          .from('accounts')
+          .update({ is_active: true, type: 'credit' })
+          .eq('id', existing.id);
+      }
+      return { success: true, name };
+    }
+
+    const { error } = await supabase
+      .from('accounts')
+      .insert({ user_id: user.id, name, type: 'credit', is_active: true });
+
+    if (error) {
+      console.error('Error creando cuenta de tarjeta:', error);
+      return { success: false, error: 'No se pudo crear la cuenta' };
+    }
+
+    revalidatePath('/settings');
+    revalidatePath('/gastos');
+    return { success: true, name };
+  } catch (error) {
+    console.error('Error en ensureAccountForCreditCard:', error);
+    return { success: false, error: 'Error interno del servidor' };
+  }
+}

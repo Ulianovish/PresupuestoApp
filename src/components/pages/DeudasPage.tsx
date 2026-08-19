@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useIngresosDeudas } from '@/hooks/useIngresosDeudas';
+import { ensureAccountForCreditCard } from '@/lib/actions/accounts';
 import { createBudgetItemsForDeuda } from '@/lib/actions/deudas-budget';
 import {
   actualizarDeuda,
@@ -189,6 +190,17 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
             ? `${nuevaDeuda.descripcion} · ${nuevaDeuda.acreedor}`
             : nuevaDeuda.descripcion;
           await createBudgetItemsForDeuda(nuevaDeuda.id, itemName);
+
+          // Con las tarjetas de crédito se pagan gastos: deben existir también
+          // como cuenta para poder elegirlas al registrar un gasto.
+          const esTarjeta =
+            nuevaDeuda.tipo_deuda === 'tarjeta_credito' ||
+            /tarjeta/i.test(nuevaDeuda.descripcion || '');
+          if (esTarjeta) {
+            await ensureAccountForCreditCard(
+              nuevaDeuda.acreedor || nuevaDeuda.descripcion,
+            );
+          }
         }
       }
       setModalOpen(false);
