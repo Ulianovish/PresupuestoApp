@@ -146,7 +146,7 @@ export default function BudgetTable({
                   Presupuestado
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  Real
+                  Gastado
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Acción
