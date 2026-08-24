@@ -308,10 +308,10 @@ export default function BudgetFormFields({
         />
       </div>
 
-      {/* Campo real */}
+      {/* Campo gastado (columna `real` del ítem) */}
       <div className="space-y-2">
         <Label htmlFor="real" className="text-white">
-          Real
+          Gastado
         </Label>
         <CurrencyInput
           value={formData.real}
