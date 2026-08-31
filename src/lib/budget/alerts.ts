@@ -41,7 +41,7 @@ export function evaluarRubro(r: RubroEstado): Alerta | null {
 }
 
 export function formatearAlerta(a: Alerta, hoy: Date): string {
-  const pct = Math.round(a.pct);
+  const pct = Math.floor(a.pct);
   if (a.threshold >= 100) {
     const exceso = a.spent - a.budgeted;
     return `🔴 ${a.itemName}: ${formatCOP(a.spent)} de ${formatCOP(a.budgeted)} (${pct}%). Te pasaste por ${formatCOP(exceso)}.`;

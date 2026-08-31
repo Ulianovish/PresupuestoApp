@@ -51,4 +51,12 @@ describe('formatearAlerta', () => {
     expect(msg).toContain('45.000');
     expect(msg).not.toContain('Te quedan');
   });
+
+  it('no muestra 100% mientras siga por debajo del umbral', () => {
+    // 99,6% redondearía a 100 y contradiría el "te quedan" de la misma frase.
+    const msg = formatearAlerta(evaluarRubro(rubro({ spent: 149400 }))!, hoy);
+    expect(msg).toContain('99%');
+    expect(msg).toContain('Te quedan');
+    expect(msg).not.toContain('100%');
+  });
 });
