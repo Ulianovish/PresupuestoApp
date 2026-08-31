@@ -881,7 +881,12 @@ En `src/lib/whatsapp/agent/turn.ts`, reemplazar `onExpenseCreated: async () => {
 ```ts
     onExpenseCreated: async e => {
       if (!e.budgetItemId) return; // sin rubro no hay contra qué comparar
-      const hoy = new Date();
+      // `new Date()` NO sirve acá: en producción el server corre en UTC, así que
+      // entre las 7pm y la medianoche hora Colombia ya está en el día siguiente
+      // y "días que faltan del mes" saldría corrido — el 31 de agosto a las 8pm
+      // diría "quedan 30 días" de un mes que se acaba en 4 horas.
+      const [aa, mm, dd] = todayBogota().split('-').map(Number);
+      const hoy = new Date(aa, mm - 1, dd);
       const msgs = await dispararAlertas(alertDepsSupabase(), {
         userId: ctx.userId,
         monthYear: todayBogota().slice(0, 7),
@@ -1124,8 +1129,20 @@ En `src/app/presupuesto/page.tsx`, junto a `<UnclassifiedExpensesPanel>`
 presupuesto?". Cargar el estado con el RPC y renderizar:
 
 ```tsx
-<BudgetAlertsPanel alertas={rubrosEnRiesgo(estadoRubros)} hoy={new Date()} />
+<BudgetAlertsPanel alertas={rubrosEnRiesgo(estadoRubros)} hoy={hoyBogota()} />
 ```
+
+Con el mismo helper que la Task 6, para que el panel y el chat nunca cuenten
+días distintos:
+
+```tsx
+const hoyBogota = () => {
+  const [aa, mm, dd] = todayBogota().split('-').map(Number);
+  return new Date(aa, mm - 1, dd);
+};
+```
+
+(`todayBogota` viene de `@/lib/whatsapp/format`.)
 
 El `estadoRubros` sale de `supabase.rpc('get_budget_alert_status', { p_user_id, p_month_year })`
 con la sesión del navegador — el RPC es `SECURITY DEFINER` y está `GRANT`eado a
