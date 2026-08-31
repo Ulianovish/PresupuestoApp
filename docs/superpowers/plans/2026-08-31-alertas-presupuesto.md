@@ -25,6 +25,7 @@
 | Archivo | Responsabilidad |
 |---|---|
 | `supabase/migrations/20260831000000_budget_alerts.sql` | Columna `alerts_enabled`, tabla `budget_alerts_sent`, RPC `get_budget_alert_status` |
+| `supabase/migrations/20260831000001_mark_budget_alert_sent.sql` | RPC del dedupe (Task 5) |
 | `src/lib/budget/thresholds.ts` | `highestThreshold` y `diasRestantesDelMes` — puras, sin I/O |
 | `src/lib/budget/thresholds.test.ts` | Tests de las puras |
 | `src/lib/budget/alerts.ts` | `evaluarRubro` (pura), `formatearAlerta` (pura), `dispararAlertas` (I/O) |
@@ -137,7 +138,7 @@ SELECT * FROM get_budget_alert_status(
 ) ORDER BY spent DESC;
 ```
 
-Esperado: **26 filas** (los rubros Variable con presupuesto > 0 de septiembre 2026). Ninguna con `budgeted = 0`. No debe aparecer `Arriendo`, `Leasing`, `Pensión Abril` ni `Pensión Alice` (son `Fijo`).
+Esperado: **25 filas** (los rubros Variable con presupuesto > 0 de septiembre 2026). Ninguna con `budgeted = 0`. No debe aparecer `Arriendo`, `Leasing`, `Pensión Abril` ni `Pensión Alice` (son `Fijo`).
 
 - [ ] **Step 4: Verificar que el override funciona**
 
@@ -149,13 +150,13 @@ WHERE bt.id = bi.template_id AND bt.month_year = '2026-09'
 
 SELECT count(*) FROM get_budget_alert_status(
   '4f87341b-e90c-4400-8cc0-5ac0203894a0', '2026-09');
--- Esperado: 25
+-- Esperado: 24
 
 UPDATE budget_items bi SET alerts_enabled = NULL
 FROM budget_templates bt, categories c
 WHERE bt.id = bi.template_id AND bt.month_year = '2026-09'
   AND c.id = bi.category_id AND bi.name = 'Dulces' AND c.name = 'MERCADO';
--- vuelve a 26
+-- vuelve a 25
 ```
 
 - [ ] **Step 5: Commit**
@@ -344,7 +345,7 @@ describe('formatearAlerta', () => {
     expect(msg).toContain('⚠️');
     expect(msg).toContain('Dulces');
     expect(msg).toContain('82%');
-    expect(msg).toContain('$27.000');
+    expect(msg).toContain('27.000');
     expect(msg).toContain('9 días');
   });
 
@@ -352,7 +353,7 @@ describe('formatearAlerta', () => {
     const msg = formatearAlerta(evaluarRubro(rubro({ spent: 195000 }))!, hoy);
     expect(msg).toContain('🔴');
     expect(msg).toContain('130%');
-    expect(msg).toContain('$45.000');
+    expect(msg).toContain('45.000');
     expect(msg).not.toContain('Te quedan');
   });
 });
@@ -426,6 +427,10 @@ export function formatearAlerta(a: Alerta, hoy: Date): string {
 ```
 
 **Nota:** `formatCOP` vive en `src/lib/whatsapp/format.ts:7` y ya lo usa el agente.
+
+⚠️ **`formatCOP` mete un NBSP (U+00A0) entre el `$` y el número:** `formatCOP(27000)`
+es `"$ 27.000"`, no `"$ 27.000"`. Por eso los tests afirman sobre `'27.000'`
+y nunca sobre `'$ 27.000'` — con espacio normal fallan.
 
 - [ ] **Step 4: Correr el test y ver que pasa**
 
