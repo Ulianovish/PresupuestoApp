@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import ConfirmModal from '@/components/atoms/ConfirmModal/ConfirmModal';
 import Toast from '@/components/atoms/Toast/Toast';
 import type { BudgetFormData } from '@/components/molecules/BudgetFormFields/BudgetFormFields';
+import BudgetAlertsPanel from '@/components/organisms/BudgetAlertsPanel/BudgetAlertsPanel';
 import BudgetHeader from '@/components/organisms/BudgetHeader/BudgetHeader';
 import BudgetItemModal from '@/components/organisms/BudgetItemModal/BudgetItemModal';
 import BudgetStatusPanels from '@/components/organisms/BudgetStatusPanels/BudgetStatusPanels';
@@ -21,6 +22,7 @@ import BudgetPageTemplate from '@/components/templates/BudgetPageTemplate/Budget
 import { useMonth } from '@/contexts/MonthContext';
 import { useMonthlyBudget } from '@/hooks/useMonthlyBudget';
 import { deleteCategory, updateCategory } from '@/lib/actions/categories';
+import { rubrosEnRiesgo, type RubroEstado } from '@/lib/budget/alerts';
 import {
   formatCurrency,
   getClassifications,
@@ -28,6 +30,20 @@ import {
   getItemNameSuggestions,
 } from '@/lib/services/budget';
 import { obtenerDeudas, type Deuda } from '@/lib/services/ingresos-deudas';
+import { createClient } from '@/lib/supabase/client';
+import { todayBogota } from '@/lib/whatsapp/format';
+
+const supabase = createClient();
+
+/**
+ * "Hoy" en Bogotá como Date local (medianoche), NO `new Date()`: mismo
+ * criterio que el turno del agente de WhatsApp (ver turn.ts), para que el
+ * panel y el chat nunca cuenten días distintos.
+ */
+const hoyBogota = (): Date => {
+  const [aa, mm, dd] = todayBogota().split('-').map(Number);
+  return new Date(aa, mm - 1, dd);
+};
 
 // Interfaces para tipos de datos
 interface ModalState {
@@ -94,6 +110,48 @@ export default function PresupuestoPage() {
     }
     loadLookups();
   }, []);
+
+  // Estado de los rubros del mes para el panel de alertas de presupuesto.
+  const [estadoRubros, setEstadoRubros] = useState<RubroEstado[]>([]);
+
+  useEffect(() => {
+    async function loadEstadoRubros() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase.rpc('get_budget_alert_status', {
+        p_user_id: user.id,
+        p_month_year: selectedMonth,
+      });
+      if (error) {
+        console.error('Error obteniendo estado de rubros:', error);
+        setEstadoRubros([]);
+        return;
+      }
+      // NUMERIC de Postgres llega como string: Number() al mapear, igual que
+      // alerts-supabase.ts.
+      setEstadoRubros(
+        (data ?? []).map(
+          (r: {
+            budget_item_id: string;
+            item_name: string;
+            category_name: string;
+            budgeted: number | string;
+            spent: number | string;
+          }) => ({
+            budgetItemId: r.budget_item_id,
+            itemName: r.item_name,
+            categoryName: r.category_name,
+            budgeted: Number(r.budgeted),
+            spent: Number(r.spent),
+          }),
+        ),
+      );
+    }
+    loadEstadoRubros();
+  }, [selectedMonth]);
 
   // Estado del modal de categoría
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -593,6 +651,10 @@ export default function PresupuestoPage() {
         budgetTable={
           !isLoading && categories.length > 0 ? (
             <>
+              <BudgetAlertsPanel
+                alertas={rubrosEnRiesgo(estadoRubros)}
+                hoy={hoyBogota()}
+              />
               <UnclassifiedExpensesPanel
                 monthYear={selectedMonth}
                 onChanged={refreshBudget}

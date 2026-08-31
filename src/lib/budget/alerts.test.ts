@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { evaluarRubro, formatearAlerta, dispararAlertas, type RubroEstado, type AlertDeps } from './alerts';
+import { evaluarRubro, formatearAlerta, dispararAlertas, rubrosEnRiesgo, type RubroEstado, type AlertDeps } from './alerts';
 
 const rubro = (over: Partial<RubroEstado> = {}): RubroEstado => ({
   budgetItemId: 'item-1',
@@ -181,5 +181,21 @@ describe('dispararAlertas', () => {
     // para siempre.
     expect(msgs).toHaveLength(1);
     expect(msgs[0]).toContain('Dulces');
+  });
+});
+
+describe('rubrosEnRiesgo', () => {
+  it('deja fuera los que van bien y ordena por porcentaje descendente', () => {
+    const estado: RubroEstado[] = [
+      rubro({ budgetItemId: 'a', itemName: 'Aseo', spent: 50000 }), // 33%
+      rubro({ budgetItemId: 'b', itemName: 'Dulces', spent: 195000 }), // 130%
+      rubro({ budgetItemId: 'c', itemName: 'Cine', spent: 123000 }), // 82%
+    ];
+    const r = rubrosEnRiesgo(estado);
+    expect(r.map(x => x.itemName)).toEqual(['Dulces', 'Cine']);
+  });
+
+  it('devuelve vacío cuando todo va bien: el panel entonces no se pinta', () => {
+    expect(rubrosEnRiesgo([rubro({ spent: 1000 })])).toEqual([]);
   });
 });

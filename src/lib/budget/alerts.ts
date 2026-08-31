@@ -115,3 +115,16 @@ export async function dispararAlertas(
 
   return mensajes;
 }
+
+/**
+ * Rubros que hoy merecen un renglón en el dashboard (>=80%), de peor a mejor.
+ *
+ * NO consulta budget_alerts_sent a propósito: aunque el bot ya haya avisado por
+ * chat, si seguís al 82% eso sigue siendo verdad y el panel debe mostrarlo.
+ */
+export function rubrosEnRiesgo(estado: RubroEstado[]): Alerta[] {
+  return estado
+    .map(evaluarRubro)
+    .filter((a): a is Alerta => a !== null)
+    .sort((x, y) => y.pct - x.pct);
+}
