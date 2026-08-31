@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
+import { formatCOP } from '@/lib/whatsapp/format';
+
 import {
   evaluarRubro,
   formatearAlerta,
@@ -63,21 +65,22 @@ describe('evaluarRubro', () => {
 describe('formatearAlerta', () => {
   const hoy = new Date(2026, 8, 22); // 22-sep-2026, quedan 9 días
 
-  it('al 80% dice cuánto queda y para cuántos días', () => {
+  it('al 82%: mensaje completo exacto, con la frase larga fijada en el spec', () => {
+    // Regresión real: al unificar con el panel, esta frase se había recortado
+    // a "Te quedan $X para 9 días" (la redacción corta del panel). Una
+    // aserción con toContain('9 días') no la hubiera atrapado porque las dos
+    // redacciones la contienen — por eso acá se compara el mensaje ENTERO.
     const msg = formatearAlerta(evaluarRubro(rubro({ spent: 123000 }))!, hoy);
-    expect(msg).toContain('⚠️');
-    expect(msg).toContain('Dulces');
-    expect(msg).toContain('82%');
-    expect(msg).toContain('27.000');
-    expect(msg).toContain('9 días');
+    expect(msg).toBe(
+      `⚠️ Vas en ${formatCOP(123000)} de ${formatCOP(150000)} en Dulces (82%).\n   Te quedan ${formatCOP(27000)} para los 9 días que faltan del mes.`,
+    );
   });
 
-  it('al pasarse dice por cuánto', () => {
+  it('al pasarse: mensaje completo exacto', () => {
     const msg = formatearAlerta(evaluarRubro(rubro({ spent: 195000 }))!, hoy);
-    expect(msg).toContain('🔴');
-    expect(msg).toContain('130%');
-    expect(msg).toContain('45.000');
-    expect(msg).not.toContain('Te quedan');
+    expect(msg).toBe(
+      `🔴 Dulces: ${formatCOP(195000)} de ${formatCOP(150000)} (130%). Te pasaste por ${formatCOP(45000)}.`,
+    );
   });
 
   it('no muestra 100% mientras siga por debajo del umbral', () => {
@@ -100,28 +103,43 @@ describe('formatearAlerta', () => {
 describe('pintarAlerta', () => {
   // Mismo camino que usa BudgetAlertsPanel: la prueba de que el panel y el
   // chat no pueden volver a decir cosas distintas del mismo dato es que los
-  // dos consuman esta única función.
+  // dos consuman esta única función. pct/excedido NUNCA se bifurcan; la
+  // REDACCIÓN de la frase de días sí, a propósito (detalleLargo para el
+  // chat, detalleCorto para la columna angosta del panel).
   const hoy = new Date(2026, 8, 22); // 22-sep-2026, quedan 9 días
 
-  it('con spent === budgeted exacto: excedido true y detalle "Llegaste al límite"', () => {
+  it('al 82%: detalleLargo y detalleCorto exactos, cada uno con su propia redacción', () => {
+    const p = pintarAlerta(evaluarRubro(rubro({ spent: 123000 }))!, hoy);
+    expect(p.pct).toBe(82);
+    expect(p.excedido).toBe(false);
+    expect(p.detalleLargo).toBe(
+      `Te quedan ${formatCOP(27000)} para los 9 días que faltan del mes`,
+    );
+    expect(p.detalleCorto).toBe(`Te quedan ${formatCOP(27000)} para 9 días`);
+  });
+
+  it('con spent === budgeted exacto: excedido true, detalleLargo y detalleCorto iguales ("Llegaste al límite")', () => {
     const p = pintarAlerta(evaluarRubro(rubro({ spent: 150000 }))!, hoy);
     expect(p.pct).toBe(100);
     expect(p.excedido).toBe(true);
-    expect(p.detalle).toBe('Llegaste al límite');
+    expect(p.detalleLargo).toBe('Llegaste al límite');
+    expect(p.detalleCorto).toBe('Llegaste al límite');
   });
 
-  it('con 99,6%: no excedido, pct trunca a 99 (nunca "100%") y detalle "Te quedan..."', () => {
+  it('con 99,6%: no excedido, pct trunca a 99 (nunca "100%") y detalleLargo "Te quedan..."', () => {
     const p = pintarAlerta(evaluarRubro(rubro({ spent: 149400 }))!, hoy);
     expect(p.pct).toBe(99);
     expect(p.excedido).toBe(false);
-    expect(p.detalle).toContain('Te quedan');
-    expect(p.detalle).not.toContain('100%');
+    expect(p.detalleLargo).toContain('Te quedan');
+    expect(p.detalleLargo).not.toContain('100%');
+    expect(p.detalleCorto).not.toContain('100%');
   });
 
-  it('excedido es threshold >= 100, no spent > budgeted: mismo criterio que formatearAlerta', () => {
+  it('excedido es threshold >= 100, no spent > budgeted; detalleLargo y detalleCorto iguales acá', () => {
     const p = pintarAlerta(evaluarRubro(rubro({ spent: 195000 }))!, hoy);
     expect(p.excedido).toBe(true);
-    expect(p.detalle).toContain('Te pasaste por');
+    expect(p.detalleLargo).toBe(`Te pasaste por ${formatCOP(45000)}`);
+    expect(p.detalleCorto).toBe(p.detalleLargo);
   });
 });
 

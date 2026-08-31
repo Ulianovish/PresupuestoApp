@@ -24,7 +24,9 @@ export interface Alerta {
 }
 
 /**
- * Fila cruda del RPC get_budget_alert_status (ver migración 20260831161241).
+ * Fila cruda del RPC get_budget_alert_status (ver migración
+ * supabase/migrations/20260831000000_budget_alerts.sql, redefinida en
+ * supabase/migrations/20260831000002_alert_rpc_privileges.sql).
  * El RPC todavía devuelve `category_name` además de estos campos, pero nada
  * lo lee: no vale la pena declararlo acá solo para ignorarlo. (Sacarlo del
  * RPC mismo queda pendiente: requiere DROP + CREATE FUNCTION porque cambia
@@ -74,17 +76,32 @@ export interface AlertaPintable {
   pct: number;
   /** true a partir de threshold >= 100, NO de spent > budgeted (ver detalle abajo). */
   excedido: boolean;
-  /** Frase lista para pegar: "Te pasaste por $X", "Llegaste al límite" o "Te quedan $X para N días". */
-  detalle: string;
+  /**
+   * Frase completa para el chat: "Te pasaste por $X", "Llegaste al límite" o
+   * "Te quedan $X para los N días que faltan del mes" (redacción fijada en
+   * el spec, docs/superpowers/specs/2026-08-31-alertas-presupuesto-design.md:196).
+   */
+  detalleLargo: string;
+  /**
+   * Misma frase, comprimida para la columna angosta del panel del
+   * dashboard: "Te quedan $X para N días" en vez de la versión larga. En el
+   * caso "excedido" es idéntica a detalleLargo — ahí no hay presión de
+   * espacio que justifique una segunda redacción.
+   */
+  detalleCorto: string;
 }
 
 /**
  * Decide las tres cosas que antes se reimplementaban por separado en el
  * mensaje de chat (`formatearAlerta`) y en el panel del dashboard
  * (`BudgetAlertsPanel`): el redondeo del porcentaje, el corte de "excedido" y
- * la frase de cuánto queda o por cuánto se pasó. Al vivir en un solo lugar,
- * las dos superficies quedan obligadas a decir exactamente lo mismo del mismo
- * dato.
+ * los datos de cuánto queda o por cuánto se pasó. Al vivir en un solo lugar,
+ * las dos superficies quedan obligadas a decidir lo mismo del mismo dato —
+ * lo único que se bifurca a propósito es la REDACCIÓN de la frase de días
+ * (`detalleLargo` vs `detalleCorto`): el chat necesita el contexto completo
+ * ("que faltan del mes"), el panel necesita que quepa en una columna. Antes
+ * de esta separación, unificar las dos superficies en una sola frase le
+ * había recortado sin querer el texto al chat (ver spec, línea 196).
  *
  * El corte de "excedido" es `threshold >= 100`, no `spent > budgeted`: con
  * `spent === budgeted` exacto no se "pasó" de nada, llegó justo — por eso ese
@@ -96,14 +113,9 @@ export function pintarAlerta(a: Alerta, hoy: Date): AlertaPintable {
 
   if (excedido) {
     const exceso = a.spent - a.budgeted;
-    return {
-      pct,
-      excedido,
-      detalle:
-        exceso > 0
-          ? `Te pasaste por ${formatCOP(exceso)}`
-          : 'Llegaste al límite',
-    };
+    const detalle =
+      exceso > 0 ? `Te pasaste por ${formatCOP(exceso)}` : 'Llegaste al límite';
+    return { pct, excedido, detalleLargo: detalle, detalleCorto: detalle };
   }
 
   const queda = a.budgeted - a.spent;
@@ -111,16 +123,17 @@ export function pintarAlerta(a: Alerta, hoy: Date): AlertaPintable {
   return {
     pct,
     excedido,
-    detalle: `Te quedan ${formatCOP(queda)} para ${dias} días`,
+    detalleLargo: `Te quedan ${formatCOP(queda)} para los ${dias} días que faltan del mes`,
+    detalleCorto: `Te quedan ${formatCOP(queda)} para ${dias} días`,
   };
 }
 
 export function formatearAlerta(a: Alerta, hoy: Date): string {
-  const { pct, excedido, detalle } = pintarAlerta(a, hoy);
+  const { pct, excedido, detalleLargo } = pintarAlerta(a, hoy);
   if (excedido) {
-    return `🔴 ${a.itemName}: ${formatCOP(a.spent)} de ${formatCOP(a.budgeted)} (${pct}%). ${detalle}.`;
+    return `🔴 ${a.itemName}: ${formatCOP(a.spent)} de ${formatCOP(a.budgeted)} (${pct}%). ${detalleLargo}.`;
   }
-  return `⚠️ Vas en ${formatCOP(a.spent)} de ${formatCOP(a.budgeted)} en ${a.itemName} (${pct}%).\n   ${detalle}.`;
+  return `⚠️ Vas en ${formatCOP(a.spent)} de ${formatCOP(a.budgeted)} en ${a.itemName} (${pct}%).\n   ${detalleLargo}.`;
 }
 
 export interface AlertDeps {
