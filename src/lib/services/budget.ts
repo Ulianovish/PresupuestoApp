@@ -21,6 +21,7 @@ interface BudgetQueryRow {
   budgeted_amount: string | number;
   real_amount: string | number;
   deuda_id: string | null;
+  alerts_enabled: boolean | null;
 }
 
 export interface BudgetItem {
@@ -168,6 +169,7 @@ export async function getBudgetByMonth(
             presupuestado: Number(row.budgeted_amount) || 0,
             real: Number(row.real_amount) || 0,
             deuda_id: row.deuda_id || null,
+            alertsEnabled: row.alerts_enabled ?? null,
           };
 
           category.items.push(item);

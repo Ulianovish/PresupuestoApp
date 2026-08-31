@@ -239,6 +239,8 @@ export interface Database {
           is_active: boolean;
           created_at: string;
           updated_at: string;
+          // NULL = automático por clasificación; true/false = override del usuario
+          alerts_enabled: boolean | null;
         };
         Insert: {
           id?: string;
@@ -255,6 +257,7 @@ export interface Database {
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
+          alerts_enabled?: boolean | null;
         };
         Update: {
           id?: string;
@@ -271,6 +274,7 @@ export interface Database {
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
+          alerts_enabled?: boolean | null;
         };
       };
       transactions: {
