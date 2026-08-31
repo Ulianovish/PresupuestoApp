@@ -159,8 +159,11 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
   let lastEntityDirty = false;
 
   // Las alertas se pegan a la respuesta del bot, no van como mensaje aparte:
-  // así no chocan con la ventana de 24 h de WhatsApp Business. Si una factura
-  // toca varios rubros, se juntan todas en el mismo mensaje.
+  // así no chocan con la ventana de 24 h de WhatsApp Business. Si un mensaje
+  // registra varios gastos ("20k taxi y 15k almuerzo"), se juntan todas acá.
+  //
+  // OJO: hoy solo `registrar_gasto` dispara alertas. Las facturas
+  // (`registrar_factura`) no llaman a onExpenseCreated, así que no avisan.
   const alertasPendientes: string[] = [];
 
   const deps: ToolDeps = {

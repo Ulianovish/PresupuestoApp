@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/lib/budget/alerts', () => ({
+  dispararAlertas: vi.fn(),
+}));
+vi.mock('@/lib/budget/alerts-supabase', () => ({
+  alertDepsSupabase: vi.fn(),
+}));
 vi.mock('@/lib/services/invoices', () => ({
   resolveUserCategoryNames: vi.fn(),
   createInvoiceDirect: vi.fn(),
@@ -37,6 +43,8 @@ vi.mock('./state', () => ({
   writeState: vi.fn(),
 }));
 
+import { dispararAlertas } from '@/lib/budget/alerts';
+import { alertDepsSupabase } from '@/lib/budget/alerts-supabase';
 import {
   createInvoiceDirect,
   getPendingInvoiceSummary,
@@ -57,6 +65,8 @@ import { callGatewayReal, runAgent } from './run';
 import { readState, writeState } from './state';
 import { handleAgentTurn } from './turn';
 
+const mockedDispararAlertas = vi.mocked(dispararAlertas);
+const mockedAlertDepsSupabase = vi.mocked(alertDepsSupabase);
 const mockedResolveCategoryNames = vi.mocked(resolveUserCategoryNames);
 const mockedCreateInvoiceDirect = vi.mocked(createInvoiceDirect);
 const mockedGetPendingInvoiceSummary = vi.mocked(getPendingInvoiceSummary);
@@ -100,6 +110,13 @@ describe('handleAgentTurn', () => {
       ok: true,
       category: 'General',
     });
+    // Sin budgetItemId en los mocks de arriba, `onExpenseCreated` corta antes
+    // de llamar a esto en casi todos los tests — se pisa por test cuando el
+    // caso sí necesita ejercitar el enganche de alertas.
+    mockedAlertDepsSupabase.mockReturnValue(
+      {} as unknown as ReturnType<typeof alertDepsSupabase>,
+    );
+    mockedDispararAlertas.mockResolvedValue([]);
   });
 
   it('camino feliz: manda el texto del agente y guarda el estado', async () => {
@@ -209,6 +226,85 @@ describe('handleAgentTurn', () => {
     expect(mensaje).toMatch(/cort/i);
     // No puede invitar a reenviar: el gasto ya está escrito.
     expect(mensaje).not.toMatch(/probá en un minuto|intentá de nuevo/i);
+  });
+
+  it('la alerta de presupuesto llega pegada a la respuesta normal del bot', async () => {
+    mockedCreateDirectExpense.mockResolvedValue({
+      ok: true,
+      category: 'MERCADO',
+      transactionId: 'tx-1',
+      budgetItemId: 'item-1',
+    });
+    mockedDispararAlertas.mockResolvedValue(['⚠️ Vas en 82% de Dulces.']);
+    mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
+      const out = await deps.executeTool('registrar_gasto', {
+        monto: 8500,
+        descripcion: 'chocolatina',
+      });
+      return { text: out.summary, calls: [] };
+    });
+
+    await handleAgentTurn({
+      userId: 'u1',
+      phone: '+57300',
+      body: '8500 chocolatina',
+    });
+
+    expect(mockedDispararAlertas).toHaveBeenCalledWith(expect.anything(), {
+      userId: 'u1',
+      monthYear: expect.any(String),
+      budgetItemIds: ['item-1'],
+      hoy: expect.any(Date),
+    });
+    const mensaje = mockedSendWhatsAppMessage.mock.calls[0][1];
+    // El texto del bot y el de la alerta tienen que venir en el MISMO
+    // mensaje: dos mensajes separados chocarían con la ventana de 24h de
+    // WhatsApp Business (ver el comentario junto a `alertasPendientes`).
+    expect(mensaje).toContain('chocolatina');
+    expect(mensaje).toContain('⚠️ Vas en 82% de Dulces.');
+  });
+
+  it('modo degradado con escrituras hechas: la alerta igual llega pegada al aviso de corte', async () => {
+    // Mismo montaje que "Gateway caído DESPUÉS de que la herramienta
+    // escribió", pero con budgetItemId: ejercita que la rama de modo
+    // degradado (huboEscrituras) también pasa por `conAlertas`, no solo la
+    // salida normal.
+    mockedCreateDirectExpense.mockResolvedValue({
+      ok: true,
+      category: 'TRANSPORTE',
+      transactionId: 'tx-1',
+      budgetItemId: 'item-2',
+    });
+    mockedDispararAlertas.mockResolvedValue(['🔴 Te pasaste en Transporte.']);
+    mockedCallGatewayReal
+      .mockResolvedValueOnce({
+        stop_reason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tu_1',
+            name: 'registrar_gasto',
+            input: { monto: 20000, descripcion: 'taxi' },
+          },
+        ],
+      })
+      .mockRejectedValueOnce(new Error('429 Too Many Requests'));
+    mockedRunAgent.mockImplementation(async (mensaje, ctx, deps) => {
+      const real = await vi.importActual<typeof import('./run')>('./run');
+      return real.runAgent(mensaje, ctx, deps);
+    });
+
+    await handleAgentTurn({ userId: 'u1', phone: '+57300', body: '20k taxi' });
+
+    expect(mockedDispararAlertas).toHaveBeenCalledWith(expect.anything(), {
+      userId: 'u1',
+      monthYear: expect.any(String),
+      budgetItemIds: ['item-2'],
+      hoy: expect.any(Date),
+    });
+    const mensaje = mockedSendWhatsAppMessage.mock.calls[0][1];
+    expect(mensaje).toMatch(/cort/i);
+    expect(mensaje).toContain('🔴 Te pasaste en Transporte.');
   });
 
   it('falla de base al armar el contexto: cae al parser en vez del error genérico', async () => {
