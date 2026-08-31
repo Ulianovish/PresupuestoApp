@@ -160,4 +160,26 @@ describe('dispararAlertas', () => {
       await dispararAlertas(depsFake([rubro({ spent: 195000 })], enviados), args),
     ).toHaveLength(0);
   });
+
+  it('un rubro que falla no se lleva puestos los avisos que los otros ya ganaron', async () => {
+    const estado = [
+      rubro({ budgetItemId: 'item-1', spent: 123000 }),
+      rubro({ budgetItemId: 'item-2', itemName: 'Cine', spent: 123000 }),
+    ];
+    const deps: AlertDeps = {
+      cargarEstado: async () => estado,
+      marcarEnviado: async (_u, _m, id) => {
+        if (id === 'item-2') throw new Error('timeout contra Supabase');
+        return true;
+      },
+    };
+    const msgs = await dispararAlertas(deps, {
+      ...args,
+      budgetItemIds: ['item-1', 'item-2'],
+    });
+    // El aviso de item-1 ya quedó marcado en la base: perderlo sería perderlo
+    // para siempre.
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain('Dulces');
+  });
 });

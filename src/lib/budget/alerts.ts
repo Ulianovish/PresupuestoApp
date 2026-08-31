@@ -92,13 +92,25 @@ export async function dispararAlertas(
     if (!tocados.has(r.budgetItemId)) continue;
     const alerta = evaluarRubro(r);
     if (!alerta) continue;
-    const esNueva = await deps.marcarEnviado(
-      args.userId,
-      args.monthYear,
-      alerta.budgetItemId,
-      alerta.threshold,
-    );
-    if (esNueva) mensajes.push(formatearAlerta(alerta, args.hoy));
+    // Un rubro que falla no puede tirar los avisos que los otros ya ganaron:
+    // marcarEnviado del anterior YA persistió su umbral, así que ese aviso no
+    // volvería a salir nunca. Mismo criterio que executeTool con el gasto ya
+    // guardado.
+    try {
+      const esNueva = await deps.marcarEnviado(
+        args.userId,
+        args.monthYear,
+        alerta.budgetItemId,
+        alerta.threshold,
+      );
+      if (esNueva) mensajes.push(formatearAlerta(alerta, args.hoy));
+    } catch (err) {
+      console.error(
+        'dispararAlertas: marcarEnviado falló para',
+        alerta.budgetItemId,
+        err,
+      );
+    }
   }
 
   return mensajes;
