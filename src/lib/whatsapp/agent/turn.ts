@@ -20,7 +20,7 @@ import {
   queryExpenseTotal,
 } from '@/lib/services/whatsapp-queries';
 import { createAdminClient } from '@/lib/supabase/server';
-import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
+import { formatCOP, hoyBogotaDate, todayBogota } from '@/lib/whatsapp/format';
 import { parseQuickExpense } from '@/lib/whatsapp/quick-expense';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/transport';
 
@@ -252,17 +252,11 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
     queryExpenses: async q => queryExpenseTotal(ctx.userId, q),
     onExpenseCreated: async e => {
       if (!e.budgetItemId) return; // sin rubro no hay contra qué comparar
-      // `new Date()` NO sirve acá: en producción el server corre en UTC, así que
-      // entre las 7pm y la medianoche hora Colombia ya está en el día siguiente
-      // y "días que faltan del mes" saldría corrido — el 31 de agosto a las 8pm
-      // diría "quedan 30 días" de un mes que se acaba en 4 horas.
-      const [aa, mm, dd] = todayBogota().split('-').map(Number);
-      const hoy = new Date(aa, mm - 1, dd);
       const msgs = await dispararAlertas(alertDepsSupabase(), {
         userId: ctx.userId,
         monthYear: todayBogota().slice(0, 7),
         budgetItemIds: [e.budgetItemId],
-        hoy,
+        hoy: hoyBogotaDate(),
       });
       alertasPendientes.push(...msgs);
     },

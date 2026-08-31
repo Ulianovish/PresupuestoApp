@@ -198,7 +198,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           // 'item' es el ítem del presupuesto al que se imputa el gasto (lo
           // asigna la IA al registrarlo y a veces se equivoca). Corregirlo por
           // chat lo marca como manual, para que la reclasificación no lo pise.
-          enum: ['monto', 'descripcion', 'cuenta', 'categoria', 'item', 'fecha'],
+          enum: [
+            'monto',
+            'descripcion',
+            'cuenta',
+            'categoria',
+            'item',
+            'fecha',
+          ],
         },
         valor: { type: 'string', description: 'El valor nuevo, como texto.' },
       },
@@ -333,8 +340,8 @@ export async function executeTool(
         };
 
       // Best-effort: el gasto YA está guardado. Si el enganche de alertas
-      // (futuro) lanza, no puede convertir un gasto real en un "no se pudo
-      // guardar" que empuje al modelo a reintentar y duplicarlo (mismo
+      // (onExpenseCreated) lanza, no puede convertir un gasto real en un "no
+      // se pudo guardar" que empuje al modelo a reintentar y duplicarlo (mismo
       // criterio que la asignación de ítem de presupuesto en createDirectExpense).
       try {
         await deps.onExpenseCreated({
