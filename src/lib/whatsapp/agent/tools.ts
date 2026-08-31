@@ -248,6 +248,8 @@ export interface ToolDeps {
     ok: boolean;
     category: string;
     transactionId?: string;
+    /** Rubro de presupuesto al que quedó asignado el gasto, si alguno. */
+    budgetItemId?: string | null;
     error?: string;
   }>;
   registerInvoice: (accountName: string) => Promise<{
@@ -275,7 +277,10 @@ export interface ToolDeps {
     mesEnCurso: boolean;
   }>;
   /** Se llama tras cada gasto creado. Enganche para las alertas de presupuesto. */
-  onExpenseCreated: (categoria: string) => Promise<void>;
+  onExpenseCreated: (e: {
+    categoria: string;
+    budgetItemId: string | null;
+  }) => Promise<void>;
 }
 
 /**
@@ -332,7 +337,10 @@ export async function executeTool(
       // guardar" que empuje al modelo a reintentar y duplicarlo (mismo
       // criterio que la asignación de ítem de presupuesto en createDirectExpense).
       try {
-        await deps.onExpenseCreated(res.category);
+        await deps.onExpenseCreated({
+          categoria: res.category,
+          budgetItemId: res.budgetItemId ?? null,
+        });
       } catch (errAlerta) {
         console.error(
           'executeTool(registrar_gasto): onExpenseCreated falló:',

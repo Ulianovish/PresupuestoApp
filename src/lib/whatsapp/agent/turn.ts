@@ -3,6 +3,8 @@
 // cae a `parseQuickExpense` para no dejar al usuario sin nada: un gasto
 // simple se sigue registrando con el LLM caído.
 
+import { dispararAlertas } from '@/lib/budget/alerts';
+import { alertDepsSupabase } from '@/lib/budget/alerts-supabase';
 import {
   createInvoiceDirect,
   getPendingInvoiceSummary,
@@ -156,6 +158,11 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
   // `responderYGuardar`).
   let lastEntityDirty = false;
 
+  // Las alertas se pegan a la respuesta del bot, no van como mensaje aparte:
+  // así no chocan con la ventana de 24 h de WhatsApp Business. Si una factura
+  // toca varios rubros, se juntan todas en el mismo mensaje.
+  const alertasPendientes: string[] = [];
+
   const deps: ToolDeps = {
     accounts: cuentas,
     categories: categorias,
@@ -240,7 +247,22 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
       return res;
     },
     queryExpenses: async q => queryExpenseTotal(ctx.userId, q),
-    onExpenseCreated: async () => {},
+    onExpenseCreated: async e => {
+      if (!e.budgetItemId) return; // sin rubro no hay contra qué comparar
+      // `new Date()` NO sirve acá: en producción el server corre en UTC, así que
+      // entre las 7pm y la medianoche hora Colombia ya está en el día siguiente
+      // y "días que faltan del mes" saldría corrido — el 31 de agosto a las 8pm
+      // diría "quedan 30 días" de un mes que se acaba en 4 horas.
+      const [aa, mm, dd] = todayBogota().split('-').map(Number);
+      const hoy = new Date(aa, mm - 1, dd);
+      const msgs = await dispararAlertas(alertDepsSupabase(), {
+        userId: ctx.userId,
+        monthYear: todayBogota().slice(0, 7),
+        budgetItemIds: [e.budgetItemId],
+        hoy,
+      });
+      alertasPendientes.push(...msgs);
+    },
   };
 
   const respuesta = await runAgent(
@@ -260,6 +282,13 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
     },
   );
 
+  // Las alertas disparadas por `onExpenseCreated` durante el turno se pegan al
+  // final de la respuesta (ver el acumulador `alertasPendientes` más arriba).
+  const conAlertas = (texto: string) =>
+    alertasPendientes.length > 0
+      ? `${texto}\n\n${alertasPendientes.join('\n\n')}`
+      : texto;
+
   // Gateway caído: no es culpa del usuario. Se intenta el parser viejo antes de
   // rendirse — con el LLM abajo, "20k taxi" se sigue registrando.
   //
@@ -274,7 +303,7 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
     await responderYGuardar(
       ctx,
       estado.turns,
-      texto,
+      conAlertas(texto),
       lastEntityDirty ? estado.lastEntity : undefined,
     );
     return;
@@ -284,7 +313,7 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
   await responderYGuardar(
     ctx,
     estado.turns,
-    texto,
+    conAlertas(texto),
     lastEntityDirty ? estado.lastEntity : undefined,
   );
 }
