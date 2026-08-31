@@ -5,7 +5,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server';
 
-import type { AlertDeps, RubroEstado } from './alerts';
+import { mapRubroEstado, type AlertDeps, type RubroEstado } from './alerts';
 
 export function alertDepsSupabase(): AlertDeps {
   const supabase = createAdminClient();
@@ -17,21 +17,7 @@ export function alertDepsSupabase(): AlertDeps {
         p_month_year: monthYear,
       });
       if (error) throw new Error(error.message);
-      return (data ?? []).map(
-        (r: {
-          budget_item_id: string;
-          item_name: string;
-          category_name: string;
-          budgeted: number | string;
-          spent: number | string;
-        }) => ({
-          budgetItemId: r.budget_item_id,
-          itemName: r.item_name,
-          categoryName: r.category_name,
-          budgeted: Number(r.budgeted),
-          spent: Number(r.spent),
-        }),
-      );
+      return (data ?? []).map(mapRubroEstado);
     },
 
     async marcarEnviado(userId, monthYear, budgetItemId, threshold) {

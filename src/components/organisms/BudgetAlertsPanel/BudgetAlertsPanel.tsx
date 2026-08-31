@@ -14,8 +14,7 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 import Card from '@/components/atoms/Card/Card';
-import { type Alerta } from '@/lib/budget/alerts';
-import { diasRestantesDelMes } from '@/lib/budget/thresholds';
+import { pintarAlerta, type Alerta } from '@/lib/budget/alerts';
 import { formatCOP } from '@/lib/whatsapp/format';
 
 interface BudgetAlertsPanelProps {
@@ -29,8 +28,6 @@ export default function BudgetAlertsPanel({
 }: BudgetAlertsPanelProps) {
   if (alertas.length === 0) return null;
 
-  const dias = diasRestantesDelMes(hoy);
-
   return (
     // variant="glass": el fondo de la página es oscuro (bg-slate-900), igual
     // que BudgetStatusPanels y UnclassifiedExpensesPanel, sus vecinos.
@@ -41,8 +38,11 @@ export default function BudgetAlertsPanel({
       </h3>
       <ul className="space-y-4">
         {alertas.map(a => {
-          const pct = Math.round(a.pct);
-          const excedido = a.spent > a.budgeted;
+          // pintarAlerta (src/lib/budget/alerts.ts) decide redondeo, corte de
+          // "excedido" y frase de días: es la MISMA función que usa el
+          // mensaje de chat (formatearAlerta), para que el panel nunca pueda
+          // decir algo distinto del mismo dato.
+          const { pct, excedido, detalle } = pintarAlerta(a, hoy);
           return (
             <li key={a.budgetItemId}>
               <div className="flex items-baseline justify-between text-sm">
@@ -62,9 +62,7 @@ export default function BudgetAlertsPanel({
                 />
               </div>
               <p className="text-xs text-gray-400">
-                {excedido
-                  ? `${pct}% · Te pasaste por ${formatCOP(a.spent - a.budgeted)}`
-                  : `${pct}% · Quedan ${formatCOP(a.budgeted - a.spent)} para ${dias} días`}
+                {pct}% · {detalle}
               </p>
             </li>
           );

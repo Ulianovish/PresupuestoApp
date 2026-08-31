@@ -1,14 +1,42 @@
 import { describe, it, expect } from 'vitest';
 
-import { evaluarRubro, formatearAlerta, dispararAlertas, rubrosEnRiesgo, type RubroEstado, type AlertDeps } from './alerts';
+import {
+  evaluarRubro,
+  formatearAlerta,
+  pintarAlerta,
+  mapRubroEstado,
+  dispararAlertas,
+  rubrosEnRiesgo,
+  type RubroEstado,
+  type AlertDeps,
+} from './alerts';
 
 const rubro = (over: Partial<RubroEstado> = {}): RubroEstado => ({
   budgetItemId: 'item-1',
   itemName: 'Dulces',
-  categoryName: 'MERCADO',
   budgeted: 150000,
   spent: 0,
   ...over,
+});
+
+describe('mapRubroEstado', () => {
+  it('mapea la fila del RPC, convirtiendo el NUMERIC (string) a number', () => {
+    // get_budget_alert_status devuelve budgeted/spent como DECIMAL, y
+    // @supabase/supabase-js los entrega como string: alertas-supabase.ts y
+    // page.tsx confiaban antes cada uno por su cuenta en Number() para esto.
+    const r = mapRubroEstado({
+      budget_item_id: 'item-1',
+      item_name: 'Dulces',
+      budgeted: '150000.00',
+      spent: '123000.00',
+    });
+    expect(r).toEqual({
+      budgetItemId: 'item-1',
+      itemName: 'Dulces',
+      budgeted: 150000,
+      spent: 123000,
+    });
+  });
 });
 
 describe('evaluarRubro', () => {
@@ -59,6 +87,42 @@ describe('formatearAlerta', () => {
     expect(msg).toContain('Te quedan');
     expect(msg).not.toContain('100%');
   });
+
+  it('con spent === budgeted exacto dice que llegó al límite, no que se pasó por $ 0', () => {
+    const msg = formatearAlerta(evaluarRubro(rubro({ spent: 150000 }))!, hoy);
+    expect(msg).toContain('🔴');
+    expect(msg).toContain('100%');
+    expect(msg).toContain('Llegaste al límite');
+    expect(msg).not.toContain('por $');
+  });
+});
+
+describe('pintarAlerta', () => {
+  // Mismo camino que usa BudgetAlertsPanel: la prueba de que el panel y el
+  // chat no pueden volver a decir cosas distintas del mismo dato es que los
+  // dos consuman esta única función.
+  const hoy = new Date(2026, 8, 22); // 22-sep-2026, quedan 9 días
+
+  it('con spent === budgeted exacto: excedido true y detalle "Llegaste al límite"', () => {
+    const p = pintarAlerta(evaluarRubro(rubro({ spent: 150000 }))!, hoy);
+    expect(p.pct).toBe(100);
+    expect(p.excedido).toBe(true);
+    expect(p.detalle).toBe('Llegaste al límite');
+  });
+
+  it('con 99,6%: no excedido, pct trunca a 99 (nunca "100%") y detalle "Te quedan..."', () => {
+    const p = pintarAlerta(evaluarRubro(rubro({ spent: 149400 }))!, hoy);
+    expect(p.pct).toBe(99);
+    expect(p.excedido).toBe(false);
+    expect(p.detalle).toContain('Te quedan');
+    expect(p.detalle).not.toContain('100%');
+  });
+
+  it('excedido es threshold >= 100, no spent > budgeted: mismo criterio que formatearAlerta', () => {
+    const p = pintarAlerta(evaluarRubro(rubro({ spent: 195000 }))!, hoy);
+    expect(p.excedido).toBe(true);
+    expect(p.detalle).toContain('Te pasaste por');
+  });
 });
 
 function depsFake(
@@ -87,7 +151,10 @@ describe('dispararAlertas', () => {
   };
 
   it('avisa la primera vez que cruza el 80%', async () => {
-    const msgs = await dispararAlertas(depsFake([rubro({ spent: 123000 })]), args);
+    const msgs = await dispararAlertas(
+      depsFake([rubro({ spent: 123000 })]),
+      args,
+    );
     expect(msgs).toHaveLength(1);
     expect(msgs[0]).toContain('82%');
   });
@@ -102,18 +169,30 @@ describe('dispararAlertas', () => {
   it('vuelve a avisar cuando sube de escalón', async () => {
     const enviados = {};
     expect(
-      await dispararAlertas(depsFake([rubro({ spent: 123000 })], enviados), args),
+      await dispararAlertas(
+        depsFake([rubro({ spent: 123000 })], enviados),
+        args,
+      ),
     ).toHaveLength(1);
     expect(
-      await dispararAlertas(depsFake([rubro({ spent: 195000 })], enviados), args),
+      await dispararAlertas(
+        depsFake([rubro({ spent: 195000 })], enviados),
+        args,
+      ),
     ).toHaveLength(1); // cruzó el 100
     expect(
-      await dispararAlertas(depsFake([rubro({ spent: 200000 })], enviados), args),
+      await dispararAlertas(
+        depsFake([rubro({ spent: 200000 })], enviados),
+        args,
+      ),
     ).toHaveLength(0); // sigue en 100, no repite
   });
 
   it('cruzar 80 y 100 de un solo golpe manda un solo aviso, el del 100', async () => {
-    const msgs = await dispararAlertas(depsFake([rubro({ spent: 195000 })]), args);
+    const msgs = await dispararAlertas(
+      depsFake([rubro({ spent: 195000 })]),
+      args,
+    );
     expect(msgs).toHaveLength(1);
     expect(msgs[0]).toContain('🔴');
   });
@@ -128,10 +207,15 @@ describe('dispararAlertas', () => {
     expect(msgs[0]).toContain('Dulces');
   });
 
-  it('junta las alertas de una factura que toca varios rubros', async () => {
+  it('junta las alertas de varios rubros tocados en el mismo turno', async () => {
     const estado = [
       rubro({ budgetItemId: 'item-1', spent: 123000 }),
-      rubro({ budgetItemId: 'item-2', itemName: 'Cine', budgeted: 60000, spent: 90000 }),
+      rubro({
+        budgetItemId: 'item-2',
+        itemName: 'Cine',
+        budgeted: 60000,
+        spent: 90000,
+      }),
     ];
     const msgs = await dispararAlertas(depsFake(estado), {
       ...args,
@@ -149,15 +233,24 @@ describe('dispararAlertas', () => {
     const enviados = {};
     // Se pasó: avisa el 100.
     expect(
-      await dispararAlertas(depsFake([rubro({ spent: 195000 })], enviados), args),
+      await dispararAlertas(
+        depsFake([rubro({ spent: 195000 })], enviados),
+        args,
+      ),
     ).toHaveLength(1);
     // Corrige a la baja: vuelve al 82%. No se des-avisa nada.
     expect(
-      await dispararAlertas(depsFake([rubro({ spent: 123000 })], enviados), args),
+      await dispararAlertas(
+        depsFake([rubro({ spent: 123000 })], enviados),
+        args,
+      ),
     ).toHaveLength(0);
     // Vuelve a pasarse al mismo escalón: tampoco repite.
     expect(
-      await dispararAlertas(depsFake([rubro({ spent: 195000 })], enviados), args),
+      await dispararAlertas(
+        depsFake([rubro({ spent: 195000 })], enviados),
+        args,
+      ),
     ).toHaveLength(0);
   });
 

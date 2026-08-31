@@ -10,7 +10,6 @@ import { highestThreshold, diasRestantesDelMes } from './thresholds';
 export interface RubroEstado {
   budgetItemId: string;
   itemName: string;
-  categoryName: string;
   budgeted: number;
   spent: number;
 }
@@ -22,6 +21,36 @@ export interface Alerta {
   pct: number;
   spent: number;
   budgeted: number;
+}
+
+/**
+ * Fila cruda del RPC get_budget_alert_status (ver migración 20260831161241).
+ * El RPC todavía devuelve `category_name` además de estos campos, pero nada
+ * lo lee: no vale la pena declararlo acá solo para ignorarlo. (Sacarlo del
+ * RPC mismo queda pendiente: requiere DROP + CREATE FUNCTION porque cambia
+ * RETURNS TABLE, y esta pasada no tocó la base de datos.)
+ */
+interface RubroEstadoRow {
+  budget_item_id: string;
+  item_name: string;
+  budgeted: number | string;
+  spent: number | string;
+}
+
+/**
+ * Mapea una fila del RPC a RubroEstado. Antes vivía duplicada (comentario
+ * incluido) en alerts-supabase.ts y en page.tsx: NUMERIC de Postgres llega
+ * como string en los dos casos, así que el Number() tiene que vivir en un
+ * solo lugar para no arriesgarse a que uno de los dos se quede corregido y el
+ * otro no.
+ */
+export function mapRubroEstado(row: RubroEstadoRow): RubroEstado {
+  return {
+    budgetItemId: row.budget_item_id,
+    itemName: row.item_name,
+    budgeted: Number(row.budgeted),
+    spent: Number(row.spent),
+  };
 }
 
 /** null = no hay nada que decir de este rubro. */
@@ -40,15 +69,58 @@ export function evaluarRubro(r: RubroEstado): Alerta | null {
   };
 }
 
-export function formatearAlerta(a: Alerta, hoy: Date): string {
+export interface AlertaPintable {
+  /** Ya redondeado con Math.floor: nunca puede leerse "100%" antes de llegar. */
+  pct: number;
+  /** true a partir de threshold >= 100, NO de spent > budgeted (ver detalle abajo). */
+  excedido: boolean;
+  /** Frase lista para pegar: "Te pasaste por $X", "Llegaste al límite" o "Te quedan $X para N días". */
+  detalle: string;
+}
+
+/**
+ * Decide las tres cosas que antes se reimplementaban por separado en el
+ * mensaje de chat (`formatearAlerta`) y en el panel del dashboard
+ * (`BudgetAlertsPanel`): el redondeo del porcentaje, el corte de "excedido" y
+ * la frase de cuánto queda o por cuánto se pasó. Al vivir en un solo lugar,
+ * las dos superficies quedan obligadas a decir exactamente lo mismo del mismo
+ * dato.
+ *
+ * El corte de "excedido" es `threshold >= 100`, no `spent > budgeted`: con
+ * `spent === budgeted` exacto no se "pasó" de nada, llegó justo — por eso ese
+ * caso dice "Llegaste al límite" en vez de "Te pasaste por $ 0".
+ */
+export function pintarAlerta(a: Alerta, hoy: Date): AlertaPintable {
   const pct = Math.floor(a.pct);
-  if (a.threshold >= 100) {
+  const excedido = a.threshold >= 100;
+
+  if (excedido) {
     const exceso = a.spent - a.budgeted;
-    return `🔴 ${a.itemName}: ${formatCOP(a.spent)} de ${formatCOP(a.budgeted)} (${pct}%). Te pasaste por ${formatCOP(exceso)}.`;
+    return {
+      pct,
+      excedido,
+      detalle:
+        exceso > 0
+          ? `Te pasaste por ${formatCOP(exceso)}`
+          : 'Llegaste al límite',
+    };
   }
+
   const queda = a.budgeted - a.spent;
   const dias = diasRestantesDelMes(hoy);
-  return `⚠️ Vas en ${formatCOP(a.spent)} de ${formatCOP(a.budgeted)} en ${a.itemName} (${pct}%).\n   Te quedan ${formatCOP(queda)} para los ${dias} días que faltan del mes.`;
+  return {
+    pct,
+    excedido,
+    detalle: `Te quedan ${formatCOP(queda)} para ${dias} días`,
+  };
+}
+
+export function formatearAlerta(a: Alerta, hoy: Date): string {
+  const { pct, excedido, detalle } = pintarAlerta(a, hoy);
+  if (excedido) {
+    return `🔴 ${a.itemName}: ${formatCOP(a.spent)} de ${formatCOP(a.budgeted)} (${pct}%). ${detalle}.`;
+  }
+  return `⚠️ Vas en ${formatCOP(a.spent)} de ${formatCOP(a.budgeted)} en ${a.itemName} (${pct}%).\n   ${detalle}.`;
 }
 
 export interface AlertDeps {
