@@ -32,6 +32,12 @@ export interface BudgetItem {
   presupuestado: number;
   real: number;
   deuda_id?: string | null;
+  /**
+   * Interruptor de alertas de presupuesto para este rubro.
+   * `null` = automático (sigue la clasificación: Variable vigila).
+   * `true`/`false` = override explícito del usuario, manda sobre la clasificación.
+   */
+  alertsEnabled?: boolean | null;
 }
 
 export interface BudgetCategory {
@@ -349,6 +355,7 @@ export async function createBudgetItem(
         presupuestado: item.presupuestado,
         real: item.real,
         deuda_id: item.deuda_id || null,
+        alertsEnabled: item.alertsEnabled ?? null,
       }),
     });
 

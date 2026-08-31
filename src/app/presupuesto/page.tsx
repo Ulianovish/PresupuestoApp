@@ -206,6 +206,7 @@ export default function PresupuestoPage() {
     presupuestado: 0,
     real: 0,
     deuda_id: null,
+    alertsEnabled: null,
   });
 
   // Funciones del modal
@@ -236,6 +237,7 @@ export default function PresupuestoPage() {
       presupuestado: 0,
       real: 0,
       deuda_id: null,
+      alertsEnabled: null,
     });
   };
 
@@ -250,6 +252,7 @@ export default function PresupuestoPage() {
       presupuestado: number;
       real: number;
       deuda_id?: string | null;
+      alertsEnabled?: boolean | null;
     },
     chainedEditing: boolean = false,
   ) => {
@@ -274,6 +277,7 @@ export default function PresupuestoPage() {
       presupuestado: item.presupuestado,
       real: item.real,
       deuda_id: item.deuda_id || null,
+      alertsEnabled: item.alertsEnabled ?? null,
     });
   };
 

@@ -79,6 +79,7 @@ export type Database = {
       };
       budget_items: {
         Row: {
+          alerts_enabled: boolean | null;
           budgeted_amount: number;
           category_id: string;
           classification_id: string;
@@ -97,6 +98,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          alerts_enabled?: boolean | null;
           budgeted_amount?: number;
           category_id: string;
           classification_id: string;
@@ -115,6 +117,7 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          alerts_enabled?: boolean | null;
           budgeted_amount?: number;
           category_id?: string;
           classification_id?: string;
