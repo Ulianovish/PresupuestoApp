@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { evaluarRubro, formatearAlerta, type RubroEstado } from './alerts';
+import { evaluarRubro, formatearAlerta, dispararAlertas, type RubroEstado, type AlertDeps } from './alerts';
 
 const rubro = (over: Partial<RubroEstado> = {}): RubroEstado => ({
   budgetItemId: 'item-1',
@@ -58,5 +58,106 @@ describe('formatearAlerta', () => {
     expect(msg).toContain('99%');
     expect(msg).toContain('Te quedan');
     expect(msg).not.toContain('100%');
+  });
+});
+
+function depsFake(
+  estado: RubroEstado[],
+  yaEnviados: Record<string, number> = {},
+): AlertDeps {
+  return {
+    cargarEstado: async () => estado,
+    // Réplica en memoria del ON CONFLICT ... WHERE last_threshold < excluded:
+    // solo "entra" si sube el umbral.
+    marcarEnviado: async (_u, _m, id, threshold) => {
+      if ((yaEnviados[id] ?? 0) >= threshold) return false;
+      yaEnviados[id] = threshold;
+      return true;
+    },
+  };
+}
+
+describe('dispararAlertas', () => {
+  const hoy = new Date(2026, 8, 22);
+  const args = {
+    userId: 'u1',
+    monthYear: '2026-09',
+    budgetItemIds: ['item-1'],
+    hoy,
+  };
+
+  it('avisa la primera vez que cruza el 80%', async () => {
+    const msgs = await dispararAlertas(depsFake([rubro({ spent: 123000 })]), args);
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain('82%');
+  });
+
+  it('no repite el mismo umbral', async () => {
+    const enviados = {};
+    const deps = depsFake([rubro({ spent: 123000 })], enviados);
+    expect(await dispararAlertas(deps, args)).toHaveLength(1);
+    expect(await dispararAlertas(deps, args)).toHaveLength(0);
+  });
+
+  it('vuelve a avisar cuando sube de escalón', async () => {
+    const enviados = {};
+    expect(
+      await dispararAlertas(depsFake([rubro({ spent: 123000 })], enviados), args),
+    ).toHaveLength(1);
+    expect(
+      await dispararAlertas(depsFake([rubro({ spent: 195000 })], enviados), args),
+    ).toHaveLength(1); // cruzó el 100
+    expect(
+      await dispararAlertas(depsFake([rubro({ spent: 200000 })], enviados), args),
+    ).toHaveLength(0); // sigue en 100, no repite
+  });
+
+  it('cruzar 80 y 100 de un solo golpe manda un solo aviso, el del 100', async () => {
+    const msgs = await dispararAlertas(depsFake([rubro({ spent: 195000 })]), args);
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain('🔴');
+  });
+
+  it('solo mira los rubros que tocó el gasto', async () => {
+    const estado = [
+      rubro({ budgetItemId: 'item-1', spent: 123000 }),
+      rubro({ budgetItemId: 'item-2', itemName: 'Cine', spent: 999000 }),
+    ];
+    const msgs = await dispararAlertas(depsFake(estado), args); // solo item-1
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain('Dulces');
+  });
+
+  it('junta las alertas de una factura que toca varios rubros', async () => {
+    const estado = [
+      rubro({ budgetItemId: 'item-1', spent: 123000 }),
+      rubro({ budgetItemId: 'item-2', itemName: 'Cine', budgeted: 60000, spent: 90000 }),
+    ];
+    const msgs = await dispararAlertas(depsFake(estado), {
+      ...args,
+      budgetItemIds: ['item-1', 'item-2'],
+    });
+    expect(msgs).toHaveLength(2);
+  });
+
+  it('un rubro que no está vigilado no aparece en el estado y no alerta', async () => {
+    const msgs = await dispararAlertas(depsFake([]), args);
+    expect(msgs).toHaveLength(0);
+  });
+
+  it('una corrección que baja el gasto no "des-avisa" ni re-avisa al volver a subir', async () => {
+    const enviados = {};
+    // Se pasó: avisa el 100.
+    expect(
+      await dispararAlertas(depsFake([rubro({ spent: 195000 })], enviados), args),
+    ).toHaveLength(1);
+    // Corrige a la baja: vuelve al 82%. No se des-avisa nada.
+    expect(
+      await dispararAlertas(depsFake([rubro({ spent: 123000 })], enviados), args),
+    ).toHaveLength(0);
+    // Vuelve a pasarse al mismo escalón: tampoco repite.
+    expect(
+      await dispararAlertas(depsFake([rubro({ spent: 195000 })], enviados), args),
+    ).toHaveLength(0);
   });
 });
