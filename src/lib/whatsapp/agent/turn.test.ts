@@ -366,6 +366,7 @@ describe('handleAgentTurn — registrar_factura', () => {
       itemsFound: 1,
       totalItems: 1,
       totalAmount: 8000,
+      budgetItemIds: [],
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
       const out = await deps.executeTool('registrar_factura', {
@@ -395,6 +396,7 @@ describe('handleAgentTurn — registrar_factura', () => {
       itemsFound: 2,
       totalItems: 5,
       totalAmount: 3000,
+      budgetItemIds: [],
       error: 'boom',
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
@@ -436,6 +438,7 @@ describe('handleAgentTurn — registrar_factura', () => {
       itemsFound: 1,
       totalItems: 1,
       totalAmount: 8000,
+      budgetItemIds: [],
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
       await deps.executeTool('registrar_factura', { cuenta: 'Nequi' });
@@ -467,6 +470,7 @@ describe('handleAgentTurn — registrar_factura', () => {
       itemsFound: 1,
       totalItems: 1,
       totalAmount: 8000,
+      budgetItemIds: [],
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
       await deps.executeTool('registrar_factura', { cuenta: 'Nequi' });

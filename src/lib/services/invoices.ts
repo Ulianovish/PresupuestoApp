@@ -272,6 +272,8 @@ export async function createInvoiceDirect(
    * o redondeos: el bot decía "$312.400" y en la app aparecían "$298.000".
    */
   totalAmount: number;
+  /** Rubros que la clasificación asignó (sin duplicados), para disparar alertas. */
+  budgetItemIds: string[];
   error?: string;
 }> {
   const supabase = createAdminClient();
@@ -290,6 +292,7 @@ export async function createInvoiceDirect(
       itemsFound: 0,
       totalItems: 0,
       totalAmount: 0,
+      budgetItemIds: [],
       error: 'Factura no encontrada.',
     };
   }
@@ -301,6 +304,7 @@ export async function createInvoiceDirect(
       itemsFound: 0,
       totalItems: typed.items?.length ?? 0,
       totalAmount: 0,
+      budgetItemIds: [],
       error: `La factura ya está en estado "${typed.status}"; no se vuelve a registrar.`,
     };
   }
@@ -332,9 +336,10 @@ export async function createInvoiceDirect(
     if (error) {
       // Corte a mitad de camino: lo ya creado son transacciones reales, no se
       // revierte. Se clasifica lo que sí se pudo (best-effort).
-      if (createdExpenses.length > 0) {
-        await clasificar(supabase, userId, createdExpenses);
-      }
+      const budgetItemIds =
+        createdExpenses.length > 0
+          ? await clasificar(supabase, userId, createdExpenses)
+          : [];
       // Si no se creó ningún gasto todavía no hay riesgo de duplicar: la fila
       // vuelve a pending_review para que la vista de rescate pueda
       // reintentarla. Si ya se creó aunque sea uno, sí queda en error —
@@ -361,6 +366,7 @@ export async function createInvoiceDirect(
         itemsFound: createdExpenses.length,
         totalItems: items.length,
         totalAmount: totalRegistrado,
+        budgetItemIds,
         error: mensaje,
       };
     }
@@ -376,7 +382,7 @@ export async function createInvoiceDirect(
     }
   }
 
-  await clasificar(supabase, userId, createdExpenses);
+  const budgetItemIds = await clasificar(supabase, userId, createdExpenses);
 
   const { error: updateError } = await supabase
     .from('electronic_invoices')
@@ -401,6 +407,7 @@ export async function createInvoiceDirect(
     itemsFound: items.length,
     totalItems: items.length,
     totalAmount: totalRegistrado,
+    budgetItemIds,
   };
 }
 
@@ -411,6 +418,12 @@ export async function createInvoiceDirect(
  * por mes y por categoría del gasto, acota la IA a los ítems de esa categoría, y
  * solo asigna cuando hay match. Nunca relanza (si falla, el gasto queda sin
  * clasificar y aparece en el panel rojo del presupuesto).
+ *
+ * Devuelve los `budget_item_id` que efectivamente quedaron asignados (sin
+ * duplicados), para que el llamador pueda disparar las alertas de presupuesto
+ * de esos rubros. Un id solo cuenta como asignado si el RPC de asignación lo
+ * confirmó: reportar un rubro que no quedó escrito dispararía una alerta
+ * sobre un gasto que en realidad no está en ese rubro.
  */
 export async function classifyApprovedExpenses(
   supabase: DBClient,
@@ -421,9 +434,10 @@ export async function classifyApprovedExpenses(
     categoryName: string;
     monthYear: string;
   }>,
-): Promise<void> {
+): Promise<string[]> {
+  const asignados = new Set<string>();
   try {
-    if (expenses.length === 0) return;
+    if (expenses.length === 0) return [];
 
     // Agrupar por mes (una factura suele ser un solo mes, pero por si acaso)
     const byMonth = new Map<string, typeof expenses>();
@@ -472,12 +486,19 @@ export async function classifyApprovedExpenses(
         for (let i = 0; i < catExpenses.length; i++) {
           const itemId = resolveItemNameToId(names[i], inCategory);
           if (itemId) {
-            await supabase.rpc('assign_expense_budget_item', {
-              p_user_id: userId,
-              p_transaction_id: catExpenses[i].id,
-              p_budget_item_id: itemId,
-              p_source: 'ai',
-            });
+            const { error: assignError } = await supabase.rpc(
+              'assign_expense_budget_item',
+              {
+                p_user_id: userId,
+                p_transaction_id: catExpenses[i].id,
+                p_budget_item_id: itemId,
+                p_source: 'ai',
+              },
+            );
+            // Solo cuenta como asignado si el RPC confirmó: avisar por un
+            // rubro que no quedó escrito sería una alerta sobre un gasto que
+            // no está ahí.
+            if (!assignError) asignados.add(itemId);
           }
         }
       }
@@ -486,4 +507,8 @@ export async function classifyApprovedExpenses(
     console.error('Error clasificando gastos de factura aprobada:', error);
     // best-effort: no relanzar
   }
+  // Afuera del catch a propósito: una falla parcial (p.ej. el segundo rubro
+  // truena) igual tiene que devolver lo que sí se asignó antes de fallar.
+  // Mismo criterio que dispararAlertas en budget/alerts.ts.
+  return [...asignados];
 }
