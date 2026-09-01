@@ -1,7 +1,7 @@
 // Definiciones de herramientas + validación. El modelo propone; acá se decide
 // si se puede. Una cuenta inventada o un monto absurdo mueren en esta capa.
 
-import { formatCOP } from '@/lib/whatsapp/format';
+import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
 
 import type { ToolOutcome } from './run';
 
@@ -267,6 +267,8 @@ export interface ToolDeps {
     totalAmount?: number;
     /** Rubros que la clasificación asignó (sin duplicados), para disparar alertas. */
     budgetItemIds?: string[];
+    /** Mes DE LA FACTURA (ver `createInvoiceDirect`), no el de hoy. */
+    monthYear?: string;
     error?: string;
   }>;
   correctLast: (
@@ -290,10 +292,15 @@ export interface ToolDeps {
    * porque una factura toca varios (2,7 en promedio): llamar una vez por rubro
    * haría un round trip a Supabase por cada uno y partiría el aviso en varios
    * mensajes, en vez del único que junta todo.
+   *
+   * `monthYear` es el mes DEL GASTO (o de la factura), nunca el de hoy: las
+   * alertas son por mes, así que compararlas contra el mes equivocado las deja
+   * sin disparar en silencio (ver `dispararAlertasWhatsapp`).
    */
   onExpenseCreated: (e: {
     categoria: string;
     budgetItemIds: string[];
+    monthYear: string;
   }) => Promise<string[]>;
 }
 
@@ -334,11 +341,16 @@ export async function executeTool(
       const v = validateGasto(input as unknown as GastoInput, deps.accounts);
       if (!v.ok) return { ok: false, summary: v.error };
 
+      // Fecha del GASTO (la que el modelo mandó, o hoy si no mandó ninguna):
+      // es la misma que se usa para escribir la transacción y la que tiene
+      // que viajar al enganche de alertas, para comparar contra el mes que
+      // corresponde y no siempre contra "hoy".
+      const fecha = v.value.fecha ?? deps.today();
       const res = await deps.createExpense({
         amount: v.value.monto,
         description: v.value.descripcion,
         accountName: v.value.cuenta ?? deps.defaultAccount,
-        date: v.value.fecha ?? deps.today(),
+        date: fecha,
       });
       if (!res.ok)
         return {
@@ -354,6 +366,7 @@ export async function executeTool(
         await deps.onExpenseCreated({
           categoria: res.category,
           budgetItemIds: res.budgetItemId ? [res.budgetItemId] : [],
+          monthYear: fecha.slice(0, 7),
         });
       } catch (errAlerta) {
         console.error(
@@ -377,24 +390,36 @@ export async function executeTool(
         return { ok: false, summary: mensajeCuentaNoResuelta(cuenta, deps) };
       }
       const res = await deps.registerInvoice(resolucion.cuenta);
-      if (res.ok) {
-        // Best-effort, igual que en registrar_gasto: los gastos de la factura
-        // YA están escritos. Si la alerta falla, no puede convertir esto en un
-        // "no se pudo guardar" que empuje al modelo a registrarla de nuevo.
-        const rubros = res.budgetItemIds ?? [];
-        if (rubros.length > 0) {
-          try {
-            await deps.onExpenseCreated({
-              categoria: 'FACTURA',
-              budgetItemIds: rubros,
-            });
-          } catch (errAlerta) {
-            console.error(
-              'executeTool(registrar_factura): onExpenseCreated falló:',
-              errAlerta,
-            );
-          }
+      // Mes DE LA FACTURA (createInvoiceDirect lo devuelve junto a los
+      // rubros), no el de hoy: una factura vieja o un CUFE que llega a
+      // principios del mes siguiente compararía contra rubros de un mes que
+      // no es el suyo y la alerta jamás dispararía (ver `alerts.ts`). El
+      // fallback a hoy es solo defensivo (un mock de test sin `monthYear`);
+      // en producción `registerInvoice` siempre lo manda.
+      const monthYear = res.monthYear ?? todayBogota().slice(0, 7);
+      // Dispara el enganche si hay rubros, tragándose cualquier falla
+      // (best-effort): ni el camino feliz ni el parcial pueden convertir un
+      // gasto ya escrito en un error que empuje al modelo a reintentar y
+      // duplicarlo. Se usa en los dos `return` de abajo: los ítems de un
+      // registro parcial YA son transacciones reales con rubro asignado, así
+      // que quedarse a medias no los excluye de las alertas.
+      const avisarRubros = async (rubros: string[]) => {
+        if (rubros.length === 0) return;
+        try {
+          await deps.onExpenseCreated({
+            categoria: 'FACTURA',
+            budgetItemIds: rubros,
+            monthYear,
+          });
+        } catch (errAlerta) {
+          console.error(
+            'executeTool(registrar_factura): onExpenseCreated falló:',
+            errAlerta,
+          );
         }
+      };
+      if (res.ok) {
+        await avisarRubros(res.budgetItemIds ?? []);
         // El total que se confirma es el que EFECTIVAMENTE se registró (suma
         // de los ítems), no el de la cabecera de la factura: con descuentos o
         // redondeos difieren y el usuario ve un número que no está en la app.
@@ -411,6 +436,7 @@ export async function executeTool(
       // reales). Decirle al modelo "no se guardó nada" lo empujaría a
       // ofrecerle al usuario reenviar la foto, duplicando esos ítems.
       if (res.itemsFound > 0) {
+        await avisarRubros(res.budgetItemIds ?? []);
         return {
           ok: false,
           wrote: true,

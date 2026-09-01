@@ -228,8 +228,11 @@ describe('executeTool', () => {
   });
 
   it('le pasa el rubro al enganche de alertas, no solo la categoría', async () => {
-    let recibido: { categoria: string; budgetItemIds: string[] } | null =
-      null;
+    let recibido: {
+      categoria: string;
+      budgetItemIds: string[];
+      monthYear: string;
+    } | null = null;
     const deps = depsFalsas({
       createExpense: async () => ({
         ok: true as const,
@@ -240,6 +243,7 @@ describe('executeTool', () => {
       onExpenseCreated: async (e: {
         categoria: string;
         budgetItemIds: string[];
+        monthYear: string;
       }) => {
         recibido = e;
         return [];
@@ -253,7 +257,30 @@ describe('executeTool', () => {
     expect(recibido).toEqual({
       categoria: 'MERCADO',
       budgetItemIds: ['item-1'],
+      // `deps.today()` de `depsFalsas` es '2026-08-17': sin `fecha` explícita
+      // en el input, el mes del gasto es el de hoy.
+      monthYear: '2026-08',
     });
+  });
+
+  it('el mes que le pasa al enganche es el de la FECHA del gasto, no el de hoy', async () => {
+    // El hallazgo crítico: si el modelo corrige la fecha a un mes anterior
+    // (una factura vieja, un CUFE que llega a principios del mes siguiente),
+    // la alerta tiene que comparar contra ESE mes, no contra "hoy" — los
+    // budget_item_id son por mes.
+    const recibido: { value: { monthYear: string } | null } = { value: null };
+    const deps = depsFalsas({
+      onExpenseCreated: async (e: { monthYear: string }) => {
+        recibido.value = e;
+        return [];
+      },
+    });
+    await executeTool(
+      'registrar_gasto',
+      { monto: 8500, descripcion: 'chocolatina', fecha: '2026-07-03' },
+      deps,
+    );
+    expect(recibido.value?.monthYear).toBe('2026-07');
   });
 
   it('devuelve un error legible si la herramienta no existe', async () => {
@@ -346,6 +373,47 @@ describe('executeTool', () => {
       expect(r.userSummary).toMatch(/ya están en tus gastos|no se perdieron/i);
       expect(r.userSummary).toMatch(/mano en gastos/i);
       expect(r.userSummary).not.toMatch(/facturas sin completar/i);
+    });
+
+    it('fallo parcial: los ítems que SÍ quedaron con rubro también avisan al enganche de alertas', async () => {
+      // El hallazgo crítico: esos ítems ya son transacciones reales con rubro
+      // asignado. Que el registro haya quedado a medias no los excluye de las
+      // alertas de presupuesto — antes esta rama no llamaba al enganche.
+      const recibido: { value: { budgetItemIds: string[] } | null } = {
+        value: null,
+      };
+      const deps = depsFalsas({
+        registerInvoice: async () => ({
+          ok: false,
+          itemsFound: 2,
+          totalItems: 5,
+          budgetItemIds: ['item-dulces'],
+        }),
+        onExpenseCreated: async (e: { budgetItemIds: string[] }) => {
+          recibido.value = e;
+          return [];
+        },
+      });
+      await executeTool('registrar_factura', { cuenta: 'Nequi' }, deps);
+      expect(recibido.value?.budgetItemIds).toEqual(['item-dulces']);
+    });
+
+    it('fallo parcial sin rubros clasificados no llama al enganche con basura', async () => {
+      let llamado = false;
+      const deps = depsFalsas({
+        registerInvoice: async () => ({
+          ok: false,
+          itemsFound: 2,
+          totalItems: 5,
+          budgetItemIds: [],
+        }),
+        onExpenseCreated: async () => {
+          llamado = true;
+          return [];
+        },
+      });
+      await executeTool('registrar_factura', { cuenta: 'Nequi' }, deps);
+      expect(llamado).toBe(false);
     });
 
     it('le pasa al enganche todos los rubros que tocó la factura', async () => {
