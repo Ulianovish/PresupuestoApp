@@ -160,10 +160,8 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
 
   // Las alertas se pegan a la respuesta del bot, no van como mensaje aparte:
   // así no chocan con la ventana de 24 h de WhatsApp Business. Si un mensaje
-  // registra varios gastos ("20k taxi y 15k almuerzo"), se juntan todas acá.
-  //
-  // OJO: hoy solo `registrar_gasto` dispara alertas. Las facturas
-  // (`registrar_factura`) no llaman a onExpenseCreated, así que no avisan.
+  // registra varios gastos ("20k taxi y 15k almuerzo") o una factura toca
+  // varios rubros, se juntan todas acá.
   const alertasPendientes: string[] = [];
 
   const deps: ToolDeps = {
@@ -200,6 +198,7 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
           ok: false,
           itemsFound: 0,
           totalItems: 0,
+          budgetItemIds: [],
           error: 'no hay factura pendiente',
         };
       }
@@ -251,14 +250,15 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
     },
     queryExpenses: async q => queryExpenseTotal(ctx.userId, q),
     onExpenseCreated: async e => {
-      if (!e.budgetItemId) return; // sin rubro no hay contra qué comparar
+      if (e.budgetItemIds.length === 0) return []; // sin rubro no hay qué comparar
       const msgs = await dispararAlertas(alertDepsSupabase(), {
         userId: ctx.userId,
         monthYear: todayBogota().slice(0, 7),
-        budgetItemIds: [e.budgetItemId],
+        budgetItemIds: e.budgetItemIds,
         hoy: hoyBogotaDate(),
       });
       alertasPendientes.push(...msgs);
+      return msgs;
     },
   };
 

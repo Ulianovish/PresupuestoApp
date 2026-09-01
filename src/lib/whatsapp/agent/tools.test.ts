@@ -161,7 +161,7 @@ function depsFalsas(over: Partial<ToolDeps> = {}): ToolDeps {
       hasta: '2026-08-17',
       mesEnCurso: true,
     }),
-    onExpenseCreated: async () => {},
+    onExpenseCreated: async () => [],
     ...over,
   };
 }
@@ -216,6 +216,7 @@ describe('executeTool', () => {
     const deps = depsFalsas({
       onExpenseCreated: async e => {
         avisado = e.categoria;
+        return [];
       },
     });
     await executeTool(
@@ -227,7 +228,7 @@ describe('executeTool', () => {
   });
 
   it('le pasa el rubro al enganche de alertas, no solo la categoría', async () => {
-    let recibido: { categoria: string; budgetItemId: string | null } | null =
+    let recibido: { categoria: string; budgetItemIds: string[] } | null =
       null;
     const deps = depsFalsas({
       createExpense: async () => ({
@@ -238,9 +239,10 @@ describe('executeTool', () => {
       }),
       onExpenseCreated: async (e: {
         categoria: string;
-        budgetItemId: string | null;
+        budgetItemIds: string[];
       }) => {
         recibido = e;
+        return [];
       },
     });
     await executeTool(
@@ -248,7 +250,10 @@ describe('executeTool', () => {
       { monto: 8500, descripcion: 'chocolatina' },
       deps,
     );
-    expect(recibido).toEqual({ categoria: 'MERCADO', budgetItemId: 'item-1' });
+    expect(recibido).toEqual({
+      categoria: 'MERCADO',
+      budgetItemIds: ['item-1'],
+    });
   });
 
   it('devuelve un error legible si la herramienta no existe', async () => {
@@ -341,6 +346,70 @@ describe('executeTool', () => {
       expect(r.userSummary).toMatch(/ya están en tus gastos|no se perdieron/i);
       expect(r.userSummary).toMatch(/mano en gastos/i);
       expect(r.userSummary).not.toMatch(/facturas sin completar/i);
+    });
+
+    it('le pasa al enganche todos los rubros que tocó la factura', async () => {
+      const recibido: {
+        value: { categoria: string; budgetItemIds: string[] } | null;
+      } = { value: null };
+      const deps = depsFalsas({
+        registerInvoice: async () => ({
+          ok: true as const,
+          itemsFound: 6,
+          totalItems: 6,
+          totalAmount: 84000,
+          budgetItemIds: ['item-dulces', 'item-carnes'],
+        }),
+        onExpenseCreated: async (e: {
+          categoria: string;
+          budgetItemIds: string[];
+        }) => {
+          recibido.value = e;
+          return [];
+        },
+      });
+      await executeTool('registrar_factura', { cuenta: 'Nequi' }, deps);
+      expect(recibido.value?.budgetItemIds).toEqual([
+        'item-dulces',
+        'item-carnes',
+      ]);
+    });
+
+    it('una factura que no clasificó nada no llama al enganche con basura', async () => {
+      let llamado = false;
+      const deps = depsFalsas({
+        registerInvoice: async () => ({
+          ok: true as const,
+          itemsFound: 3,
+          totalItems: 3,
+          totalAmount: 1000,
+          budgetItemIds: [],
+        }),
+        onExpenseCreated: async () => {
+          llamado = true;
+          return [];
+        },
+      });
+      await executeTool('registrar_factura', { cuenta: 'Nequi' }, deps);
+      expect(llamado).toBe(false);
+    });
+
+    it('si el enganche lanza en una factura, la factura igual queda registrada', async () => {
+      // Mismo criterio que en registrar_gasto: los gastos YA están escritos.
+      const deps = depsFalsas({
+        registerInvoice: async () => ({
+          ok: true as const,
+          itemsFound: 3,
+          totalItems: 3,
+          totalAmount: 1000,
+          budgetItemIds: ['item-dulces'],
+        }),
+        onExpenseCreated: async () => {
+          throw new Error('Supabase caído');
+        },
+      });
+      const r = await executeTool('registrar_factura', { cuenta: 'Nequi' }, deps);
+      expect(r.ok).toBe(true);
     });
   });
 

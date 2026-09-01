@@ -486,6 +486,40 @@ describe('handleAgentTurn — registrar_factura', () => {
 
     expect(mockedCreateInvoiceDirect).toHaveBeenCalledTimes(1);
   });
+
+  it('la alerta de presupuesto también llega cuando la factura clasifica rubros', async () => {
+    // Mismo criterio que el test análogo de registrar_gasto: acá el rubro no
+    // sale de un solo gasto sino de la lista que devuelve la clasificación de
+    // la factura completa.
+    mockedAlertDepsSupabase.mockReturnValue(
+      {} as unknown as ReturnType<typeof alertDepsSupabase>,
+    );
+    mockedDispararAlertas.mockResolvedValue(['⚠️ Vas en 82% de Dulces.']);
+    mockedCreateInvoiceDirect.mockResolvedValue({
+      ok: true,
+      itemsFound: 2,
+      totalItems: 2,
+      totalAmount: 84000,
+      budgetItemIds: ['item-dulces', 'item-carnes'],
+    });
+    mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
+      const out = await deps.executeTool('registrar_factura', {
+        cuenta: 'Nequi',
+      });
+      return { text: out.summary, calls: [] };
+    });
+
+    await handleAgentTurn({ userId: 'u1', phone: '+57300', body: 'con Nequi' });
+
+    expect(mockedDispararAlertas).toHaveBeenCalledWith(expect.anything(), {
+      userId: 'u1',
+      monthYear: expect.any(String),
+      budgetItemIds: ['item-dulces', 'item-carnes'],
+      hoy: expect.any(Date),
+    });
+    const mensaje = mockedSendWhatsAppMessage.mock.calls[0][1];
+    expect(mensaje).toContain('⚠️ Vas en 82% de Dulces.');
+  });
 });
 
 // Task 10: sin guardar `last_entity` tras registrar un gasto, "no, eran 30

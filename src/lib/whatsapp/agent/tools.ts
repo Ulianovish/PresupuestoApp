@@ -265,6 +265,8 @@ export interface ToolDeps {
     totalItems: number;
     /** Suma de lo que EFECTIVAMENTE quedó en `transactions` (ver I3). */
     totalAmount?: number;
+    /** Rubros que la clasificación asignó (sin duplicados), para disparar alertas. */
+    budgetItemIds?: string[];
     error?: string;
   }>;
   correctLast: (
@@ -283,11 +285,16 @@ export interface ToolDeps {
     /** true si el período lo puso el default (mes en curso), no el modelo. */
     mesEnCurso: boolean;
   }>;
-  /** Se llama tras cada gasto creado. Enganche para las alertas de presupuesto. */
+  /**
+   * Se llama tras cada gasto creado, con los rubros que tocó. Es una LISTA
+   * porque una factura toca varios (2,7 en promedio): llamar una vez por rubro
+   * haría un round trip a Supabase por cada uno y partiría el aviso en varios
+   * mensajes, en vez del único que junta todo.
+   */
   onExpenseCreated: (e: {
     categoria: string;
-    budgetItemId: string | null;
-  }) => Promise<void>;
+    budgetItemIds: string[];
+  }) => Promise<string[]>;
 }
 
 /**
@@ -346,7 +353,7 @@ export async function executeTool(
       try {
         await deps.onExpenseCreated({
           categoria: res.category,
-          budgetItemId: res.budgetItemId ?? null,
+          budgetItemIds: res.budgetItemId ? [res.budgetItemId] : [],
         });
       } catch (errAlerta) {
         console.error(
@@ -371,6 +378,23 @@ export async function executeTool(
       }
       const res = await deps.registerInvoice(resolucion.cuenta);
       if (res.ok) {
+        // Best-effort, igual que en registrar_gasto: los gastos de la factura
+        // YA están escritos. Si la alerta falla, no puede convertir esto en un
+        // "no se pudo guardar" que empuje al modelo a registrarla de nuevo.
+        const rubros = res.budgetItemIds ?? [];
+        if (rubros.length > 0) {
+          try {
+            await deps.onExpenseCreated({
+              categoria: 'FACTURA',
+              budgetItemIds: rubros,
+            });
+          } catch (errAlerta) {
+            console.error(
+              'executeTool(registrar_factura): onExpenseCreated falló:',
+              errAlerta,
+            );
+          }
+        }
         // El total que se confirma es el que EFECTIVAMENTE se registró (suma
         // de los ítems), no el de la cabecera de la factura: con descuentos o
         // redondeos difieren y el usuario ve un número que no está en la app.
