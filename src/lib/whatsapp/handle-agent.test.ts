@@ -63,6 +63,7 @@ describe('handleAgentMessage', () => {
         itemsFound: 3,
         totalItems: 3,
         budgetItemIds: ['item-mercado'],
+        monthYear: '2026-08',
       })),
       onExpenseCreated: vi.fn(async () => ['⚠️ Vas en 90% de Mercado.']),
     });
@@ -74,6 +75,8 @@ describe('handleAgentMessage', () => {
     expect(deps.onExpenseCreated).toHaveBeenCalledWith({
       categoria: 'FACTURA',
       budgetItemIds: ['item-mercado'],
+      // Mes DE LA FACTURA (lo que devuelve `registerInvoice`), no el de hoy.
+      monthYear: '2026-08',
     });
     expect(deps.sendMessage).toHaveBeenCalledTimes(1);
     expect(deps.sendMessage).toHaveBeenCalledWith(
@@ -219,6 +222,63 @@ describe('handleAgentMessage', () => {
     expect(mensaje).toMatch(/mano en gastos/i);
     expect(mensaje).toMatch(/no vuelvas a mandar el cufe/i);
     expect(mensaje).not.toMatch(/facturas sin completar/i);
+  });
+
+  it('cufe cuyo registro falla a mitad de camino: los ítems que SÍ quedaron con rubro también avisan al enganche', async () => {
+    // El hallazgo crítico: esos ítems ya son transacciones reales con rubro
+    // asignado. Que el registro haya quedado a medias no los excluye de las
+    // alertas de presupuesto.
+    const deps = makeDeps({
+      registerInvoice: vi.fn(async () => ({
+        ok: false,
+        itemsFound: 3,
+        totalItems: 8,
+        budgetItemIds: ['item-mercado'],
+        monthYear: '2026-08',
+        error: 'boom',
+      })),
+      onExpenseCreated: vi.fn(async () => ['⚠️ Vas en 90% de Mercado.']),
+    });
+    await handleAgentMessage(
+      'cufe',
+      { userId: 'u1', phone: '+57300', body: `${CUFE} con la Nequi`, existingPendingId: null },
+      deps,
+    );
+    expect(deps.onExpenseCreated).toHaveBeenCalledWith({
+      categoria: 'FACTURA',
+      budgetItemIds: ['item-mercado'],
+      monthYear: '2026-08',
+    });
+    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as string;
+    expect(mensaje).toContain('⚠️ Vas en 90% de Mercado.');
+  });
+
+  it('si el enganche del CUFE lanza, la factura igual queda confirmada', async () => {
+    // Mismo criterio que el resto de los caminos: los gastos de la factura
+    // YA están escritos, una alerta que falla no puede convertir esto en un
+    // "no pude guardar".
+    const deps = makeDeps({
+      registerInvoice: vi.fn(async () => ({
+        ok: true,
+        itemsFound: 3,
+        totalItems: 3,
+        budgetItemIds: ['item-mercado'],
+        monthYear: '2026-08',
+      })),
+      onExpenseCreated: vi.fn(async () => {
+        throw new Error('Supabase caído');
+      }),
+    });
+    await handleAgentMessage(
+      'cufe',
+      { userId: 'u1', phone: '+57300', body: `${CUFE} con la Nequi`, existingPendingId: null },
+      deps,
+    );
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringMatching(/✅ Registré tu factura/),
+    );
   });
 
   it('cufe error → avisa el error', async () => {
