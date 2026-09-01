@@ -214,8 +214,8 @@ describe('executeTool', () => {
   it('avisa al llamador del gasto creado, para poder disparar alertas después', async () => {
     let avisado = '';
     const deps = depsFalsas({
-      onExpenseCreated: async cat => {
-        avisado = cat;
+      onExpenseCreated: async e => {
+        avisado = e.categoria;
       },
     });
     await executeTool(
@@ -224,6 +224,31 @@ describe('executeTool', () => {
       deps,
     );
     expect(avisado).toBe('MERCADO');
+  });
+
+  it('le pasa el rubro al enganche de alertas, no solo la categoría', async () => {
+    let recibido: { categoria: string; budgetItemId: string | null } | null =
+      null;
+    const deps = depsFalsas({
+      createExpense: async () => ({
+        ok: true as const,
+        category: 'MERCADO',
+        transactionId: 't1',
+        budgetItemId: 'item-1',
+      }),
+      onExpenseCreated: async (e: {
+        categoria: string;
+        budgetItemId: string | null;
+      }) => {
+        recibido = e;
+      },
+    });
+    await executeTool(
+      'registrar_gasto',
+      { monto: 8500, descripcion: 'chocolatina' },
+      deps,
+    );
+    expect(recibido).toEqual({ categoria: 'MERCADO', budgetItemId: 'item-1' });
   });
 
   it('devuelve un error legible si la herramienta no existe', async () => {

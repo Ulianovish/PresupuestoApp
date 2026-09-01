@@ -6,11 +6,12 @@
  */
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 import ConfirmModal from '@/components/atoms/ConfirmModal/ConfirmModal';
 import Toast from '@/components/atoms/Toast/Toast';
 import type { BudgetFormData } from '@/components/molecules/BudgetFormFields/BudgetFormFields';
+import BudgetAlertsPanel from '@/components/organisms/BudgetAlertsPanel/BudgetAlertsPanel';
 import BudgetHeader from '@/components/organisms/BudgetHeader/BudgetHeader';
 import BudgetItemModal from '@/components/organisms/BudgetItemModal/BudgetItemModal';
 import BudgetStatusPanels from '@/components/organisms/BudgetStatusPanels/BudgetStatusPanels';
@@ -22,12 +23,21 @@ import { useMonth } from '@/contexts/MonthContext';
 import { useMonthlyBudget } from '@/hooks/useMonthlyBudget';
 import { deleteCategory, updateCategory } from '@/lib/actions/categories';
 import {
+  mapRubroEstado,
+  rubrosEnRiesgo,
+  type RubroEstado,
+} from '@/lib/budget/alerts';
+import {
   formatCurrency,
   getClassifications,
   getControls,
   getItemNameSuggestions,
 } from '@/lib/services/budget';
 import { obtenerDeudas, type Deuda } from '@/lib/services/ingresos-deudas';
+import { createClient } from '@/lib/supabase/client';
+import { hoyBogotaDate, todayBogota } from '@/lib/whatsapp/format';
+
+const supabase = createClient();
 
 // Interfaces para tipos de datos
 interface ModalState {
@@ -95,6 +105,53 @@ export default function PresupuestoPage() {
     loadLookups();
   }, []);
 
+  // Estado de los rubros del mes para el panel de alertas de presupuesto.
+  const [estadoRubros, setEstadoRubros] = useState<RubroEstado[]>([]);
+
+  // Trae el estado de rubros de un mes puntual, sin tocar el estado de React:
+  // así lo puede llamar tanto el useEffect (con su propio guard de
+  // cancelación) como refreshEstadoRubros (los refrescos manuales).
+  const fetchEstadoRubros = useCallback(
+    async (month: string): Promise<RubroEstado[]> => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data, error } = await supabase.rpc('get_budget_alert_status', {
+        p_user_id: user.id,
+        p_month_year: month,
+      });
+      if (error) {
+        console.error('Error obteniendo estado de rubros:', error);
+        return [];
+      }
+      return (data ?? []).map(mapRubroEstado);
+    },
+    [],
+  );
+
+  // Recarga el panel de alertas. Se llama en los mismos puntos donde se llama
+  // refreshBudget (ver refreshBudgetAndAlertas más abajo): sin esto, asignar
+  // un gasto desde UnclassifiedExpensesPanel, guardar "Nunca avisar" en un
+  // rubro, o el botón de refrescar del header no movían el panel hasta
+  // recargar la página entera.
+  const refreshEstadoRubros = useCallback(async () => {
+    setEstadoRubros(await fetchEstadoRubros(selectedMonth));
+  }, [selectedMonth, fetchEstadoRubros]);
+
+  useEffect(() => {
+    // Ante un cambio rápido de mes, una respuesta tardía del mes viejo no
+    // puede pisar la del mes nuevo que ya se pidió después.
+    let cancelado = false;
+    fetchEstadoRubros(selectedMonth).then(estado => {
+      if (!cancelado) setEstadoRubros(estado);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [selectedMonth, fetchEstadoRubros]);
+
   // Estado del modal de categoría
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
@@ -109,9 +166,17 @@ export default function PresupuestoPage() {
   // Estado para copiar el mes anterior (evita duplicados por reentrada/doble copia)
   const [isCopying, setIsCopying] = useState(false);
 
+  // Recarga presupuesto y panel de alertas juntos: usar esta función en todo
+  // punto que hoy dispararía refreshBudget, para que el panel de "Presupuestos
+  // en riesgo" nunca quede desactualizado respecto a la tabla.
+  const refreshBudgetAndAlertas = async () => {
+    await refreshBudget();
+    await refreshEstadoRubros();
+  };
+
   const handleCategoryCreated = async () => {
     await refreshCategories();
-    await refreshBudget();
+    await refreshBudgetAndAlertas();
   };
 
   // Estado del modal
@@ -148,6 +213,7 @@ export default function PresupuestoPage() {
     presupuestado: 0,
     real: 0,
     deuda_id: null,
+    alertsEnabled: null,
   });
 
   const openAddModal = (categoriaId: string) => {
@@ -165,6 +231,7 @@ export default function PresupuestoPage() {
       presupuestado: 0,
       real: 0,
       deuda_id: null,
+      alertsEnabled: null,
     });
   };
 
@@ -179,6 +246,7 @@ export default function PresupuestoPage() {
       presupuestado: number;
       real: number;
       deuda_id?: string | null;
+      alertsEnabled?: boolean | null;
     },
     chainedEditing: boolean = false,
   ) => {
@@ -203,6 +271,7 @@ export default function PresupuestoPage() {
       presupuestado: item.presupuestado,
       real: item.real,
       deuda_id: item.deuda_id || null,
+      alertsEnabled: item.alertsEnabled ?? null,
     });
   };
 
@@ -265,6 +334,13 @@ export default function PresupuestoPage() {
           if (editedItemCategory && !editedItemCategory.expanded) {
             toggleCategory(editedItemCategory.id);
           }
+
+          // addBudgetItem/editBudgetItem solo tocan el estado local de
+          // `categories` (optimista, sin round-trip): sin esto, cambiar
+          // "Nunca avisar" en el modal y guardar dejaba el renglón del panel
+          // de alertas desactualizado (rojo o verde según lo que decía ANTES
+          // de guardar) hasta recargar la página entera.
+          await refreshEstadoRubros();
 
           showToast('Item guardado exitosamente');
 
@@ -352,6 +428,9 @@ export default function PresupuestoPage() {
         if (modalState.isOpen && modalState.item?.id === id) {
           closeModal();
         }
+        // Un rubro eliminado no puede seguir apareciendo en el panel de
+        // alertas hasta recargar la página.
+        await refreshEstadoRubros();
       } else {
         showToast('Error al eliminar el item', 'error');
       }
@@ -360,7 +439,7 @@ export default function PresupuestoPage() {
       if (result.success) {
         showToast('Categoría eliminada');
         await refreshCategories();
-        await refreshBudget();
+        await refreshBudgetAndAlertas();
       } else {
         showToast(result.error || 'Error al eliminar la categoría', 'error');
       }
@@ -375,7 +454,12 @@ export default function PresupuestoPage() {
       const success = await editBudgetItem(itemId, updates);
       if (!success) {
         showToast('Error al actualizar', 'error');
+        return;
       }
+      // Cambiar la clasificación puede cambiar si el rubro se vigila
+      // automáticamente (con alertsEnabled null, "Variable" vigila y el resto
+      // no): el panel necesita el mismo refresco que handleSave.
+      await refreshEstadoRubros();
     } catch {
       showToast('Error al actualizar', 'error');
     }
@@ -388,7 +472,7 @@ export default function PresupuestoPage() {
     if (result.success) {
       showToast('Nombre de categoría actualizado');
       await refreshCategories();
-      await refreshBudget();
+      await refreshBudgetAndAlertas();
     } else {
       showToast(result.error || 'Error al renombrar la categoría', 'error');
     }
@@ -480,6 +564,12 @@ export default function PresupuestoPage() {
             presupuestado: item.presupuestado,
             real: 0,
             deuda_id: item.deuda_id || null,
+            // Sin esto, createBudgetItem lo crea como `null` (automático) y el
+            // ítem copiado pierde el override de alertas del mes anterior
+            // ("Nunca avisar" vuelve a avisar, o viceversa). Mismo modo de
+            // falla que se arregló en getBudgetByMonth (Task 8), por este otro
+            // camino de escritura.
+            alertsEnabled: item.alertsEnabled ?? null,
           });
           itemsCopied++;
         }
@@ -490,7 +580,7 @@ export default function PresupuestoPage() {
           ? `Se copiaron ${itemsCopied} items (${itemsOmitidos} omitidos por nombre repetido)`
           : `Se copiaron ${itemsCopied} items del mes anterior`,
       );
-      await refreshBudget();
+      await refreshBudgetAndAlertas();
     } catch (err) {
       console.error('Error copiando mes anterior:', err);
       showToast('Error al copiar el mes anterior', 'error');
@@ -548,6 +638,16 @@ export default function PresupuestoPage() {
   const selectedMonthLabel =
     monthOptions.find(m => m.value === selectedMonth)?.label || selectedMonth;
 
+  // El panel de alertas solo tiene sentido para el mes EN CURSO: "días que
+  // faltan del mes" y "excedido" son preguntas sobre un mes que sigue
+  // corriendo. selectedMonth se persiste en localStorage y el selector ofrece
+  // cualquier mes, así que sin este chequeo alguien que dejó la app abierta en
+  // un mes viejo (o mira uno futuro) vería el conteo de días de HOY aplicado a
+  // un mes que no es ese — p. ej. los excedidos de agosto con "Quedan $63.000
+  // para 9 días", que son los días de septiembre. No se pinta nada para otro
+  // mes en vez de arriesgar ese mensaje engañoso.
+  const esMesEnCurso = selectedMonth === todayBogota().slice(0, 7);
+
   // Preparar deudas para el selector del modal
   const deudasOptions = deudas
     .filter(d => !d.pagada)
@@ -559,7 +659,7 @@ export default function PresupuestoPage() {
         header={
           <BudgetHeader
             selectedMonth={selectedMonth}
-            onRefresh={refreshBudget}
+            onRefresh={refreshBudgetAndAlertas}
             isLoading={isLoading}
             monthOptions={monthOptions}
             onCopyPreviousMonth={handleCopyPreviousMonth}
@@ -579,9 +679,15 @@ export default function PresupuestoPage() {
         budgetTable={
           !isLoading && categories.length > 0 ? (
             <>
+              {esMesEnCurso && (
+                <BudgetAlertsPanel
+                  alertas={rubrosEnRiesgo(estadoRubros)}
+                  hoy={hoyBogotaDate()}
+                />
+              )}
               <UnclassifiedExpensesPanel
                 monthYear={selectedMonth}
-                onChanged={refreshBudget}
+                onChanged={refreshBudgetAndAlertas}
               />
               <BudgetTable
                 categories={categories}

@@ -13,6 +13,10 @@ const UpdateBudgetItemSchema = z.object({
   clasificacion: z.string().optional(),
   control: z.string().optional(),
   deuda_id: z.string().uuid().nullable().optional(),
+  // Interruptor de alertas: null = automático por clasificación.
+  // Optional (puede faltar en el body) pero el valor en sí también puede ser
+  // null a propósito, así que se distingue con `!== undefined` más abajo.
+  alertsEnabled: z.boolean().nullable().optional(),
 });
 
 /**
@@ -56,6 +60,7 @@ export async function PATCH(
       classification_id?: string;
       control_id?: string;
       deuda_id?: string | null;
+      alerts_enabled?: boolean | null;
     } = {};
 
     if (validatedData.descripcion !== undefined) {
@@ -72,6 +77,11 @@ export async function PATCH(
     }
     if (validatedData.deuda_id !== undefined) {
       updateData.deuda_id = validatedData.deuda_id;
+    }
+    // OJO: comparar contra `undefined`, no truthy — `null` es un valor válido
+    // y a propósito (automático), distinto de no haber mandado el campo.
+    if (validatedData.alertsEnabled !== undefined) {
+      updateData.alerts_enabled = validatedData.alertsEnabled;
     }
 
     // Buscar IDs de clasificación y control por nombre
@@ -140,6 +150,7 @@ export async function PATCH(
       presupuestado: parseFloat(data.budgeted_amount) || 0,
       real: parseFloat(data.real_amount) || 0,
       deuda_id: data.deuda_id || null,
+      alertsEnabled: data.alerts_enabled ?? null,
     };
 
     return NextResponse.json({

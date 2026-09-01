@@ -15,6 +15,8 @@ const CreateBudgetItemSchema = z.object({
   presupuestado: z.number(),
   real: z.number(),
   deuda_id: z.string().uuid().nullable().optional(),
+  // Interruptor de alertas: null = automático por clasificación
+  alertsEnabled: z.boolean().nullable().optional(),
 });
 
 /**
@@ -94,6 +96,7 @@ export async function POST(request: NextRequest) {
         real_amount: validatedData.real,
         due_date: validatedData.fecha,
         deuda_id: validatedData.deuda_id || null,
+        alerts_enabled: validatedData.alertsEnabled ?? null,
       })
       .select()
       .single();
@@ -116,6 +119,7 @@ export async function POST(request: NextRequest) {
       presupuestado: parseFloat(data.budgeted_amount) || 0,
       real: parseFloat(data.real_amount) || 0,
       deuda_id: data.deuda_id || null,
+      alertsEnabled: data.alerts_enabled ?? null,
     };
 
     return NextResponse.json({

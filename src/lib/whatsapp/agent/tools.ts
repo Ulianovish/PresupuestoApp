@@ -198,7 +198,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           // 'item' es el ítem del presupuesto al que se imputa el gasto (lo
           // asigna la IA al registrarlo y a veces se equivoca). Corregirlo por
           // chat lo marca como manual, para que la reclasificación no lo pise.
-          enum: ['monto', 'descripcion', 'cuenta', 'categoria', 'item', 'fecha'],
+          enum: [
+            'monto',
+            'descripcion',
+            'cuenta',
+            'categoria',
+            'item',
+            'fecha',
+          ],
         },
         valor: { type: 'string', description: 'El valor nuevo, como texto.' },
       },
@@ -248,6 +255,8 @@ export interface ToolDeps {
     ok: boolean;
     category: string;
     transactionId?: string;
+    /** Rubro de presupuesto al que quedó asignado el gasto, si alguno. */
+    budgetItemId?: string | null;
     error?: string;
   }>;
   registerInvoice: (accountName: string) => Promise<{
@@ -275,7 +284,10 @@ export interface ToolDeps {
     mesEnCurso: boolean;
   }>;
   /** Se llama tras cada gasto creado. Enganche para las alertas de presupuesto. */
-  onExpenseCreated: (categoria: string) => Promise<void>;
+  onExpenseCreated: (e: {
+    categoria: string;
+    budgetItemId: string | null;
+  }) => Promise<void>;
 }
 
 /**
@@ -328,11 +340,14 @@ export async function executeTool(
         };
 
       // Best-effort: el gasto YA está guardado. Si el enganche de alertas
-      // (futuro) lanza, no puede convertir un gasto real en un "no se pudo
-      // guardar" que empuje al modelo a reintentar y duplicarlo (mismo
+      // (onExpenseCreated) lanza, no puede convertir un gasto real en un "no
+      // se pudo guardar" que empuje al modelo a reintentar y duplicarlo (mismo
       // criterio que la asignación de ítem de presupuesto en createDirectExpense).
       try {
-        await deps.onExpenseCreated(res.category);
+        await deps.onExpenseCreated({
+          categoria: res.category,
+          budgetItemId: res.budgetItemId ?? null,
+        });
       } catch (errAlerta) {
         console.error(
           'executeTool(registrar_gasto): onExpenseCreated falló:',

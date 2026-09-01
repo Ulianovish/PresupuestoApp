@@ -79,6 +79,7 @@ export type Database = {
       };
       budget_items: {
         Row: {
+          alerts_enabled: boolean | null;
           budgeted_amount: number;
           category_id: string;
           classification_id: string;
@@ -97,6 +98,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          alerts_enabled?: boolean | null;
           budgeted_amount?: number;
           category_id: string;
           classification_id: string;
@@ -115,6 +117,7 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          alerts_enabled?: boolean | null;
           budgeted_amount?: number;
           category_id?: string;
           classification_id?: string;
@@ -677,6 +680,7 @@ export type Database = {
       get_budget_by_month: {
         Args: { p_month_year: string; p_user_id: string };
         Returns: {
+          alerts_enabled: boolean | null;
           budgeted_amount: number;
           category_color: string;
           category_icon: string;

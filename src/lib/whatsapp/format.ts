@@ -27,3 +27,19 @@ export function todayBogota(): string {
 export function primerDiaDelMes(ymd: string): string {
   return `${ymd.slice(0, 7)}-01`;
 }
+
+/**
+ * "Hoy" en Bogotá como `Date` local (medianoche), para cálculos que necesitan
+ * un objeto `Date` (p. ej. `diasRestantesDelMes`). NO usar `new Date()`: en
+ * producción el server corre en UTC, así que entre las 7pm y la medianoche
+ * hora Colombia ya está en el día siguiente.
+ *
+ * Construida a partir de `todayBogota()` a propósito: esta duplicación
+ * (`hoyBogota` del turno del agente + `todayYmd` del webhook) ya existió una
+ * vez y se eliminó por riesgo de que las dos definiciones divergieran. No
+ * reintroducirla — este es el único lugar donde se arma el `Date`.
+ */
+export function hoyBogotaDate(): Date {
+  const [aa, mm, dd] = todayBogota().split('-').map(Number);
+  return new Date(aa, mm - 1, dd);
+}

@@ -19,6 +19,12 @@ export interface BudgetFormData {
   presupuestado: number;
   real: number;
   deuda_id?: string | null;
+  /**
+   * Interruptor de alertas de presupuesto para este rubro.
+   * `null` = automático (sigue la clasificación: Variable vigila).
+   * `true`/`false` = override explícito del usuario, manda sobre la clasificación.
+   */
+  alertsEnabled: boolean | null;
 }
 
 interface LookupItem {
@@ -349,6 +355,36 @@ export default function BudgetFormFields({
           </select>
         </div>
       )}
+
+      {/* Interruptor de alertas de presupuesto: select de tres estados porque
+          `null` (automático por clasificación) es un valor que hay que poder
+          volver a elegir, no solo true/false */}
+      <div className="space-y-2">
+        <Label className="text-white">Alertas de presupuesto</Label>
+        <select
+          value={
+            formData.alertsEnabled === null
+              ? 'auto'
+              : String(formData.alertsEnabled)
+          }
+          onChange={e =>
+            onFormDataChange(prev => ({
+              ...prev,
+              alertsEnabled:
+                e.target.value === 'auto' ? null : e.target.value === 'true',
+            }))
+          }
+          className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="auto">Automático (según clasificación)</option>
+          <option value="true">Siempre avisar</option>
+          <option value="false">Nunca avisar</option>
+        </select>
+        <p className="text-xs text-gray-400">
+          En automático se vigilan los rubros Variable, que son los que se
+          deciden compra a compra.
+        </p>
+      </div>
     </div>
   );
 }
