@@ -238,6 +238,43 @@ describe('createInvoiceDirect', () => {
     expect(res.itemsFound).toBe(0);
     expect(rpc).not.toHaveBeenCalled();
   });
+
+  it('devuelve el mes DE LA FACTURA, no el de hoy: los budget_item_id son por mes', async () => {
+    // El hallazgo crítico: si el llamador comparara las alertas contra el mes
+    // de hoy en vez del de la factura, una factura vieja (o un CUFE que llega
+    // a principios del mes siguiente) nunca matchearía sus propios
+    // budget_item_id y la alerta no dispararía nunca, en silencio.
+    const rpc = vi.fn().mockResolvedValue({ data: 'tx-1', error: null });
+    const { from } = makeSupabaseMock({
+      row: invoiceRow({ invoice_date: '2026-07-03' }), // factura de un mes anterior
+      rpc,
+    });
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    const res = await createInvoiceDirect('user-1', 'inv-1', 'Nequi', {
+      classify: async () => [],
+    });
+
+    expect(res.monthYear).toBe('2026-07');
+  });
+
+  it('en un registro parcial, el mes devuelto también es el de la factura', async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({ data: 'tx-1', error: null }) // arroz: ok
+      .mockResolvedValueOnce({ data: null, error: { message: 'boom' } }); // leche: falla
+    const { from } = makeSupabaseMock({
+      row: invoiceRow({ invoice_date: '2026-07-03' }),
+      rpc,
+    });
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    const res = await createInvoiceDirect('user-1', 'inv-1', 'Nequi', {
+      classify: async () => [],
+    });
+
+    expect(res.monthYear).toBe('2026-07');
+  });
 });
 
 describe('getPendingInvoiceSummary', () => {

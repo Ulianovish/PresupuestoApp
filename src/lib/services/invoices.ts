@@ -274,6 +274,14 @@ export async function createInvoiceDirect(
   totalAmount: number;
   /** Rubros que la clasificación asignó (sin duplicados), para disparar alertas. */
   budgetItemIds: string[];
+  /**
+   * Mes DE LA FACTURA (`invoice_date`), no el de hoy: las alertas de
+   * presupuesto son por mes, así que el llamador tiene que compararlas contra
+   * este mes y no contra el actual. En los retornos tempranos de error
+   * `budgetItemIds` siempre viene vacío, así que este valor no se usa — queda
+   * en `''` en vez de inventar un mes que no se conoce.
+   */
+  monthYear: string;
   error?: string;
 }> {
   const supabase = createAdminClient();
@@ -293,6 +301,7 @@ export async function createInvoiceDirect(
       totalItems: 0,
       totalAmount: 0,
       budgetItemIds: [],
+      monthYear: '',
       error: 'Factura no encontrada.',
     };
   }
@@ -305,6 +314,7 @@ export async function createInvoiceDirect(
       totalItems: typed.items?.length ?? 0,
       totalAmount: 0,
       budgetItemIds: [],
+      monthYear: '',
       error: `La factura ya está en estado "${typed.status}"; no se vuelve a registrar.`,
     };
   }
@@ -367,6 +377,10 @@ export async function createInvoiceDirect(
         totalItems: items.length,
         totalAmount: totalRegistrado,
         budgetItemIds,
+        // El mes de la factura, no el de hoy (ver el campo en la firma):
+        // estos ítems YA son transacciones reales y también deben poder
+        // disparar sus alertas.
+        monthYear: fecha.slice(0, 7),
         error: mensaje,
       };
     }
@@ -408,6 +422,8 @@ export async function createInvoiceDirect(
     totalItems: items.length,
     totalAmount: totalRegistrado,
     budgetItemIds,
+    // El mes de la factura, no el de hoy (ver el campo en la firma).
+    monthYear: fecha.slice(0, 7),
   };
 }
 
