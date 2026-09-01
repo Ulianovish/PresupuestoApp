@@ -200,6 +200,28 @@ describe('handleAgentTurn', () => {
     expect(mensaje).toContain('⚠️ Vas en 95% de Transporte.');
   });
 
+  it('modo degradado: si el enganche de alertas lanza, el gasto igual queda confirmado', async () => {
+    // Mismo criterio que el resto de los caminos: el gasto YA está guardado,
+    // una alerta que falla no puede convertir esto en un error que sugiera
+    // reintentar (y duplicar el gasto).
+    mockedRunAgent.mockResolvedValue({
+      kind: 'service_error',
+      huboEscrituras: false,
+    });
+    mockedCreateDirectExpense.mockResolvedValue({
+      ok: true,
+      category: 'TRANSPORTE',
+      transactionId: 'tx-1',
+      budgetItemId: 'item-taxi',
+    });
+    mockedDispararAlertas.mockRejectedValue(new Error('Supabase caído'));
+
+    await handleAgentTurn({ userId: 'u1', phone: '+57300', body: '20k taxi' });
+
+    const mensaje = mockedSendWhatsAppMessage.mock.calls[0][1];
+    expect(mensaje).toMatch(/✅ Anotado/);
+  });
+
   it('Gateway caído + parser que no acierta: mensaje honesto, no culpa al usuario', async () => {
     mockedRunAgent.mockResolvedValue({
       kind: 'service_error',
@@ -396,6 +418,7 @@ describe('handleAgentTurn — registrar_factura', () => {
       totalItems: 1,
       totalAmount: 8000,
       budgetItemIds: [],
+      monthYear: '2026-08',
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
       const out = await deps.executeTool('registrar_factura', {
@@ -426,6 +449,7 @@ describe('handleAgentTurn — registrar_factura', () => {
       totalItems: 5,
       totalAmount: 3000,
       budgetItemIds: [],
+      monthYear: '2026-08',
       error: 'boom',
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
@@ -468,6 +492,7 @@ describe('handleAgentTurn — registrar_factura', () => {
       totalItems: 1,
       totalAmount: 8000,
       budgetItemIds: [],
+      monthYear: '2026-08',
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
       await deps.executeTool('registrar_factura', { cuenta: 'Nequi' });
@@ -500,6 +525,7 @@ describe('handleAgentTurn — registrar_factura', () => {
       totalItems: 1,
       totalAmount: 8000,
       budgetItemIds: [],
+      monthYear: '2026-08',
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
       await deps.executeTool('registrar_factura', { cuenta: 'Nequi' });
@@ -530,6 +556,7 @@ describe('handleAgentTurn — registrar_factura', () => {
       totalItems: 2,
       totalAmount: 84000,
       budgetItemIds: ['item-dulces', 'item-carnes'],
+      monthYear: '2026-08',
     });
     mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
       const out = await deps.executeTool('registrar_factura', {
@@ -542,12 +569,43 @@ describe('handleAgentTurn — registrar_factura', () => {
 
     expect(mockedDispararAlertas).toHaveBeenCalledWith(expect.anything(), {
       userId: 'u1',
-      monthYear: expect.any(String),
+      monthYear: '2026-08',
       budgetItemIds: ['item-dulces', 'item-carnes'],
       hoy: expect.any(Date),
     });
     const mensaje = mockedSendWhatsAppMessage.mock.calls[0][1];
     expect(mensaje).toContain('⚠️ Vas en 82% de Dulces.');
+  });
+
+  it('una factura de un mes ANTERIOR dispara la alerta con el mes de la factura, no con el de hoy', async () => {
+    // El hallazgo crítico: `get_budget_alert_status` filtra por
+    // `bt.month_year = p_month_year`. Si acá se colara "hoy" (estamos en
+    // 2026-09 según el reloj del sistema), una factura de julio comparada
+    // contra septiembre nunca matchea sus propios budget_item_id y
+    // `dispararAlertas` devuelve `[]` en silencio, sin que nadie se entere.
+    mockedDispararAlertas.mockResolvedValue(['⚠️ Vas en 82% de Dulces.']);
+    mockedCreateInvoiceDirect.mockResolvedValue({
+      ok: true,
+      itemsFound: 1,
+      totalItems: 1,
+      totalAmount: 8000,
+      budgetItemIds: ['item-dulces'],
+      // Factura de julio, llegada (p. ej.) a principios de agosto por CUFE.
+      monthYear: '2026-07',
+    });
+    mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
+      const out = await deps.executeTool('registrar_factura', {
+        cuenta: 'Nequi',
+      });
+      return { text: out.summary, calls: [] };
+    });
+
+    await handleAgentTurn({ userId: 'u1', phone: '+57300', body: 'con Nequi' });
+
+    expect(mockedDispararAlertas).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ monthYear: '2026-07' }),
+    );
   });
 });
 

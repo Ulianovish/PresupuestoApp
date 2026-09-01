@@ -18,7 +18,7 @@ import {
   queryExpenseTotal,
 } from '@/lib/services/whatsapp-queries';
 import { createAdminClient } from '@/lib/supabase/server';
-import { dispararAlertasWhatsapp } from '@/lib/whatsapp/alerts';
+import { dispararAlertasWhatsapp, pegarAlertas } from '@/lib/whatsapp/alerts';
 import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
 import { parseQuickExpense } from '@/lib/whatsapp/quick-expense';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/transport';
@@ -101,17 +101,27 @@ async function intentarModoDegradado(
   // vacío en este punto —ninguna herramienta llegó a correr—, así que
   // concatenar acá y dejar que `conAlertas` sume un acumulador vacío da
   // exactamente el mismo resultado que empujar ahí; concatenar a mano cubre
-  // los dos call sites con una sola implementación.
+  // los dos call sites con una sola implementación. Esa garantía de "vacío"
+  // depende de un acoplamiento no local: el enganche (`onExpenseCreated`) solo
+  // se llama desde ramas de `executeTool` que TAMBIÉN marcan `wrote: true`
+  // (de donde sale `huboEscrituras`). Una herramienta futura que escriba y
+  // llame al enganche sin marcar `wrote` rompe esto en silencio.
+  //
+  // El mes de la alerta es el de HOY, explícito (no un default oculto):
+  // `parseQuickExpense` no reconoce fechas, así que este camino SIEMPRE
+  // registra con la fecha de hoy (ver `date: todayBogota()` arriba) y no hay
+  // otro mes posible que pasarle.
   let alertas: string[] = [];
   try {
     alertas = await dispararAlertasWhatsapp(
       ctx.userId,
       res.budgetItemId ? [res.budgetItemId] : [],
+      todayBogota().slice(0, 7),
     );
   } catch (errAlerta) {
     console.error('intentarModoDegradado: dispararAlertasWhatsapp falló:', errAlerta);
   }
-  return alertas.length > 0 ? `${base}\n\n${alertas.join('\n\n')}` : base;
+  return pegarAlertas(base, alertas);
 }
 
 /**
@@ -271,7 +281,11 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
     },
     queryExpenses: async q => queryExpenseTotal(ctx.userId, q),
     onExpenseCreated: async e => {
-      const msgs = await dispararAlertasWhatsapp(ctx.userId, e.budgetItemIds);
+      const msgs = await dispararAlertasWhatsapp(
+        ctx.userId,
+        e.budgetItemIds,
+        e.monthYear,
+      );
       alertasPendientes.push(...msgs);
       return msgs;
     },
@@ -296,10 +310,7 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
 
   // Las alertas disparadas por `onExpenseCreated` durante el turno se pegan al
   // final de la respuesta (ver el acumulador `alertasPendientes` más arriba).
-  const conAlertas = (texto: string) =>
-    alertasPendientes.length > 0
-      ? `${texto}\n\n${alertasPendientes.join('\n\n')}`
-      : texto;
+  const conAlertas = (texto: string) => pegarAlertas(texto, alertasPendientes);
 
   // Gateway caído: no es culpa del usuario. Se intenta el parser viejo antes de
   // rendirse — con el LLM abajo, "20k taxi" se sigue registrando.
