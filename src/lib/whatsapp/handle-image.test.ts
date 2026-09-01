@@ -18,6 +18,7 @@ function makeDeps(overrides = {}) {
     })),
     savePending: vi.fn(async () => {}),
     registerInvoice: vi.fn(async () => ({ ok: true, itemsFound: 2, totalItems: 2 })),
+    onExpenseCreated: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -133,6 +134,87 @@ describe('handleImageMessage', () => {
       'u1',
       '+57300',
       expect.objectContaining({ accountName: 'Nequi' }),
+    );
+  });
+
+  it('la foto de una transferencia también dispara la alerta del rubro', async () => {
+    let recibido: string[] | null = null;
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'transfer',
+        amount: 50000,
+        date: '2026-06-11',
+        account: 'Nequi',
+        description: 'Juan',
+        confidence: 0.9,
+      })),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'MERCADO',
+        transactionId: 't1',
+        budgetItemId: 'item-dulces',
+      })),
+      onExpenseCreated: async (e: { budgetItemIds: string[] }) => {
+        recibido = e.budgetItemIds;
+        return [];
+      },
+    });
+    await handleImageMessage(ctx, deps);
+    expect(recibido).toEqual(['item-dulces']);
+  });
+
+  it('la alerta de la transferencia se pega al mismo mensaje, no manda uno aparte', async () => {
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'transfer',
+        amount: 50000,
+        date: '2026-06-11',
+        account: 'Nequi',
+        description: 'Juan',
+        confidence: 0.9,
+      })),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'MERCADO',
+        transactionId: 't1',
+        budgetItemId: 'item-dulces',
+      })),
+      onExpenseCreated: vi.fn(async () => ['⚠️ Vas en 82% de Dulces.']),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.sendMessage).toHaveBeenCalledTimes(1);
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringContaining('⚠️ Vas en 82% de Dulces.'),
+    );
+  });
+
+  it('si el enganche de la transferencia lanza, el gasto igual queda confirmado', async () => {
+    // Mismo criterio que executeTool: el gasto YA está guardado, una alerta
+    // que falla no puede convertir esto en un "no pude registrar".
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'transfer',
+        amount: 50000,
+        date: '2026-06-11',
+        account: 'Nequi',
+        description: 'Juan',
+        confidence: 0.9,
+      })),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'MERCADO',
+        transactionId: 't1',
+        budgetItemId: 'item-dulces',
+      })),
+      onExpenseCreated: vi.fn(async () => {
+        throw new Error('Supabase caído');
+      }),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringMatching(/✅ Registré/),
     );
   });
 

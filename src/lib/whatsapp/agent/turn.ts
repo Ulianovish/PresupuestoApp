@@ -3,8 +3,6 @@
 // cae a `parseQuickExpense` para no dejar al usuario sin nada: un gasto
 // simple se sigue registrando con el LLM caído.
 
-import { dispararAlertas } from '@/lib/budget/alerts';
-import { alertDepsSupabase } from '@/lib/budget/alerts-supabase';
 import {
   createInvoiceDirect,
   getPendingInvoiceSummary,
@@ -20,7 +18,8 @@ import {
   queryExpenseTotal,
 } from '@/lib/services/whatsapp-queries';
 import { createAdminClient } from '@/lib/supabase/server';
-import { formatCOP, hoyBogotaDate, todayBogota } from '@/lib/whatsapp/format';
+import { dispararAlertasWhatsapp } from '@/lib/whatsapp/alerts';
+import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
 import { parseQuickExpense } from '@/lib/whatsapp/quick-expense';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/transport';
 
@@ -250,13 +249,7 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
     },
     queryExpenses: async q => queryExpenseTotal(ctx.userId, q),
     onExpenseCreated: async e => {
-      if (e.budgetItemIds.length === 0) return []; // sin rubro no hay qué comparar
-      const msgs = await dispararAlertas(alertDepsSupabase(), {
-        userId: ctx.userId,
-        monthYear: todayBogota().slice(0, 7),
-        budgetItemIds: e.budgetItemIds,
-        hoy: hoyBogotaDate(),
-      });
+      const msgs = await dispararAlertasWhatsapp(ctx.userId, e.budgetItemIds);
       alertasPendientes.push(...msgs);
       return msgs;
     },

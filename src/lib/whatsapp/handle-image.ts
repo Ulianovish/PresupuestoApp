@@ -71,7 +71,23 @@ export interface ImageDeps {
     userId: string,
     phone: string,
     input: { amount: number; description: string; accountName: string; date: string },
-  ) => Promise<{ ok: boolean; category: string; error?: string }>;
+  ) => Promise<{
+    ok: boolean;
+    category: string;
+    error?: string;
+    /** Rubro de presupuesto asignado, si lo hubo (ver `onExpenseCreated`). */
+    budgetItemId?: string | null;
+  }>;
+  /**
+   * Se llama tras registrar el gasto, con el rubro que tocó (misma firma que
+   * `tools.ts`). Esta rama no tiene el acumulador `alertasPendientes` del
+   * agente: devuelve los mensajes de alerta para que se peguen al único
+   * mensaje que esta rama manda con `sendMessage`.
+   */
+  onExpenseCreated: (e: {
+    categoria: string;
+    budgetItemIds: string[];
+  }) => Promise<string[]>;
   /** Cuentas activas del usuario, para resolver con cuál se pagó una factura. */
   accounts: string[];
   /**
@@ -149,9 +165,22 @@ export async function handleImageMessage(
       date: result.date ?? deps.today(),
     });
     if (res.ok) {
+      // Best-effort: el gasto YA está guardado (mismo criterio que executeTool).
+      // La alerta se pega al mismo mensaje, no va como uno aparte: acá no hay
+      // acumulador porque esta rama responde por su cuenta.
+      let alertas: string[] = [];
+      try {
+        alertas = await deps.onExpenseCreated({
+          categoria: res.category,
+          budgetItemIds: res.budgetItemId ? [res.budgetItemId] : [],
+        });
+      } catch (errAlerta) {
+        console.error('handleImage(transfer): onExpenseCreated falló:', errAlerta);
+      }
+      const base = `✅ Registré ${formatCOP(result.amount)} en ${res.category} (${accountName}). Si algo está mal, edítalo en la app.`;
       await deps.sendMessage(
         ctx.phone,
-        `✅ Registré ${formatCOP(result.amount)} en ${res.category} (${accountName}). Si algo está mal, edítalo en la app.`,
+        alertas.length > 0 ? `${base}\n\n${alertas.join('\n\n')}` : base,
       );
     } else {
       await deps.sendMessage(
