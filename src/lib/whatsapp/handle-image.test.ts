@@ -258,6 +258,7 @@ describe('handleImageMessage', () => {
         totalItems: 1,
         totalAmount: 6000,
         budgetItemIds: ['item-mercado'],
+        monthYear: '2026-06',
       })),
       onExpenseCreated: vi.fn(async () => ['⚠️ Vas en 90% de Mercado.']),
     });
@@ -265,12 +266,83 @@ describe('handleImageMessage', () => {
     expect(deps.onExpenseCreated).toHaveBeenCalledWith({
       categoria: 'FACTURA',
       budgetItemIds: ['item-mercado'],
+      // Mes DE LA FACTURA (lo que devuelve `registerInvoice`), no el de hoy.
+      monthYear: '2026-06',
     });
     expect(deps.sendMessage).toHaveBeenCalledTimes(1);
     expect(deps.sendMessage).toHaveBeenCalledWith(
       '+57300',
       expect.stringContaining('⚠️ Vas en 90% de Mercado.'),
     );
+  });
+
+  it('si el enganche del recibo lanza, la factura igual queda confirmada', async () => {
+    // Mismo criterio que la rama de transferencia: los gastos de la factura
+    // YA están escritos, una alerta que falla no puede convertir esto en un
+    // "no pude registrar".
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'receipt',
+        supplier: 'D1',
+        date: '2026-06-12',
+        items: [{ description: 'Arroz', amount: 6000 }],
+        total: 6000,
+        confidence: 0.8,
+      })),
+      registerInvoice: vi.fn(async () => ({
+        ok: true,
+        itemsFound: 1,
+        totalItems: 1,
+        totalAmount: 6000,
+        budgetItemIds: ['item-mercado'],
+        monthYear: '2026-06',
+      })),
+      onExpenseCreated: vi.fn(async () => {
+        throw new Error('Supabase caído');
+      }),
+    });
+    await handleImageMessage({ ...ctx, body: 'pagué con Nequi' }, deps);
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringMatching(/✅ Registré tu factura/),
+    );
+  });
+
+  it('recibo cuyo registro falla a mitad de camino: los ítems que SÍ quedaron con rubro también avisan al enganche', async () => {
+    // El hallazgo crítico: esos ítems ya son transacciones reales con rubro
+    // asignado. Que el registro haya quedado a medias no los excluye de las
+    // alertas de presupuesto.
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'receipt',
+        supplier: 'D1',
+        date: '2026-06-12',
+        items: [
+          { description: 'arroz', amount: 5000 },
+          { description: 'leche', amount: 3000 },
+        ],
+        total: 8000,
+        confidence: 0.8,
+      })),
+      registerInvoice: vi.fn(async () => ({
+        ok: false,
+        itemsFound: 1,
+        totalItems: 2,
+        budgetItemIds: ['item-mercado'],
+        monthYear: '2026-06',
+        error: 'boom',
+      })),
+      onExpenseCreated: vi.fn(async () => ['⚠️ Vas en 90% de Mercado.']),
+    });
+    await handleImageMessage({ ...ctx, body: 'con Nequi' }, deps);
+    expect(deps.onExpenseCreated).toHaveBeenCalledWith({
+      categoria: 'FACTURA',
+      budgetItemIds: ['item-mercado'],
+      monthYear: '2026-06',
+    });
+    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as string;
+    expect(mensaje).toContain('⚠️ Vas en 90% de Mercado.');
   });
 
   it('recibo → se persiste SIEMPRE como borrador, antes de decidir si hay que preguntar', async () => {
