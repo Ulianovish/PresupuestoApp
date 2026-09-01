@@ -171,6 +171,35 @@ describe('handleAgentTurn', () => {
     });
   });
 
+  it('modo degradado (Gateway caído, sin escrituras previas) también dispara la alerta del rubro', async () => {
+    // A diferencia de "modo degradado con escrituras hechas" (más abajo), acá
+    // ninguna herramienta corrió antes: ejercita que `intentarModoDegradado`
+    // dispara la alerta por su cuenta (no vía `alertasPendientes`, que en
+    // este call site está garantizado vacío).
+    mockedRunAgent.mockResolvedValue({
+      kind: 'service_error',
+      huboEscrituras: false,
+    });
+    mockedCreateDirectExpense.mockResolvedValue({
+      ok: true,
+      category: 'TRANSPORTE',
+      transactionId: 'tx-1',
+      budgetItemId: 'item-taxi',
+    });
+    mockedDispararAlertas.mockResolvedValue(['⚠️ Vas en 95% de Transporte.']);
+
+    await handleAgentTurn({ userId: 'u1', phone: '+57300', body: '20k taxi' });
+
+    expect(mockedDispararAlertas).toHaveBeenCalledWith(expect.anything(), {
+      userId: 'u1',
+      monthYear: expect.any(String),
+      budgetItemIds: ['item-taxi'],
+      hoy: expect.any(Date),
+    });
+    const mensaje = mockedSendWhatsAppMessage.mock.calls[0][1];
+    expect(mensaje).toContain('⚠️ Vas en 95% de Transporte.');
+  });
+
   it('Gateway caído + parser que no acierta: mensaje honesto, no culpa al usuario', async () => {
     mockedRunAgent.mockResolvedValue({
       kind: 'service_error',

@@ -164,6 +164,8 @@ export async function POST(request: NextRequest) {
               }),
             registerInvoice: (invoiceId, accountName) =>
               createInvoiceDirect(userId, invoiceId, accountName),
+            onExpenseCreated: e =>
+              dispararAlertasWhatsapp(userId, e.budgetItemIds),
           },
         );
       } catch (err) {

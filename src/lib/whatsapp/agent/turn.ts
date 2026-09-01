@@ -87,9 +87,31 @@ async function intentarModoDegradado(
     accountName: cuentaDefecto,
     date: todayBogota(),
   });
-  return res.ok
-    ? `✅ Anotado ${formatCOP(rapido.amount)} en ${res.category} (${cuentaDefecto}) · ${rapido.description}. Si algo está mal, edítalo en la app.`
-    : '❌ No pude registrar el gasto. Intentá de nuevo en un momento.';
+  if (!res.ok) {
+    return '❌ No pude registrar el gasto. Intentá de nuevo en un momento.';
+  }
+  const base = `✅ Anotado ${formatCOP(rapido.amount)} en ${res.category} (${cuentaDefecto}) · ${rapido.description}. Si algo está mal, edítalo en la app.`;
+  // Best-effort, mismo criterio que el resto de los caminos: el gasto YA está
+  // guardado, una alerta que falle no puede convertir esto en un error.
+  //
+  // Se concatena a mano en vez de empujar a `alertasPendientes`: este helper
+  // también se llama desde el catch de armado de contexto (más abajo), ANTES
+  // de que ese acumulador exista en el scope de `handleAgentTurn`. En el otro
+  // call site (Gateway caído SIN escrituras) el acumulador está garantizado
+  // vacío en este punto —ninguna herramienta llegó a correr—, así que
+  // concatenar acá y dejar que `conAlertas` sume un acumulador vacío da
+  // exactamente el mismo resultado que empujar ahí; concatenar a mano cubre
+  // los dos call sites con una sola implementación.
+  let alertas: string[] = [];
+  try {
+    alertas = await dispararAlertasWhatsapp(
+      ctx.userId,
+      res.budgetItemId ? [res.budgetItemId] : [],
+    );
+  } catch (errAlerta) {
+    console.error('intentarModoDegradado: dispararAlertasWhatsapp falló:', errAlerta);
+  }
+  return alertas.length > 0 ? `${base}\n\n${alertas.join('\n\n')}` : base;
 }
 
 /**

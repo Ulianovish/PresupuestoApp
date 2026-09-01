@@ -15,6 +15,7 @@ function makeDeps(overrides = {}) {
     accounts: ['Efectivo', 'Nequi'],
     savePending: vi.fn(async () => {}),
     registerInvoice: vi.fn(async () => ({ ok: true, itemsFound: 3, totalItems: 3 })),
+    onExpenseCreated: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -52,6 +53,32 @@ describe('handleAgentMessage', () => {
     expect(deps.sendMessage).not.toHaveBeenCalledWith(
       expect.anything(),
       expect.stringMatching(/¿con qué cuenta/i),
+    );
+  });
+
+  it('el CUFE registrado también dispara la alerta de los rubros que tocó, pegada al mismo mensaje', async () => {
+    const deps = makeDeps({
+      registerInvoice: vi.fn(async () => ({
+        ok: true,
+        itemsFound: 3,
+        totalItems: 3,
+        budgetItemIds: ['item-mercado'],
+      })),
+      onExpenseCreated: vi.fn(async () => ['⚠️ Vas en 90% de Mercado.']),
+    });
+    await handleAgentMessage(
+      'cufe',
+      { userId: 'u1', phone: '+57300', body: `${CUFE} con la Nequi`, existingPendingId: null },
+      deps,
+    );
+    expect(deps.onExpenseCreated).toHaveBeenCalledWith({
+      categoria: 'FACTURA',
+      budgetItemIds: ['item-mercado'],
+    });
+    expect(deps.sendMessage).toHaveBeenCalledTimes(1);
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringContaining('⚠️ Vas en 90% de Mercado.'),
     );
   });
 

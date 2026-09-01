@@ -242,6 +242,37 @@ describe('handleImageMessage', () => {
     expect(mensaje).not.toMatch(/312\.400/);
   });
 
+  it('el recibo registrado también dispara la alerta de los rubros que tocó, pegada al mismo mensaje', async () => {
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'receipt',
+        supplier: 'D1',
+        date: '2026-06-12',
+        items: [{ description: 'Arroz', amount: 6000 }],
+        total: 6000,
+        confidence: 0.8,
+      })),
+      registerInvoice: vi.fn(async () => ({
+        ok: true,
+        itemsFound: 1,
+        totalItems: 1,
+        totalAmount: 6000,
+        budgetItemIds: ['item-mercado'],
+      })),
+      onExpenseCreated: vi.fn(async () => ['⚠️ Vas en 90% de Mercado.']),
+    });
+    await handleImageMessage({ ...ctx, body: 'pagué con Nequi' }, deps);
+    expect(deps.onExpenseCreated).toHaveBeenCalledWith({
+      categoria: 'FACTURA',
+      budgetItemIds: ['item-mercado'],
+    });
+    expect(deps.sendMessage).toHaveBeenCalledTimes(1);
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringContaining('⚠️ Vas en 90% de Mercado.'),
+    );
+  });
+
   it('recibo → se persiste SIEMPRE como borrador, antes de decidir si hay que preguntar', async () => {
     const deps = makeDeps({
       analyzeImage: vi.fn(async () => ({

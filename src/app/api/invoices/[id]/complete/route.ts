@@ -43,6 +43,10 @@ export async function POST(
     );
   }
 
+  // A propósito NO se dispara `dispararAlertasWhatsapp` acá: esta ruta la
+  // llama la app web (dashboard "Facturas sin completar"), no hay una
+  // conversación de WhatsApp donde pegar el aviso, y el panel ya cubre este
+  // caso porque calcula el estado del presupuesto en vivo al renderizar.
   const result = await createInvoiceDirect(user.id, id, body.accountName);
 
   if (!result.ok) {

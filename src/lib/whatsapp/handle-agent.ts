@@ -52,8 +52,21 @@ export interface AgentDeps {
     totalItems: number;
     /** Suma de lo que EFECTIVAMENTE quedó registrado (ver `createInvoiceDirect`). */
     totalAmount?: number;
+    /** Rubros que tocó la factura (ver `onExpenseCreated`), para disparar alertas. */
+    budgetItemIds?: string[];
     error?: string;
   }>;
+  /**
+   * Se llama tras registrar la factura, con los rubros que tocó (misma firma
+   * que `tools.ts` y `handle-image.ts`). Esta rama tampoco tiene el
+   * acumulador `alertasPendientes` del agente: devuelve los mensajes de
+   * alerta para que se peguen al único mensaje que esta rama manda con
+   * `sendMessage`.
+   */
+  onExpenseCreated: (e: {
+    categoria: string;
+    budgetItemIds: string[];
+  }) => Promise<string[]>;
 }
 
 export interface AgentContext {
@@ -116,9 +129,25 @@ export async function handleAgentMessage(
       // distinto del que le confirmó el bot.
       const totalRegistradoTexto =
         res.totalAmount != null ? ` por ${formatCOP(res.totalAmount)}` : totalTexto;
+      // Best-effort, mismo criterio que `registrar_factura` en tools.ts: los
+      // gastos de la factura YA están escritos, una alerta que falle no puede
+      // convertir esto en un "no pude guardar". Se pega al mismo mensaje.
+      const rubros = res.budgetItemIds ?? [];
+      let alertas: string[] = [];
+      if (rubros.length > 0) {
+        try {
+          alertas = await deps.onExpenseCreated({
+            categoria: 'FACTURA',
+            budgetItemIds: rubros,
+          });
+        } catch (errAlerta) {
+          console.error('handleAgentMessage(cufe): onExpenseCreated falló:', errAlerta);
+        }
+      }
+      const base = `✅ Registré tu factura${supplierTexto}${totalRegistradoTexto} (${res.itemsFound} ítems) en ${cuenta}.`;
       await deps.sendMessage(
         ctx.phone,
-        `✅ Registré tu factura${supplierTexto}${totalRegistradoTexto} (${res.itemsFound} ítems) en ${cuenta}.`,
+        alertas.length > 0 ? `${base}\n\n${alertas.join('\n\n')}` : base,
       );
     } else if (res.itemsFound > 0) {
       // Fallo a mitad de camino: esos ítems YA son transacciones reales. Decir
