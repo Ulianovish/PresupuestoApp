@@ -260,7 +260,16 @@ export async function createInvoiceDirect(
   userId: string,
   invoiceId: string,
   accountName: string,
-  deps: { classify?: typeof classifyApprovedExpenses } = {},
+  deps: {
+    classify?: typeof classifyApprovedExpenses;
+    /**
+     * Categoría elegida por el usuario para una línea, por índice. Sustituye a
+     * la que sugirió la IA: p. ej. un chocolate que quedó en MERCADO pero es
+     * un regalo. Se usa tanto al crear el gasto como al clasificarlo, para que
+     * el ítem de presupuesto se busque dentro de la categoría correcta.
+     */
+    categoryOverrides?: Record<number, string>;
+  } = {},
 ): Promise<{
   ok: boolean;
   itemsFound: number;
@@ -317,14 +326,15 @@ export async function createInvoiceDirect(
   // registro se corta a la mitad, el total refleja esa mitad y no la cabecera.
   let totalRegistrado = 0;
 
-  for (const item of items) {
+  for (const [idx, item] of items.entries()) {
     const monto = item.total_with_tax ?? item.total_price;
+    const categoria = deps.categoryOverrides?.[idx] ?? item.category;
     const { data, error } = await supabase.rpc('upsert_monthly_expense', {
       p_user_id: userId,
       p_description: item.description,
       p_amount: monto,
       p_transaction_date: fecha,
-      p_category_name: item.category,
+      p_category_name: categoria,
       p_account_name: accountName,
       p_place: typed.supplier_name ?? 'WhatsApp',
     });
@@ -369,7 +379,7 @@ export async function createInvoiceDirect(
       createdExpenses.push({
         id: data,
         description: item.description,
-        categoryName: item.category,
+        categoryName: categoria,
         monthYear: fecha.slice(0, 7),
       });
       totalRegistrado += Number(monto ?? 0);
