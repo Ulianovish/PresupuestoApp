@@ -23,6 +23,7 @@ import ExpenseStatusPanels from '@/components/organisms/ExpenseStatusPanels/Expe
 import ExpenseSummary from '@/components/organisms/ExpenseSummary/ExpenseSummary';
 import ExpenseTable from '@/components/organisms/ExpenseTable/ExpenseTable';
 import PendingInvoicesPanel from '@/components/organisms/PendingInvoicesPanel/PendingInvoicesPanel';
+import UnclassifiedExpensesPanel from '@/components/organisms/UnclassifiedExpensesPanel/UnclassifiedExpensesPanel';
 import ExpensePageTemplate from '@/components/templates/ExpensePageTemplate/ExpensePageTemplate';
 import { useCategories } from '@/hooks/useCategories';
 import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
@@ -686,10 +687,21 @@ export default function GastosPage() {
         ) : undefined
       }
       migrationPanel={
-        <PendingInvoicesPanel
-          refreshToken={invoiceRefresh}
-          onCompleted={refreshExpenses}
-        />
+        <>
+          <PendingInvoicesPanel
+            refreshToken={invoiceRefresh}
+            onCompleted={refreshExpenses}
+          />
+          {/* Gastos del mes que aún no tienen ítem de presupuesto asignado */}
+          <div className="mt-6">
+            <UnclassifiedExpensesPanel
+              monthYear={selectedMonth}
+              onChanged={async () => {
+                await Promise.all([refreshExpenses(), loadBudgetItems()]);
+              }}
+            />
+          </div>
+        </>
       }
       modal={
         <ExpenseModal
