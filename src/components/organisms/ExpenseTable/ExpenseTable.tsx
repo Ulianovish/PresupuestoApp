@@ -64,6 +64,8 @@ interface ExpenseTableProps {
     itemId: string,
   ) => void | Promise<void>;
   onCreateItem?: (transaction: ExpenseTransaction) => void;
+  onRenameItem?: (itemId: string, newName: string) => Promise<void>;
+  onDeleteItem?: (itemId: string) => Promise<void>;
 }
 
 export default function ExpenseTable({
@@ -81,6 +83,8 @@ export default function ExpenseTable({
   budgetItems,
   onAssignItem,
   onCreateItem,
+  onRenameItem,
+  onDeleteItem,
 }: ExpenseTableProps) {
   // Filtros por columna al estilo Excel: null = sin filtro
   const [filters, setFilters] = useState<Record<string, string[] | null>>({});
@@ -337,6 +341,8 @@ export default function ExpenseTable({
                     budgetItems={budgetItems}
                     onAssignItem={onAssignItem}
                     onCreateItem={onCreateItem}
+                    onRenameItem={onRenameItem}
+                    onDeleteItem={onDeleteItem}
                   />
                 ))}
               </tbody>

@@ -11,6 +11,7 @@ import React from 'react';
 import { Edit, Trash2 } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
+import BudgetItemSelect from '@/components/molecules/BudgetItemSelect/BudgetItemSelect';
 import InlineCombobox from '@/components/molecules/InlineCombobox/InlineCombobox';
 import {
   ExpenseTransaction,
@@ -42,6 +43,10 @@ interface ExpenseRowProps {
   ) => void | Promise<void>;
   /** Abre el modal para crear un ítem nuevo y asignárselo a este gasto. */
   onCreateItem?: (transaction: ExpenseTransaction) => void;
+  /** Renombra un ítem del presupuesto (clic derecho sobre él en el desplegable). */
+  onRenameItem?: (itemId: string, newName: string) => Promise<void>;
+  /** Elimina un ítem del presupuesto (clic derecho sobre él en el desplegable). */
+  onDeleteItem?: (itemId: string) => Promise<void>;
 }
 
 /** Normaliza texto para comparar sin acentos ni mayúsculas. */
@@ -75,19 +80,6 @@ function visibleItemsForExpense(
   return base;
 }
 
-/** Agrupa los ítems por categoría, conservando el orden de llegada. */
-function groupItemsByCategory(
-  items: BudgetItemRef[],
-): Array<[string, BudgetItemRef[]]> {
-  const groups = new Map<string, BudgetItemRef[]>();
-  for (const it of items) {
-    const arr = groups.get(it.category_name) ?? [];
-    arr.push(it);
-    groups.set(it.category_name, arr);
-  }
-  return Array.from(groups.entries());
-}
-
 export default function ExpenseRow({
   transaction,
   formatCurrency,
@@ -100,6 +92,8 @@ export default function ExpenseRow({
   budgetItems,
   onAssignItem,
   onCreateItem,
+  onRenameItem,
+  onDeleteItem,
 }: ExpenseRowProps) {
   const handleEdit = () => {
     onEdit(transaction);
@@ -137,41 +131,20 @@ export default function ExpenseRow({
       {/* Ítem de presupuesto — asignable/reasignable */}
       <td className="px-4 py-2">
         {budgetItems && budgetItems.length > 0 && onAssignItem ? (
-          <select
+          <BudgetItemSelect
             value={transaction.budget_item_id ?? ''}
-            onChange={e => {
-              if (e.target.value === '__create__') {
-                onCreateItem?.(transaction);
-                return;
-              }
-              onAssignItem(transaction.id, e.target.value);
-            }}
-            className={`w-[130px] bg-slate-700/60 border rounded-lg text-xs px-2 py-1 ${
-              transaction.budget_item_id
-                ? 'border-slate-600 text-white'
-                : 'border-red-500/50 text-red-300'
-            }`}
-          >
-            <option value="">Sin asignar</option>
-            {onCreateItem && (
-              <option value="__create__">➕ Crear nuevo ítem…</option>
+            items={visibleItemsForExpense(
+              budgetItems,
+              transaction.category_name,
+              transaction.budget_item_id,
             )}
-            {groupItemsByCategory(
-              visibleItemsForExpense(
-                budgetItems,
-                transaction.category_name,
-                transaction.budget_item_id,
-              ),
-            ).map(([cat, its]) => (
-              <optgroup key={cat} label={cat}>
-                {its.map(it => (
-                  <option key={it.id} value={it.id}>
-                    {it.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+            onSelect={itemId => onAssignItem(transaction.id, itemId)}
+            onCreate={
+              onCreateItem ? () => onCreateItem(transaction) : undefined
+            }
+            onRenameItem={onRenameItem}
+            onDeleteItem={onDeleteItem}
+          />
         ) : (
           <span className="text-gray-400 text-xs">—</span>
         )}
