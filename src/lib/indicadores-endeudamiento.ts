@@ -9,6 +9,8 @@
  * Módulo puro (sin Supabase ni React) para poder probarlo de forma aislada.
  */
 
+import { totalIngresosDelMes, type IngresoConFecha } from './ingresos-mes';
+
 /** Deuda reducida a lo que necesitan los indicadores. */
 export interface DeudaParaIndicador {
   /** 'tarjeta_credito' = deuda de consumo; cualquier otro valor = deuda de activos. */
@@ -21,11 +23,7 @@ export interface DeudaParaIndicador {
 }
 
 /** Ingreso reducido a lo que necesitan los indicadores. */
-export interface IngresoParaIndicador {
-  /** Fecha en formato ISO (YYYY-MM-DD). */
-  fecha?: string | null;
-  monto?: number | null;
-}
+export type IngresoParaIndicador = IngresoConFecha;
 
 export interface IndicadoresEndeudamiento {
   /** Suma de cuotas mensuales de deudas de consumo. */
@@ -60,10 +58,7 @@ export function ingresoNetoDelMes(
   ingresos: IngresoParaIndicador[],
   mes: string,
 ): number {
-  if (!mes) return 0;
-  return ingresos
-    .filter(i => (i.fecha ?? '').slice(0, 7) === mes)
-    .reduce((sum, i) => sum + (i.monto ?? 0), 0);
+  return totalIngresosDelMes(ingresos, mes);
 }
 
 /**

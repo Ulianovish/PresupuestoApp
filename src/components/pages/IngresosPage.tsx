@@ -21,7 +21,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useMonth } from '@/contexts/MonthContext';
 import { useIngresosDeudas } from '@/hooks/useIngresosDeudas';
+import {
+  fechaPorDefectoDelMes,
+  ingresosDelMes,
+  totalIngresosDelMes,
+} from '@/lib/ingresos-mes';
+import { formatMonthName } from '@/lib/services/expenses';
 import {
   actualizarIngreso,
   eliminarIngreso,
@@ -46,6 +53,13 @@ interface IngresoFormData {
 export default function IngresosPage({ user: _user }: IngresosPageProps) {
   const { ingresos, loading, agregarIngreso, recargarDatos, formatCurrency } =
     useIngresosDeudas();
+  const { selectedMonth } = useMonth();
+
+  // Los ingresos son mensuales: la pantalla muestra solo el mes seleccionado
+  // en el menu lateral, el mismo que usan Presupuesto y Gastos.
+  const nombreMes = formatMonthName(selectedMonth);
+  const ingresosMes = ingresosDelMes(ingresos, selectedMonth);
+  const totalMes = totalIngresosDelMes(ingresos, selectedMonth);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -59,7 +73,7 @@ export default function IngresosPage({ user: _user }: IngresosPageProps) {
     descripcion: '',
     fuente: '',
     monto: 0,
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: fechaPorDefectoDelMes(selectedMonth),
   });
 
   const resetForm = () => {
@@ -67,7 +81,7 @@ export default function IngresosPage({ user: _user }: IngresosPageProps) {
       descripcion: '',
       fuente: '',
       monto: 0,
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: fechaPorDefectoDelMes(selectedMonth),
     });
     setEditingId(null);
   };
@@ -142,8 +156,12 @@ export default function IngresosPage({ user: _user }: IngresosPageProps) {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-blue-400 mb-2">Ingresos</h1>
-            <p className="text-gray-300">Gestiona tus fuentes de ingreso</p>
+            <h1 className="text-3xl font-bold text-blue-400 mb-2">
+              Ingresos - {nombreMes}
+            </h1>
+            <p className="text-gray-300">
+              Gestiona tus fuentes de ingreso del mes
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <Button
@@ -166,20 +184,34 @@ export default function IngresosPage({ user: _user }: IngresosPageProps) {
         {/* Lista de ingresos */}
         <Card variant="glass">
           <CardHeader>
-            <CardTitle className="text-white flex items-center">
-              <TrendingUp className="w-5 h-5 mr-2" />
-              Todos los Ingresos
+            <CardTitle className="text-white flex items-center justify-between">
+              <div className="flex items-center">
+                <TrendingUp className="w-5 h-5 mr-2" />
+                Ingresos de {nombreMes}
+              </div>
+              <span className="text-sm font-normal text-gray-400">
+                Total:{' '}
+                <span className="font-semibold text-emerald-400">
+                  {formatCurrency(totalMes)}
+                </span>
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {ingresos.length === 0 ? (
+            {ingresosMes.length === 0 ? (
               <div className="text-center py-8">
                 <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-400">No hay ingresos registrados</p>
+                <p className="text-gray-400">
+                  No hay ingresos registrados en {nombreMes}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Cambia de mes en el menu lateral o agrega el ingreso de este
+                  mes.
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
-                {ingresos.map(ingreso => (
+                {ingresosMes.map(ingreso => (
                   <div
                     key={ingreso.id}
                     className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
