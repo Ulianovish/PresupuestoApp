@@ -25,15 +25,22 @@ import ConfirmModal from '@/components/atoms/ConfirmModal/ConfirmModal';
 import CurrencyInput from '@/components/atoms/CurrencyInput/CurrencyInput';
 import Input from '@/components/atoms/Input/Input';
 import FormField from '@/components/molecules/FormField/FormField';
+import IndicadoresEndeudamiento from '@/components/organisms/IndicadoresEndeudamiento/IndicadoresEndeudamiento';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useMonth } from '@/contexts/MonthContext';
 import { useIngresosDeudas } from '@/hooks/useIngresosDeudas';
 import { ensureAccountForCreditCard } from '@/lib/actions/accounts';
 import { createBudgetItemsForDeuda } from '@/lib/actions/deudas-budget';
+import {
+  calcularIndicadores,
+  ingresoNetoDelMes,
+} from '@/lib/indicadores-endeudamiento';
+import { formatMonthName } from '@/lib/services/expenses';
 import {
   actualizarDeuda,
   eliminarDeuda,
@@ -87,8 +94,19 @@ const EMPTY_FORM: DeudaFormData = {
 };
 
 export default function DeudasPage({ user: _user }: DeudasPageProps) {
-  const { deudas, loading, agregarDeuda, recargarDatos, formatCurrency } =
-    useIngresosDeudas();
+  const {
+    deudas,
+    ingresos,
+    loading,
+    agregarDeuda,
+    recargarDatos,
+    formatCurrency,
+  } = useIngresosDeudas();
+  const { selectedMonth } = useMonth();
+
+  // Indicadores de endeudamiento sobre el ingreso neto del mes seleccionado
+  const ingresoNeto = ingresoNetoDelMes(ingresos, selectedMonth);
+  const indicadores = calcularIndicadores(deudas, ingresoNeto);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -336,7 +354,7 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
           <div>
             <h1 className="text-3xl font-bold text-blue-400 mb-2">Deudas</h1>
             <p className="text-gray-300">
-              Gestiona tus deudas bancarias y tarjetas de crédito
+              Gestiona tus deudas de activos y de consumo
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -362,13 +380,19 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
           </Card>
         ) : (
           <div className="space-y-6">
-            {/* Deudas Bancarias */}
+            <IndicadoresEndeudamiento
+              indicadores={indicadores}
+              nombreMes={formatMonthName(selectedMonth)}
+              formatCurrency={formatCurrency}
+            />
+
+            {/* Deudas de Activos */}
             <Card variant="glass">
               <CardHeader>
                 <CardTitle className="text-white flex items-center justify-between">
                   <div className="flex items-center">
                     <Landmark className="w-5 h-5 mr-2 text-blue-400" />
-                    Deudas Bancarias
+                    Deudas de Activos
                   </div>
                   <Button
                     size="sm"
@@ -383,18 +407,18 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
               <CardContent>
                 {renderDeudaList(
                   deudasBanco,
-                  'No hay deudas bancarias registradas',
+                  'No hay deudas de activos registradas',
                 )}
               </CardContent>
             </Card>
 
-            {/* Tarjetas de Crédito */}
+            {/* Deudas de Consumo */}
             <Card variant="glass">
               <CardHeader>
                 <CardTitle className="text-white flex items-center justify-between">
                   <div className="flex items-center">
                     <CreditCard className="w-5 h-5 mr-2 text-orange-400" />
-                    Tarjetas de Crédito
+                    Deudas de Consumo
                   </div>
                   <Button
                     size="sm"
@@ -409,7 +433,7 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
               <CardContent>
                 {renderDeudaList(
                   deudasTarjeta,
-                  'No hay tarjetas de crédito registradas',
+                  'No hay deudas de consumo registradas',
                 )}
               </CardContent>
             </Card>
