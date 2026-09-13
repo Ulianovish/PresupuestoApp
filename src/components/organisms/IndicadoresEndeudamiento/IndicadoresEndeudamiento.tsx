@@ -14,14 +14,17 @@
 
 import React from 'react';
 
-import { Percent } from 'lucide-react';
+import { AlertTriangle, Percent } from 'lucide-react';
 
 import Card, {
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/atoms/Card/Card';
-import type { IndicadoresEndeudamiento as Indicadores } from '@/lib/indicadores-endeudamiento';
+import {
+  alertasEndeudamiento,
+  type IndicadoresEndeudamiento as Indicadores,
+} from '@/lib/indicadores-endeudamiento';
 
 interface IndicadoresEndeudamientoProps {
   indicadores: Indicadores;
@@ -77,6 +80,17 @@ export default function IndicadoresEndeudamiento({
         </p>
       </CardHeader>
       <CardContent>
+        {alertasEndeudamiento(indicadores).map(alerta => (
+          <div
+            key={alerta.id}
+            role="alert"
+            className="mb-4 flex items-start gap-3 rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+          >
+            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-400" />
+            <p>{alerta.mensaje}</p>
+          </div>
+        ))}
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Indicador
             titulo="Del ingreso a deudas de consumo"

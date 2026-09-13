@@ -103,3 +103,34 @@ export function calcularIndicadores(
     porcentajeTotal: porcentaje(pagosTotales),
   };
 }
+
+/** Porcentaje del ingreso a deuda de consumo a partir del cual se alerta. */
+export const UMBRAL_ALERTA_CONSUMO = 10;
+
+export interface AlertaEndeudamiento {
+  id: string;
+  mensaje: string;
+}
+
+/**
+ * Notas de alerta según los indicadores del mes.
+ *
+ * Solo se alerta cuando hay porcentaje calculado: sin ingreso del mes no se
+ * puede saber si el endeudamiento es alto.
+ */
+export function alertasEndeudamiento(
+  indicadores: IndicadoresEndeudamiento,
+): AlertaEndeudamiento[] {
+  const alertas: AlertaEndeudamiento[] = [];
+
+  const { porcentajeConsumo } = indicadores;
+  if (porcentajeConsumo !== null && porcentajeConsumo > UMBRAL_ALERTA_CONSUMO) {
+    alertas.push({
+      id: 'consumo-alto',
+      mensaje:
+        'Estás con una calidad de vida alta, por encima de tus posibilidades. Busca ayuda financiera.',
+    });
+  }
+
+  return alertas;
+}

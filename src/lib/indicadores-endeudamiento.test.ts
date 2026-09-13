@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  alertasEndeudamiento,
   calcularIndicadores,
   esDeudaDeConsumo,
   ingresoNetoDelMes,
@@ -130,5 +131,38 @@ describe('calcularIndicadores', () => {
       1000,
     );
     expect(r.pagosTotales).toBe(0);
+  });
+});
+
+describe('alertasEndeudamiento', () => {
+  const conConsumo = (porcentajeConsumo: number | null) => ({
+    pagosConsumo: 0,
+    pagosActivos: 0,
+    pagosTotales: 0,
+    ingresoNeto: porcentajeConsumo === null ? 0 : 100,
+    porcentajeConsumo,
+    porcentajeActivos: 0,
+    porcentajeTotal: 0,
+  });
+
+  it('alerta cuando el consumo supera el 10 %', () => {
+    const alertas = alertasEndeudamiento(conConsumo(23.4));
+    expect(alertas).toHaveLength(1);
+    expect(alertas[0].mensaje).toContain('por encima de tus posibilidades');
+    expect(alertas[0].mensaje).toContain('Busca ayuda financiera');
+  });
+
+  it('no alerta en exactamente 10 % ni por debajo', () => {
+    expect(alertasEndeudamiento(conConsumo(10))).toEqual([]);
+    expect(alertasEndeudamiento(conConsumo(4))).toEqual([]);
+  });
+
+  it('no alerta si el mes no tiene ingreso', () => {
+    expect(alertasEndeudamiento(conConsumo(null))).toEqual([]);
+  });
+
+  it('con los datos de agosto 2026 aparece la alerta', () => {
+    const r = calcularIndicadores(DEUDAS, 17750000);
+    expect(alertasEndeudamiento(r).map(a => a.id)).toEqual(['consumo-alto']);
   });
 });
