@@ -3,7 +3,8 @@
 // registro directo (o pregunta la cuenta si no se puede resolver).
 
 import { normalizar, resolverCuenta } from '@/lib/whatsapp/agent/tools';
-import { formatCOP } from '@/lib/whatsapp/format';
+import { pegarAlertas } from '@/lib/whatsapp/alerts';
+import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
 import type { VisionResult } from '@/lib/whatsapp/vision';
 
 /**
@@ -65,13 +66,40 @@ export interface ReceiptDraftInput {
 
 export interface ImageDeps {
   sendMessage: (to: string, body: string) => Promise<{ ok: boolean }>;
-  downloadMedia: (url: string) => Promise<{ base64: string; mime: string } | null>;
+  downloadMedia: (
+    url: string,
+  ) => Promise<{ base64: string; mime: string } | null>;
   analyzeImage: (base64: string, mime: string) => Promise<VisionResult>;
   createDirectExpense: (
     userId: string,
     phone: string,
-    input: { amount: number; description: string; accountName: string; date: string },
-  ) => Promise<{ ok: boolean; category: string; error?: string }>;
+    input: {
+      amount: number;
+      description: string;
+      accountName: string;
+      date: string;
+    },
+  ) => Promise<{
+    ok: boolean;
+    category: string;
+    error?: string;
+    /** Rubro de presupuesto asignado, si lo hubo (ver `onExpenseCreated`). */
+    budgetItemId?: string | null;
+  }>;
+  /**
+   * Se llama tras registrar el gasto, con el rubro que tocó (misma firma que
+   * `tools.ts`). Esta rama no tiene el acumulador `alertasPendientes` del
+   * agente: devuelve los mensajes de alerta para que se peguen al único
+   * mensaje que esta rama manda con `sendMessage`.
+   *
+   * `monthYear` es el mes DEL GASTO (o de la factura), nunca el de hoy: ver
+   * `dispararAlertasWhatsapp`.
+   */
+  onExpenseCreated: (e: {
+    categoria: string;
+    budgetItemIds: string[];
+    monthYear: string;
+  }) => Promise<string[]>;
   /** Cuentas activas del usuario, para resolver con cuál se pagó una factura. */
   accounts: string[];
   /**
@@ -84,7 +112,12 @@ export interface ImageDeps {
   createReceiptDraft: (
     userId: string,
     input: ReceiptDraftInput,
-  ) => Promise<{ ok: boolean; itemsFound: number; invoiceId?: string; error?: string }>;
+  ) => Promise<{
+    ok: boolean;
+    itemsFound: number;
+    invoiceId?: string;
+    error?: string;
+  }>;
   /** Guarda el id de la factura ya persistida, esperando que el usuario diga con qué cuenta pagó. */
   savePending: (invoiceId: string) => Promise<void>;
   /** Registra la factura ya persistida y resuelta (sin aprobación manual). */
@@ -97,6 +130,10 @@ export interface ImageDeps {
     totalItems: number;
     /** Suma de lo que EFECTIVAMENTE quedó registrado (ver `createInvoiceDirect`). */
     totalAmount?: number;
+    /** Rubros que tocó la factura (ver `onExpenseCreated`), para disparar alertas. */
+    budgetItemIds?: string[];
+    /** Mes DE LA FACTURA (ver `createInvoiceDirect`), no el de hoy. */
+    monthYear?: string;
     error?: string;
   }>;
   resolveDefaultAccount: (phone: string) => Promise<string>;
@@ -142,17 +179,35 @@ export async function handleImageMessage(
     const accountName =
       resolveAccountFromMessage(ctx.body, result.account, deps.accounts) ??
       (await deps.resolveDefaultAccount(ctx.phone));
+    // Fecha del GASTO (la que leyó la visión, o hoy si no la leyó): es la que
+    // se escribe en la transacción y la que tiene que viajar a las alertas,
+    // para comparar contra el mes que corresponde y no siempre contra "hoy".
+    const fecha = result.date ?? deps.today();
     const res = await deps.createDirectExpense(ctx.userId, ctx.phone, {
       amount: result.amount,
       description: result.description ?? 'Transferencia',
       accountName,
-      date: result.date ?? deps.today(),
+      date: fecha,
     });
     if (res.ok) {
-      await deps.sendMessage(
-        ctx.phone,
-        `✅ Registré ${formatCOP(result.amount)} en ${res.category} (${accountName}). Si algo está mal, edítalo en la app.`,
-      );
+      // Best-effort: el gasto YA está guardado (mismo criterio que executeTool).
+      // La alerta se pega al mismo mensaje, no va como uno aparte: acá no hay
+      // acumulador porque esta rama responde por su cuenta.
+      let alertas: string[] = [];
+      try {
+        alertas = await deps.onExpenseCreated({
+          categoria: res.category,
+          budgetItemIds: res.budgetItemId ? [res.budgetItemId] : [],
+          monthYear: fecha.slice(0, 7),
+        });
+      } catch (errAlerta) {
+        console.error(
+          'handleImage(transfer): onExpenseCreated falló:',
+          errAlerta,
+        );
+      }
+      const base = `✅ Registré ${formatCOP(result.amount)} en ${res.category} (${accountName}). Si algo está mal, edítalo en la app.`;
+      await deps.sendMessage(ctx.phone, pegarAlertas(base, alertas));
     } else {
       await deps.sendMessage(
         ctx.phone,
@@ -182,7 +237,8 @@ export async function handleImageMessage(
     }
 
     const supplierTexto = result.supplier ? ` de ${result.supplier}` : '';
-    const totalTexto = result.total != null ? ` por ${formatCOP(result.total)}` : '';
+    const totalTexto =
+      result.total != null ? ` por ${formatCOP(result.total)}` : '';
     const cuenta = resolveAccountFromMessage(ctx.body, null, deps.accounts);
 
     if (!cuenta) {
@@ -204,26 +260,56 @@ export async function handleImageMessage(
     }
 
     const res = await deps.registerInvoice(draft.invoiceId, cuenta);
+    // Mes DE LA FACTURA (createInvoiceDirect lo devuelve junto a los rubros),
+    // no el de hoy: ver el comentario en `dispararAlertasWhatsapp`. Fallback a
+    // hoy solo defensivo (mock de test sin `monthYear`); en producción
+    // `registerInvoice` siempre lo manda.
+    const monthYear = res.monthYear ?? todayBogota().slice(0, 7);
+    // Dispara el enganche si hay rubros, tragándose cualquier falla
+    // (best-effort): ni el camino feliz ni el parcial pueden convertir un
+    // gasto ya escrito en un error. Los ítems de un registro parcial YA son
+    // transacciones reales con rubro asignado, así que quedarse a medias no
+    // los excluye de las alertas.
+    const avisarRubros = async (rubros: string[]): Promise<string[]> => {
+      if (rubros.length === 0) return [];
+      try {
+        return await deps.onExpenseCreated({
+          categoria: 'FACTURA',
+          budgetItemIds: rubros,
+          monthYear,
+        });
+      } catch (errAlerta) {
+        console.error(
+          'handleImage(receipt): onExpenseCreated falló:',
+          errAlerta,
+        );
+        return [];
+      }
+    };
     if (res.ok) {
       // El total que se confirma es el REGISTRADO (suma de los ítems que
       // entraron en transactions), no el que leyó la visión en la cabecera:
       // con descuentos o redondeos difieren y el usuario veía en la app un
       // número distinto del que le confirmó el bot.
       const totalRegistradoTexto =
-        res.totalAmount != null ? ` por ${formatCOP(res.totalAmount)}` : totalTexto;
-      await deps.sendMessage(
-        ctx.phone,
-        `✅ Registré tu factura${supplierTexto}${totalRegistradoTexto} (${res.itemsFound} ítems) en ${cuenta}.`,
-      );
+        res.totalAmount != null
+          ? ` por ${formatCOP(res.totalAmount)}`
+          : totalTexto;
+      // Best-effort, mismo criterio que `registrar_factura` en tools.ts: los
+      // gastos de la factura YA están escritos, una alerta que falle no puede
+      // convertir esto en un "no pude registrar". Se pega al mismo mensaje.
+      const alertas = await avisarRubros(res.budgetItemIds ?? []);
+      const base = `✅ Registré tu factura${supplierTexto}${totalRegistradoTexto} (${res.itemsFound} ítems) en ${cuenta}.`;
+      await deps.sendMessage(ctx.phone, pegarAlertas(base, alertas));
     } else if (res.itemsFound > 0) {
       // Fallo a mitad de camino: esos ítems YA son transacciones reales. Decir
       // "no pude guardar la factura" empujaría a reenviar la foto y duplicarlos.
       // El panel "Facturas sin completar" no tiene botón para esto (solo para
       // pending_review): la acción real es cargar el resto a mano en Gastos.
-      await deps.sendMessage(
-        ctx.phone,
-        `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta} (esos ya están en tus gastos, no se perdieron). Los que faltan, cargalos a mano en Gastos; no reenvíes la foto, duplicaría los que ya quedaron.`,
-      );
+      // Esos ítems también quedan con rubro asignado: la alerta también avisa.
+      const alertas = await avisarRubros(res.budgetItemIds ?? []);
+      const base = `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta} (esos ya están en tus gastos, no se perdieron). Los que faltan, cargalos a mano en Gastos; no reenvíes la foto, duplicaría los que ya quedaron.`;
+      await deps.sendMessage(ctx.phone, pegarAlertas(base, alertas));
     } else {
       await deps.sendMessage(
         ctx.phone,

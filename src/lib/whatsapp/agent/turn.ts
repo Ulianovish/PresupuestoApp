@@ -3,8 +3,6 @@
 // cae a `parseQuickExpense` para no dejar al usuario sin nada: un gasto
 // simple se sigue registrando con el LLM caído.
 
-import { dispararAlertas } from '@/lib/budget/alerts';
-import { alertDepsSupabase } from '@/lib/budget/alerts-supabase';
 import {
   createInvoiceDirect,
   getPendingInvoiceSummary,
@@ -20,7 +18,8 @@ import {
   queryExpenseTotal,
 } from '@/lib/services/whatsapp-queries';
 import { createAdminClient } from '@/lib/supabase/server';
-import { formatCOP, hoyBogotaDate, todayBogota } from '@/lib/whatsapp/format';
+import { dispararAlertasWhatsapp, pegarAlertas } from '@/lib/whatsapp/alerts';
+import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
 import { parseQuickExpense } from '@/lib/whatsapp/quick-expense';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/transport';
 
@@ -88,9 +87,44 @@ async function intentarModoDegradado(
     accountName: cuentaDefecto,
     date: todayBogota(),
   });
-  return res.ok
-    ? `✅ Anotado ${formatCOP(rapido.amount)} en ${res.category} (${cuentaDefecto}) · ${rapido.description}. Si algo está mal, edítalo en la app.`
-    : '❌ No pude registrar el gasto. Intentá de nuevo en un momento.';
+  if (!res.ok) {
+    return '❌ No pude registrar el gasto. Intentá de nuevo en un momento.';
+  }
+  const base = `✅ Anotado ${formatCOP(rapido.amount)} en ${res.category} (${cuentaDefecto}) · ${rapido.description}. Si algo está mal, edítalo en la app.`;
+  // Best-effort, mismo criterio que el resto de los caminos: el gasto YA está
+  // guardado, una alerta que falle no puede convertir esto en un error.
+  //
+  // Se concatena a mano en vez de empujar a `alertasPendientes`: este helper
+  // también se llama desde el catch de armado de contexto (más abajo), ANTES
+  // de que ese acumulador exista en el scope de `handleAgentTurn`. En el otro
+  // call site (Gateway caído SIN escrituras) el acumulador está garantizado
+  // vacío en este punto —ninguna herramienta llegó a correr—, así que
+  // concatenar acá y dejar que `conAlertas` sume un acumulador vacío da
+  // exactamente el mismo resultado que empujar ahí; concatenar a mano cubre
+  // los dos call sites con una sola implementación. Esa garantía de "vacío"
+  // depende de un acoplamiento no local: el enganche (`onExpenseCreated`) solo
+  // se llama desde ramas de `executeTool` que TAMBIÉN marcan `wrote: true`
+  // (de donde sale `huboEscrituras`). Una herramienta futura que escriba y
+  // llame al enganche sin marcar `wrote` rompe esto en silencio.
+  //
+  // El mes de la alerta es el de HOY, explícito (no un default oculto):
+  // `parseQuickExpense` no reconoce fechas, así que este camino SIEMPRE
+  // registra con la fecha de hoy (ver `date: todayBogota()` arriba) y no hay
+  // otro mes posible que pasarle.
+  let alertas: string[] = [];
+  try {
+    alertas = await dispararAlertasWhatsapp(
+      ctx.userId,
+      res.budgetItemId ? [res.budgetItemId] : [],
+      todayBogota().slice(0, 7),
+    );
+  } catch (errAlerta) {
+    console.error(
+      'intentarModoDegradado: dispararAlertasWhatsapp falló:',
+      errAlerta,
+    );
+  }
+  return pegarAlertas(base, alertas);
 }
 
 /**
@@ -160,10 +194,8 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
 
   // Las alertas se pegan a la respuesta del bot, no van como mensaje aparte:
   // así no chocan con la ventana de 24 h de WhatsApp Business. Si un mensaje
-  // registra varios gastos ("20k taxi y 15k almuerzo"), se juntan todas acá.
-  //
-  // OJO: hoy solo `registrar_gasto` dispara alertas. Las facturas
-  // (`registrar_factura`) no llaman a onExpenseCreated, así que no avisan.
+  // registra varios gastos ("20k taxi y 15k almuerzo") o una factura toca
+  // varios rubros, se juntan todas acá.
   const alertasPendientes: string[] = [];
 
   const deps: ToolDeps = {
@@ -200,6 +232,7 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
           ok: false,
           itemsFound: 0,
           totalItems: 0,
+          budgetItemIds: [],
           error: 'no hay factura pendiente',
         };
       }
@@ -251,14 +284,13 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
     },
     queryExpenses: async q => queryExpenseTotal(ctx.userId, q),
     onExpenseCreated: async e => {
-      if (!e.budgetItemId) return; // sin rubro no hay contra qué comparar
-      const msgs = await dispararAlertas(alertDepsSupabase(), {
-        userId: ctx.userId,
-        monthYear: todayBogota().slice(0, 7),
-        budgetItemIds: [e.budgetItemId],
-        hoy: hoyBogotaDate(),
-      });
+      const msgs = await dispararAlertasWhatsapp(
+        ctx.userId,
+        e.budgetItemIds,
+        e.monthYear,
+      );
       alertasPendientes.push(...msgs);
+      return msgs;
     },
   };
 
@@ -281,10 +313,7 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
 
   // Las alertas disparadas por `onExpenseCreated` durante el turno se pegan al
   // final de la respuesta (ver el acumulador `alertasPendientes` más arriba).
-  const conAlertas = (texto: string) =>
-    alertasPendientes.length > 0
-      ? `${texto}\n\n${alertasPendientes.join('\n\n')}`
-      : texto;
+  const conAlertas = (texto: string) => pegarAlertas(texto, alertasPendientes);
 
   // Gateway caído: no es culpa del usuario. Se intenta el parser viejo antes de
   // rendirse — con el LLM abajo, "20k taxi" se sigue registrando.

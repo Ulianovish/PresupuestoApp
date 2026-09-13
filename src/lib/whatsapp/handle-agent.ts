@@ -13,8 +13,9 @@
 // preguntar — el mismo criterio y los mismos textos que usa
 // `handle-image.ts` para que las dos vías respondan igual.
 
+import { pegarAlertas } from '@/lib/whatsapp/alerts';
 import { extractCufe } from '@/lib/whatsapp/classify';
-import { formatCOP } from '@/lib/whatsapp/format';
+import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
 import { resolveAccountFromMessage } from '@/lib/whatsapp/handle-image';
 
 export type CufeOutcome =
@@ -52,8 +53,27 @@ export interface AgentDeps {
     totalItems: number;
     /** Suma de lo que EFECTIVAMENTE quedó registrado (ver `createInvoiceDirect`). */
     totalAmount?: number;
+    /** Rubros que tocó la factura (ver `onExpenseCreated`), para disparar alertas. */
+    budgetItemIds?: string[];
+    /** Mes DE LA FACTURA (ver `createInvoiceDirect`), no el de hoy. */
+    monthYear?: string;
     error?: string;
   }>;
+  /**
+   * Se llama tras registrar la factura, con los rubros que tocó (misma firma
+   * que `tools.ts` y `handle-image.ts`). Esta rama tampoco tiene el
+   * acumulador `alertasPendientes` del agente: devuelve los mensajes de
+   * alerta para que se peguen al único mensaje que esta rama manda con
+   * `sendMessage`.
+   *
+   * `monthYear` es el mes DE LA FACTURA, nunca el de hoy: ver
+   * `dispararAlertasWhatsapp`.
+   */
+  onExpenseCreated: (e: {
+    categoria: string;
+    budgetItemIds: string[];
+    monthYear: string;
+  }) => Promise<string[]>;
 }
 
 export interface AgentContext {
@@ -109,26 +129,56 @@ export async function handleAgentMessage(
     }
 
     const res = await deps.registerInvoice(out.invoiceId, cuenta);
+    // Mes DE LA FACTURA (createInvoiceDirect lo devuelve junto a los rubros),
+    // no el de hoy: ver el comentario en `dispararAlertasWhatsapp`. Fallback a
+    // hoy solo defensivo (mock de test sin `monthYear`); en producción
+    // `registerInvoice` siempre lo manda.
+    const monthYear = res.monthYear ?? todayBogota().slice(0, 7);
+    // Dispara el enganche si hay rubros, tragándose cualquier falla
+    // (best-effort): ni el camino feliz ni el parcial pueden convertir un
+    // gasto ya escrito en un error. Los ítems de un registro parcial YA son
+    // transacciones reales con rubro asignado, así que quedarse a medias no
+    // los excluye de las alertas.
+    const avisarRubros = async (rubros: string[]): Promise<string[]> => {
+      if (rubros.length === 0) return [];
+      try {
+        return await deps.onExpenseCreated({
+          categoria: 'FACTURA',
+          budgetItemIds: rubros,
+          monthYear,
+        });
+      } catch (errAlerta) {
+        console.error(
+          'handleAgentMessage(cufe): onExpenseCreated falló:',
+          errAlerta,
+        );
+        return [];
+      }
+    };
     if (res.ok) {
       // El total que se confirma es el REGISTRADO (suma de los ítems que
       // entraron en transactions), no el de la cabecera de la factura: con
       // descuentos o redondeos difieren y el usuario veía en la app un número
       // distinto del que le confirmó el bot.
       const totalRegistradoTexto =
-        res.totalAmount != null ? ` por ${formatCOP(res.totalAmount)}` : totalTexto;
-      await deps.sendMessage(
-        ctx.phone,
-        `✅ Registré tu factura${supplierTexto}${totalRegistradoTexto} (${res.itemsFound} ítems) en ${cuenta}.`,
-      );
+        res.totalAmount != null
+          ? ` por ${formatCOP(res.totalAmount)}`
+          : totalTexto;
+      // Best-effort, mismo criterio que `registrar_factura` en tools.ts: los
+      // gastos de la factura YA están escritos, una alerta que falle no puede
+      // convertir esto en un "no pude guardar". Se pega al mismo mensaje.
+      const alertas = await avisarRubros(res.budgetItemIds ?? []);
+      const base = `✅ Registré tu factura${supplierTexto}${totalRegistradoTexto} (${res.itemsFound} ítems) en ${cuenta}.`;
+      await deps.sendMessage(ctx.phone, pegarAlertas(base, alertas));
     } else if (res.itemsFound > 0) {
       // Fallo a mitad de camino: esos ítems YA son transacciones reales. Decir
       // "no pude guardar la factura" empujaría a reenviar el CUFE y duplicarlos.
       // El panel "Facturas sin completar" no tiene botón para esto (solo para
       // pending_review): la acción real es cargar el resto a mano en Gastos.
-      await deps.sendMessage(
-        ctx.phone,
-        `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta} (esos ya están en tus gastos, no se perdieron). Los que faltan, cargalos a mano en Gastos; no vuelvas a mandar el CUFE, duplicaría los que ya quedaron.`,
-      );
+      // Esos ítems también quedan con rubro asignado: la alerta también avisa.
+      const alertas = await avisarRubros(res.budgetItemIds ?? []);
+      const base = `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta} (esos ya están en tus gastos, no se perdieron). Los que faltan, cargalos a mano en Gastos; no vuelvas a mandar el CUFE, duplicaría los que ya quedaron.`;
+      await deps.sendMessage(ctx.phone, pegarAlertas(base, alertas));
     } else {
       await deps.sendMessage(
         ctx.phone,

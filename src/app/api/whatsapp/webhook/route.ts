@@ -12,12 +12,10 @@ import {
   createVisionReceiptDraft,
   resolveDefaultAccount,
 } from '@/lib/services/whatsapp-expenses';
-import {
-  getLinkByPhone,
-  redeemLinkCode,
-} from '@/lib/services/whatsapp-links';
+import { getLinkByPhone, redeemLinkCode } from '@/lib/services/whatsapp-links';
 import { readState, writeState } from '@/lib/whatsapp/agent/state';
 import { handleAgentTurn, listarCuentas } from '@/lib/whatsapp/agent/turn';
+import { dispararAlertasWhatsapp } from '@/lib/whatsapp/alerts';
 import { ackMessage, classifyText, simpleReply } from '@/lib/whatsapp/classify';
 import { todayBogota } from '@/lib/whatsapp/format';
 import { handleAgentMessage } from '@/lib/whatsapp/handle-agent';
@@ -118,6 +116,8 @@ export async function POST(request: NextRequest) {
               }),
             registerInvoice: (invoiceId, accountName) =>
               createInvoiceDirect(userId, invoiceId, accountName),
+            onExpenseCreated: e =>
+              dispararAlertasWhatsapp(userId, e.budgetItemIds, e.monthYear),
           },
         );
       } catch (err) {
@@ -161,6 +161,8 @@ export async function POST(request: NextRequest) {
               }),
             registerInvoice: (invoiceId, accountName) =>
               createInvoiceDirect(userId, invoiceId, accountName),
+            onExpenseCreated: e =>
+              dispararAlertasWhatsapp(userId, e.budgetItemIds, e.monthYear),
           },
         );
       } catch (err) {

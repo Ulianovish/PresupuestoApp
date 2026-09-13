@@ -17,7 +17,12 @@ function makeDeps(overrides = {}) {
       invoiceId: 'inv-1',
     })),
     savePending: vi.fn(async () => {}),
-    registerInvoice: vi.fn(async () => ({ ok: true, itemsFound: 2, totalItems: 2 })),
+    registerInvoice: vi.fn(async () => ({
+      ok: true,
+      itemsFound: 2,
+      totalItems: 2,
+    })),
+    onExpenseCreated: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -49,7 +54,10 @@ describe('handleImageMessage', () => {
       accountName: 'Nequi',
       date: '2026-06-11',
     });
-    expect(deps.sendMessage).toHaveBeenCalledWith('+57300', expect.stringMatching(/50.?000/));
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringMatching(/50.?000/),
+    );
   });
 
   it('transferencia sin cuenta → usa la cuenta por defecto', async () => {
@@ -136,6 +144,87 @@ describe('handleImageMessage', () => {
     );
   });
 
+  it('la foto de una transferencia también dispara la alerta del rubro', async () => {
+    let recibido: string[] | null = null;
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'transfer',
+        amount: 50000,
+        date: '2026-06-11',
+        account: 'Nequi',
+        description: 'Juan',
+        confidence: 0.9,
+      })),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'MERCADO',
+        transactionId: 't1',
+        budgetItemId: 'item-dulces',
+      })),
+      onExpenseCreated: async (e: { budgetItemIds: string[] }) => {
+        recibido = e.budgetItemIds;
+        return [];
+      },
+    });
+    await handleImageMessage(ctx, deps);
+    expect(recibido).toEqual(['item-dulces']);
+  });
+
+  it('la alerta de la transferencia se pega al mismo mensaje, no manda uno aparte', async () => {
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'transfer',
+        amount: 50000,
+        date: '2026-06-11',
+        account: 'Nequi',
+        description: 'Juan',
+        confidence: 0.9,
+      })),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'MERCADO',
+        transactionId: 't1',
+        budgetItemId: 'item-dulces',
+      })),
+      onExpenseCreated: vi.fn(async () => ['⚠️ Vas en 82% de Dulces.']),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.sendMessage).toHaveBeenCalledTimes(1);
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringContaining('⚠️ Vas en 82% de Dulces.'),
+    );
+  });
+
+  it('si el enganche de la transferencia lanza, el gasto igual queda confirmado', async () => {
+    // Mismo criterio que executeTool: el gasto YA está guardado, una alerta
+    // que falla no puede convertir esto en un "no pude registrar".
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'transfer',
+        amount: 50000,
+        date: '2026-06-11',
+        account: 'Nequi',
+        description: 'Juan',
+        confidence: 0.9,
+      })),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'MERCADO',
+        transactionId: 't1',
+        budgetItemId: 'item-dulces',
+      })),
+      onExpenseCreated: vi.fn(async () => {
+        throw new Error('Supabase caído');
+      }),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringMatching(/✅ Registré/),
+    );
+  });
+
   it('el total que confirma de una factura es el REGISTRADO, no el que leyó la visión', async () => {
     const deps = makeDeps({
       analyzeImage: vi.fn(async () => ({
@@ -158,6 +247,109 @@ describe('handleImageMessage', () => {
       .calls[0][1] as string;
     expect(mensaje).toMatch(/298\.000/);
     expect(mensaje).not.toMatch(/312\.400/);
+  });
+
+  it('el recibo registrado también dispara la alerta de los rubros que tocó, pegada al mismo mensaje', async () => {
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'receipt',
+        supplier: 'D1',
+        date: '2026-06-12',
+        items: [{ description: 'Arroz', amount: 6000 }],
+        total: 6000,
+        confidence: 0.8,
+      })),
+      registerInvoice: vi.fn(async () => ({
+        ok: true,
+        itemsFound: 1,
+        totalItems: 1,
+        totalAmount: 6000,
+        budgetItemIds: ['item-mercado'],
+        monthYear: '2026-06',
+      })),
+      onExpenseCreated: vi.fn(async () => ['⚠️ Vas en 90% de Mercado.']),
+    });
+    await handleImageMessage({ ...ctx, body: 'pagué con Nequi' }, deps);
+    expect(deps.onExpenseCreated).toHaveBeenCalledWith({
+      categoria: 'FACTURA',
+      budgetItemIds: ['item-mercado'],
+      // Mes DE LA FACTURA (lo que devuelve `registerInvoice`), no el de hoy.
+      monthYear: '2026-06',
+    });
+    expect(deps.sendMessage).toHaveBeenCalledTimes(1);
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringContaining('⚠️ Vas en 90% de Mercado.'),
+    );
+  });
+
+  it('si el enganche del recibo lanza, la factura igual queda confirmada', async () => {
+    // Mismo criterio que la rama de transferencia: los gastos de la factura
+    // YA están escritos, una alerta que falla no puede convertir esto en un
+    // "no pude registrar".
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'receipt',
+        supplier: 'D1',
+        date: '2026-06-12',
+        items: [{ description: 'Arroz', amount: 6000 }],
+        total: 6000,
+        confidence: 0.8,
+      })),
+      registerInvoice: vi.fn(async () => ({
+        ok: true,
+        itemsFound: 1,
+        totalItems: 1,
+        totalAmount: 6000,
+        budgetItemIds: ['item-mercado'],
+        monthYear: '2026-06',
+      })),
+      onExpenseCreated: vi.fn(async () => {
+        throw new Error('Supabase caído');
+      }),
+    });
+    await handleImageMessage({ ...ctx, body: 'pagué con Nequi' }, deps);
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringMatching(/✅ Registré tu factura/),
+    );
+  });
+
+  it('recibo cuyo registro falla a mitad de camino: los ítems que SÍ quedaron con rubro también avisan al enganche', async () => {
+    // El hallazgo crítico: esos ítems ya son transacciones reales con rubro
+    // asignado. Que el registro haya quedado a medias no los excluye de las
+    // alertas de presupuesto.
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({
+        kind: 'receipt',
+        supplier: 'D1',
+        date: '2026-06-12',
+        items: [
+          { description: 'arroz', amount: 5000 },
+          { description: 'leche', amount: 3000 },
+        ],
+        total: 8000,
+        confidence: 0.8,
+      })),
+      registerInvoice: vi.fn(async () => ({
+        ok: false,
+        itemsFound: 1,
+        totalItems: 2,
+        budgetItemIds: ['item-mercado'],
+        monthYear: '2026-06',
+        error: 'boom',
+      })),
+      onExpenseCreated: vi.fn(async () => ['⚠️ Vas en 90% de Mercado.']),
+    });
+    await handleImageMessage({ ...ctx, body: 'con Nequi' }, deps);
+    expect(deps.onExpenseCreated).toHaveBeenCalledWith({
+      categoria: 'FACTURA',
+      budgetItemIds: ['item-mercado'],
+      monthYear: '2026-06',
+    });
+    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as string;
+    expect(mensaje).toContain('⚠️ Vas en 90% de Mercado.');
   });
 
   it('recibo → se persiste SIEMPRE como borrador, antes de decidir si hay que preguntar', async () => {
@@ -194,7 +386,8 @@ describe('handleImageMessage', () => {
     await handleImageMessage({ ...ctx, body: 'pagué con Nequi' }, deps);
     expect(deps.registerInvoice).toHaveBeenCalledWith('inv-1', 'Nequi');
     expect(deps.savePending).not.toHaveBeenCalled();
-    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0][1];
     expect(mensaje).toMatch(/registr/i);
     expect(mensaje).toMatch(/6\.?000/); // el total, para que el usuario pueda detectar una lectura mala
   });
@@ -213,7 +406,8 @@ describe('handleImageMessage', () => {
     await handleImageMessage({ ...ctx, body: '' }, deps);
     expect(deps.savePending).toHaveBeenCalledWith('inv-1');
     expect(deps.registerInvoice).not.toHaveBeenCalled();
-    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0][1];
     expect(mensaje).toMatch(/qué cuenta/i);
     expect(mensaje).toMatch(/6\.?000/);
   });
@@ -233,9 +427,9 @@ describe('handleImageMessage', () => {
       { ...ctx, body: '', existingPendingId: 'inv-vieja' },
       deps,
     );
-    const mensajes = (deps.sendMessage as ReturnType<typeof vi.fn>).mock.calls.map(
-      c => c[1] as string,
-    );
+    const mensajes = (
+      deps.sendMessage as ReturnType<typeof vi.fn>
+    ).mock.calls.map(c => c[1] as string);
     expect(mensajes.some(m => /otra factura/i.test(m))).toBe(true);
     expect(mensajes.some(m => /qué cuenta/i.test(m))).toBe(true);
     expect(deps.savePending).toHaveBeenCalledWith('inv-1');
@@ -286,7 +480,8 @@ describe('handleImageMessage', () => {
       })),
     });
     await handleImageMessage({ ...ctx, body: 'con Nequi' }, deps);
-    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0][1];
     expect(mensaje).toContain('1');
     expect(mensaje).toContain('2');
     expect(mensaje).not.toMatch(/no pude guardar la factura/i);
@@ -322,11 +517,16 @@ describe('handleImageMessage', () => {
   });
 
   it('unknown → pide reenviar/escribir (no crea nada)', async () => {
-    const deps = makeDeps({ analyzeImage: vi.fn(async () => ({ kind: 'unknown' })) });
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({ kind: 'unknown' })),
+    });
     await handleImageMessage(ctx, deps);
     expect(deps.createDirectExpense).not.toHaveBeenCalled();
     expect(deps.createReceiptDraft).not.toHaveBeenCalled();
-    expect(deps.sendMessage).toHaveBeenCalledWith('+57300', expect.stringMatching(/no pude|reenv|escrib/i));
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringMatching(/no pude|reenv|escrib/i),
+    );
   });
 
   it('service_error → culpa al servicio, NO a la foto', async () => {
@@ -365,7 +565,9 @@ describe('resolveAccountFromMessage', () => {
   });
 
   it('el texto le gana a la visión: el usuario sabe más que la foto', () => {
-    expect(resolveAccountFromMessage('fue con Nequi', 'Efectivo', CUENTAS)).toBe('Nequi');
+    expect(
+      resolveAccountFromMessage('fue con Nequi', 'Efectivo', CUENTAS),
+    ).toBe('Nequi');
   });
 
   it('devuelve null si no hay nada que resolver, para que el bot pregunte', () => {
@@ -373,7 +575,9 @@ describe('resolveAccountFromMessage', () => {
   });
 
   it('ignora una cuenta que el usuario no tiene', () => {
-    expect(resolveAccountFromMessage('con Bancolombia', null, CUENTAS)).toBeNull();
+    expect(
+      resolveAccountFromMessage('con Bancolombia', null, CUENTAS),
+    ).toBeNull();
   });
 
   it('una cuenta ambigua por texto se trata como no resuelta, nunca se elige al azar', () => {
@@ -387,14 +591,24 @@ describe('resolveAccountFromMessage', () => {
 
   it('la visión también trata la ambigüedad como no resuelta', () => {
     const CUENTAS_AMBIGUAS = ['Davivienda', 'DAVIVIENDA', 'Nequi'];
-    expect(resolveAccountFromMessage('', 'davivienda', CUENTAS_AMBIGUAS)).toBeNull();
+    expect(
+      resolveAccountFromMessage('', 'davivienda', CUENTAS_AMBIGUAS),
+    ).toBeNull();
   });
 
   it('varias cuentas que comparten la misma palabra distintiva también son ambiguas', () => {
     // Con ~23 cuentas reales, varias comparten palabra (8 variantes de "Nu").
-    const CUENTAS_COMPARTIDAS = ['Banco Falabella', 'Falabella Crédito', 'Nequi'];
+    const CUENTAS_COMPARTIDAS = [
+      'Banco Falabella',
+      'Falabella Crédito',
+      'Nequi',
+    ];
     expect(
-      resolveAccountFromMessage('pagué con Falabella', null, CUENTAS_COMPARTIDAS),
+      resolveAccountFromMessage(
+        'pagué con Falabella',
+        null,
+        CUENTAS_COMPARTIDAS,
+      ),
     ).toBeNull();
   });
 });

@@ -14,7 +14,12 @@ function makeDeps(overrides = {}) {
     })),
     accounts: ['Efectivo', 'Nequi'],
     savePending: vi.fn(async () => {}),
-    registerInvoice: vi.fn(async () => ({ ok: true, itemsFound: 3, totalItems: 3 })),
+    registerInvoice: vi.fn(async () => ({
+      ok: true,
+      itemsFound: 3,
+      totalItems: 3,
+    })),
+    onExpenseCreated: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -24,7 +29,12 @@ describe('handleAgentMessage', () => {
     const deps = makeDeps();
     await handleAgentMessage(
       'cufe',
-      { userId: 'u1', phone: '+573001234567', body: CUFE, existingPendingId: null },
+      {
+        userId: 'u1',
+        phone: '+573001234567',
+        body: CUFE,
+        existingPendingId: null,
+      },
       deps,
     );
     expect(deps.processCufe).toHaveBeenCalledWith('u1', CUFE);
@@ -44,7 +54,12 @@ describe('handleAgentMessage', () => {
     const deps = makeDeps();
     await handleAgentMessage(
       'cufe',
-      { userId: 'u1', phone: '+57300', body: `${CUFE} con la Nequi`, existingPendingId: null },
+      {
+        userId: 'u1',
+        phone: '+57300',
+        body: `${CUFE} con la Nequi`,
+        existingPendingId: null,
+      },
       deps,
     );
     expect(deps.registerInvoice).toHaveBeenCalledWith('inv-1', 'Nequi');
@@ -52,6 +67,40 @@ describe('handleAgentMessage', () => {
     expect(deps.sendMessage).not.toHaveBeenCalledWith(
       expect.anything(),
       expect.stringMatching(/¿con qué cuenta/i),
+    );
+  });
+
+  it('el CUFE registrado también dispara la alerta de los rubros que tocó, pegada al mismo mensaje', async () => {
+    const deps = makeDeps({
+      registerInvoice: vi.fn(async () => ({
+        ok: true,
+        itemsFound: 3,
+        totalItems: 3,
+        budgetItemIds: ['item-mercado'],
+        monthYear: '2026-08',
+      })),
+      onExpenseCreated: vi.fn(async () => ['⚠️ Vas en 90% de Mercado.']),
+    });
+    await handleAgentMessage(
+      'cufe',
+      {
+        userId: 'u1',
+        phone: '+57300',
+        body: `${CUFE} con la Nequi`,
+        existingPendingId: null,
+      },
+      deps,
+    );
+    expect(deps.onExpenseCreated).toHaveBeenCalledWith({
+      categoria: 'FACTURA',
+      budgetItemIds: ['item-mercado'],
+      // Mes DE LA FACTURA (lo que devuelve `registerInvoice`), no el de hoy.
+      monthYear: '2026-08',
+    });
+    expect(deps.sendMessage).toHaveBeenCalledTimes(1);
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringContaining('⚠️ Vas en 90% de Mercado.'),
     );
   });
 
@@ -65,7 +114,12 @@ describe('handleAgentMessage', () => {
     });
     await handleAgentMessage(
       'cufe',
-      { userId: 'u1', phone: '+57300', body: CUFE, existingPendingId: 'inv-old' },
+      {
+        userId: 'u1',
+        phone: '+57300',
+        body: CUFE,
+        existingPendingId: 'inv-old',
+      },
       deps,
     );
     expect(enviados.some(t => /otra factura/i.test(t))).toBe(true);
@@ -89,7 +143,12 @@ describe('handleAgentMessage', () => {
     const deps = makeDeps();
     await handleAgentMessage(
       'cufe',
-      { userId: 'u1', phone: '+57300', body: 'texto sin cufe', existingPendingId: null },
+      {
+        userId: 'u1',
+        phone: '+57300',
+        body: 'texto sin cufe',
+        existingPendingId: null,
+      },
       deps,
     );
     expect(deps.processCufe).not.toHaveBeenCalled();
@@ -181,7 +240,12 @@ describe('handleAgentMessage', () => {
     });
     await handleAgentMessage(
       'cufe',
-      { userId: 'u1', phone: '+57300', body: `${CUFE} con la Nequi`, existingPendingId: null },
+      {
+        userId: 'u1',
+        phone: '+57300',
+        body: `${CUFE} con la Nequi`,
+        existingPendingId: null,
+      },
       deps,
     );
     const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
@@ -194,9 +258,80 @@ describe('handleAgentMessage', () => {
     expect(mensaje).not.toMatch(/facturas sin completar/i);
   });
 
+  it('cufe cuyo registro falla a mitad de camino: los ítems que SÍ quedaron con rubro también avisan al enganche', async () => {
+    // El hallazgo crítico: esos ítems ya son transacciones reales con rubro
+    // asignado. Que el registro haya quedado a medias no los excluye de las
+    // alertas de presupuesto.
+    const deps = makeDeps({
+      registerInvoice: vi.fn(async () => ({
+        ok: false,
+        itemsFound: 3,
+        totalItems: 8,
+        budgetItemIds: ['item-mercado'],
+        monthYear: '2026-08',
+        error: 'boom',
+      })),
+      onExpenseCreated: vi.fn(async () => ['⚠️ Vas en 90% de Mercado.']),
+    });
+    await handleAgentMessage(
+      'cufe',
+      {
+        userId: 'u1',
+        phone: '+57300',
+        body: `${CUFE} con la Nequi`,
+        existingPendingId: null,
+      },
+      deps,
+    );
+    expect(deps.onExpenseCreated).toHaveBeenCalledWith({
+      categoria: 'FACTURA',
+      budgetItemIds: ['item-mercado'],
+      monthYear: '2026-08',
+    });
+    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as string;
+    expect(mensaje).toContain('⚠️ Vas en 90% de Mercado.');
+  });
+
+  it('si el enganche del CUFE lanza, la factura igual queda confirmada', async () => {
+    // Mismo criterio que el resto de los caminos: los gastos de la factura
+    // YA están escritos, una alerta que falla no puede convertir esto en un
+    // "no pude guardar".
+    const deps = makeDeps({
+      registerInvoice: vi.fn(async () => ({
+        ok: true,
+        itemsFound: 3,
+        totalItems: 3,
+        budgetItemIds: ['item-mercado'],
+        monthYear: '2026-08',
+      })),
+      onExpenseCreated: vi.fn(async () => {
+        throw new Error('Supabase caído');
+      }),
+    });
+    await handleAgentMessage(
+      'cufe',
+      {
+        userId: 'u1',
+        phone: '+57300',
+        body: `${CUFE} con la Nequi`,
+        existingPendingId: null,
+      },
+      deps,
+    );
+    expect(deps.sendMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringMatching(/✅ Registré tu factura/),
+    );
+  });
+
   it('cufe error → avisa el error', async () => {
     const deps = makeDeps({
-      processCufe: vi.fn(async () => ({ ok: false, reason: 'error', message: 'DIAN caído' })),
+      processCufe: vi.fn(async () => ({
+        ok: false,
+        reason: 'error',
+        message: 'DIAN caído',
+      })),
     });
     await handleAgentMessage(
       'cufe',
