@@ -26,13 +26,17 @@ export interface DeudaParaIndicador {
 export type IngresoParaIndicador = IngresoConFecha;
 
 export interface IndicadoresEndeudamiento {
-  /** Suma de cuotas mensuales de deudas de consumo. */
+  /** Suma de cuotas mensuales de deudas de consumo (tarjetas de crédito). */
   pagosConsumo: number;
+  /** Suma de cuotas mensuales de deudas de activos (el resto). */
+  pagosActivos: number;
   /** Suma de cuotas mensuales de todas las deudas. */
   pagosTotales: number;
   ingresoNeto: number;
   /** Porcentaje del ingreso destinado a deuda de consumo; null si no hay ingreso. */
   porcentajeConsumo: number | null;
+  /** Porcentaje del ingreso destinado a deuda de activos; null si no hay ingreso. */
+  porcentajeActivos: number | null;
   /** Porcentaje del ingreso destinado a todas las deudas; null si no hay ingreso. */
   porcentajeTotal: number | null;
 }
@@ -81,14 +85,21 @@ export function calcularIndicadores(
   const pagosConsumo = vigentes
     .filter(esDeudaDeConsumo)
     .reduce((sum, d) => sum + (d.valor_cuota ?? 0), 0);
+  // Los activos son el complemento del consumo, así consumo + activos
+  // siempre cuadra con el total.
+  const pagosActivos = pagosTotales - pagosConsumo;
 
   const hayIngreso = ingresoNeto > 0;
+  const porcentaje = (pago: number) =>
+    hayIngreso ? (pago / ingresoNeto) * 100 : null;
 
   return {
     pagosConsumo,
+    pagosActivos,
     pagosTotales,
     ingresoNeto,
-    porcentajeConsumo: hayIngreso ? (pagosConsumo / ingresoNeto) * 100 : null,
-    porcentajeTotal: hayIngreso ? (pagosTotales / ingresoNeto) * 100 : null,
+    porcentajeConsumo: porcentaje(pagosConsumo),
+    porcentajeActivos: porcentaje(pagosActivos),
+    porcentajeTotal: porcentaje(pagosTotales),
   };
 }

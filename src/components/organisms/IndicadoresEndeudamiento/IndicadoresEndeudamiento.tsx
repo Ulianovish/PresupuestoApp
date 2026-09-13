@@ -1,10 +1,11 @@
 /**
  * IndicadoresEndeudamiento - Organism Level
  *
- * Muestra los dos indicadores básicos de endeudamiento sobre el ingreso neto
- * del mes seleccionado:
+ * Muestra los indicadores básicos de endeudamiento sobre el ingreso neto del
+ * mes seleccionado, uno por cada grupo de deudas más el total:
  *
  *   - % del ingreso destinado a deudas de consumo (tarjetas de crédito)
+ *   - % del ingreso destinado a deudas de activos
  *   - % del ingreso destinado a todas las deudas
  *
  * Debajo de cada porcentaje se deja a la vista la división que lo produce,
@@ -62,7 +63,7 @@ export default function IndicadoresEndeudamiento({
   nombreMes,
   formatCurrency,
 }: IndicadoresEndeudamientoProps) {
-  const { pagosConsumo, pagosTotales, ingresoNeto } = indicadores;
+  const { pagosConsumo, pagosActivos, pagosTotales, ingresoNeto } = indicadores;
 
   return (
     <Card variant="glass">
@@ -76,11 +77,18 @@ export default function IndicadoresEndeudamiento({
         </p>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Indicador
             titulo="Del ingreso a deudas de consumo"
             porcentaje={indicadores.porcentajeConsumo}
             numerador={pagosConsumo}
+            ingresoNeto={ingresoNeto}
+            formatCurrency={formatCurrency}
+          />
+          <Indicador
+            titulo="Del ingreso a deudas de activos"
+            porcentaje={indicadores.porcentajeActivos}
+            numerador={pagosActivos}
             ingresoNeto={ingresoNeto}
             formatCurrency={formatCurrency}
           />

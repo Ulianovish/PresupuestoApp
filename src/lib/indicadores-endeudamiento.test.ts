@@ -72,15 +72,22 @@ describe('esDeudaDeConsumo', () => {
 });
 
 describe('calcularIndicadores', () => {
-  it('separa los pagos de consumo del total', () => {
+  it('separa los pagos de consumo, de activos y el total', () => {
     const r = calcularIndicadores(DEUDAS, 17750000);
     expect(r.pagosConsumo).toBe(4148000);
+    expect(r.pagosActivos).toBe(3376703);
     expect(r.pagosTotales).toBe(7524703);
+  });
+
+  it('consumo mas activos siempre cuadra con el total', () => {
+    const r = calcularIndicadores(DEUDAS, 17750000);
+    expect(r.pagosConsumo + r.pagosActivos).toBe(r.pagosTotales);
   });
 
   it('calcula los porcentajes sobre el ingreso neto', () => {
     const r = calcularIndicadores(DEUDAS, 17750000);
     expect(r.porcentajeConsumo).toBeCloseTo(23.37, 2);
+    expect(r.porcentajeActivos).toBeCloseTo(19.02, 2);
     expect(r.porcentajeTotal).toBeCloseTo(42.39, 2);
   });
 
@@ -105,6 +112,7 @@ describe('calcularIndicadores', () => {
   it('sin ingreso del mes deja los porcentajes en null, no en Infinity', () => {
     const r = calcularIndicadores(DEUDAS, 0);
     expect(r.porcentajeConsumo).toBeNull();
+    expect(r.porcentajeActivos).toBeNull();
     expect(r.porcentajeTotal).toBeNull();
     expect(r.pagosTotales).toBe(7524703);
   });
@@ -112,6 +120,7 @@ describe('calcularIndicadores', () => {
   it('sin deudas los porcentajes son 0', () => {
     const r = calcularIndicadores([], 17750000);
     expect(r.porcentajeConsumo).toBe(0);
+    expect(r.porcentajeActivos).toBe(0);
     expect(r.porcentajeTotal).toBe(0);
   });
 
