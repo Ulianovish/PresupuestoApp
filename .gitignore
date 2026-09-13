@@ -50,3 +50,6 @@ next-env.d.ts
 # Scratch de superpowers (ledger, briefs, reportes de revisión)
 .superpowers/
 .env.vercel-tmp
+
+# El proyecto usa bun (ver bun.lock); npm generaria un lockfile en conflicto
+package-lock.json

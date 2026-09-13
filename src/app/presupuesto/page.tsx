@@ -17,7 +17,6 @@ import BudgetItemModal from '@/components/organisms/BudgetItemModal/BudgetItemMo
 import BudgetStatusPanels from '@/components/organisms/BudgetStatusPanels/BudgetStatusPanels';
 import BudgetTable from '@/components/organisms/BudgetTable/BudgetTable';
 import CategoryModal from '@/components/organisms/CategoryModal/CategoryModal';
-import UnclassifiedExpensesPanel from '@/components/organisms/UnclassifiedExpensesPanel/UnclassifiedExpensesPanel';
 import BudgetPageTemplate from '@/components/templates/BudgetPageTemplate/BudgetPageTemplate';
 import { useMonth } from '@/contexts/MonthContext';
 import { useMonthlyBudget } from '@/hooks/useMonthlyBudget';
@@ -132,10 +131,9 @@ export default function PresupuestoPage() {
   );
 
   // Recarga el panel de alertas. Se llama en los mismos puntos donde se llama
-  // refreshBudget (ver refreshBudgetAndAlertas más abajo): sin esto, asignar
-  // un gasto desde UnclassifiedExpensesPanel, guardar "Nunca avisar" en un
-  // rubro, o el botón de refrescar del header no movían el panel hasta
-  // recargar la página entera.
+  // refreshBudget (ver refreshBudgetAndAlertas más abajo): sin esto, guardar
+  // "Nunca avisar" en un rubro o el botón de refrescar del header no movían
+  // el panel hasta recargar la página entera.
   const refreshEstadoRubros = useCallback(async () => {
     setEstadoRubros(await fetchEstadoRubros(selectedMonth));
   }, [selectedMonth, fetchEstadoRubros]);
@@ -685,10 +683,6 @@ export default function PresupuestoPage() {
                   hoy={hoyBogotaDate()}
                 />
               )}
-              <UnclassifiedExpensesPanel
-                monthYear={selectedMonth}
-                onChanged={refreshBudgetAndAlertas}
-              />
               <BudgetTable
                 categories={categories}
                 budgetData={budgetData}

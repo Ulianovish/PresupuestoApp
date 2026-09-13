@@ -1,5 +1,5 @@
 // POST /api/invoices/[id]/complete
-// Body: { accountName: string }
+// Body: { accountName: string, categoryOverrides?: Record<number, string> }
 //
 // Reemplaza al viejo /approve. Ya no hay un trámite de "aprobación": el bot
 // de WhatsApp pregunta la cuenta y registra directo. Esta ruta solo existe
@@ -29,7 +29,10 @@ export async function POST(
     return Response.json({ error: 'No autenticado' }, { status: 401 });
   }
 
-  let body: { accountName?: string };
+  let body: {
+    accountName?: string;
+    categoryOverrides?: Record<number, string>;
+  };
   try {
     body = await request.json();
   } catch {
@@ -43,7 +46,9 @@ export async function POST(
     );
   }
 
-  const result = await createInvoiceDirect(user.id, id, body.accountName);
+  const result = await createInvoiceDirect(user.id, id, body.accountName, {
+    categoryOverrides: body.categoryOverrides,
+  });
 
   if (!result.ok) {
     return Response.json(

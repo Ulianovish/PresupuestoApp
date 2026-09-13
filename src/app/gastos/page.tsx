@@ -23,10 +23,12 @@ import ExpenseStatusPanels from '@/components/organisms/ExpenseStatusPanels/Expe
 import ExpenseSummary from '@/components/organisms/ExpenseSummary/ExpenseSummary';
 import ExpenseTable from '@/components/organisms/ExpenseTable/ExpenseTable';
 import PendingInvoicesPanel from '@/components/organisms/PendingInvoicesPanel/PendingInvoicesPanel';
+import UnclassifiedExpensesPanel from '@/components/organisms/UnclassifiedExpensesPanel/UnclassifiedExpensesPanel';
 import ExpensePageTemplate from '@/components/templates/ExpensePageTemplate/ExpensePageTemplate';
 import { useCategories } from '@/hooks/useCategories';
 import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
 import { createBudgetItemInMonth } from '@/lib/actions/categories';
+import { updateBudgetItem, deleteBudgetItem } from '@/lib/services/budget';
 import {
   ACCOUNT_TYPES,
   createExpenseTransaction,
@@ -186,6 +188,45 @@ export default function GastosPage() {
     } catch (err) {
       console.error('Error asignando ítem al gasto:', err);
       toast.error('No se pudo asignar el ítem al gasto');
+    }
+  };
+
+  /**
+   * Renombra un ítem del presupuesto desde el desplegable (clic derecho).
+   * Afecta al ítem en sí, así que todos los gastos que lo usan pasan a
+   * mostrar el nombre nuevo.
+   */
+  const handleRenameBudgetItem = async (itemId: string, newName: string) => {
+    try {
+      const updated = await updateBudgetItem(itemId, { descripcion: newName });
+      if (!updated) {
+        toast.error('No se pudo renombrar el ítem');
+        return;
+      }
+      await Promise.all([loadBudgetItems(), refreshExpenses()]);
+      toast.success('Ítem renombrado');
+    } catch (err) {
+      console.error('Error renombrando ítem:', err);
+      toast.error('No se pudo renombrar el ítem');
+    }
+  };
+
+  /**
+   * Elimina un ítem del presupuesto desde el desplegable (clic derecho).
+   * Los gastos que lo tenían asignado no se borran: quedan sin asignar.
+   */
+  const handleDeleteBudgetItem = async (itemId: string) => {
+    try {
+      const ok = await deleteBudgetItem(itemId);
+      if (!ok) {
+        toast.error('No se pudo eliminar el ítem');
+        return;
+      }
+      await Promise.all([loadBudgetItems(), refreshExpenses()]);
+      toast.success('Ítem eliminado; sus gastos quedaron sin asignar');
+    } catch (err) {
+      console.error('Error eliminando ítem:', err);
+      toast.error('No se pudo eliminar el ítem');
     }
   };
 
@@ -682,14 +723,27 @@ export default function GastosPage() {
             budgetItems={budgetItems}
             onAssignItem={handleAssignItem}
             onCreateItem={setCreateItemFor}
+            onRenameItem={handleRenameBudgetItem}
+            onDeleteItem={handleDeleteBudgetItem}
           />
         ) : undefined
       }
       migrationPanel={
-        <PendingInvoicesPanel
-          refreshToken={invoiceRefresh}
-          onCompleted={refreshExpenses}
-        />
+        <>
+          <PendingInvoicesPanel
+            refreshToken={invoiceRefresh}
+            onCompleted={refreshExpenses}
+          />
+          {/* Gastos del mes que aún no tienen ítem de presupuesto asignado */}
+          <div className="mt-6">
+            <UnclassifiedExpensesPanel
+              monthYear={selectedMonth}
+              onChanged={async () => {
+                await Promise.all([refreshExpenses(), loadBudgetItems()]);
+              }}
+            />
+          </div>
+        </>
       }
       modal={
         <ExpenseModal

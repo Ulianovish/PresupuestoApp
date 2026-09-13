@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import Button from '@/components/atoms/Button/Button';
+import { useCategories } from '@/hooks/useCategories';
 import { formatCurrency, getUserAccounts } from '@/lib/services/expenses';
 import type { ElectronicInvoice } from '@/types/invoices';
 
@@ -29,6 +30,14 @@ export default function PendingInvoicesPanel({
   const [accountNames, setAccountNames] = useState<string[]>([]);
   const [account, setAccount] = useState<string>('');
   const [completing, setCompleting] = useState(false);
+  // Categoría elegida a mano por línea (índice del ítem -> categoría). La IA
+  // acierta casi siempre, pero un chocolate puede ser MERCADO o un regalo.
+  const [categoryOverrides, setCategoryOverrides] = useState<
+    Record<number, string>
+  >({});
+
+  const { categories: budgetCategories } = useCategories();
+  const categoryNames = budgetCategories.map(c => c.name.toUpperCase());
 
   // Cuentas reales del usuario (tabla `accounts`), no la lista fija de
   // ACCOUNT_TYPES: con esa, rescatar una factura la registraría con una
@@ -80,6 +89,7 @@ export default function PendingInvoicesPanel({
 
   const openInvoice = (inv: ElectronicInvoice) => {
     setOpenId(inv.id);
+    setCategoryOverrides({});
     setAccount(prev =>
       prev && accountNames.includes(prev) ? prev : (accountNames[0] ?? ''),
     );
@@ -95,12 +105,13 @@ export default function PendingInvoicesPanel({
       const res = await fetch(`/api/invoices/${inv.id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountName: account }),
+        body: JSON.stringify({ accountName: account, categoryOverrides }),
       });
       const data = await res.json();
       if (!res.ok)
         throw new Error(data.error || 'Error registrando la factura');
       toast.success(`${data.itemsFound} gastos registrados`);
+      setCategoryOverrides({});
       setOpenId(null);
       await load();
       onCompleted();
@@ -201,9 +212,33 @@ export default function PendingInvoicesPanel({
                       <span className="text-slate-400">
                         {formatCurrency(it.total_with_tax ?? it.total_price)}
                       </span>
-                      <span className="text-xs text-slate-500">
-                        {it.category}
-                      </span>
+                      {categoryNames.length > 0 ? (
+                        <select
+                          value={categoryOverrides[idx] ?? it.category}
+                          onChange={e =>
+                            setCategoryOverrides(prev => ({
+                              ...prev,
+                              [idx]: e.target.value,
+                            }))
+                          }
+                          title="Categoría del gasto: cámbiala si la IA se equivocó"
+                          className="w-44 flex-shrink-0 rounded border border-slate-600 bg-slate-800 px-1 py-0.5 text-xs text-slate-200"
+                        >
+                          {/* La categoría sugerida se incluye aunque ya no exista */}
+                          {!categoryNames.includes(it.category) && (
+                            <option value={it.category}>{it.category}</option>
+                          )}
+                          {categoryNames.map(c => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-slate-500">
+                          {it.category}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>

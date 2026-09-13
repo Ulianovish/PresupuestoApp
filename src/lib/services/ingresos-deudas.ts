@@ -7,6 +7,8 @@
 
 import { supabase } from '@/lib/supabase/client';
 
+import { aColumnasDeActualizacion } from './deudas-columnas';
+
 // ============================================
 // TIPOS E INTERFACES
 // ============================================
@@ -292,9 +294,11 @@ export async function actualizarDeuda(
   datosActualizados: Partial<NuevaDeuda> & { pagada?: boolean },
 ): Promise<Deuda> {
   try {
+    // El formulario manda `tipo_deuda`, pero la columna se llama `tipo`:
+    // enviarlo tal cual hace que PostgREST responda 400 (PGRST204).
     const { data, error } = await supabase
       .from('deudas')
-      .update(datosActualizados)
+      .update(aColumnasDeActualizacion(datosActualizados))
       .eq('id', id)
       .select()
       .single();
