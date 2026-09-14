@@ -171,10 +171,40 @@ export async function dispararAlertas(
   if (tocados.size === 0) return [];
 
   const estado = await deps.cargarEstado(args.userId, args.monthYear);
+  return avisarNuevas(
+    deps,
+    args,
+    estado.filter(r => tocados.has(r.budgetItemId)),
+  );
+}
+
+/**
+ * Como `dispararAlertas`, pero sobre TODOS los rubros vigilados del mes, de
+ * peor a mejor. Para avisos que no nacen de un gasto (la ruta
+ * /api/cron/alertas-pendientes): recupera los umbrales que se cruzaron sin que
+ * nadie avisara — un gasto cargado desde la web, un presupuesto que se bajó, o
+ * las semanas en que las alertas no estaban desplegadas. Comparte el mismo
+ * `marcarEnviado`, así que nunca repite lo que ya se avisó al registrar un gasto.
+ */
+export async function alertasPendientes(
+  deps: AlertDeps,
+  args: { userId: string; monthYear: string; hoy: Date },
+): Promise<string[]> {
+  const estado = await deps.cargarEstado(args.userId, args.monthYear);
+  const peorPrimero = [...estado].sort(
+    (x, y) => y.spent / (y.budgeted || 1) - x.spent / (x.budgeted || 1),
+  );
+  return avisarNuevas(deps, args, peorPrimero);
+}
+
+async function avisarNuevas(
+  deps: AlertDeps,
+  args: { userId: string; monthYear: string; hoy: Date },
+  rubros: RubroEstado[],
+): Promise<string[]> {
   const mensajes: string[] = [];
 
-  for (const r of estado) {
-    if (!tocados.has(r.budgetItemId)) continue;
+  for (const r of rubros) {
     const alerta = evaluarRubro(r);
     if (!alerta) continue;
     // Un rubro que falla no puede tirar los avisos que los otros ya ganaron:
