@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { useMonth } from '@/contexts/MonthContext';
+import { totalIngresosDelMes } from '@/lib/ingresos-mes';
 import { type MonthlyBudgetData } from '@/lib/services/budget';
 import { type MonthlyExpenseData } from '@/lib/services/expenses';
 import { type Ingreso, type Deuda } from '@/lib/services/ingresos-deudas';
@@ -73,10 +74,12 @@ export const useDashboardData = (): DashboardData => {
     // Datos de gastos
     const totalSpent = expenseHook.expenseData?.total_amount || 0;
 
-    // Datos de ingresos
-    const totalIncome =
-      incomeHook.ingresos?.reduce((sum, ingreso) => sum + ingreso.monto, 0) ||
-      0;
+    // Datos de ingresos: solo los del mes seleccionado, igual que el
+    // presupuesto y los gastos. Sumarlos todos mezclaba meses distintos.
+    const totalIncome = totalIngresosDelMes(
+      incomeHook.ingresos ?? [],
+      selectedMonth,
+    );
 
     // Datos de deudas
     const totalDebt =
@@ -116,6 +119,7 @@ export const useDashboardData = (): DashboardData => {
     expenseHook.expenseData,
     incomeHook.ingresos,
     incomeHook.deudas,
+    selectedMonth,
   ]);
 
   // Función para refrescar todos los datos
