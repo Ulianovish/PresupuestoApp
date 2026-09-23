@@ -45,6 +45,8 @@ interface FormData {
   transaction_date: string;
   category_name: string;
   account_name: string;
+  purchase_total?: number | null;
+  installments?: number | null;
   place: string;
 }
 
@@ -60,6 +62,8 @@ interface ExpenseModalProps {
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
   onCufeSaved?: () => void;
+  /** Cuentas que son tarjeta de crédito: habilitan los campos de cuotas. */
+  creditAccounts?: string[];
 }
 
 export default function ExpenseModal({
@@ -68,6 +72,7 @@ export default function ExpenseModal({
   formData,
   expenseCategories,
   accountTypes,
+  creditAccounts,
   onFormChange,
   onSubmit,
   onClose,
@@ -95,7 +100,9 @@ export default function ExpenseModal({
               type="button"
               onClick={() => setMode('manual')}
               className={`flex-1 rounded-md px-3 py-1.5 text-sm ${
-                mode === 'manual' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'
+                mode === 'manual'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-700 text-slate-300'
               }`}
             >
               Manual
@@ -104,7 +111,9 @@ export default function ExpenseModal({
               type="button"
               onClick={() => setMode('cufe')}
               className={`flex-1 rounded-md px-3 py-1.5 text-sm ${
-                mode === 'cufe' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'
+                mode === 'cufe'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-700 text-slate-300'
               }`}
             >
               Factura (CUFE)
@@ -126,6 +135,7 @@ export default function ExpenseModal({
               formData={formData}
               expenseCategories={expenseCategories}
               accountTypes={accountTypes}
+              creditAccounts={creditAccounts}
               onFormChange={onFormChange}
             />
 

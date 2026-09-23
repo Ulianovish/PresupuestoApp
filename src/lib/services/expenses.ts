@@ -24,6 +24,8 @@ export interface ExpenseTransaction {
   place?: string;
   created_at: string;
   budget_item_id?: string | null;
+  purchase_total?: number | null;
+  installments?: number | null;
 }
 
 export interface ExpenseFormData {
@@ -33,6 +35,10 @@ export interface ExpenseFormData {
   category_name: string;
   account_name: string;
   place?: string;
+  /** Compras a cuotas con tarjeta: valor total de la compra. */
+  purchase_total?: number | null;
+  /** Compras a cuotas con tarjeta: en cuántas cuotas se difirió. */
+  installments?: number | null;
 }
 
 export interface ExpenseSummary {
@@ -174,6 +180,8 @@ export async function createExpenseTransaction(
     p_category_name: expenseData.category_name,
     p_account_name: expenseData.account_name,
     p_place: expenseData.place ? toTitleCase(expenseData.place) : null,
+    p_purchase_total: expenseData.purchase_total ?? null,
+    p_installments: expenseData.installments ?? null,
   });
 
   if (error) {

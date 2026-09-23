@@ -23,6 +23,7 @@ import React from 'react';
 import CurrencyInput from '@/components/atoms/CurrencyInput/CurrencyInput';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cuotaSugerida, esTarjetaDeCredito } from '@/lib/cuotas';
 
 interface FormData {
   description: string;
@@ -31,6 +32,8 @@ interface FormData {
   category_name: string;
   account_name: string;
   place: string;
+  purchase_total?: number | null;
+  installments?: number | null;
 }
 
 interface ExpenseFormFieldsProps {
@@ -41,6 +44,8 @@ interface ExpenseFormFieldsProps {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => void;
   onAmountChange?: (amount: number) => void;
+  /** Cuentas que son tarjeta de crédito: habilitan los campos de cuotas. */
+  creditAccounts?: string[];
 }
 
 export default function ExpenseFormFields({
@@ -49,7 +54,29 @@ export default function ExpenseFormFields({
   accountTypes,
   onFormChange,
   onAmountChange,
+  creditAccounts = [],
 }: ExpenseFormFieldsProps) {
+  const esCredito = esTarjetaDeCredito(formData.account_name, creditAccounts);
+
+  /** Emite un cambio con la misma forma que espera el formulario del padre. */
+  const emitir = (name: string, value: string) => {
+    onFormChange({
+      target: { name, value },
+    } as React.ChangeEvent<HTMLInputElement>);
+  };
+
+  /**
+   * Al cambiar el total o las cuotas se rellena el monto con la división.
+   * Queda editable a propósito: el banco suele cobrar una cuota mayor por los
+   * intereses, y ese valor real solo lo sabe quien mira el extracto.
+   */
+  const sugerirMonto = (total?: number | null, cuotas?: number | null) => {
+    const sugerida = cuotaSugerida(total, cuotas);
+    if (sugerida === null) return;
+    if (onAmountChange) onAmountChange(sugerida);
+    else emitir('amount', String(sugerida));
+  };
+
   return (
     <div className="space-y-4">
       {/* Descripción */}
@@ -146,6 +173,68 @@ export default function ExpenseFormFields({
           ))}
         </select>
       </div>
+
+      {/* Compra a cuotas: solo aplica si se pagó con tarjeta de crédito */}
+      {esCredito && (
+        <div className="space-y-4 rounded-lg border border-orange-500/30 bg-orange-500/5 p-3">
+          <p className="text-xs text-orange-200">
+            Compra con tarjeta de crédito. Si la difieres, registra el total y
+            las cuotas: el monto de arriba es lo que suma este mes y el total se
+            carga a la deuda de la tarjeta.
+          </p>
+
+          <div className="space-y-2">
+            <Label htmlFor="purchase_total" className="text-white">
+              Valor total de la compra
+            </Label>
+            <CurrencyInput
+              value={formData.purchase_total ?? 0}
+              onChange={value => {
+                emitir('purchase_total', String(value));
+                sugerirMonto(value, formData.installments);
+              }}
+              className="bg-slate-700/50 border-slate-600 text-white"
+              placeholder="$0"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="installments" className="text-white">
+              Número de cuotas
+            </Label>
+            <Input
+              id="installments"
+              name="installments"
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={formData.installments ?? ''}
+              onChange={e => {
+                const cuotas = parseInt(e.target.value, 10) || 0;
+                emitir('installments', String(cuotas));
+                sugerirMonto(formData.purchase_total, cuotas);
+              }}
+              placeholder="Ej: 2"
+              className="bg-slate-700/50 border-slate-600 text-white"
+            />
+            {cuotaSugerida(formData.purchase_total, formData.installments) !==
+              null && (
+              <p className="text-xs text-gray-400">
+                Cuota sugerida:{' '}
+                {cuotaSugerida(
+                  formData.purchase_total,
+                  formData.installments,
+                )?.toLocaleString('es-CO', {
+                  style: 'currency',
+                  currency: 'COP',
+                  minimumFractionDigits: 0,
+                })}
+                . Si el banco te cobra otra por intereses, corrige el monto.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Lugar */}
       <div className="space-y-2">

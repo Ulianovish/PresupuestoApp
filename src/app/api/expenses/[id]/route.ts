@@ -14,6 +14,8 @@ const UpdateExpenseSchema = z.object({
   category_name: z.string().optional(),
   account_name: z.string().optional(),
   place: z.string().optional(),
+  purchase_total: z.coerce.number().nullable().optional(),
+  installments: z.coerce.number().int().nullable().optional(),
 });
 
 /**
@@ -97,6 +99,8 @@ export async function PATCH(
       place?: string;
       account_id?: string;
       budget_item_id?: string | null;
+      purchase_total?: number | null;
+      installments?: number | null;
     } = {};
     if (validatedData.description !== undefined) {
       updateData.description = toTitleCase(validatedData.description);
@@ -141,6 +145,14 @@ export async function PATCH(
     }
     if (validatedData.place !== undefined) {
       updateData.place = toTitleCase(validatedData.place);
+    }
+    // Compras a cuotas: el trigger de la base ajusta el saldo de la tarjeta
+    // con la diferencia, así que basta con guardar el valor nuevo.
+    if (validatedData.purchase_total !== undefined) {
+      updateData.purchase_total = validatedData.purchase_total;
+    }
+    if (validatedData.installments !== undefined) {
+      updateData.installments = validatedData.installments;
     }
     if (accountId) {
       updateData.account_id = accountId;

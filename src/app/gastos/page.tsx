@@ -143,6 +143,9 @@ interface FormData {
   category_name: string;
   account_name: string;
   place: string;
+  /** Compras a cuotas con tarjeta: valor total y número de cuotas. */
+  purchase_total?: number | null;
+  installments?: number | null;
 }
 
 export default function GastosPage() {
@@ -263,12 +266,18 @@ export default function GastosPage() {
 
   // Cuentas del usuario, para editar (o crear) la cuenta de cada gasto inline
   const [accountNames, setAccountNames] = useState<string[]>([]);
+  // Las tarjetas de crédito habilitan los campos de compra a cuotas
+  const [creditAccountNames, setCreditAccountNames] = useState<string[]>([]);
   const loadAccounts = useCallback(async () => {
     try {
       const accts = await getUserAccounts();
       setAccountNames(accts.map(a => a.name));
+      setCreditAccountNames(
+        accts.filter(a => a.type === 'credit').map(a => a.name),
+      );
     } catch {
       setAccountNames([]);
+      setCreditAccountNames([]);
     }
   }, []);
   useEffect(() => {
@@ -307,11 +316,25 @@ export default function GastosPage() {
     const { name, value, type } = e.target;
     // El monto siempre debe ser número: CurrencyInput envía un evento sintético
     // sin `type="number"`, y guardarlo como texto hacía que la API lo rechazara.
-    const isNumeric = type === 'number' || name === 'amount';
-    setForm(prev => ({
-      ...prev,
-      [name]: isNumeric ? parseFloat(value) || 0 : value,
-    }));
+    const isNumeric =
+      type === 'number' ||
+      name === 'amount' ||
+      name === 'purchase_total' ||
+      name === 'installments';
+    setForm(prev => {
+      const next = {
+        ...prev,
+        [name]: isNumeric ? parseFloat(value) || 0 : value,
+      };
+      // Al pasar a una cuenta que no es tarjeta, las cuotas dejan de aplicar:
+      // si se quedaran guardadas seguirían cargándose a una deuda que ya no
+      // corresponde.
+      if (name === 'account_name' && !creditAccountNames.includes(value)) {
+        next.purchase_total = null;
+        next.installments = null;
+      }
+      return next;
+    });
   };
 
   // Preparar formulario para edición
@@ -323,6 +346,8 @@ export default function GastosPage() {
       category_name: transaction.category_name,
       account_name: transaction.account_name,
       place: transaction.place || '',
+      purchase_total: transaction.purchase_total ?? null,
+      installments: transaction.installments ?? null,
     });
     editExpense(transaction);
   };
@@ -356,6 +381,8 @@ export default function GastosPage() {
         category_name: categoryNames[0] || '',
         account_name: ACCOUNT_TYPES[0],
         place: '',
+        purchase_total: null,
+        installments: null,
       });
 
       closeModal();
@@ -754,6 +781,7 @@ export default function GastosPage() {
           accountTypes={Array.from(
             new Set([...accountNames, ...ACCOUNT_TYPES]),
           )}
+          creditAccounts={creditAccountNames}
           onFormChange={handleFormChange}
           onSubmit={handleSubmitExpense}
           onClose={handleCloseModal}
