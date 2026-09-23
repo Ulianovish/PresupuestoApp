@@ -14,6 +14,7 @@
  *     totalBudget: 1000000,
  *     totalSpent: 750000,
  *     totalRemaining: 250000,
+ *     cashFlow: 400000,
  *     totalIncome: 1200000,
  *     spentPercentage: 75,
  *     overBudgetCount: 2
@@ -33,6 +34,7 @@ interface DashboardSummary {
   totalBudget: number;
   totalSpent: number;
   totalRemaining: number;
+  cashFlow: number;
   totalIncome: number;
   spentPercentage: number;
   overBudgetCount: number;
@@ -147,9 +149,9 @@ export default function DashboardSummaryCards({
             <div className="text-right">
               <p className="text-sm text-gray-400">Flujo Efectivo Mensual</p>
               <p
-                className={`text-2xl font-bold ${summary.totalRemaining < 0 ? 'text-red-400' : 'text-white'}`}
+                className={`text-2xl font-bold ${summary.cashFlow < 0 ? 'text-red-400' : 'text-white'}`}
               >
-                {isLoading ? '...' : formatCurrency(summary.totalRemaining)}
+                {isLoading ? '...' : formatCurrency(summary.cashFlow)}
               </p>
             </div>
           </div>

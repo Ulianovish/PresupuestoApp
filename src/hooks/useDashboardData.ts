@@ -22,6 +22,8 @@ export interface DashboardSummary {
   totalBudget: number;
   totalSpent: number;
   totalRemaining: number;
+  /** Flujo de caja del mes: ingresos menos gastos reales. */
+  cashFlow: number;
   totalIncome: number;
   totalDebt: number;
   spentPercentage: number;
@@ -85,8 +87,12 @@ export const useDashboardData = (): DashboardData => {
     const totalDebt =
       incomeHook.deudas?.reduce((sum, deuda) => sum + deuda.monto, 0) || 0;
 
-    // Usar gastos reales en lugar de presupuesto real para mayor precisión
+    // Cuánto queda del presupuesto (no es el flujo de caja).
     const totalRemaining = totalBudget - totalSpent;
+
+    // Flujo de caja del mes: lo que entró menos lo que se gastó. El
+    // presupuesto no entra en esta cuenta, es una intención, no dinero.
+    const cashFlow = totalIncome - totalSpent;
 
     // Calcular porcentaje gastado
     const spentPercentage =
@@ -108,6 +114,7 @@ export const useDashboardData = (): DashboardData => {
       totalBudget,
       totalSpent,
       totalRemaining,
+      cashFlow,
       totalIncome,
       totalDebt,
       spentPercentage,
