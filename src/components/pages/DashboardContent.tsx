@@ -12,11 +12,12 @@
  */
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { RefreshCw } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
+import CreditCardsSummary from '@/components/organisms/CreditCardsSummary/CreditCardsSummary';
 import DashboardHeader from '@/components/organisms/DashboardHeader/DashboardHeader';
 import DashboardMainContent from '@/components/organisms/DashboardMainContent/DashboardMainContent';
 import DashboardQuickActions from '@/components/organisms/DashboardQuickActions/DashboardQuickActions';
@@ -24,6 +25,10 @@ import DashboardSummaryCards from '@/components/organisms/DashboardSummaryCards/
 import DashboardPageTemplate from '@/components/templates/DashboardPageTemplate/DashboardPageTemplate';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { BudgetCategory } from '@/lib/services/budget';
+import { getCreditCardsSummary } from '@/lib/services/credit-cards';
+import { conMovimiento } from '@/lib/services/credit-cards-filter';
+import type { CreditCardSummary } from '@/lib/services/credit-cards-filter';
+import { formatMonthName } from '@/lib/services/expenses';
 
 // Tipo User definido localmente basado en la estructura de Supabase
 interface User {
@@ -44,8 +49,29 @@ export default function DashboardContent({
   user: _user,
 }: DashboardContentProps) {
   // Usar el hook personalizado para obtener datos integrados
-  const { summary, budgetData, isLoading, error, refreshData } =
+  const { summary, budgetData, isLoading, error, refreshData, selectedMonth } =
     useDashboardData();
+
+  // Resumen de tarjetas de crédito del mes: gasto cargado a cada tarjeta y
+  // abonos hechos a ella. Solo se listan las que tuvieron movimiento.
+  const [tarjetas, setTarjetas] = useState<CreditCardSummary[]>([]);
+  const [tarjetasCargando, setTarjetasCargando] = useState(true);
+
+  const cargarTarjetas = useCallback(async () => {
+    setTarjetasCargando(true);
+    try {
+      setTarjetas(conMovimiento(await getCreditCardsSummary(selectedMonth)));
+    } catch (err) {
+      console.error('Error cargando el resumen de tarjetas:', err);
+      setTarjetas([]);
+    } finally {
+      setTarjetasCargando(false);
+    }
+  }, [selectedMonth]);
+
+  useEffect(() => {
+    cargarTarjetas();
+  }, [cargarTarjetas]);
 
   // Función para formatear moneda
   const formatCurrency = (amount: number): string => {
@@ -127,13 +153,21 @@ export default function DashboardContent({
   const quickActions = <DashboardQuickActions />;
 
   const mainContent = (
-    <DashboardMainContent
-      budgetItems={budgetItems}
-      budgetData={budgetData}
-      isLoading={isLoading}
-      onItemUpdate={handleItemUpdate}
-      onItemEdit={handleItemEdit}
-    />
+    <div className="space-y-6">
+      <CreditCardsSummary
+        tarjetas={tarjetas}
+        nombreMes={formatMonthName(selectedMonth)}
+        isLoading={tarjetasCargando}
+        formatCurrency={formatCurrency}
+      />
+      <DashboardMainContent
+        budgetItems={budgetItems}
+        budgetData={budgetData}
+        isLoading={isLoading}
+        onItemUpdate={handleItemUpdate}
+        onItemEdit={handleItemEdit}
+      />
+    </div>
   );
 
   const refreshButton = (
