@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { z } from 'zod';
 
+import { itemSigueEnCategoria } from '@/lib/services/expense-category-item';
 import { createClient } from '@/lib/supabase/server';
 import { toTitleCase } from '@/lib/text-case';
 
@@ -95,6 +96,7 @@ export async function PATCH(
       category_name?: string;
       place?: string;
       account_id?: string;
+      budget_item_id?: string | null;
     } = {};
     if (validatedData.description !== undefined) {
       updateData.description = toTitleCase(validatedData.description);
@@ -108,6 +110,34 @@ export async function PATCH(
     }
     if (validatedData.category_name !== undefined) {
       updateData.category_name = validatedData.category_name;
+
+      // El ítem asignado puede ser de la categoría anterior. Si ya no
+      // corresponde se suelta: el gasto queda sin clasificar (visible en rojo)
+      // en vez de seguir sumando en una categoría que no es la suya.
+      const { data: actual } = await supabase
+        .from('transactions')
+        .select('budget_item_id')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (actual?.budget_item_id) {
+        const { data: item } = await supabase
+          .from('budget_items')
+          .select('categories(name)')
+          .eq('id', actual.budget_item_id)
+          .single();
+
+        const categoriaDelItem = (
+          item as { categories?: { name?: string } | null } | null
+        )?.categories?.name;
+
+        if (
+          !itemSigueEnCategoria(validatedData.category_name, categoriaDelItem)
+        ) {
+          updateData.budget_item_id = null;
+        }
+      }
     }
     if (validatedData.place !== undefined) {
       updateData.place = toTitleCase(validatedData.place);
