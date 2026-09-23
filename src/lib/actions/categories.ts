@@ -463,3 +463,68 @@ export async function createBudgetItemInMonth(
     return { success: false, error: 'Error interno del servidor' };
   }
 }
+
+export interface CategoryWithUsage {
+  id: string;
+  name: string;
+  /** Ítems de presupuesto que cuelgan de la categoría (en todos los meses). */
+  items: number;
+  /** Gastos registrados con esa categoría. */
+  gastos: number;
+}
+
+/**
+ * Lista las categorías activas con su uso, para el panel de Ajustes.
+ *
+ * El uso se muestra antes de eliminar: una categoría con gastos e ítems
+ * detrás no debería desaparecer sin que se vea qué arrastra.
+ */
+export async function listCategoriesWithUsage(): Promise<CategoryWithUsage[]> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data: categorias, error } = await supabase
+      .from('categories')
+      .select('id, name')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('name');
+
+    if (error) {
+      console.error('Error listando categorías:', error);
+      return [];
+    }
+
+    const filas = (categorias ?? []) as Array<{ id: string; name: string }>;
+
+    return await Promise.all(
+      filas.map(async c => {
+        const [{ count: items }, { count: gastos }] = await Promise.all([
+          supabase
+            .from('budget_items')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('category_id', c.id),
+          supabase
+            .from('transactions')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('category_name', c.name),
+        ]);
+        return {
+          id: c.id,
+          name: c.name,
+          items: items ?? 0,
+          gastos: gastos ?? 0,
+        };
+      }),
+    );
+  } catch (error) {
+    console.error('Error en listCategoriesWithUsage:', error);
+    return [];
+  }
+}
