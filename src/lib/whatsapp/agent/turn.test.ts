@@ -358,6 +358,86 @@ describe('handleAgentTurn', () => {
     expect(mensaje).toContain('🔴 Te pasaste en Transporte.');
   });
 
+  it('Gateway caído tras DOS gastos escritos: la respuesta lista lo que quedó guardado, sin modo degradado', async () => {
+    // Regresión del incidente real ("40k carne desmechar / 14k huevos / Con
+    // davivienda"): los dos gastos se guardaron, la vuelta de cierre se cayó
+    // y el usuario recibió un aviso genérico sin saber QUÉ se había anotado.
+    mockedCreateDirectExpense
+      .mockResolvedValueOnce({
+        ok: true,
+        category: 'MERCADO',
+        transactionId: 'tx-1',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        category: 'MERCADO',
+        transactionId: 'tx-2',
+      });
+    mockedCallGatewayReal
+      .mockResolvedValueOnce({
+        stop_reason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tu_1',
+            name: 'registrar_gasto',
+            input: { monto: 40000, descripcion: 'carne desmechar' },
+          },
+          {
+            type: 'tool_use',
+            id: 'tu_2',
+            name: 'registrar_gasto',
+            input: { monto: 14000, descripcion: 'huevos' },
+          },
+        ],
+      })
+      .mockRejectedValueOnce(new Error('Gateway 429: rate limited'));
+    mockedRunAgent.mockImplementation(async (mensaje, ctx, deps) => {
+      const real = await vi.importActual<typeof import('./run')>('./run');
+      return real.runAgent(mensaje, ctx, deps);
+    });
+    const body = '40k carne desmechar / 14k huevos / Con davivienda';
+
+    await handleAgentTurn({ userId: 'u1', phone: '+57300', body });
+
+    // Solo los dos gastos del agente: el modo degradado NO corrió encima.
+    expect(mockedCreateDirectExpense).toHaveBeenCalledTimes(2);
+    const mensaje = mockedSendWhatsAppMessage.mock.calls[0][1];
+    expect(mensaje).toMatch(/✅ Anotado \$\s?40\.000 .*carne desmechar/);
+    expect(mensaje).toMatch(/✅ Anotado \$\s?14\.000 .*huevos/);
+    expect(mensaje).not.toContain(
+      'se me cortó la conversación antes de terminar',
+    );
+    // Sigue siendo honesto sobre el corte y no invita a reenviar todo.
+    expect(mensaje).toMatch(/cort/i);
+    expect(mensaje).not.toMatch(/probá en un minuto|intentá de nuevo/i);
+    // El intercambio queda guardado tal cual se mandó (contexto para el
+    // próximo mensaje) y "lo último" apunta al último gasto escrito.
+    expect(mockedWriteState).toHaveBeenCalledWith('+57300', 'u1', {
+      turns: [
+        { role: 'user', content: body },
+        { role: 'assistant', content: mensaje },
+      ],
+      lastEntity: expect.objectContaining({
+        transactionId: 'tx-2',
+        description: 'huevos',
+      }),
+    });
+  });
+
+  it('corte con escrituras pero sin resumen: queda el aviso fijo como último recurso', async () => {
+    mockedRunAgent.mockResolvedValue({
+      kind: 'service_error',
+      huboEscrituras: true,
+    });
+
+    await handleAgentTurn({ userId: 'u1', phone: '+57300', body: '20k taxi' });
+
+    expect(mockedCreateDirectExpense).not.toHaveBeenCalled();
+    const mensaje = mockedSendWhatsAppMessage.mock.calls[0][1];
+    expect(mensaje).toContain('se me cortó la conversación antes de terminar');
+  });
+
   it('falla de base al armar el contexto: cae al parser en vez del error genérico', async () => {
     mockedResolveDefaultAccount.mockRejectedValue(new Error('DB caída'));
 
