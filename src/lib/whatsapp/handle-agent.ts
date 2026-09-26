@@ -13,8 +13,9 @@
 // preguntar — el mismo criterio y los mismos textos que usa
 // `handle-image.ts` para que las dos vías respondan igual.
 
+import { esRechazoDeNit } from '@/lib/dian/nit-rechazado';
 import { pegarAlertas } from '@/lib/whatsapp/alerts';
-import { extractCufe } from '@/lib/whatsapp/classify';
+import { extractCufe, extractQrNits } from '@/lib/whatsapp/classify';
 import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
 import { resolveAccountFromMessage } from '@/lib/whatsapp/handle-image';
 
@@ -38,7 +39,15 @@ export type CufeOutcome =
 
 export interface AgentDeps {
   sendMessage: (to: string, body: string) => Promise<{ ok: boolean }>;
-  processCufe: (userId: string, cufe: string) => Promise<CufeOutcome>;
+  /**
+   * `nits`: NIT del emisor y documento del comprador sacados del bloque del
+   * QR (ver `extractQrNits`); vacío con el CUFE pelado.
+   */
+  processCufe: (
+    userId: string,
+    cufe: string,
+    nits: string[],
+  ) => Promise<CufeOutcome>;
   /** Cuentas activas del usuario, para resolver con cuál se pagó la factura. */
   accounts: string[];
   /** Guarda el id de la factura ya persistida, esperando que el usuario diga con qué cuenta pagó. */
@@ -101,7 +110,9 @@ export async function handleAgentMessage(
     );
     return;
   }
-  const out = await deps.processCufe(ctx.userId, cufe);
+  // La DIAN exige el NIT del emisor o del receptor: si vino el bloque del QR,
+  // los suyos aciertan de una en vez de adivinar con el genérico.
+  const out = await deps.processCufe(ctx.userId, cufe, extractQrNits(ctx.body));
 
   if (out.ok) {
     const supplierTexto = out.supplier ? ` de ${out.supplier}` : '';
@@ -196,6 +207,14 @@ export async function handleAgentMessage(
     await deps.sendMessage(
       ctx.phone,
       `⚠️ Esa factura quedó registrada a medias: ${out.itemsFound} de ${out.totalItems} ítems ya son gastos tuyos (no se perdieron). No la vuelvo a procesar porque duplicaría esos; los que faltan, cargalos a mano en Gastos.`,
+    );
+  } else if (esRechazoDeNit(out.message)) {
+    // Reintentar el mismo texto falla igual (es determinista), y el detalle
+    // técnico del scraper no le dice nada al usuario. Lo que sí sirve es el
+    // bloque completo del QR (trae los NIT reales) o la foto.
+    await deps.sendMessage(
+      ctx.phone,
+      '❌ La DIAN no encontró la factura con el NIT del emisor ni del comprador. Revisá que hayas mandado el texto completo del QR (con NitFac y DocAdq), o mandame una foto de la factura.',
     );
   } else {
     await deps.sendMessage(

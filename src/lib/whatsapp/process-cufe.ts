@@ -39,10 +39,14 @@ async function safeReadSupplierTotal(
   }
 }
 
-/** Procesa un CUFE para WhatsApp con service-role; mapea el resultado a CufeOutcome. */
+/**
+ * Procesa un CUFE para WhatsApp con service-role; mapea el resultado a
+ * CufeOutcome. `nits` son los del bloque del QR (se le pasan al scraper).
+ */
 export async function processCufeForWhatsApp(
   userId: string,
   cufe: string,
+  nits: string[] = [],
 ): Promise<CufeOutcome> {
   const admin = createAdminClient();
   const prep = await prepareInvoiceProcessing(userId, cufe, admin);
@@ -80,6 +84,7 @@ export async function processCufeForWhatsApp(
   const run = await runInvoiceProcessing(prep.invoiceId, cufe, {
     categoryNames,
     client: admin,
+    nits,
   });
   if (!run.ok) return { ok: false, reason: 'error', message: run.message };
 

@@ -37,7 +37,7 @@ describe('handleAgentMessage', () => {
       },
       deps,
     );
-    expect(deps.processCufe).toHaveBeenCalledWith('u1', CUFE);
+    expect(deps.processCufe).toHaveBeenCalledWith('u1', CUFE, []);
     expect(deps.savePending).toHaveBeenCalledWith('inv-1');
     expect(deps.registerInvoice).not.toHaveBeenCalled();
     expect(deps.sendMessage).toHaveBeenCalledWith(
@@ -136,7 +136,7 @@ describe('handleAgentMessage', () => {
       { userId: 'u1', phone: '+57300', body: qrBlock, existingPendingId: null },
       deps,
     );
-    expect(deps.processCufe).toHaveBeenCalledWith('u1', realCufe);
+    expect(deps.processCufe).toHaveBeenCalledWith('u1', realCufe, []);
   });
 
   it('cufe sin CUFE válido en el cuerpo → pide reenviar (no procesa)', async () => {
@@ -342,5 +342,52 @@ describe('handleAgentMessage', () => {
       '+57300',
       expect.stringMatching(/no pude|error|falló/i),
     );
+  });
+
+  it('bloque del QR con NitFac/DocAdq → le pasa los NIT a processCufe (la DIAN exige el del emisor o el receptor)', async () => {
+    const realCufe =
+      '2b1af0974d2ff13b97a46279b75ea9b3cd3dea3c0f1250791a75cdb2f74db5374d69582635cfa8774f48229dfffb79cf';
+    const qrBlock = [
+      'NumFac: B3828717',
+      'NitFac: 890922113',
+      'DocAdq: 1018427689',
+      'CUFE:',
+      realCufe,
+    ].join('\n');
+    const deps = makeDeps();
+    await handleAgentMessage(
+      'cufe',
+      { userId: 'u1', phone: '+57300', body: qrBlock, existingPendingId: null },
+      deps,
+    );
+    expect(deps.processCufe).toHaveBeenCalledWith('u1', realCufe, [
+      '890922113',
+      '1018427689',
+    ]);
+  });
+
+  it('la DIAN rechazó todos los NIT → explica qué mandar, sin nombres de variables ni "reintentá más tarde"', async () => {
+    // Es determinista: reintentar el mismo texto falla igual. Lo que sirve es
+    // el bloque completo del QR (con NitFac/DocAdq) o una foto.
+    const deps = makeDeps({
+      processCufe: vi.fn(async () => ({
+        ok: false,
+        reason: 'error',
+        message:
+          'VPS falló (VPS respondió 500: La DIAN rechazó todos los NIT probados (222222222222, 2222222222). Configurá DIAN_SEARCH_NIT)',
+      })),
+    });
+    await handleAgentMessage(
+      'cufe',
+      { userId: 'u1', phone: '+57300', body: CUFE, existingPendingId: null },
+      deps,
+    );
+    const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as string;
+    expect(mensaje).toMatch(/NIT del emisor/i);
+    expect(mensaje).toMatch(/NitFac/);
+    expect(mensaje).toMatch(/foto/i);
+    expect(mensaje).not.toMatch(/DIAN_SEARCH_NIT/);
+    expect(mensaje).not.toMatch(/más tarde/i);
   });
 });

@@ -32,7 +32,11 @@ import {
   saveProcessedInvoice,
 } from '@/lib/services/invoices';
 
-import { prepareInvoiceProcessing, runInvoiceProcessing } from './process-invoice';
+import {
+  fetchFromVps,
+  prepareInvoiceProcessing,
+  runInvoiceProcessing,
+} from './process-invoice';
 
 function sseStream(lines: string[]): ReadableStream<Uint8Array> {
   const enc = new TextEncoder();
@@ -213,6 +217,132 @@ describe('runInvoiceProcessing', () => {
 
     // Con tiempo de sobra el respaldo sí debe intentarse.
     expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
+  });
+});
+
+describe('NIT del QR hacia los scrapers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  const vpsOk = () => ({
+    ok: true,
+    status: 200,
+    body: null,
+    json: async () => COMPLETE_RESULT,
+  });
+
+  it('con nits, el upstream de Vercel los recibe como &nits=a,b', async () => {
+    vi.stubEnv('DIAN_VPS_URL', '');
+    const fetchMock = vi.fn(async (_url: string) => ({
+      ok: true,
+      body: sseStream([sse({ step: 'complete', result: COMPLETE_RESULT })]),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await runInvoiceProcessing('inv-nits-vercel', 'CUFE123', {
+      categoryNames: ['OTROS'],
+      nits: ['890922113', '1018427689'],
+    });
+
+    const url = new URL(fetchMock.mock.calls[0][0]);
+    expect(url.pathname).toBe('/api/cufe-to-data-stream');
+    expect(url.searchParams.get('cufe')).toBe('CUFE123');
+    expect(url.searchParams.get('nits')).toBe('890922113,1018427689');
+  });
+
+  it('con nits, el /scrape del VPS los recibe como &nits=a,b', async () => {
+    vi.stubEnv('DIAN_VPS_URL', 'http://vps.test');
+    const fetchMock = vi.fn(async (_url: string) => vpsOk());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await runInvoiceProcessing('inv-nits-vps', 'CUFE123', {
+      categoryNames: ['OTROS'],
+      nits: ['890922113', '1018427689'],
+    });
+
+    const url = new URL(fetchMock.mock.calls[0][0]);
+    expect(url.pathname).toBe('/scrape');
+    expect(url.searchParams.get('cufe')).toBe('CUFE123');
+    expect(url.searchParams.get('nits')).toBe('890922113,1018427689');
+  });
+
+  it('sin nits, ninguna URL lleva el parámetro (scrapers viejos: igual que hoy)', async () => {
+    vi.stubEnv('DIAN_VPS_URL', 'http://vps.test');
+    let call = 0;
+    const fetchMock = vi.fn(async (_url: string) => {
+      call += 1;
+      if (call === 1) throw new Error('VPS respondió 429');
+      return {
+        ok: true,
+        body: sseStream([sse({ step: 'complete', result: COMPLETE_RESULT })]),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await runInvoiceProcessing('inv-sin-nits', 'CUFE123', {
+      categoryNames: ['OTROS'],
+      retryBaseMs: 0,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [u] of fetchMock.mock.calls) {
+      expect(new URL(u).searchParams.has('nits')).toBe(false);
+    }
+  });
+
+  it('un 500 del VPS con {error} en JSON expone la causa real, no un 500 pelado', async () => {
+    vi.stubEnv('DIAN_VPS_URL', 'http://vps.test');
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 500,
+      text: async () => JSON.stringify({ success: false, error: 'Chrome se cerró' }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchFromVps('CUFE123')).rejects.toThrow(
+      'VPS respondió 500: Chrome se cerró',
+    );
+  });
+
+  it('un error del VPS con cuerpo que no es JSON sigue dando el status', async () => {
+    vi.stubEnv('DIAN_VPS_URL', 'http://vps.test');
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 502,
+      text: async () => '<html>Bad Gateway</html>',
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchFromVps('CUFE123')).rejects.toThrow(/^VPS respondió 502$/);
+  });
+
+  it('la DIAN rechazó todos los NIT en el VPS → NO arranca Vercel (es determinista) y reporta la causa', async () => {
+    vi.stubEnv('DIAN_VPS_URL', 'http://vps.test');
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 500,
+      text: async () =>
+        JSON.stringify({
+          success: false,
+          error: 'La DIAN rechazó todos los NIT probados (222222222222, 2222222222)',
+        }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await runInvoiceProcessing('inv-nit-rechazado', 'CUFE123', {
+      categoryNames: ['OTROS'],
+      retryBaseMs: 0,
+    });
+
+    expect(res.ok).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(markInvoiceError).toHaveBeenCalledWith(
+      'inv-nit-rechazado',
+      expect.stringContaining('rechazó todos los NIT'),
+      undefined,
+    );
   });
 });
 
