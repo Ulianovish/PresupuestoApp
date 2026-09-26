@@ -155,4 +155,32 @@ describe('processCufeForWhatsApp', () => {
     expect(out).toEqual({ ok: false, reason: 'error', message: 'DIAN caído' });
     expect(mockedSummary).not.toHaveBeenCalled();
   });
+
+  it('le pasa los NIT del QR a runInvoiceProcessing', async () => {
+    mockedPrepare.mockResolvedValueOnce({ kind: 'ready', invoiceId: 'inv-new' });
+    mockedRun.mockResolvedValueOnce({ ok: true, itemsFound: 1 });
+    mockedSummary.mockResolvedValueOnce(null);
+
+    await processCufeForWhatsApp('u1', 'CUFE123', ['890922113', '1018427689']);
+
+    expect(mockedRun).toHaveBeenCalledWith(
+      'inv-new',
+      'CUFE123',
+      expect.objectContaining({ nits: ['890922113', '1018427689'] }),
+    );
+  });
+
+  it('sin NIT (CUFE pelado) → nits vacío', async () => {
+    mockedPrepare.mockResolvedValueOnce({ kind: 'ready', invoiceId: 'inv-new' });
+    mockedRun.mockResolvedValueOnce({ ok: true, itemsFound: 1 });
+    mockedSummary.mockResolvedValueOnce(null);
+
+    await processCufeForWhatsApp('u1', 'CUFE123');
+
+    expect(mockedRun).toHaveBeenCalledWith(
+      'inv-new',
+      'CUFE123',
+      expect.objectContaining({ nits: [] }),
+    );
+  });
 });

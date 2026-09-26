@@ -4,6 +4,7 @@
 // errores transitorios, detección del error real del upstream y cierre prematuro.
 
 import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
+import { esRechazoDeNit } from '@/lib/dian/nit-rechazado';
 import { parseSSEEventLine } from '@/lib/dian/sse';
 import {
   createProcessingInvoice,
@@ -71,6 +72,17 @@ export interface RunOptions {
   retryBaseMs?: number;
   /** Cliente Supabase a inyectar (service-role para WhatsApp). Web: cookie por defecto. */
   client?: DBClient;
+  /**
+   * NIT a probar en el formulario de la DIAN antes de los genéricos: el del
+   * emisor y el del comprador, sacados del bloque del QR. Vacío (default) =
+   * los scrapers usan solo los genéricos, como antes.
+   */
+  nits?: string[];
+}
+
+/** `&nits=a,b` para los scrapers, o nada: un scraper viejo ignora el parámetro. */
+function nitsParam(nits: string[]): string {
+  return nits.length > 0 ? `&nits=${encodeURIComponent(nits.join(','))}` : '';
 }
 
 // Cuántos intentos totales contra el scraper upstream. OJO: cada intento resuelve
@@ -264,10 +276,11 @@ export async function fetchFromVps(
   cufe: string,
   onProgress?: (event: ProgressEvent) => void | Promise<void>,
   timeoutMs: number = VPS_MAX_MS,
+  nits: string[] = [],
 ): Promise<CufeProcessResult> {
   const base = process.env.DIAN_VPS_URL;
   if (!base) throw new Error('DIAN_VPS_URL no configurado');
-  const url = `${base.replace(/\/$/, '')}/scrape?cufe=${encodeURIComponent(cufe)}`;
+  const url = `${base.replace(/\/$/, '')}/scrape?cufe=${encodeURIComponent(cufe)}${nitsParam(nits)}`;
 
   await onProgress?.({
     step: 'connecting_dian',
@@ -281,7 +294,19 @@ export async function fetchFromVps(
     signal: AbortSignal.timeout(Math.max(1_000, timeoutMs)),
   });
   if (!resp.ok) {
-    throw new Error(`VPS respondió ${resp.status}`);
+    // El VPS explica el fallo en `{error}`; sin leerlo, el usuario solo veía
+    // "VPS respondió 500" y no había forma de saber si era la DIAN, el NIT o
+    // el browser. Un cuerpo que no es JSON (proxy caído) deja el status solo.
+    let detalle = '';
+    try {
+      const body = JSON.parse(await resp.text()) as { error?: unknown };
+      if (typeof body?.error === 'string' && body.error) {
+        detalle = `: ${body.error}`;
+      }
+    } catch {
+      // No es JSON: queda el status pelado.
+    }
+    throw new Error(`VPS respondió ${resp.status}${detalle}`);
   }
   const data = (await resp.json()) as CufeProcessResult;
   if (!data.success) {
@@ -304,12 +329,12 @@ export async function runInvoiceProcessing(
   const baseUrl =
     process.env.FACTURA_DIAN_URL || 'https://factura-dian.vercel.app';
   const method = process.env.FACTURA_DIAN_METHOD || 'python';
-  const { categoryNames, onProgress, retryBaseMs, client } = opts;
+  const { categoryNames, onProgress, retryBaseMs, client, nits = [] } = opts;
 
   try {
     const upstreamUrl = `${baseUrl}/api/cufe-to-data-stream?cufe=${encodeURIComponent(
       cufe,
-    )}&method=${method}&download-pdf=false`;
+    )}&method=${method}&download-pdf=false${nitsParam(nits)}`;
 
     // Motores. El VPS suele fallar menos (headful → menos captchas, sin timeout de
     // 300s, más RAM), así que por defecto es el PRIMARIO cuando está configurado.
@@ -333,6 +358,7 @@ export async function runInvoiceProcessing(
         cufe,
         onProgress,
         Math.max(1_000, Math.min(VPS_MAX_MS, remainingMs())),
+        nits,
       );
 
     const vpsConfigured = Boolean(process.env.DIAN_VPS_URL);
@@ -353,6 +379,13 @@ export async function runInvoiceProcessing(
       } catch (primaryErr) {
         const primaryMsg =
           primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+
+        // La DIAN rechazó todos los NIT: el respaldo prueba los mismos contra
+        // la misma DIAN y falla igual, solo que quemando captchas pagos y ~3
+        // min. Se reporta directo.
+        if (esRechazoDeNit(primaryMsg)) {
+          throw new Error(`${primaryName} falló (${primaryMsg})`);
+        }
 
         // Solo se intenta el respaldo si de verdad alcanza a terminar. Arrancarlo
         // sin tiempo suficiente garantiza que la función muera antes de poder

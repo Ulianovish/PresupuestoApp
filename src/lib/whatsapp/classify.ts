@@ -20,6 +20,32 @@ export function extractCufe(text: string): string | null {
   return match ? match[0].toLowerCase() : null;
 }
 
+/**
+ * NIT genéricos de consumidor final: los scrapers ya los prueban solos como
+ * respaldo, mandarlos también solo repetiría el mismo intento.
+ */
+const NITS_GENERICOS = new Set(['222222222222', '2222222222']);
+
+/**
+ * Extrae del bloque del QR el NIT del emisor (`NitFac`) y el documento del
+ * comprador (`DocAdq`), en ese orden. La DIAN exige uno de los dos para
+ * buscar la factura, y con el genérico solo acierta si el comprador era
+ * consumidor final. Acepta los dos formatos que devuelven los lectores de QR:
+ * `NitFac="800149695"` en una línea y `NitFac: 800149695` por líneas.
+ * Devuelve [] con el CUFE pelado (los scrapers caen a los genéricos).
+ */
+export function extractQrNits(text: string): string[] {
+  const nits: string[] = [];
+  for (const campo of ['NitFac', 'DocAdq']) {
+    const match = (text || '').match(
+      new RegExp(`\\b${campo}\\s*[:=]\\s*"?(\\d{5,15})(?!\\d)`, 'i'),
+    );
+    const nit = match?.[1];
+    if (nit && !NITS_GENERICOS.has(nit) && !nits.includes(nit)) nits.push(nit);
+  }
+  return nits;
+}
+
 export function classifyText(body: string, numMedia: number): Decision {
   if (numMedia > 0) return 'image';
   const text = (body || '').trim();
