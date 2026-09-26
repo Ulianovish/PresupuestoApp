@@ -10,13 +10,71 @@ import type { Turn } from './state';
 /** Tope de vueltas. Un modelo en bucle no puede colgar la función serverless. */
 const MAX_ITERACIONES = 3;
 
-/** Status que vale la pena reintentar: saturación o fallo pasajero del proveedor. */
-const STATUS_REINTENTABLES = new Set([408, 409, 429, 500, 502, 503, 504, 529]);
-const MAX_INTENTOS_GATEWAY = 3;
-const RETRY_BASE_MS = Number(process.env.AGENT_RETRY_DELAY_MS ?? 1500);
+/**
+ * Status que vale la pena reintentar: saturación o fallo pasajero del
+ * proveedor. Cualquier 5xx entra además por `esReintentable`.
+ */
+const STATUS_REINTENTABLES = new Set([408, 409, 429]);
 
-function dormir(ms: number): Promise<void> {
+function esReintentable(status: number): boolean {
+  return STATUS_REINTENTABLES.has(status) || status >= 500;
+}
+
+/**
+ * Esperas entre intentos (sin `Retry-After`). Tres reintentos en ~17 s: el
+ * 429 del plan gratuito es por RÁFAGA, y con 1,5 s + 3 s el tercer intento
+ * todavía caía dentro de la misma ventana — así se perdió la respuesta del
+ * incidente "40k carne / 14k huevos".
+ */
+const ESPERAS_MS = [2_000, 5_000, 10_000];
+const MAX_INTENTOS_GATEWAY = ESPERAS_MS.length + 1;
+/** Jitter para que dos turnos simultáneos no reintenten en el mismo instante. */
+const JITTER_MAX_MS = 500;
+/** Tope por espera, aunque el Gateway pida más con `Retry-After`. */
+const ESPERA_MAX_MS = 15_000;
+const TIMEOUT_INTENTO_MS = 30_000;
+/**
+ * Presupuesto total de UNA llamada, reintentos incluidos. `runAgent` puede
+ * llamar hasta MAX_ITERACIONES veces y la función vive 300 s (maxDuration del
+ * webhook): 3 × 60 s deja margen para las herramientas. Pasado eso Vercel la
+ * mata sin correr ningún catch y el usuario se queda sin respuesta.
+ */
+const PRESUPUESTO_TOTAL_MS = 60_000;
+/** Un intento con menos margen que esto no tiene chance real: no se arranca. */
+const INTENTO_MINIMO_MS = 5_000;
+
+function dormirReal(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Falla del Gateway con lo necesario para diagnosticar el próximo incidente
+ * (429 vs 5xx vs timeout vs red) sin loguear el contenido del mensaje.
+ */
+export class GatewayError extends Error {
+  /** Status HTTP, o undefined si ni siquiera hubo respuesta (red/timeout). */
+  readonly status?: number;
+
+  constructor(message: string, status?: number, cause?: unknown) {
+    super(message, { cause });
+    this.name = 'GatewayError';
+    this.status = status;
+  }
+}
+
+/** `Retry-After` en segundos (o fecha HTTP) → ms. null si no vino o no se entiende. */
+function leerRetryAfter(valor: string | null, ahora: number): number | null {
+  if (!valor) return null;
+  const segundos = Number(valor);
+  if (Number.isFinite(segundos) && segundos >= 0) return segundos * 1000;
+  const fecha = Date.parse(valor);
+  return Number.isNaN(fecha) ? null : Math.max(0, fecha - ahora);
+}
+
+/** Opciones inyectables de `callGatewayReal`: los tests no esperan de verdad. */
+export interface OpcionesGateway {
+  dormir?: (ms: number) => Promise<void>;
+  ahora?: () => number;
 }
 
 export interface ToolCall {
@@ -52,6 +110,13 @@ export type AgentReply =
       kind: 'service_error';
       /** Si es true, NO se puede reintentar nada: ya hay escrituras hechas. */
       huboEscrituras: boolean;
+      /**
+       * Lo que SÍ quedó hecho antes del corte, en texto para el usuario (una
+       * línea por herramienta). Solo viene si hubo escrituras: sin esto el
+       * llamador solo podía mandar un aviso genérico y el usuario no sabía qué
+       * gastos se habían guardado.
+       */
+      resumen?: string;
     };
 
 type GatewayMessage = { role: 'user' | 'assistant'; content: unknown };
@@ -161,12 +226,24 @@ export async function runAgent(
     // la vuelta 0 anduvo, una herramienta ESCRIBIÓ el gasto, y la vuelta 1
     // falló. Por eso se reporta si hubo escrituras: sin ese dato el llamador
     // corría el modo degradado con el mismo mensaje y registraba el gasto por
-    // segunda vez.
-    console.error('runAgent: falló el Gateway:', err);
-    return {
-      kind: 'service_error',
-      huboEscrituras: resultadosHerramientas.some(r => r.wrote),
-    };
+    // segunda vez. Y se manda el resumen de lo escrito, para que el usuario
+    // sepa QUÉ quedó guardado en vez de un "revisá en la app" a ciegas.
+    const huboEscrituras = resultadosHerramientas.some(r => r.wrote);
+    // Status y clase del error, nunca el contenido del mensaje: es lo que
+    // separa un 429 de un 5xx o un timeout en el próximo incidente.
+    const status = err instanceof GatewayError ? err.status : undefined;
+    const clase = err instanceof Error ? err.name : typeof err;
+    const detalle = err instanceof Error ? err.message.slice(0, 300) : '';
+    console.error(
+      `runAgent: falló el Gateway status=${status ?? 'sin respuesta'} error=${clase} huboEscrituras=${huboEscrituras} herramientas=${resultadosHerramientas.length}: ${detalle}`,
+    );
+    return huboEscrituras
+      ? {
+          kind: 'service_error',
+          huboEscrituras,
+          resumen: resumirEfectos(resultadosHerramientas),
+        }
+      : { kind: 'service_error', huboEscrituras };
   }
 
   // Si el cierre fue genuino y trajo texto, ese es el mensaje. Si no (se
@@ -176,28 +253,38 @@ export async function runAgent(
   // que le haga creer al usuario que no pasó nada.
   let textoFinal = terminoNaturalmente ? ultimoTexto : '';
   if (!textoFinal) {
-    // Se incluye TODO lo que escribió, no solo lo que salió `ok`: un
-    // `registrar_factura` parcial es `ok:false` y aun así dejó transacciones
-    // reales. Dejarlo afuera hacía que el fallback dijera "No pude completar la
-    // acción. Probá de nuevo" — exactamente lo que empuja a duplicar la
-    // factura, y lo contrario de lo que el summary de esa herramienta se
-    // esfuerza en explicar.
-    const conEfecto = resultadosHerramientas.filter(r => r.ok || r.wrote);
-    // `userSummary` y no `summary`: el segundo está escrito PARA EL MODELO
-    // (montos crudos, instrucciones tipo "decile al usuario que...").
     textoFinal =
-      conEfecto.length > 0
-        ? conEfecto.map(r => r.userSummary ?? r.summary).join('\n')
-        : 'No pude completar la acción. Probá de nuevo.';
+      resumirEfectos(resultadosHerramientas) ??
+      'No pude completar la acción. Probá de nuevo.';
   }
 
   return { text: textoFinal, calls: ejecutadas };
+}
+
+/**
+ * Lo que tuvo efecto, en texto para el usuario (una línea por herramienta), o
+ * undefined si nada lo tuvo. Se usa cuando hay que responder sin que el modelo
+ * redacte: se agotaron las vueltas o el Gateway se cortó a mitad del bucle.
+ */
+function resumirEfectos(resultados: ToolOutcome[]): string | undefined {
+  // Se incluye TODO lo que escribió, no solo lo que salió `ok`: un
+  // `registrar_factura` parcial es `ok:false` y aun así dejó transacciones
+  // reales. Dejarlo afuera hacía que el fallback dijera "No pude completar la
+  // acción. Probá de nuevo" — exactamente lo que empuja a duplicar la
+  // factura, y lo contrario de lo que el summary de esa herramienta se
+  // esfuerza en explicar.
+  const conEfecto = resultados.filter(r => r.ok || r.wrote);
+  if (conEfecto.length === 0) return undefined;
+  // `userSummary` y no `summary`: el segundo está escrito PARA EL MODELO
+  // (montos crudos, instrucciones tipo "decile al usuario que...").
+  return conEfecto.map(r => r.userSummary ?? r.summary).join('\n');
 }
 
 /** Llamada real al Gateway. Se inyecta en producción; los tests la reemplazan. */
 export async function callGatewayReal(
   messages: GatewayMessage[],
   system: string,
+  { dormir = dormirReal, ahora = Date.now }: OpcionesGateway = {},
 ): Promise<{ stop_reason?: string; content?: unknown[] } | undefined> {
   // Mismo encadenado que vision.ts y categorizer.ts: en producción la variable
   // todavía se llama MINIMAX_API_KEY (quedó del proveedor anterior). Leer solo
@@ -206,7 +293,9 @@ export async function callGatewayReal(
   // enteraría de que el agente nunca se ejecutó.
   const apiKey = process.env.AI_GATEWAY_API_KEY || process.env.MINIMAX_API_KEY;
   if (!apiKey) {
-    throw new Error('falta AI_GATEWAY_API_KEY (ni MINIMAX_API_KEY como respaldo)');
+    throw new Error(
+      'falta AI_GATEWAY_API_KEY (ni MINIMAX_API_KEY como respaldo)',
+    );
   }
 
   const baseUrl =
@@ -223,39 +312,80 @@ export async function callGatewayReal(
   // que empiece a devolver 429. `vision.ts` ya reintenta ante esos status y por
   // eso sobrevive; sin esto, el agente moría al primer tropiezo y el usuario
   // veía "mi asistente está fallando" por un límite pasajero.
-  let ultimoDetalle = '';
-  for (let intento = 1; intento <= MAX_INTENTOS_GATEWAY; intento++) {
-    const res = await fetch(`${baseUrl}/v1/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 2048,
-        system,
-        tools: TOOL_DEFINITIONS,
-        messages,
-      }),
-      // Presupuesto de tiempo: un Gateway colgado no puede llevarse la función.
-      // Vercel la mata SIN ejecutar ningún catch, y ahí el usuario se queda sin
-      // respuesta — la misma falla muda que tuvo el CUFE.
-      signal: AbortSignal.timeout(30_000),
-    });
+  //
+  // También se reintenta cuando fetch LANZA (red caída, timeout del intento):
+  // es tan pasajero como un 503. Lo que acota todo es el presupuesto total de
+  // tiempo, no la cantidad de intentos.
+  const inicio = ahora();
+  for (let intento = 1; ; intento++) {
+    const transcurrido = ahora() - inicio;
+    let error: GatewayError;
+    let retryAfterMs: number | null = null;
+    try {
+      const res = await fetch(`${baseUrl}/v1/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 2048,
+          system,
+          tools: TOOL_DEFINITIONS,
+          messages,
+        }),
+        // Presupuesto de tiempo: un Gateway colgado no puede llevarse la
+        // función. Vercel la mata SIN ejecutar ningún catch, y ahí el usuario
+        // se queda sin respuesta — la misma falla muda que tuvo el CUFE. El
+        // timeout de cada intento se recorta a lo que queda del presupuesto
+        // total, para que un reintento no lo estire.
+        signal: AbortSignal.timeout(
+          Math.min(TIMEOUT_INTENTO_MS, PRESUPUESTO_TOTAL_MS - transcurrido),
+        ),
+      });
 
-    if (res.ok) return res.json();
+      if (res.ok) return res.json();
 
-    ultimoDetalle = await res.text().catch(() => '');
-    console.error(
-      `callGatewayReal HTTP ${res.status} (intento ${intento}) modelo=${model} body=${ultimoDetalle.slice(0, 300)}`,
-    );
-    if (STATUS_REINTENTABLES.has(res.status) && intento < MAX_INTENTOS_GATEWAY) {
-      await dormir(RETRY_BASE_MS * intento);
-      continue;
+      const detalle = await res.text().catch(() => '');
+      console.error(
+        `callGatewayReal HTTP ${res.status} (intento ${intento}) modelo=${model} body=${detalle.slice(0, 300)}`,
+      );
+      error = new GatewayError(
+        `Gateway ${res.status}: ${detalle.slice(0, 300)}`,
+        res.status,
+      );
+      if (!esReintentable(res.status)) throw error;
+      retryAfterMs = leerRetryAfter(res.headers.get('retry-after'), ahora());
+    } catch (err) {
+      // El status no reintentable de arriba (400, 401...) sale tal cual.
+      if (err instanceof GatewayError) throw err;
+      // Sin respuesta HTTP: red, DNS o el timeout del intento (TimeoutError).
+      const clase = err instanceof Error ? err.name : typeof err;
+      const mensaje = err instanceof Error ? err.message : String(err);
+      console.error(
+        `callGatewayReal sin respuesta (intento ${intento}) modelo=${model} error=${clase}: ${mensaje}`,
+      );
+      error = new GatewayError(
+        `Gateway sin respuesta: ${clase}: ${mensaje}`,
+        undefined,
+        err,
+      );
     }
-    throw new Error(`Gateway ${res.status}: ${ultimoDetalle.slice(0, 300)}`);
+
+    if (intento >= MAX_INTENTOS_GATEWAY) throw error;
+    const jitter = Math.floor(Math.random() * JITTER_MAX_MS);
+    const espera = Math.min(
+      (retryAfterMs ?? ESPERAS_MS[intento - 1]) + jitter,
+      ESPERA_MAX_MS,
+    );
+    // Si después de esperar ya no queda margen para un intento con chances,
+    // mejor fallar ahora: el llamador todavía tiene tiempo de responderle al
+    // usuario (modo degradado o resumen de lo escrito).
+    if (ahora() - inicio + espera + INTENTO_MINIMO_MS > PRESUPUESTO_TOTAL_MS) {
+      throw error;
+    }
+    await dormir(espera);
   }
-  throw new Error(`Gateway agotó reintentos: ${ultimoDetalle.slice(0, 300)}`);
 }

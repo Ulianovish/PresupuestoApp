@@ -44,9 +44,20 @@ const CUENTA_DE_EMERGENCIA = 'Efectivo';
  * escribió. No se puede reintentar nada (ni por el modo degradado ni pidiéndole
  * al usuario que reenvíe): lo escrito son transacciones reales y volver a
  * pasar el mismo mensaje las duplicaría.
+ *
+ * Es el último recurso: lo normal es que `runAgent` mande el `resumen` de lo
+ * escrito y se responda con eso + `NOTA_CORTE` (ver abajo).
  */
 const AVISO_CORTE_CON_ESCRITURAS =
   '⚠️ Registré lo que me pediste, pero se me cortó la conversación antes de terminar. Revisá en la app si algo quedó a medias — no me lo reenvíes, se duplicaría.';
+
+/**
+ * Va debajo del resumen de lo escrito cuando el Gateway se corta a mitad del
+ * turno. Pide solo lo que falte, nunca el mensaje entero: lo de arriba ya son
+ * transacciones reales y reenviarlo todo las duplicaría.
+ */
+const NOTA_CORTE =
+  '(Se me cortó la conexión antes de terminar; si faltaba algo, mandámelo de nuevo solo con eso.)';
 
 /** Cuentas activas del usuario. Compartida con el flujo de imágenes del webhook. */
 export async function listarCuentas(userId: string): Promise<string[]> {
@@ -321,10 +332,15 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
   // Salvo que alguna herramienta YA haya escrito antes de que el Gateway se
   // cayera: ahí el modo degradado le pasaría el MISMO mensaje a
   // `parseQuickExpense` y registraría el gasto por segunda vez. Con escrituras
-  // hechas se responde la verdad y no se toca nada más.
+  // hechas se responde la verdad y no se toca nada más: la lista de lo que SÍ
+  // quedó guardado (las mismas confirmaciones ✅ que habría mandado el camino
+  // normal) y una nota del corte. El intercambio se guarda igual que en el
+  // camino feliz, así el próximo mensaje tiene el contexto de lo registrado.
   if ('kind' in respuesta) {
     const texto = respuesta.huboEscrituras
-      ? AVISO_CORTE_CON_ESCRITURAS
+      ? respuesta.resumen
+        ? `${respuesta.resumen}\n\n${NOTA_CORTE}`
+        : AVISO_CORTE_CON_ESCRITURAS
       : await intentarModoDegradado(ctx, cuentaDefecto);
     await responderYGuardar(
       ctx,
