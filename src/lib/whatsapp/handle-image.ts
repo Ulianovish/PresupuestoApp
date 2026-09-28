@@ -2,8 +2,14 @@
 // analiza con visión y enruta: transferencia → gasto directo; recibo →
 // registro directo (o pregunta la cuenta si no se puede resolver).
 
+import type { LastEntity, Turn } from '@/lib/whatsapp/agent/state';
 import { normalizar, resolverCuenta } from '@/lib/whatsapp/agent/tools';
 import { pegarAlertas } from '@/lib/whatsapp/alerts';
+import {
+  avisoFechaDescartada,
+  describirTransferencia,
+  sanearFechaComprobante,
+} from '@/lib/whatsapp/comprobante';
 import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
 import type { VisionResult } from '@/lib/whatsapp/vision';
 
@@ -69,7 +75,12 @@ export interface ImageDeps {
   downloadMedia: (
     url: string,
   ) => Promise<{ base64: string; mime: string } | null>;
-  analyzeImage: (base64: string, mime: string) => Promise<VisionResult>;
+  /** `caption` = lo que escribió el usuario junto a la foto (ver `buildVisionPrompt`). */
+  analyzeImage: (
+    base64: string,
+    mime: string,
+    caption?: string,
+  ) => Promise<VisionResult>;
   createDirectExpense: (
     userId: string,
     phone: string,
@@ -83,6 +94,8 @@ export interface ImageDeps {
     ok: boolean;
     category: string;
     error?: string;
+    /** Id del gasto creado: queda como `lastEntity` para poder corregirlo. */
+    transactionId?: string;
     /** Rubro de presupuesto asignado, si lo hubo (ver `onExpenseCreated`). */
     budgetItemId?: string | null;
   }>;
@@ -138,6 +151,16 @@ export interface ImageDeps {
   }>;
   resolveDefaultAccount: (phone: string) => Promise<string>;
   today: () => string;
+  /**
+   * Guarda la memoria de la conversación (mismo `writeState` que usa el
+   * agente): el intercambio de la foto entra a `turns` y `lastEntity` queda
+   * apuntando al gasto que registró la foto (o en null si fue una factura).
+   * Sin esto, un "si quedó mal es $X" justo después corregía un gasto viejo.
+   */
+  saveState: (patch: {
+    turns: Turn[];
+    lastEntity: LastEntity | null;
+  }) => Promise<void>;
 }
 
 export interface ImageContext {
@@ -152,6 +175,42 @@ export interface ImageContext {
    * también necesita preguntar.
    */
   existingPendingId: string | null;
+  /** Turnos vigentes de la conversación, para sumarles el de esta foto. */
+  previousTurns?: Turn[];
+}
+
+/**
+ * Guarda el intercambio de la foto y el "último gasto" corregible. Se llama
+ * ANTES de mandar la respuesta: si el usuario contesta rápido "si quedó mal
+ * es $X", el agente ya tiene que encontrar este gasto. Best-effort: el gasto
+ * ya está escrito, una falla acá no puede convertirse en un error para el
+ * usuario (en el peor caso la corrección cae en "no tengo un gasto reciente").
+ */
+async function guardarMemoria(
+  ctx: ImageContext,
+  deps: ImageDeps,
+  respuesta: string,
+  lastEntity: LastEntity | null,
+): Promise<void> {
+  const texto = ctx.body.trim();
+  try {
+    await deps.saveState({
+      lastEntity,
+      turns: [
+        ...(ctx.previousTurns ?? []),
+        { role: 'user', content: `[foto] ${texto || 'sin texto'}` },
+        { role: 'assistant', content: respuesta },
+      ],
+    });
+  } catch (err) {
+    console.error('handleImage: no pude guardar la conversación:', err);
+  }
+}
+
+/** Agrega el aviso de fecha descartada (si lo hay) en una línea aparte. */
+function conAvisoFecha(base: string, descartada: string | null): string {
+  const aviso = avisoFechaDescartada(descartada);
+  return aviso ? `${base}\n${aviso}` : base;
 }
 
 export async function handleImageMessage(
@@ -167,7 +226,7 @@ export async function handleImageMessage(
     return;
   }
 
-  const result = await deps.analyzeImage(media.base64, media.mime);
+  const result = await deps.analyzeImage(media.base64, media.mime, ctx.body);
 
   if (result.kind === 'transfer') {
     // `result.account` es texto crudo de la visión y NO se puede pasar tal cual
@@ -179,13 +238,20 @@ export async function handleImageMessage(
     const accountName =
       resolveAccountFromMessage(ctx.body, result.account, deps.accounts) ??
       (await deps.resolveDefaultAccount(ctx.phone));
-    // Fecha del GASTO (la que leyó la visión, o hoy si no la leyó): es la que
-    // se escribe en la transacción y la que tiene que viajar a las alertas,
-    // para comparar contra el mes que corresponde y no siempre contra "hoy".
-    const fecha = result.date ?? deps.today();
+    // Fecha del GASTO (la que leyó la visión, o hoy si no la leyó o no es
+    // creíble): es la que se escribe en la transacción y la que tiene que
+    // viajar a las alertas, para comparar contra el mes que corresponde.
+    const { fecha, descartada } = sanearFechaComprobante(
+      result.date,
+      deps.today(),
+    );
+    // La descripción sale de lo que escribió el usuario ("Huevos con nequi"
+    // → "Huevos"), no del destinatario impreso: la categoría y el rubro se
+    // deciden sobre ella, y "Carlos Gomez" terminaba en OTROS.
+    const descripcion = describirTransferencia(ctx.body, result, deps.accounts);
     const res = await deps.createDirectExpense(ctx.userId, ctx.phone, {
       amount: result.amount,
-      description: result.description ?? 'Transferencia',
+      description: descripcion,
       accountName,
       date: fecha,
     });
@@ -206,8 +272,28 @@ export async function handleImageMessage(
           errAlerta,
         );
       }
-      const base = `✅ Registré ${formatCOP(result.amount)} en ${res.category} (${accountName}). Si algo está mal, edítalo en la app.`;
-      await deps.sendMessage(ctx.phone, pegarAlertas(base, alertas));
+      const base = conAvisoFecha(
+        `✅ Registré ${formatCOP(result.amount)} · ${descripcion} en ${res.category} (${accountName}). Si algo está mal, edítalo en la app.`,
+        descartada,
+      );
+      const respuesta = pegarAlertas(base, alertas);
+      await guardarMemoria(
+        ctx,
+        deps,
+        respuesta,
+        res.transactionId
+          ? {
+              kind: 'expense',
+              transactionId: res.transactionId,
+              amount: result.amount,
+              description: descripcion,
+              accountName,
+              category: res.category,
+              date: fecha,
+            }
+          : null,
+      );
+      await deps.sendMessage(ctx.phone, respuesta);
     } else {
       await deps.sendMessage(
         ctx.phone,
@@ -222,9 +308,13 @@ export async function handleImageMessage(
     // guarda acá, la factura solo existiría en `pending` (vence a los 30 min,
     // y una segunda foto lo pisa) y podría desaparecer sin que el usuario se
     // entere de que "ya está guardada" fue mentira.
+    const { fecha, descartada } = sanearFechaComprobante(
+      result.date,
+      deps.today(),
+    );
     const draft = await deps.createReceiptDraft(ctx.userId, {
       supplier: result.supplier,
-      date: result.date ?? deps.today(),
+      date: fecha,
       items: result.items,
       total: result.total,
     });
@@ -252,10 +342,14 @@ export async function handleImageMessage(
         );
       }
       await deps.savePending(draft.invoiceId);
-      await deps.sendMessage(
-        ctx.phone,
+      const pregunta = conAvisoFecha(
         `🧾 Leí tu factura${supplierTexto}${totalTexto} (${result.items.length} ítems). ¿Con qué cuenta la pagaste?`,
+        descartada,
       );
+      // Una factura no deja un "último gasto" corregible (son N ítems): sin
+      // limpiar, un "si quedó mal es $X" iba a un gasto viejo y ajeno.
+      await guardarMemoria(ctx, deps, pregunta, null);
+      await deps.sendMessage(ctx.phone, pregunta);
       return;
     }
 
@@ -299,8 +393,15 @@ export async function handleImageMessage(
       // gastos de la factura YA están escritos, una alerta que falle no puede
       // convertir esto en un "no pude registrar". Se pega al mismo mensaje.
       const alertas = await avisarRubros(res.budgetItemIds ?? []);
-      const base = `✅ Registré tu factura${supplierTexto}${totalRegistradoTexto} (${res.itemsFound} ítems) en ${cuenta}.`;
-      await deps.sendMessage(ctx.phone, pegarAlertas(base, alertas));
+      const base = conAvisoFecha(
+        `✅ Registré tu factura${supplierTexto}${totalRegistradoTexto} (${res.itemsFound} ítems) en ${cuenta}.`,
+        descartada,
+      );
+      const respuesta = pegarAlertas(base, alertas);
+      // Mismo criterio que `registerInvoice` en turn.ts: una factura no deja
+      // un "último gasto" corregible.
+      await guardarMemoria(ctx, deps, respuesta, null);
+      await deps.sendMessage(ctx.phone, respuesta);
     } else if (res.itemsFound > 0) {
       // Fallo a mitad de camino: esos ítems YA son transacciones reales. Decir
       // "no pude guardar la factura" empujaría a reenviar la foto y duplicarlos.
@@ -308,8 +409,13 @@ export async function handleImageMessage(
       // pending_review): la acción real es cargar el resto a mano en Gastos.
       // Esos ítems también quedan con rubro asignado: la alerta también avisa.
       const alertas = await avisarRubros(res.budgetItemIds ?? []);
-      const base = `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta} (esos ya están en tus gastos, no se perdieron). Los que faltan, cargalos a mano en Gastos; no reenvíes la foto, duplicaría los que ya quedaron.`;
-      await deps.sendMessage(ctx.phone, pegarAlertas(base, alertas));
+      const base = conAvisoFecha(
+        `⚠️ Registré ${res.itemsFound} de ${res.totalItems} ítems de tu factura${supplierTexto} en ${cuenta} (esos ya están en tus gastos, no se perdieron). Los que faltan, cargalos a mano en Gastos; no reenvíes la foto, duplicaría los que ya quedaron.`,
+        descartada,
+      );
+      const respuesta = pegarAlertas(base, alertas);
+      await guardarMemoria(ctx, deps, respuesta, null);
+      await deps.sendMessage(ctx.phone, respuesta);
     } else {
       await deps.sendMessage(
         ctx.phone,

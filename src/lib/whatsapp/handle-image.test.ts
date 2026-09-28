@@ -23,6 +23,7 @@ function makeDeps(overrides = {}) {
       totalItems: 2,
     })),
     onExpenseCreated: vi.fn(async () => []),
+    saveState: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -43,7 +44,7 @@ describe('handleImageMessage', () => {
         amount: 50000,
         date: '2026-06-11',
         account: 'Nequi',
-        description: 'Juan',
+        recipient: 'Juan',
         confidence: 0.9,
       })),
     });
@@ -67,7 +68,8 @@ describe('handleImageMessage', () => {
         amount: 30000,
         date: null,
         account: null,
-        description: null,
+        concept: null,
+        recipient: null,
         confidence: 0.7,
       })),
     });
@@ -93,7 +95,7 @@ describe('handleImageMessage', () => {
         amount: 50000,
         date: '2026-06-11',
         account: 'Nequi',
-        description: 'Juan',
+        recipient: 'Juan',
         confidence: 0.9,
       })),
     });
@@ -112,7 +114,7 @@ describe('handleImageMessage', () => {
         amount: 50000,
         date: '2026-06-11',
         account: 'Bancolombia Ahorros',
-        description: 'Juan',
+        recipient: 'Juan',
         confidence: 0.9,
       })),
     });
@@ -132,7 +134,7 @@ describe('handleImageMessage', () => {
         amount: 50000,
         date: '2026-06-11',
         account: 'Efectivo',
-        description: 'Juan',
+        recipient: 'Juan',
         confidence: 0.9,
       })),
     });
@@ -152,7 +154,7 @@ describe('handleImageMessage', () => {
         amount: 50000,
         date: '2026-06-11',
         account: 'Nequi',
-        description: 'Juan',
+        recipient: 'Juan',
         confidence: 0.9,
       })),
       createDirectExpense: vi.fn(async () => ({
@@ -177,7 +179,7 @@ describe('handleImageMessage', () => {
         amount: 50000,
         date: '2026-06-11',
         account: 'Nequi',
-        description: 'Juan',
+        recipient: 'Juan',
         confidence: 0.9,
       })),
       createDirectExpense: vi.fn(async () => ({
@@ -205,7 +207,7 @@ describe('handleImageMessage', () => {
         amount: 50000,
         date: '2026-06-11',
         account: 'Nequi',
-        description: 'Juan',
+        recipient: 'Juan',
         confidence: 0.9,
       })),
       createDirectExpense: vi.fn(async () => ({
@@ -548,6 +550,268 @@ describe('handleImageMessage', () => {
     await handleImageMessage(ctx, deps);
     expect(deps.analyzeImage).not.toHaveBeenCalled();
     expect(deps.sendMessage).toHaveBeenCalled();
+  });
+});
+
+describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
+  function transferencia(extra: Record<string, unknown> = {}) {
+    return vi.fn(async () => ({
+      kind: 'transfer',
+      amount: 9000,
+      date: '2026-06-11',
+      account: null,
+      concept: 'Pago',
+      recipient: 'Carlos Gomez',
+      confidence: 0.9,
+      ...extra,
+    }));
+  }
+
+  function mensajes(deps: { sendMessage: unknown }): string[] {
+    return (deps.sendMessage as ReturnType<typeof vi.fn>).mock.calls.map(
+      c => c[1] as string,
+    );
+  }
+
+  it('le pasa a la visión lo que escribió el usuario junto a la foto', async () => {
+    const deps = makeDeps({ analyzeImage: transferencia() });
+    await handleImageMessage({ ...ctx, body: 'Huevos con nequi' }, deps);
+    expect(deps.analyzeImage).toHaveBeenCalledWith(
+      'b64',
+      'image/png',
+      'Huevos con nequi',
+    );
+  });
+
+  it('"Huevos con nequi" → la descripción es "Huevos" (no el destinatario), y la cuenta sigue saliendo del texto', async () => {
+    const deps = makeDeps({
+      analyzeImage: transferencia(),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'MERCADO',
+        transactionId: 't1',
+      })),
+    });
+    await handleImageMessage({ ...ctx, body: 'Huevos con nequi' }, deps);
+    expect(deps.createDirectExpense).toHaveBeenCalledWith('u1', '+57300', {
+      amount: 9000,
+      description: 'Huevos',
+      accountName: 'Nequi',
+      date: '2026-06-11',
+    });
+    expect(mensajes(deps)[0]).toMatch(
+      /^✅ Registré \$\s?9\.000 · Huevos en MERCADO \(Nequi\)\./,
+    );
+  });
+
+  it('sin texto → la descripción es el concepto que leyó la visión', async () => {
+    const deps = makeDeps({
+      analyzeImage: transferencia({ concept: 'Cena afuera' }),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.createDirectExpense).toHaveBeenCalledWith(
+      'u1',
+      '+57300',
+      expect.objectContaining({ description: 'Cena afuera' }),
+    );
+  });
+
+  it('sin texto ni concepto → el destinatario', async () => {
+    const deps = makeDeps({ analyzeImage: transferencia({ concept: null }) });
+    await handleImageMessage(ctx, deps);
+    expect(deps.createDirectExpense).toHaveBeenCalledWith(
+      'u1',
+      '+57300',
+      expect.objectContaining({ description: 'Carlos Gomez' }),
+    );
+  });
+
+  it('transferencia con fecha vieja (>60 días) → registra con hoy y lo avisa', async () => {
+    const deps = makeDeps({
+      analyzeImage: transferencia({ date: '2025-04-09' }),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.createDirectExpense).toHaveBeenCalledWith(
+      'u1',
+      '+57300',
+      expect.objectContaining({ date: '2026-06-12' }),
+    );
+    expect(mensajes(deps)[0]).toContain(
+      '(La fecha del comprobante parecía 9 abr 2025; la puse hoy. Editala si no.)',
+    );
+  });
+
+  it('transferencia con fecha futura → registra con hoy y lo avisa', async () => {
+    const deps = makeDeps({
+      analyzeImage: transferencia({ date: '2026-07-09' }),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.createDirectExpense).toHaveBeenCalledWith(
+      'u1',
+      '+57300',
+      expect.objectContaining({ date: '2026-06-12' }),
+    );
+    expect(mensajes(deps)[0]).toMatch(/parecía 9 jul 2026; la puse hoy/);
+  });
+
+  it('transferencia con fecha normal → sin aviso de fecha', async () => {
+    const deps = makeDeps({ analyzeImage: transferencia() });
+    await handleImageMessage(ctx, deps);
+    expect(mensajes(deps)[0]).not.toMatch(/parecía/);
+  });
+
+  it('transferencia registrada → queda como lastEntity y el intercambio entra a los turnos', async () => {
+    const previos = [
+      { role: 'user' as const, content: '20k taxi' },
+      { role: 'assistant' as const, content: '✅ Anotado' },
+    ];
+    const deps = makeDeps({
+      analyzeImage: transferencia({ amount: 563091 }),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'MERCADO',
+        transactionId: 't-foto',
+      })),
+    });
+    await handleImageMessage(
+      { ...ctx, body: 'Huevos con nequi', previousTurns: previos },
+      deps,
+    );
+    const confirmacion = mensajes(deps)[0];
+    expect(deps.saveState).toHaveBeenCalledWith({
+      lastEntity: {
+        kind: 'expense',
+        transactionId: 't-foto',
+        amount: 563091,
+        description: 'Huevos',
+        accountName: 'Nequi',
+        category: 'MERCADO',
+        date: '2026-06-11',
+      },
+      turns: [
+        ...previos,
+        { role: 'user', content: '[foto] Huevos con nequi' },
+        { role: 'assistant', content: confirmacion },
+      ],
+    });
+  });
+
+  it('el estado se guarda ANTES de confirmar: una corrección rápida ya encuentra este gasto', async () => {
+    const deps = makeDeps({
+      analyzeImage: transferencia(),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'OTROS',
+        transactionId: 't1',
+      })),
+    });
+    await handleImageMessage(ctx, deps);
+    const guardado = (deps.saveState as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[0];
+    const enviado = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[0];
+    expect(guardado).toBeLessThan(enviado);
+  });
+
+  it('foto sin texto → el turno del usuario dice "[foto] sin texto"', async () => {
+    const deps = makeDeps({
+      analyzeImage: transferencia(),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'OTROS',
+        transactionId: 't1',
+      })),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.saveState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turns: [
+          { role: 'user', content: '[foto] sin texto' },
+          expect.objectContaining({ role: 'assistant' }),
+        ],
+      }),
+    );
+  });
+
+  it('si guardar el estado falla, el gasto igual se confirma', async () => {
+    const deps = makeDeps({
+      analyzeImage: transferencia(),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'OTROS',
+        transactionId: 't1',
+      })),
+      saveState: vi.fn(async () => {
+        throw new Error('db caída');
+      }),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(mensajes(deps)[0]).toMatch(/✅ Registré/);
+  });
+
+  it('transferencia que no se pudo registrar → no toca la memoria', async () => {
+    const deps = makeDeps({
+      analyzeImage: transferencia(),
+      createDirectExpense: vi.fn(async () => ({
+        ok: false,
+        category: 'OTROS',
+        error: 'boom',
+      })),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.saveState).not.toHaveBeenCalled();
+  });
+
+  const recibo = (extra: Record<string, unknown> = {}) =>
+    vi.fn(async () => ({
+      kind: 'receipt',
+      supplier: 'D1',
+      date: '2026-06-12',
+      items: [{ description: 'Arroz', amount: 6000 }],
+      total: 6000,
+      confidence: 0.8,
+      ...extra,
+    }));
+
+  it('recibo pendiente de cuenta → limpia lastEntity (una corrección no puede ir a un gasto viejo)', async () => {
+    const deps = makeDeps({ analyzeImage: recibo() });
+    await handleImageMessage(ctx, deps);
+    expect(deps.savePending).toHaveBeenCalledWith('inv-1');
+    expect(deps.saveState).toHaveBeenCalledWith(
+      expect.objectContaining({ lastEntity: null }),
+    );
+  });
+
+  it('recibo registrado directo → también limpia lastEntity', async () => {
+    const deps = makeDeps({ analyzeImage: recibo() });
+    await handleImageMessage({ ...ctx, body: 'pagué con Nequi' }, deps);
+    expect(deps.registerInvoice).toHaveBeenCalled();
+    expect(deps.saveState).toHaveBeenCalledWith(
+      expect.objectContaining({ lastEntity: null }),
+    );
+  });
+
+  it('recibo con fecha vieja → el borrador va con hoy y el mensaje lo avisa', async () => {
+    const deps = makeDeps({ analyzeImage: recibo({ date: '2025-04-09' }) });
+    await handleImageMessage(ctx, deps);
+    expect(deps.createReceiptDraft).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ date: '2026-06-12' }),
+    );
+    expect(mensajes(deps).join('\n')).toContain(
+      'parecía 9 abr 2025; la puse hoy',
+    );
+  });
+
+  it('recibo con fecha futura y cuenta resuelta → registra con hoy y lo avisa', async () => {
+    const deps = makeDeps({ analyzeImage: recibo({ date: '2026-10-09' }) });
+    await handleImageMessage({ ...ctx, body: 'pagué con Nequi' }, deps);
+    expect(deps.createReceiptDraft).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ date: '2026-06-12' }),
+    );
+    expect(mensajes(deps)[0]).toMatch(/✅ Registré tu factura/);
+    expect(mensajes(deps)[0]).toContain('parecía 9 oct 2026');
   });
 });
 
