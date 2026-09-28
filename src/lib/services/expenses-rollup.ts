@@ -36,3 +36,16 @@ export function resolveItemNameToId(
   const found = items.find(i => i.name === name);
   return found ? found.id : null;
 }
+
+/**
+ * Normaliza un nombre de categoría/ítem para compararlo: sin tildes, en
+ * minúsculas y con los espacios colapsados ("Vivienda " ≡ "VIVIENDA").
+ */
+export function normalizarNombre(s: string | null | undefined): string {
+  return (s ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}

@@ -4,6 +4,7 @@ import type { BudgetItemRef } from '@/lib/services/expenses-rollup';
 
 import {
   asignacionesAGuardar,
+  mensajeClasificacion,
   sugerenciaVisible,
   valorDelSelect,
   type SugerenciasPorGasto,
@@ -99,5 +100,37 @@ describe('asignacionesAGuardar', () => {
       g2: { budgetItemId: 'arriendo', source: 'historial' },
     };
     expect(asignacionesAGuardar(GASTOS, { g2: '' }, sug, ITEMS)).toEqual([]);
+  });
+});
+
+describe('mensajeClasificacion', () => {
+  it('reporta el número REAL asignado y el desglose', () => {
+    expect(
+      mensajeClasificacion({
+        total: 5,
+        assigned: 2,
+        byHistory: 1,
+        byAi: 1,
+        skippedNoBudget: 0,
+        unmatched: 3,
+      }),
+    ).toBe(
+      'Se asignaron 2 de 5 gastos (1 por tu historial, 1 por IA). 3 quedan para asignar a mano.',
+    );
+  });
+
+  it('dice cuántos se saltaron por no haber presupuesto en el mes', () => {
+    expect(
+      mensajeClasificacion({
+        total: 3,
+        assigned: 0,
+        byHistory: 0,
+        byAi: 0,
+        skippedNoBudget: 3,
+        unmatched: 0,
+      }),
+    ).toBe(
+      'No se asignó ningún gasto. 3 son de un mes sin presupuesto (créalo primero).',
+    );
   });
 });

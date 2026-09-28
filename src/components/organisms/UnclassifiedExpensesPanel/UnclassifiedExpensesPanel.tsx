@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
 import { AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 
 import Button from '@/components/atoms/Button/Button';
 import InlineCombobox from '@/components/molecules/InlineCombobox/InlineCombobox';
@@ -20,6 +21,7 @@ import {
 
 import {
   asignacionesAGuardar,
+  mensajeClasificacion,
   sugerenciaVisible,
   valorDelSelect,
   type SeleccionUsuario,
@@ -137,9 +139,16 @@ export default function UnclassifiedExpensesPanel({
   const handleClassifyAll = async () => {
     setIsBusy(true);
     try {
-      await classifyUnassignedForMonth(monthYear);
+      const resumen = await classifyUnassignedForMonth(monthYear);
+      const mensaje = mensajeClasificacion(resumen);
+      if (resumen.assigned > 0) toast.success(mensaje);
+      else toast.warning(mensaje);
       await load();
       onChanged?.();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'No se pudo clasificar',
+      );
     } finally {
       setIsBusy(false);
     }

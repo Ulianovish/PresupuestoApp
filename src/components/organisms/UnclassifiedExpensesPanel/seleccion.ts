@@ -9,6 +9,7 @@
  * usuario realmente eligió.
  */
 
+import type { ClassificationSummary } from '@/lib/services/expenses';
 import type {
   BudgetItemRef,
   BudgetItemSource,
@@ -105,4 +106,32 @@ export function asignacionesAGuardar(
     }
   }
   return out;
+}
+
+/**
+ * Mensaje para el usuario tras "Clasificar con IA", con el número REAL que
+ * quedó asignado (antes se reportaba cada fila como hecha aunque la IA no
+ * hubiera asignado nada).
+ */
+export function mensajeClasificacion(r: ClassificationSummary): string {
+  const partes: string[] = [];
+  if (r.assigned > 0) {
+    const desglose: string[] = [];
+    if (r.byHistory > 0) desglose.push(`${r.byHistory} por tu historial`);
+    if (r.byAi > 0) desglose.push(`${r.byAi} por IA`);
+    partes.push(
+      `Se asignaron ${r.assigned} de ${r.total} gastos${desglose.length ? ` (${desglose.join(', ')})` : ''}.`,
+    );
+  } else {
+    partes.push('No se asignó ningún gasto.');
+  }
+  if (r.skippedNoBudget > 0) {
+    partes.push(
+      `${r.skippedNoBudget} son de un mes sin presupuesto (créalo primero).`,
+    );
+  }
+  if (r.unmatched > 0) {
+    partes.push(`${r.unmatched} quedan para asignar a mano.`);
+  }
+  return partes.join(' ');
 }

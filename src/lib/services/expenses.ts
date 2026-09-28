@@ -3,15 +3,13 @@
  * Proporciona funciones CRUD para transacciones de gastos organizadas por mes
  */
 
-import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
 import { createClient } from '@/lib/supabase/client';
 import { toTitleCase } from '@/lib/text-case';
 
-import {
-  resolveItemNameToId,
-  type BudgetItemRef,
-  type BudgetItemSource,
-  type UnclassifiedExpense,
+import type {
+  BudgetItemRef,
+  BudgetItemSource,
+  UnclassifiedExpense,
 } from './expenses-rollup';
 
 // Interfaces para gastos mensuales
@@ -164,6 +162,13 @@ export async function getMonthlyExpenseData(
  */
 export async function createExpenseTransaction(
   expenseData: ExpenseFormData,
+  opts: {
+    /**
+     * false = no clasificar ahora (p. ej. una importación masiva, que conviene
+     * clasificar al final en un solo lote con `classifyExpensesOnServer`).
+     */
+    clasificar?: boolean;
+  } = {},
 ): Promise<string> {
   const {
     data: { user },
@@ -190,15 +195,16 @@ export async function createExpenseTransaction(
     throw new Error(`Error creando gasto: ${error.message}`);
   }
 
-  // Clasificación best-effort: asigna el gasto a un ítem del presupuesto.
-  // No bloquea la creación si la IA falla (el gasto queda "sin clasificar").
-  const monthYear = expenseData.transaction_date.slice(0, 7);
-  await classifyAndAssignExpense(
-    data,
-    expenseData.description,
-    expenseData.category_name,
-    monthYear,
-  );
+  // Clasificación best-effort EN EL SERVIDOR: asigna el gasto a un ítem del
+  // presupuesto (historial del usuario o IA). Si falla, el gasto ya está
+  // guardado y queda en el panel "sin clasificar".
+  if (opts.clasificar !== false && typeof data === 'string') {
+    try {
+      await classifyExpensesOnServer({ expenseIds: [data] });
+    } catch (error) {
+      console.error('No se pudo clasificar el gasto nuevo:', error);
+    }
+  }
 
   return data; // Retorna el ID de la transacción creada
 }
@@ -455,51 +461,41 @@ export async function assignExpenseToBudgetItem(
   }
 }
 
-/**
- * Clasifica UN gasto (por IA) dentro de su categoría y lo asigna si hay match.
- * Acotado a la categoría del gasto; si no hay ítems en esa categoría, no hace nada.
- */
-export async function classifyAndAssignExpense(
-  expenseId: string,
-  description: string,
-  categoryName: string,
-  monthYear: string,
-): Promise<void> {
-  try {
-    const items = await getBudgetItemsForMonth(monthYear);
-    const inCategory = items.filter(i => i.category_name === categoryName);
-    if (inCategory.length === 0) return; // OTROS/sin ítems -> queda sin clasificar
+/** Conteos que devuelve POST /api/expenses/classify (ver la ruta). */
+export interface ClassificationSummary {
+  total: number;
+  assigned: number;
+  byHistory: number;
+  byAi: number;
+  skippedNoBudget: number;
+  unmatched: number;
+}
 
-    const [name] = await classifyExpensesToItems(
-      [{ description }],
-      inCategory.map(i => i.name),
-    );
-    const itemId = resolveItemNameToId(name, inCategory);
-    if (itemId) {
-      await assignExpenseToBudgetItem(expenseId, itemId, 'ai');
-    }
-  } catch (error) {
-    console.error('Error en classifyAndAssignExpense:', error);
-    // No relanzar: la clasificación es best-effort; el gasto queda sin asignar.
+/**
+ * Pide al SERVIDOR que clasifique gastos sin ítem (por mes o por ids). La IA
+ * no puede correr acá: en el navegador no existen las API keys y antes se
+ * devolvía null para todo sin avisar.
+ */
+export async function classifyExpensesOnServer(
+  body: { monthYear: string } | { expenseIds: string[] },
+): Promise<ClassificationSummary> {
+  const res = await fetch('/api/expenses/classify', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error || `Error clasificando gastos (${res.status})`);
   }
+  return (await res.json()) as ClassificationSummary;
 }
 
 /** Clasifica en lote los gastos sin asignar de un mes (botón "Clasificar con IA"). */
 export async function classifyUnassignedForMonth(
   monthYear: string,
-): Promise<number> {
-  const pending = await getUnclassifiedExpenses(monthYear);
-  let assigned = 0;
-  for (const exp of pending) {
-    await classifyAndAssignExpense(
-      exp.id,
-      exp.description,
-      exp.category_name,
-      monthYear,
-    );
-    assigned++;
-  }
-  return assigned;
+): Promise<ClassificationSummary> {
+  return classifyExpensesOnServer({ monthYear });
 }
 
 export {
