@@ -130,6 +130,13 @@ export function mensajeClasificacion(r: ClassificationSummary): string {
       `${r.skippedNoBudget} son de un mes sin presupuesto (créalo primero).`,
     );
   }
+  if (r.recategorized > 0) {
+    partes.push(
+      r.recategorized === 1
+        ? '1 cambió de categoría según tu historial.'
+        : `${r.recategorized} cambiaron de categoría según tu historial.`,
+    );
+  }
   if (r.unmatched > 0) {
     partes.push(`${r.unmatched} quedan para asignar a mano.`);
   }

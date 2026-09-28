@@ -1,5 +1,5 @@
 // POST /api/expenses/classify
-// Body: { monthYear: 'YYYY-MM' } | { expenseIds: string[] }
+// Body: { monthYear: 'YYYY-MM' } | { expenseIds: string[], guessedCategoryIds?: string[] }
 // GET  /api/expenses/classify?monthYear=YYYY-MM → { suggestions }
 //
 // Clasifica en el SERVIDOR los gastos sin ítem de presupuesto: botón
@@ -7,6 +7,11 @@
 // ids). Antes esto corría en el navegador, donde no hay API key de IA: no se
 // clasificaba nada y la UI igual reportaba cada fila como hecha. Devuelve los
 // conteos REALES (solo lo que el RPC de asignación confirmó).
+//
+// `guessedCategoryIds` (subconjunto de `expenseIds`): gastos cuya categoría
+// ADIVINÓ el cliente (palabras clave de la importación), no el usuario. Solo
+// a esos — y a los que no tienen categoría — el historial les puede cambiar la
+// categoría; la que eligió el usuario (OTROS incluido) se respeta.
 //
 // El GET no asigna nada: devuelve las sugerencias del historial manual del
 // usuario para preseleccionarlas (marcadas) en el panel.
@@ -29,6 +34,7 @@ const BodySchema = z
       .regex(/^\d{4}-\d{2}$/)
       .optional(),
     expenseIds: z.array(z.string().uuid()).min(1).max(200).optional(),
+    guessedCategoryIds: z.array(z.string()).max(200).optional(),
   })
   .refine(b => !!b.monthYear || !!b.expenseIds, {
     message: 'Se requiere monthYear o expenseIds',
@@ -43,6 +49,8 @@ export interface ClassifyResponse {
   skippedNoBudget: number;
   /** Con presupuesto, pero ningún ítem encajó (o la asignación falló). */
   unmatched: number;
+  /** A cuántos el historial les cambió la categoría. */
+  recategorized: number;
 }
 
 type Cliente = Awaited<ReturnType<typeof createClient>>;
@@ -134,6 +142,7 @@ export async function POST(request: Request) {
     if (error) {
       return Response.json({ error: error.message }, { status: 500 });
     }
+    const adivinadas = new Set(body.guessedCategoryIds ?? []);
     gastos = ((data as unknown[]) ?? []).map(row => {
       const r = row as {
         id: string;
@@ -146,6 +155,7 @@ export async function POST(request: Request) {
         description: r.description ?? '',
         categoryName: r.category_name ?? '',
         monthYear: r.month_year,
+        ...(adivinadas.has(r.id) && { categoriaAdivinada: true }),
       };
     });
   } else {
@@ -169,6 +179,7 @@ export async function POST(request: Request) {
     byAi: r.asignados.filter(a => a.source === 'ai').length,
     skippedNoBudget: r.sinPresupuesto,
     unmatched: r.sinCoincidencia,
+    recategorized: r.categoriasCambiadas,
   };
   return Response.json(respuesta);
 }

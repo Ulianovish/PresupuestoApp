@@ -216,9 +216,45 @@ describe('clasificarGastos', () => {
     ]);
   });
 
-  it('un gasto en OTROS que el historial reconoce toma también la categoría', async () => {
+  it('un gasto con categoría ADIVINADA que el historial reconoce toma también la categoría (y se cuenta)', async () => {
     const { client, from, update } = fakeSupabase({
       itemsPorMes: { '2026-09': ITEMS_SEPT },
+    });
+
+    const r = await clasificarGastos(
+      client,
+      'u1',
+      [
+        {
+          id: 't1',
+          description:
+            'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+          categoryName: 'OTROS',
+          monthYear: '2026-09',
+          categoriaAdivinada: true,
+        },
+      ],
+      { historial: HISTORIAL },
+    );
+
+    expect(from).toHaveBeenCalledWith('transactions');
+    expect(update).toHaveBeenCalledWith({ category_name: 'VIVIENDA' });
+    expect(r.asignados).toEqual([
+      { expenseId: 't1', budgetItemId: 'arriendo', source: 'historial' },
+    ]);
+    expect(r.categoriasCambiadas).toBe(1);
+    expect(mockedClassify).not.toHaveBeenCalled();
+  });
+
+  it('OTROS elegido por el usuario NO se reescribe desde el historial: sigue la IA en OTROS', async () => {
+    mockedClassify.mockImplementation(async items => items.map(() => null));
+    const { client, update } = fakeSupabase({
+      itemsPorMes: {
+        '2026-09': [
+          ...ITEMS_SEPT,
+          { item_id: 'varios', item_name: 'Varios', category_name: 'OTROS' },
+        ],
+      },
     });
 
     const r = await clasificarGastos(
@@ -236,12 +272,17 @@ describe('clasificarGastos', () => {
       { historial: HISTORIAL },
     );
 
-    expect(from).toHaveBeenCalledWith('transactions');
-    expect(update).toHaveBeenCalledWith({ category_name: 'VIVIENDA' });
-    expect(r.asignados).toEqual([
-      { expenseId: 't1', budgetItemId: 'arriendo', source: 'historial' },
-    ]);
-    expect(mockedClassify).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(r.categoriasCambiadas).toBe(0);
+    expect(mockedClassify).toHaveBeenCalledWith(
+      [
+        {
+          description:
+            'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        },
+      ],
+      ['Varios'],
+    );
   });
 });
 

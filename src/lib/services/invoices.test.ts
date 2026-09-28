@@ -116,6 +116,34 @@ describe('createInvoiceDirect', () => {
     );
   });
 
+  it('la categoría de la IA va como ADIVINADA; la que eligió el usuario (override) no', async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({ data: 'tx-1', error: null })
+      .mockResolvedValueOnce({ data: 'tx-2', error: null });
+    const { from } = makeSupabaseMock({ row: invoiceRow(), rpc });
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    const classify = vi.fn(async () => [] as string[]);
+    await createInvoiceDirect('user-1', 'inv-1', 'Nequi', {
+      classify,
+      categoryOverrides: { 1: 'OTROS' },
+    });
+
+    expect(classify).toHaveBeenCalledWith(expect.anything(), 'user-1', [
+      expect.objectContaining({
+        id: 'tx-1',
+        categoryName: 'MERCADO',
+        categoriaAdivinada: true,
+      }),
+      expect.objectContaining({
+        id: 'tx-2',
+        categoryName: 'OTROS',
+        categoriaAdivinada: false,
+      }),
+    ]);
+  });
+
   it('fallo a mitad de camino: reporta el conteo real, no cero, y marca la factura en error', async () => {
     // Este es el hallazgo crítico: un usuario que cree que no se guardó nada
     // reenvía la foto y duplica los ítems que sí se registraron.

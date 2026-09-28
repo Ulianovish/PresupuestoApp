@@ -11,6 +11,7 @@ import {
   indexarHistorial,
   itemDesdeHistorial,
   normalizarDescripcion,
+  primerosDeGrupo,
   type FilaHistorial,
 } from './historial-clasificacion';
 
@@ -68,7 +69,9 @@ describe('normalizarDescripcion', () => {
     expect(normalizarDescripcion('Transferencia a Carlos Gomez')).toBe(
       'carlos gomez',
     );
-    expect(normalizarDescripcion('Enviado desde Arq')).toBe('arq');
+    expect(normalizarDescripcion('Transferencia a Academia Chechi')).toBe(
+      'academia chechi',
+    );
     expect(normalizarDescripcion('Pago En Qr Breb: Elizabeth')).toBe(
       'elizabeth',
     );
@@ -92,6 +95,38 @@ describe('normalizarDescripcion', () => {
 
   it('si solo queda el prefijo, no hay clave (no se matchea contra todo)', () => {
     expect(normalizarDescripcion('Pago En Qr Breb:')).toBe('');
+  });
+
+  it('claves de menos de 4 letras no se matchean ("Enviado desde Arq" → "arq")', () => {
+    expect(normalizarDescripcion('Enviado desde Arq')).toBe('');
+    expect(normalizarDescripcion('Pan')).toBe('');
+  });
+
+  it('descripciones genéricas (categorías, bancos, verbos de pago) no son clave', () => {
+    for (const generica of [
+      'Mercado',
+      'Compras',
+      'Pago',
+      'Transferencia', // el concepto por defecto de un comprobante sin concepto
+      'Sin descripción',
+      'Gastos varios',
+      'Otros',
+      'Nequi',
+      'Compra Bancolombia',
+      'Pago tarjeta crédito',
+      'Depósito A Daviplata Por Pse',
+      'Efectivo',
+      'Factura',
+      'Recibo',
+    ]) {
+      expect(normalizarDescripcion(generica), generica).toBe('');
+    }
+  });
+
+  it('una palabra genérica acompañada de algo específico sí es clave', () => {
+    expect(normalizarDescripcion('Mercado D1')).toBe('mercado d1');
+    expect(normalizarDescripcion('Pago Tarjeta Nu')).toBe('pago tarjeta nu');
+    expect(normalizarDescripcion('Almuerzo')).toBe('almuerzo');
   });
 });
 
@@ -137,6 +172,122 @@ describe('construirHistorial / buscarEnHistorial', () => {
     expect(buscarEnHistorial('chocolate', idx)).toMatchObject({
       categoria: 'GASTOS HORMIGA',
       itemNombre: null,
+    });
+  });
+});
+
+/** Fila cuyo ítem tiene id (para marcarlo como "primero de su categoría"). */
+function filaConId(
+  itemId: string,
+  description: string,
+  categoria: string,
+  item: string,
+  fecha = '2026-08-15',
+): FilaHistorial {
+  const f = fila(description, categoria, item, fecha);
+  f.budget_items = { ...f.budget_items!, id: itemId };
+  return f;
+}
+
+describe('primerosDeGrupo', () => {
+  it('marca el primer ítem (en el orden de la base) de cada categoría/mes con más de un ítem', () => {
+    const primeros = primerosDeGrupo([
+      // Ya vienen ordenados por nombre, como los devuelve la consulta.
+      { id: 'aseo', template_id: 'sep', category_id: 'mercado' },
+      { id: 'carnes', template_id: 'sep', category_id: 'mercado' },
+      { id: 'arriendo', template_id: 'sep', category_id: 'vivienda' },
+      { id: 'aseo-ago', template_id: 'ago', category_id: 'mercado' },
+      { id: 'lacena-ago', template_id: 'ago', category_id: 'mercado' },
+    ]);
+    // "arriendo" es el único de su categoría: elegirlo no era un default dudoso.
+    expect([...primeros].sort()).toEqual(['aseo', 'aseo-ago']);
+  });
+});
+
+describe('construirHistorial: filas "Asignar" del panel viejo', () => {
+  // El panel viejo guardaba como 'manual' el primer ítem alfabético de la
+  // categoría cuando el usuario solo apretaba "Asignar".
+  const PRIMEROS = new Set(['sep-aseo', 'sep-cine', 'ago-cine']);
+
+  it('descarta una fila manual que apunta al primer ítem de la categoría, sin respaldo', () => {
+    const entradas = construirHistorial(
+      [filaConId('sep-cine', 'Migao', 'GASTOS PERSONALES', 'Cine')],
+      { primerosDeGrupo: PRIMEROS },
+    );
+    expect(entradas).toEqual([]);
+  });
+
+  it('la confía si OTRA fila manual (no sospechosa) con la misma clave coincide', () => {
+    const entradas = construirHistorial(
+      [
+        filaConId('sep-aseo', 'Quitamanchas Polvo', 'MERCADO', 'Aseo'),
+        filaConId(
+          'jul-aseo',
+          'Quitamanchas Polvo',
+          'MERCADO',
+          'Aseo',
+          '2026-07-01',
+        ),
+      ],
+      { primerosDeGrupo: PRIMEROS },
+    );
+    expect(entradas).toHaveLength(2);
+  });
+
+  it('dos filas sospechosas que coinciden no se respaldan entre sí', () => {
+    const entradas = construirHistorial(
+      [
+        filaConId('sep-aseo', 'Paquete Todo A', 'MERCADO', 'Aseo'),
+        filaConId('sep-aseo', 'Paquete Todo A', 'MERCADO', 'Aseo'),
+      ],
+      { primerosDeGrupo: PRIMEROS },
+    );
+    expect(entradas).toEqual([]);
+  });
+
+  it('la confía si el nombre del ítem aparece en la descripción ("Entradas Cineprox" → Cine)', () => {
+    const entradas = construirHistorial(
+      [
+        filaConId('ago-cine', 'Entradas Cineprox', 'ENTRETENIMIENTO', 'Cine'),
+        filaConId('sep-cine', 'Cine', 'ENTRETENIMIENTO', 'Cine'),
+      ],
+      { primerosDeGrupo: PRIMEROS },
+    );
+    expect(entradas.map(e => e.clave)).toEqual(['entradas cineprox', 'cine']);
+  });
+
+  it('una fila cuyo ítem NO es el primero se confía como siempre', () => {
+    const entradas = construirHistorial(
+      [filaConId('sep-rest', 'Migao', 'GASTOS PERSONALES', 'Restaurantes')],
+      { primerosDeGrupo: PRIMEROS },
+    );
+    expect(entradas).toHaveLength(1);
+  });
+
+  it('una sospechosa descartada no tapa a una confiable más vieja de la misma clave', () => {
+    const idx = indexarHistorial(
+      construirHistorial(
+        [
+          filaConId(
+            'sep-cine',
+            'Migao',
+            'GASTOS PERSONALES',
+            'Cine',
+            '2026-09-01',
+          ),
+          filaConId(
+            'jul-rest',
+            'Migao',
+            'GASTOS PERSONALES',
+            'Restaurantes',
+            '2026-07-01',
+          ),
+        ],
+        { primerosDeGrupo: PRIMEROS },
+      ),
+    );
+    expect(buscarEnHistorial('migao', idx)).toMatchObject({
+      itemNombre: 'Restaurantes',
     });
   });
 });
@@ -188,7 +339,34 @@ describe('itemDesdeHistorial', () => {
     ).toMatchObject({ itemId: 'oct-arreglos-v' });
   });
 
-  it('si el gasto quedó en OTROS (comodín), toma la categoría del historial', () => {
+  it('si la categoría del gasto fue ADIVINADA (IA/palabras clave), toma la del historial', () => {
+    expect(
+      itemDesdeHistorial(
+        'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        'OTROS',
+        idx,
+        ITEMS_OCT,
+        { categoriaAdivinada: true },
+      ),
+    ).toEqual({
+      itemId: 'oct-arriendo',
+      categoria: 'VIVIENDA',
+      cambiaCategoria: true,
+    });
+  });
+
+  it('si el gasto no tiene categoría, toma la del historial', () => {
+    expect(
+      itemDesdeHistorial(
+        'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        '',
+        idx,
+        ITEMS_OCT,
+      ),
+    ).toMatchObject({ itemId: 'oct-arriendo', cambiaCategoria: true });
+  });
+
+  it('OTROS elegido por el usuario se respeta: no se le cambia la categoría', () => {
     expect(
       itemDesdeHistorial(
         'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
@@ -196,11 +374,7 @@ describe('itemDesdeHistorial', () => {
         idx,
         ITEMS_OCT,
       ),
-    ).toEqual({
-      itemId: 'oct-arriendo',
-      categoria: 'VIVIENDA',
-      cambiaCategoria: true,
-    });
+    ).toBeNull();
   });
 
   it('respeta una categoría elegida distinta a la del historial', () => {
@@ -218,7 +392,11 @@ describe('itemDesdeHistorial', () => {
 });
 
 describe('cargarHistorialManual', () => {
-  function fakeClient(result: { data: unknown; error: unknown }) {
+  /** Fake por tabla: `transactions` (las manuales) y `budget_items` (hermanos). */
+  function fakeClient(
+    result: { data: unknown; error: unknown },
+    hermanos: { data: unknown; error: unknown } = { data: [], error: null },
+  ) {
     const builder = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -226,10 +404,32 @@ describe('cargarHistorialManual', () => {
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue(result),
     };
-    return { client: { from: vi.fn(() => builder) }, builder };
+    const items = {
+      select: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue(hermanos),
+    };
+    const client = {
+      from: vi.fn((tabla: string) =>
+        tabla === 'budget_items' ? items : builder,
+      ),
+    };
+    return { client, builder, items };
   }
 
-  it('una sola consulta: solo manuales del usuario, de los últimos meses', async () => {
+  const conItem = (f: FilaHistorial, id: string, tpl: string, cat: string) => {
+    f.budget_items = {
+      ...f.budget_items!,
+      id,
+      template_id: tpl,
+      category_id: cat,
+    };
+    return f;
+  };
+
+  it('solo manuales del usuario, de los últimos meses', async () => {
     const { client, builder } = fakeClient({
       data: [fila('Carlos Gomez', 'MERCADO', 'Huevos', '2026-09-05')],
       error: null,
@@ -239,11 +439,72 @@ describe('cargarHistorialManual', () => {
       'u1',
       { meses: 6, hoy: new Date('2026-09-28T12:00:00Z') },
     );
-    expect(client.from).toHaveBeenCalledTimes(1);
     expect(client.from).toHaveBeenCalledWith('transactions');
     expect(builder.eq).toHaveBeenCalledWith('user_id', 'u1');
     expect(builder.eq).toHaveBeenCalledWith('budget_item_source', 'manual');
     expect(builder.gte).toHaveBeenCalledWith('transaction_date', '2026-03-01');
+    expect(entradas).toHaveLength(1);
+  });
+
+  it('descarta la fila cuyo ítem es el primero (por nombre) de su categoría ese mes', async () => {
+    const { client, items } = fakeClient(
+      {
+        data: [
+          conItem(
+            fila('Migao', 'GASTOS PERSONALES', 'Cine'),
+            'cine',
+            'sep',
+            'gp',
+          ),
+          conItem(
+            fila('Almuerzo Afuera', 'GASTOS PERSONALES', 'Restaurantes'),
+            'rest',
+            'sep',
+            'gp',
+          ),
+        ],
+        error: null,
+      },
+      {
+        // Orden de la base (por nombre): "Cine" antes que "Restaurantes".
+        data: [
+          { id: 'cine', template_id: 'sep', category_id: 'gp' },
+          { id: 'rest', template_id: 'sep', category_id: 'gp' },
+        ],
+        error: null,
+      },
+    );
+    const entradas = await cargarHistorialManual(
+      client as unknown as Parameters<typeof cargarHistorialManual>[0],
+      'u1',
+    );
+    expect(client.from).toHaveBeenCalledWith('budget_items');
+    expect(items.in).toHaveBeenCalledWith('template_id', ['sep']);
+    expect(items.in).toHaveBeenCalledWith('category_id', ['gp']);
+    expect(items.eq).toHaveBeenCalledWith('is_active', true);
+    expect(items.order).toHaveBeenCalledWith('name');
+    expect(entradas.map(e => e.descripcion)).toEqual(['Almuerzo Afuera']);
+  });
+
+  it('si falla la consulta de ítems hermanos, sigue sin ese filtro', async () => {
+    const { client } = fakeClient(
+      {
+        data: [
+          conItem(
+            fila('Migao', 'GASTOS PERSONALES', 'Cine'),
+            'cine',
+            'sep',
+            'gp',
+          ),
+        ],
+        error: null,
+      },
+      { data: null, error: { message: 'boom' } },
+    );
+    const entradas = await cargarHistorialManual(
+      client as unknown as Parameters<typeof cargarHistorialManual>[0],
+      'u1',
+    );
     expect(entradas).toHaveLength(1);
   });
 
@@ -298,12 +559,12 @@ describe('categorizarConHistorial', () => {
   });
 
   it('ignora una categoría del historial que el usuario ya no tiene', async () => {
-    const entradas = construirHistorial([fila('Pan', 'PANADERIA', null)]);
+    const entradas = construirHistorial([fila('Panela', 'PANADERIA', null)]);
     const categorizar = vi.fn(async (items: Array<{ description: string }>) =>
       items.map(() => 'MERCADO'),
     );
     const cats = await categorizarConHistorial(
-      [{ description: 'Pan' }],
+      [{ description: 'Panela' }],
       ['MERCADO'],
       entradas,
       {},
@@ -316,8 +577,8 @@ describe('categorizarConHistorial', () => {
 describe('ejemplosParaPrompt', () => {
   it('toma hasta N ejemplos distintos, repartidos entre categorías', () => {
     const entradas = construirHistorial([
-      fila('Pan', 'MERCADO', 'Lacena', '2026-09-10'),
-      fila('pan', 'MERCADO', 'Lacena', '2026-09-09'),
+      fila('Panela', 'MERCADO', 'Lacena', '2026-09-10'),
+      fila('panela', 'MERCADO', 'Lacena', '2026-09-09'),
       fila('Arroz', 'MERCADO', 'Lacena', '2026-09-08'),
       fila('Leche', 'MERCADO', 'Lacteos', '2026-09-07'),
       fila('Gaseosa', 'GASTOS HORMIGA', 'Bebidas', '2026-09-06'),
@@ -338,7 +599,7 @@ describe('ejemplosParaPrompt', () => {
   });
 
   it('descarta ejemplos de categorías que el usuario ya no tiene', () => {
-    const entradas = construirHistorial([fila('Pan', 'PANADERIA', null)]);
+    const entradas = construirHistorial([fila('Panela', 'PANADERIA', null)]);
     expect(ejemplosParaPrompt(entradas, ['MERCADO'])).toEqual([]);
   });
 

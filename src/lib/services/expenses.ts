@@ -469,6 +469,8 @@ export interface ClassificationSummary {
   byAi: number;
   skippedNoBudget: number;
   unmatched: number;
+  /** A cuántos el historial les cambió la categoría. */
+  recategorized: number;
 }
 
 /**
@@ -477,7 +479,13 @@ export interface ClassificationSummary {
  * devolvía null para todo sin avisar.
  */
 export async function classifyExpensesOnServer(
-  body: { monthYear: string } | { expenseIds: string[] },
+  body:
+    | { monthYear: string }
+    | {
+        expenseIds: string[];
+        /** Ids cuya categoría se adivinó (no la eligió el usuario). */
+        guessedCategoryIds?: string[];
+      },
 ): Promise<ClassificationSummary> {
   const res = await fetch('/api/expenses/classify', {
     method: 'POST',

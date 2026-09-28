@@ -113,6 +113,7 @@ describe('mensajeClasificacion', () => {
         byAi: 1,
         skippedNoBudget: 0,
         unmatched: 3,
+        recategorized: 0,
       }),
     ).toBe(
       'Se asignaron 2 de 5 gastos (1 por tu historial, 1 por IA). 3 quedan para asignar a mano.',
@@ -128,9 +129,26 @@ describe('mensajeClasificacion', () => {
         byAi: 0,
         skippedNoBudget: 3,
         unmatched: 0,
+        recategorized: 0,
       }),
     ).toBe(
       'No se asignó ningún gasto. 3 son de un mes sin presupuesto (créalo primero).',
+    );
+  });
+
+  it('avisa cuántos cambiaron de categoría por el historial', () => {
+    expect(
+      mensajeClasificacion({
+        total: 2,
+        assigned: 2,
+        byHistory: 2,
+        byAi: 0,
+        skippedNoBudget: 0,
+        unmatched: 0,
+        recategorized: 1,
+      }),
+    ).toBe(
+      'Se asignaron 2 de 2 gastos (2 por tu historial). 1 cambió de categoría según tu historial.',
     );
   });
 });

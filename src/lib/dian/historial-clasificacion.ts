@@ -14,6 +14,13 @@
  * una manual previa, así que no aportan información nueva y sí podrían
  * perpetuar un error viejo más allá de la ventana de meses.
  *
+ * Y ni siquiera toda 'manual' es del usuario: el panel viejo "Gastos sin
+ * clasificar" preseleccionaba el PRIMER ítem alfabético de la categoría y
+ * "Asignar" lo guardaba como 'manual' ("Mercado" → Aseo, "Migao" → Cine). Por
+ * eso (1) las descripciones genéricas o muy cortas no son clave, y (2) una
+ * fila que apunta al primer ítem de una categoría con varios ítems ese mes
+ * solo se cree si algo la respalda (ver `construirHistorial`).
+ *
  * Todo lo que no toca la base es puro y testeable; `cargarHistorialManual`
  * hace UNA consulta por lote y es best-effort.
  */
@@ -35,9 +42,20 @@ export interface FilaHistorial {
   category_name: string | null;
   transaction_date: string;
   budget_items: {
+    /** id / plantilla (mes) / categoría: para saber si era el "primer ítem". */
+    id?: string | null;
+    template_id?: string | null;
+    category_id?: string | null;
     name: string | null;
     categories: { name: string | null } | null;
   } | null;
+}
+
+/** Ítem del presupuesto tal como lo devuelve la consulta de ítems hermanos. */
+export interface ItemHermano {
+  id: string;
+  template_id: string | null;
+  category_id: string | null;
 }
 
 export interface EntradaHistorial {
@@ -58,9 +76,6 @@ export interface EntradaHistorial {
 }
 
 export type IndiceHistorial = Map<string, EntradaHistorial>;
-
-/** Categorías "no sé": un gasto en ellas puede tomar la categoría del historial. */
-const CATEGORIAS_COMODIN = new Set(['otros', '']);
 
 /** Meses hacia atrás que se miran por defecto. */
 const MESES_HISTORIAL = 12;
@@ -91,11 +106,87 @@ const PREFIJOS: RegExp[] = [
   /^(?:[a-z]+ ){0,5}\d{6,} de\s+/,
 ];
 
+/** Claves más cortas que esto no se matchean ("arq", "pan"): demasiado ambiguas. */
+const LARGO_MINIMO_CLAVE = 4;
+
+/**
+ * Palabras que no identifican un gasto: categorías, bancos/billeteras, medios y
+ * verbos de pago, rellenos de los comprobantes ('Transferencia' es el concepto
+ * por defecto de un comprobante sin concepto) y conectores. Una clave hecha
+ * SOLO de estas palabras ("Mercado", "Compra Bancolombia", "Sin descripción")
+ * no se matchea: "Mercado" pudo ser aseo, carne o verduras. Con algo
+ * específico al lado ("Mercado D1", "Pago Tarjeta Nu") sí es clave. Ojo: acá
+ * no van cosas concretas como "almuerzo" o "gasolina".
+ */
+const PALABRAS_GENERICAS = new Set([
+  // categorías / "no sé"
+  'mercado',
+  'gasto',
+  'gastos',
+  'varios',
+  'otros',
+  'otro',
+  'general',
+  // verbos y documentos de pago
+  'compra',
+  'compras',
+  'pago',
+  'pagos',
+  'transferencia',
+  'transferencias',
+  'transf',
+  'envio',
+  'enviado',
+  'deposito',
+  'consignacion',
+  'retiro',
+  'abono',
+  'factura',
+  'recibo',
+  'comprobante',
+  'sin',
+  'descripcion',
+  'concepto',
+  // bancos, billeteras y medios
+  'nequi',
+  'daviplata',
+  'bancolombia',
+  'davivienda',
+  'davibank',
+  'bold',
+  'breb',
+  'bre',
+  'pse',
+  'qr',
+  'banco',
+  'efectivo',
+  'tarjeta',
+  'credito',
+  'debito',
+  // conectores
+  'a',
+  'al',
+  'b',
+  'con',
+  'de',
+  'del',
+  'desde',
+  'el',
+  'en',
+  'la',
+  'las',
+  'los',
+  'para',
+  'por',
+  'y',
+]);
+
 /**
  * Normaliza una descripción para buscarla en el historial: minúsculas, sin
  * tildes ni puntuación, espacios colapsados, sin prefijos bancarios ni
  * "cuota N de M". Un handle "@susana7309" queda como "susana". Si no queda
- * nada útil (p. ej. solo el prefijo), devuelve '' y no se matchea.
+ * nada útil (solo el prefijo, menos de 4 letras o solo palabras genéricas),
+ * devuelve '' y no se matchea.
  */
 export function normalizarDescripcion(desc: string | null | undefined): string {
   let s = (desc ?? '')
@@ -116,12 +207,68 @@ export function normalizarDescripcion(desc: string | null | undefined): string {
   }
   s = s.replace(/\s*\bcuota \d+ de \d+$/, '').trim();
 
-  return s.length >= 3 ? s : '';
+  if (s.length < LARGO_MINIMO_CLAVE) return '';
+  if (s.split(' ').every(p => PALABRAS_GENERICAS.has(p))) return '';
+  return s;
 }
 
-/** Convierte filas de la base en entradas (más reciente primero, como vienen). */
-export function construirHistorial(filas: FilaHistorial[]): EntradaHistorial[] {
-  const entradas: EntradaHistorial[] = [];
+/**
+ * Ids de los ítems que el panel viejo habría preseleccionado: el PRIMERO de
+ * cada categoría de cada mes (plantilla), solo si esa categoría tenía más de
+ * un ítem (con uno solo no había nada que elegir). `items` tiene que venir en
+ * el orden de `get_budget_items_for_month` (por nombre, con la collation de
+ * la base): el primero que aparece de cada grupo es el primero alfabético.
+ */
+export function primerosDeGrupo(items: ItemHermano[]): Set<string> {
+  const porGrupo = new Map<string, { primero: string; cuantos: number }>();
+  for (const it of items) {
+    const k = `${it.template_id}|${it.category_id}`;
+    const g = porGrupo.get(k);
+    if (g) g.cuantos++;
+    else porGrupo.set(k, { primero: it.id, cuantos: 1 });
+  }
+  const out = new Set<string>();
+  for (const g of porGrupo.values()) if (g.cuantos > 1) out.add(g.primero);
+  return out;
+}
+
+/** Palabras de 4+ letras del nombre del ítem ("Alimentación Alice" → alimentacion, alice). */
+function palabrasDeItem(nombre: string): string[] {
+  return normalizarNombre(nombre)
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(p => p.length >= LARGO_MINIMO_CLAVE && !PALABRAS_GENERICAS.has(p));
+}
+
+/**
+ * ¿El nombre del ítem aparece en la descripción? ("Entradas Cineprox" → Cine,
+ * "Anthropic Claude Sub" → Claude IA). Si aparece, la asignación no fue el
+ * default ciego del panel: el ítem describe el gasto.
+ */
+function itemEnDescripcion(itemNombre: string, clave: string): boolean {
+  const palabras = clave.split(' ');
+  return palabrasDeItem(itemNombre).some(pi =>
+    palabras.some(pd => pd.startsWith(pi)),
+  );
+}
+
+/**
+ * Convierte filas de la base en entradas (más reciente primero, como vienen).
+ *
+ * `primerosDeGrupo`: ítems que el panel viejo preseleccionaba (ver
+ * `primerosDeGrupo()`). Una fila cuyo ítem es uno de esos, de la misma
+ * categoría del gasto, es SOSPECHOSA: pudo ser un "Asignar" sin mirar. Se
+ * descarta entera (categoría incluida: tampoco la confirmó) salvo que la
+ * respalde otra fila manual NO sospechosa con la misma clave, categoría e
+ * ítem, o que el nombre del ítem aparezca en la descripción.
+ */
+export function construirHistorial(
+  filas: FilaHistorial[],
+  opts: { primerosDeGrupo?: Set<string> } = {},
+): EntradaHistorial[] {
+  const primeros = opts.primerosDeGrupo ?? new Set<string>();
+  const candidatas: Array<{ entrada: EntradaHistorial; sospechosa: boolean }> =
+    [];
   for (const f of filas) {
     const descripcion = (f.description ?? '').replace(/\s+/g, ' ').trim();
     const clave = normalizarDescripcion(descripcion);
@@ -137,15 +284,36 @@ export function construirHistorial(filas: FilaHistorial[]): EntradaHistorial[] {
         ? item.name
         : null;
 
-    entradas.push({
-      descripcion,
-      clave,
-      categoria,
-      itemNombre,
-      fecha: f.transaction_date,
+    candidatas.push({
+      entrada: {
+        descripcion,
+        clave,
+        categoria,
+        itemNombre,
+        fecha: f.transaction_date,
+      },
+      // Sospechosa solo si el ítem es de la categoría del gasto: el panel
+      // viejo preseleccionaba dentro de esa categoría. Un ítem de otra
+      // categoría lo eligió el usuario.
+      sospechosa: !!(itemNombre && item?.id && primeros.has(item.id)),
     });
   }
-  return entradas;
+
+  const mismaDecision = (a: EntradaHistorial, b: EntradaHistorial) =>
+    a.clave === b.clave &&
+    normalizarNombre(a.categoria) === normalizarNombre(b.categoria) &&
+    normalizarNombre(a.itemNombre) === normalizarNombre(b.itemNombre);
+
+  return candidatas
+    .filter(
+      ({ entrada, sospechosa }) =>
+        !sospechosa ||
+        itemEnDescripcion(entrada.itemNombre ?? '', entrada.clave) ||
+        candidatas.some(
+          o => !o.sospechosa && mismaDecision(o.entrada, entrada),
+        ),
+    )
+    .map(c => c.entrada);
 }
 
 /** Índice por clave; ante repetidos gana la asignación más reciente. */
@@ -174,9 +342,11 @@ export function buscarEnHistorial(
 
 /**
  * Ítem del mes destino según el historial. Aplica si la categoría actual del
- * gasto es la misma del historial, o si es un comodín (OTROS / vacía): una
- * categoría que el usuario eligió distinta a la del historial se respeta.
- * `cambiaCategoria` avisa al llamador que también debe actualizar la
+ * gasto es la misma del historial, o si la categoría se puede cambiar: vacía,
+ * o marcada por el llamador como ADIVINADA (`categoriaAdivinada`: la puso la
+ * IA de WhatsApp/visión/facturas o las palabras clave de la importación, no
+ * el usuario). Una categoría que el usuario eligió — OTROS incluido — se
+ * respeta. `cambiaCategoria` avisa al llamador que también debe actualizar la
  * categoría del gasto, para que no quede un ítem de VIVIENDA en un gasto OTROS.
  */
 export function itemDesdeHistorial(
@@ -184,13 +354,15 @@ export function itemDesdeHistorial(
   categoriaGasto: string,
   indice: IndiceHistorial,
   items: BudgetItemRef[],
+  opts: { categoriaAdivinada?: boolean } = {},
 ): { itemId: string; categoria: string; cambiaCategoria: boolean } | null {
   const hit = buscarEnHistorial(descripcion, indice);
   if (!hit || !hit.itemNombre) return null;
 
   const catGasto = normalizarNombre(categoriaGasto);
   const catHist = normalizarNombre(hit.categoria);
-  if (catGasto !== catHist && !CATEGORIAS_COMODIN.has(catGasto)) return null;
+  const sePuedeCambiar = catGasto === '' || !!opts.categoriaAdivinada;
+  if (catGasto !== catHist && !sePuedeCambiar) return null;
 
   const nombre = normalizarNombre(hit.itemNombre);
   const item = items.find(
@@ -215,8 +387,55 @@ function desdeHaceMeses(hoy: Date, meses: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Tope de ítems hermanos (12 meses × los ítems de las categorías usadas). */
+const LIMITE_HERMANOS = 5000;
+
 /**
- * Carga las asignaciones MANUALES recientes del usuario (una consulta). El
+ * Ítems que el panel viejo habría preseleccionado entre los de las filas
+ * (segunda consulta: los ítems activos de esos meses y categorías, en el
+ * orden de `get_budget_items_for_month`). Best-effort: si falla, conjunto
+ * vacío — se sigue sin ese filtro (las claves genéricas igual se descartan).
+ */
+async function cargarPrimerosDeGrupo(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>,
+  filas: FilaHistorial[],
+): Promise<Set<string>> {
+  const plantillas = new Set<string>();
+  const categorias = new Set<string>();
+  for (const f of filas) {
+    const it = f.budget_items;
+    if (it?.template_id && it.category_id) {
+      plantillas.add(it.template_id);
+      categorias.add(it.category_id);
+    }
+  }
+  if (plantillas.size === 0) return new Set();
+  try {
+    const { data, error } = await supabase
+      .from('budget_items')
+      .select('id, template_id, category_id')
+      .in('template_id', [...plantillas])
+      .in('category_id', [...categorias])
+      .eq('is_active', true)
+      // Mismo orden que get_budget_items_for_month (c.name, bi.name): dentro
+      // de una categoría, por nombre con la collation de la base.
+      .order('name')
+      .limit(LIMITE_HERMANOS);
+    if (error) throw new Error(error.message);
+    return primerosDeGrupo((data ?? []) as ItemHermano[]);
+  } catch (error) {
+    console.warn(
+      '[historial] no se pudieron cargar los ítems hermanos:',
+      error,
+    );
+    return new Set();
+  }
+}
+
+/**
+ * Carga las asignaciones MANUALES recientes del usuario (una consulta, más
+ * otra por los ítems hermanos para descartar los "Asignar" a ciegas). El
  * `user_id` se filtra explícito porque en WhatsApp corre con service-role.
  * Best-effort: ante cualquier error devuelve [] y se sigue con la IA.
  */
@@ -236,7 +455,7 @@ export async function cargarHistorialManual(
     const { data, error } = await supabase
       .from('transactions')
       .select(
-        'description, category_name, transaction_date, budget_items(name, categories(name))',
+        'description, category_name, transaction_date, budget_items(id, template_id, category_id, name, categories(name))',
       )
       .eq('user_id', userId)
       .eq('budget_item_source', 'manual')
@@ -244,7 +463,10 @@ export async function cargarHistorialManual(
       .order('transaction_date', { ascending: false })
       .limit(LIMITE_FILAS);
     if (error) throw new Error(error.message);
-    return construirHistorial((data ?? []) as unknown as FilaHistorial[]);
+    const filas = (data ?? []) as unknown as FilaHistorial[];
+    return construirHistorial(filas, {
+      primerosDeGrupo: await cargarPrimerosDeGrupo(supabase, filas),
+    });
   } catch (error) {
     console.warn('[historial] no se pudo cargar el historial manual:', error);
     return [];

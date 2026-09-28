@@ -107,6 +107,7 @@ describe('POST /api/expenses/classify', () => {
       asignados: [{ expenseId: 't2', budgetItemId: 'arriendo', source: 'ai' }],
       sinPresupuesto: 0,
       sinCoincidencia: 1,
+      categoriasCambiadas: 0,
     });
 
     const res = await post({ monthYear: '2026-09' });
@@ -134,6 +135,7 @@ describe('POST /api/expenses/classify', () => {
       byAi: 1,
       skippedNoBudget: 0,
       unmatched: 1,
+      recategorized: 0,
     });
   });
 
@@ -144,6 +146,7 @@ describe('POST /api/expenses/classify', () => {
       asignados: [],
       sinPresupuesto: 2,
       sinCoincidencia: 0,
+      categoriasCambiadas: 0,
     });
 
     const json = await (await post({ monthYear: '2026-09' })).json();
@@ -160,6 +163,7 @@ describe('POST /api/expenses/classify', () => {
       ],
       sinPresupuesto: 0,
       sinCoincidencia: 0,
+      categoriasCambiadas: 0,
     });
 
     const json = await (
@@ -179,6 +183,38 @@ describe('POST /api/expenses/classify', () => {
     ]);
     expect(json.byHistory).toBe(1);
     expect(json.assigned).toBe(1);
+  });
+
+  it('marca como ADIVINADA solo la categoría de los ids que el cliente dice (import con palabras clave)', async () => {
+    fakeClient();
+    mockedClasificar.mockResolvedValue({
+      total: 1,
+      asignados: [
+        { expenseId: 't9', budgetItemId: 'aseo', source: 'historial' },
+      ],
+      sinPresupuesto: 0,
+      sinCoincidencia: 0,
+      categoriasCambiadas: 1,
+    });
+
+    const json = await (
+      await post({
+        expenseIds: ['11111111-1111-4111-8111-111111111111'],
+        guessedCategoryIds: ['t9'],
+      })
+    ).json();
+
+    expect(mockedClasificar).toHaveBeenCalledWith(expect.anything(), 'u1', [
+      {
+        id: 't9',
+        description: 'Mercado',
+        categoryName: 'MERCADO',
+        monthYear: '2026-09',
+        categoriaAdivinada: true,
+      },
+    ]);
+    // La UI lo avisa: "N cambiaron de categoría".
+    expect(json.recategorized).toBe(1);
   });
 });
 

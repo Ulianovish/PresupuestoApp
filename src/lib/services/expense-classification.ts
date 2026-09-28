@@ -30,6 +30,13 @@ export interface GastoAClasificar {
   description: string;
   categoryName: string;
   monthYear: string;
+  /**
+   * La categoría la ADIVINÓ el sistema (IA de WhatsApp/visión/facturas,
+   * palabras clave de la importación) y no el usuario: el historial puede
+   * reemplazarla. Sin la marca, solo se reemplaza una categoría vacía — una
+   * elegida a mano (OTROS incluido) se respeta.
+   */
+  categoriaAdivinada?: boolean;
 }
 
 export interface AsignacionHecha {
@@ -47,6 +54,8 @@ export interface ResultadoClasificacion {
   sinPresupuesto: number;
   /** Gastos con presupuesto pero sin ítem que encaje (o cuya asignación falló). */
   sinCoincidencia: number;
+  /** Gastos a los que el historial les CAMBIÓ la categoría (la UI lo avisa). */
+  categoriasCambiadas: number;
 }
 
 type Clasificador = typeof classifyExpensesToItems;
@@ -110,6 +119,7 @@ export async function clasificarGastos(
   };
   const asignados: AsignacionHecha[] = [];
   let sinPresupuesto = 0;
+  let categoriasCambiadas = 0;
 
   const asignar = async (
     gasto: GastoAClasificar,
@@ -147,15 +157,16 @@ export async function clasificarGastos(
           gasto.categoryName,
           idx,
           items,
+          { categoriaAdivinada: gasto.categoriaAdivinada },
         );
         if (!hit) {
           paraIA.push(gasto);
           continue;
         }
         if (hit.cambiaCategoria) {
-          // El gasto estaba en OTROS: se le pone la categoría del historial
-          // para que no quede un ítem de VIVIENDA en un gasto OTROS. Si no se
-          // pudo, mejor no asignar por historial y dejar que siga la IA.
+          // La categoría estaba vacía o era adivinada: se le pone la del
+          // historial para que no quede un ítem de VIVIENDA en un gasto OTROS.
+          // Si no se pudo, mejor no asignar por historial y dejar que siga la IA.
           // Cast: `transactions` en database.ts no tiene category_name.
           const { error } = await (supabase as unknown as SupabaseClient)
             .from('transactions')
@@ -166,6 +177,7 @@ export async function clasificarGastos(
             paraIA.push(gasto);
             continue;
           }
+          categoriasCambiadas++;
         }
         const antes = asignados.length;
         await asignar(gasto, hit.itemId, 'historial');
@@ -203,6 +215,7 @@ export async function clasificarGastos(
     asignados,
     sinPresupuesto,
     sinCoincidencia: gastos.length - asignados.length - sinPresupuesto,
+    categoriasCambiadas,
   };
 }
 

@@ -337,6 +337,7 @@ export async function createInvoiceDirect(
     description: string;
     categoryName: string;
     monthYear: string;
+    categoriaAdivinada: boolean;
   }> = [];
   // Se acumula sobre lo que de verdad se escribió, ítem por ítem: si el
   // registro se corta a la mitad, el total refleja esa mitad y no la cabecera.
@@ -403,6 +404,9 @@ export async function createInvoiceDirect(
         description: item.description,
         categoryName: categoria,
         monthYear: fecha.slice(0, 7),
+        // La de la IA es adivinada (el historial la puede corregir); la que
+        // el usuario eligió para esta línea, no.
+        categoriaAdivinada: deps.categoryOverrides?.[idx] === undefined,
       });
       totalRegistrado += Number(monto ?? 0);
     }
