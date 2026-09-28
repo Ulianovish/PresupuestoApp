@@ -65,12 +65,25 @@ export async function redeemLinkCode(
 
   const userId = (row as { user_id: string }).user_id;
 
-  const { error: upsertError } = await supabase
+  // El documento (cédula/NIT para la DIAN) es de la persona del número en SU
+  // presupuesto: si el número pasa a otro usuario, no se hereda el del dueño
+  // anterior. Solo se conserva si se sabe que el dueño es el mismo; ante la
+  // duda (número nuevo o lectura fallida) arranca vacío.
+  const { data: previo } = await supabase
     .from('whatsapp_links')
-    .upsert(
-      { phone_e164: phoneE164, user_id: userId },
-      { onConflict: 'phone_e164' },
-    );
+    .select('user_id')
+    .eq('phone_e164', phoneE164)
+    .maybeSingle();
+  const mismoDueno = (previo as { user_id: string } | null)?.user_id === userId;
+
+  const { error: upsertError } = await supabase.from('whatsapp_links').upsert(
+    {
+      phone_e164: phoneE164,
+      user_id: userId,
+      ...(!mismoDueno && { documento: null }),
+    },
+    { onConflict: 'phone_e164' },
+  );
   if (upsertError) {
     // El código ya quedó consumido; reportamos fallo para que el usuario
     // reintente con uno nuevo en vez de creer que quedó vinculado.

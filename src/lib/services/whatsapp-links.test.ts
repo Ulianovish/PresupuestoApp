@@ -23,11 +23,80 @@ describe('generateSixDigitCode', () => {
   });
 });
 
+/** Tabla whatsapp_links: lectura del vínculo previo + upsert. */
+function tablaLinks(previo: { data: unknown; error: unknown }) {
+  const upsert = vi.fn().mockResolvedValue({ error: null });
+  return {
+    upsert,
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue(previo),
+  };
+}
+
+function codigoValido(userId = 'user-1') {
+  return {
+    update: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
+    gt: vi.fn().mockReturnThis(),
+    select: vi
+      .fn()
+      .mockResolvedValue({ data: [{ user_id: userId }], error: null }),
+  };
+}
+
 describe('redeemLinkCode', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('re-vincular el número a OTRO usuario borra el documento del dueño anterior', async () => {
+    const links = tablaLinks({ data: { user_id: 'otro' }, error: null });
+    const from = vi.fn((table: string) =>
+      table === 'whatsapp_link_codes' ? codigoValido() : links,
+    );
+    mockedAdmin.mockReturnValue({ from });
+
+    await redeemLinkCode('482913', '+573001234567');
+
+    expect(links.upsert).toHaveBeenCalledWith(
+      { phone_e164: '+573001234567', user_id: 'user-1', documento: null },
+      { onConflict: 'phone_e164' },
+    );
+  });
+
+  it('re-vincular al MISMO usuario conserva el documento', async () => {
+    const links = tablaLinks({ data: { user_id: 'user-1' }, error: null });
+    const from = vi.fn((table: string) =>
+      table === 'whatsapp_link_codes' ? codigoValido() : links,
+    );
+    mockedAdmin.mockReturnValue({ from });
+
+    await redeemLinkCode('482913', '+573001234567');
+
+    expect(links.upsert).toHaveBeenCalledWith(
+      { phone_e164: '+573001234567', user_id: 'user-1' },
+      { onConflict: 'phone_e164' },
+    );
+  });
+
+  it('si no se puede leer el vínculo previo, borra el documento (ante la duda, no se hereda)', async () => {
+    const links = tablaLinks({ data: null, error: { message: 'boom' } });
+    const from = vi.fn((table: string) =>
+      table === 'whatsapp_link_codes' ? codigoValido() : links,
+    );
+    mockedAdmin.mockReturnValue({ from });
+
+    await redeemLinkCode('482913', '+573001234567');
+
+    expect(links.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ documento: null }),
+      { onConflict: 'phone_e164' },
+    );
+  });
+
   it('canjea con UPDATE atómico condicional: marca usado, upserta y devuelve userId', async () => {
-    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const links = tablaLinks({ data: null, error: null });
+    const upsert = links.upsert;
     // Cadena del UPDATE atómico: update().eq().is().gt().select() → {data:[{user_id}]}
     const updateChain = {
       update: vi.fn().mockReturnThis(),
@@ -40,7 +109,7 @@ describe('redeemLinkCode', () => {
     };
     const from = vi.fn((table: string) => {
       if (table === 'whatsapp_link_codes') return updateChain;
-      if (table === 'whatsapp_links') return { upsert };
+      if (table === 'whatsapp_links') return links;
       throw new Error(`tabla inesperada ${table}`);
     });
     mockedAdmin.mockReturnValue({ from });
@@ -53,8 +122,9 @@ describe('redeemLinkCode', () => {
       expect.objectContaining({ used_at: expect.any(String) }),
     );
     expect(updateChain.is).toHaveBeenCalledWith('used_at', null);
+    // Número nuevo: el documento arranca vacío.
     expect(upsert).toHaveBeenCalledWith(
-      { phone_e164: '+573001234567', user_id: 'user-1' },
+      { phone_e164: '+573001234567', user_id: 'user-1', documento: null },
       { onConflict: 'phone_e164' },
     );
   });
