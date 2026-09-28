@@ -65,6 +65,76 @@ const MULETILLAS = new Set([
   'y',
 ]);
 
+/**
+ * Palabras de un pie de foto que es una INSTRUCCIÓN al bot y no el concepto
+ * del gasto: "Subela a gastos" (caso real: quedó como descripción), "anota
+ * esto", "regístralo", "guárdalo", "agrega esto", "ahí va". Si el texto se
+ * queda solo con estas (y muletillas), no hay concepto y se cae a lo que leyó
+ * la visión.
+ */
+const INSTRUCCIONES = new Set([
+  // verbos de registrar, con y sin pronombre pegado (ya sin tildes)
+  'anota',
+  'anotalo',
+  'anotala',
+  'anotar',
+  'apunta',
+  'apuntalo',
+  'apuntala',
+  'sube',
+  'subela',
+  'subelo',
+  'subir',
+  'registra',
+  'registralo',
+  'registrala',
+  'registrar',
+  'guarda',
+  'guardalo',
+  'guardala',
+  'guardar',
+  'agrega',
+  'agregalo',
+  'agregala',
+  'agregar',
+  'anade',
+  'anadelo',
+  'anadela',
+  'carga',
+  'cargalo',
+  'cargala',
+  'mete',
+  'metelo',
+  'metela',
+  'pon',
+  'ponlo',
+  'ponla',
+  // de qué habla: "esto", "este gasto", "a gastos", "ahí va"
+  'esto',
+  'este',
+  'esta',
+  'eso',
+  'ese',
+  'esa',
+  'aqui',
+  'aca',
+  'ahi',
+  'va',
+  'a',
+  'al',
+  'gasto',
+  'gastos',
+  'lo',
+  'le',
+  // cortesía
+  'porfa',
+  'porfavor',
+  'favor',
+  'plis',
+  'pls',
+  'gracias',
+]);
+
 /** Token normalizado y sin puntuación, para comparar contra los conjuntos. */
 function clave(token: string): string {
   return normalizar(token).replace(/[^\p{L}\p{N}]/gu, '');
@@ -135,6 +205,15 @@ export function conceptoDesdeTexto(
   )
     restantes.pop();
 
+  // Un texto que solo le da una orden al bot ("Subela a gastos") no es concepto.
+  if (
+    restantes.every(t => {
+      const k = clave(t);
+      return !k || INSTRUCCIONES.has(k) || MULETILLAS.has(k);
+    })
+  )
+    return null;
+
   const concepto = restantes
     .join(' ')
     .replace(/[\s,.;:-]+$/, '')
@@ -172,17 +251,34 @@ function diaUtc(ymd: string): number {
 }
 
 /**
+ * ¿Es `ymd` una fecha YYYY-MM-DD que existe? `Date.UTC` no valida: el 31 de
+ * febrero lo corre en silencio al 3 de marzo, y un "2026-02-31" pasaba por
+ * reciente y se escribía tal cual.
+ */
+function fechaValida(ymd: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+  const [a, m, d] = ymd.split('-').map(Number);
+  const f = new Date(Date.UTC(a, m - 1, d));
+  return (
+    f.getUTCFullYear() === a &&
+    f.getUTCMonth() === m - 1 &&
+    f.getUTCDate() === d
+  );
+}
+
+/**
  * La visión a veces lee mal la fecha (un año viejo, o una fecha de
  * vencimiento en el futuro) y el gasto quedaba en un mes que nadie mira. Si
- * la fecha está a más de 60 días en el pasado o en el futuro, se usa hoy y se
- * devuelve la descartada para avisarle al usuario. `hoy` es YYYY-MM-DD de
- * Bogotá (`todayBogota`).
+ * la fecha está a más de 60 días en el pasado o en el futuro, o no existe
+ * ("2026-02-31", "ayer"), se usa hoy y se devuelve la descartada para
+ * avisarle al usuario. `hoy` es YYYY-MM-DD de Bogotá (`todayBogota`).
  */
 export function sanearFechaComprobante(
   fecha: string | null,
   hoy: string,
 ): { fecha: string; descartada: string | null } {
   if (!fecha) return { fecha: hoy, descartada: null };
+  if (!fechaValida(fecha)) return { fecha: hoy, descartada: fecha };
   const diferencia = diaUtc(hoy) - diaUtc(fecha);
   if (diferencia < 0 || diferencia > DIAS_MAXIMOS_ATRAS) {
     return { fecha: hoy, descartada: fecha };
@@ -205,8 +301,9 @@ const MESES = [
   'dic',
 ];
 
-/** "2025-04-09" → "9 abr 2025". */
+/** "2025-04-09" → "9 abr 2025". Una fecha que no existe se muestra tal cual. */
 export function formatFechaCorta(ymd: string): string {
+  if (!fechaValida(ymd)) return ymd;
   const [a, m, d] = ymd.split('-').map(Number);
   return `${d} ${MESES[m - 1]} ${a}`;
 }

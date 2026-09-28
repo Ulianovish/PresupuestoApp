@@ -2,7 +2,11 @@
 // analiza con visión y enruta: transferencia → gasto directo; recibo →
 // registro directo (o pregunta la cuenta si no se puede resolver).
 
-import type { LastEntity, Turn } from '@/lib/whatsapp/agent/state';
+import {
+  readState,
+  type LastEntity,
+  type Turn,
+} from '@/lib/whatsapp/agent/state';
 import { normalizar, resolverCuenta } from '@/lib/whatsapp/agent/tools';
 import { pegarAlertas } from '@/lib/whatsapp/alerts';
 import {
@@ -161,6 +165,12 @@ export interface ImageDeps {
     turns: Turn[];
     lastEntity: LastEntity | null;
   }) => Promise<void>;
+  /**
+   * Relee los turnos VIGENTES justo antes de guardar (por defecto, con
+   * `readState`). La visión tarda ~30 s: un mensaje de texto que el agente
+   * procesó en ese rato ya está en la base y no en `previousTurns`.
+   */
+  readTurns?: () => Promise<Turn[]>;
 }
 
 export interface ImageContext {
@@ -193,11 +203,25 @@ async function guardarMemoria(
   lastEntity: LastEntity | null,
 ): Promise<void> {
   const texto = ctx.body.trim();
+  // Los turnos se releen AHORA, no se usan los de cuando llegó la foto: si en
+  // el medio se procesó un texto ("20k taxi"), escribir `previousTurns` + la
+  // foto lo borraba de la memoria. Si el releído falla, se cae a esos.
+  let previos = ctx.previousTurns ?? [];
+  try {
+    previos = await (
+      deps.readTurns ?? (async () => (await readState(ctx.phone)).turns)
+    )();
+  } catch (err) {
+    console.warn(
+      'handleImage: no pude releer los turnos, uso los de antes:',
+      err,
+    );
+  }
   try {
     await deps.saveState({
       lastEntity,
       turns: [
-        ...(ctx.previousTurns ?? []),
+        ...previos,
         { role: 'user', content: `[foto] ${texto || 'sin texto'}` },
         { role: 'assistant', content: respuesta },
       ],
@@ -435,8 +459,10 @@ export async function handleImageMessage(
     return;
   }
 
-  await deps.sendMessage(
-    ctx.phone,
-    'No pude leer la imagen 🤔. Reenvíala más clara, o escribe el gasto (ej. "20k taxi") o pega el CUFE.',
-  );
+  const noLeida =
+    'No pude leer la imagen 🤔. Reenvíala más clara, o escribe el gasto (ej. "20k taxi") o pega el CUFE.';
+  // Una foto que no se pudo leer tampoco deja un "último gasto" corregible: sin
+  // limpiarlo, un "si quedó mal es $X" corregía un gasto viejo y ajeno.
+  await guardarMemoria(ctx, deps, noLeida, null);
+  await deps.sendMessage(ctx.phone, noLeida);
 }

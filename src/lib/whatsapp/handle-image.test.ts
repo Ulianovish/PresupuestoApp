@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
+// Sin base en los tests: el releído por defecto de los turnos (readState)
+// falla y `guardarMemoria` cae a `previousTurns`. Los tests que prueban el
+// releído inyectan `readTurns`.
+vi.mock('@/lib/whatsapp/agent/state', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/whatsapp/agent/state')>()),
+  readState: vi.fn(async () => {
+    throw new Error('sin base en tests');
+  }),
+}));
+
 import { handleImageMessage, resolveAccountFromMessage } from './handle-image';
 
 function makeDeps(overrides = {}) {
@@ -747,6 +757,86 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
     });
     await handleImageMessage(ctx, deps);
     expect(mensajes(deps)[0]).toMatch(/✅ Registré/);
+  });
+
+  it('relee los turnos justo antes de guardar: un turno de texto procesado mientras tanto no se pierde', async () => {
+    // La visión tarda ~30 s: si en ese rato el usuario escribió "20k taxi" y
+    // el agente lo guardó, pisar `turns` con la foto de hace 30 s lo borraba.
+    const viejos = [{ role: 'user' as const, content: 'hola' }];
+    const actuales = [
+      ...viejos,
+      { role: 'user' as const, content: '20k taxi' },
+      { role: 'assistant' as const, content: '✅ Anotado taxi' },
+    ];
+    const readTurns = vi.fn(async () => actuales);
+    const deps = makeDeps({
+      analyzeImage: transferencia(),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'OTROS',
+        transactionId: 't1',
+      })),
+      readTurns,
+    });
+    await handleImageMessage({ ...ctx, previousTurns: viejos }, deps);
+    const guardado = (deps.saveState as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as { turns: Array<{ content: string }> };
+    expect(guardado.turns.slice(0, 3)).toEqual(actuales);
+    expect(guardado.turns[3]).toEqual({
+      role: 'user',
+      content: '[foto] sin texto',
+    });
+    // Se relee DESPUÉS de analizar la foto, no antes.
+    const leido = readTurns.mock.invocationCallOrder[0];
+    const analizado = (deps.analyzeImage as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[0];
+    expect(leido).toBeGreaterThan(analizado);
+  });
+
+  it('si releer los turnos falla, usa los que se leyeron al llegar la foto', async () => {
+    const previos = [{ role: 'user' as const, content: 'hola' }];
+    const deps = makeDeps({
+      analyzeImage: transferencia(),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'OTROS',
+        transactionId: 't1',
+      })),
+      readTurns: vi.fn(async () => {
+        throw new Error('db caída');
+      }),
+    });
+    await handleImageMessage({ ...ctx, previousTurns: previos }, deps);
+    expect(deps.saveState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turns: [
+          ...previos,
+          { role: 'user', content: '[foto] sin texto' },
+          expect.objectContaining({ role: 'assistant' }),
+        ],
+      }),
+    );
+  });
+
+  it('foto ilegible (unknown) → limpia lastEntity: "si quedó mal es $X" no puede ir a un gasto viejo', async () => {
+    const deps = makeDeps({
+      analyzeImage: vi.fn(async () => ({ kind: 'unknown' })),
+    });
+    await handleImageMessage({ ...ctx, body: 'esta' }, deps);
+    expect(deps.saveState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lastEntity: null,
+        turns: [
+          { role: 'user', content: '[foto] esta' },
+          expect.objectContaining({ role: 'assistant' }),
+        ],
+      }),
+    );
+    const guardado = (deps.saveState as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[0];
+    const enviado = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[0];
+    expect(guardado).toBeLessThan(enviado);
   });
 
   it('transferencia que no se pudo registrar → no toca la memoria', async () => {

@@ -48,6 +48,28 @@ describe('conceptoDesdeTexto', () => {
     expect(conceptoDesdeTexto('', CUENTAS)).toBeNull();
     expect(conceptoDesdeTexto('   ', CUENTAS)).toBeNull();
   });
+
+  it.each([
+    'Subela a gastos', // caso real: quedó como descripción del gasto
+    'súbela a gastos',
+    'anota esto',
+    'Anótalo porfa',
+    'regístralo',
+    'guárdalo',
+    'agrega esto',
+    'ahí va',
+    'Registra este gasto',
+    'guárdalo con nequi',
+  ])('una instrucción no es un concepto: %j → null', texto => {
+    expect(conceptoDesdeTexto(texto, CUENTAS)).toBeNull();
+  });
+
+  it('una instrucción junto a un concepto deja el concepto intacto', () => {
+    expect(conceptoDesdeTexto('Huevos', CUENTAS)).toBe('Huevos');
+    expect(conceptoDesdeTexto('Almuerzo con Juan', CUENTAS)).toBe(
+      'Almuerzo con Juan',
+    );
+  });
 });
 
 describe('describirTransferencia', () => {
@@ -79,6 +101,23 @@ describe('describirTransferencia', () => {
         CUENTAS,
       ),
     ).toBe('Carlos Gomez');
+  });
+
+  it('un pie de foto que es una instrucción cae al concepto de la visión', () => {
+    expect(
+      describirTransferencia(
+        'Subela a gastos',
+        { concept: 'Arriendo septiembre', recipient: 'Luisa Gomez' },
+        CUENTAS,
+      ),
+    ).toBe('Arriendo septiembre');
+    expect(
+      describirTransferencia(
+        'anota esto',
+        { concept: null, recipient: 'Luisa Gomez' },
+        CUENTAS,
+      ),
+    ).toBe('Luisa Gomez');
   });
 
   it('sin nada → "Transferencia"', () => {
@@ -134,6 +173,27 @@ describe('sanearFechaComprobante', () => {
     });
   });
 
+  it.each(['2026-02-31', '2026-09-31', '2026-13-01', '2026-00-10', 'ayer'])(
+    'fecha imposible o ilegible %j → hoy, y se informa',
+    imposible => {
+      expect(sanearFechaComprobante(imposible, HOY)).toEqual({
+        fecha: HOY,
+        descartada: imposible,
+      });
+    },
+  );
+
+  it('"31 de febrero" pocos días antes de hoy no pasa por reciente (Date.UTC lo corría a marzo)', () => {
+    expect(sanearFechaComprobante('2026-02-31', '2026-03-05')).toEqual({
+      fecha: '2026-03-05',
+      descartada: '2026-02-31',
+    });
+    expect(sanearFechaComprobante('2026-02-28', '2026-03-05')).toEqual({
+      fecha: '2026-02-28',
+      descartada: null,
+    });
+  });
+
   it('sin fecha → hoy, sin aviso (no había nada que descartar)', () => {
     expect(sanearFechaComprobante(null, HOY)).toEqual({
       fecha: HOY,
@@ -146,5 +206,10 @@ describe('formatFechaCorta', () => {
   it('"2025-04-09" → "9 abr 2025"', () => {
     expect(formatFechaCorta('2025-04-09')).toBe('9 abr 2025');
     expect(formatFechaCorta('2026-12-31')).toBe('31 dic 2026');
+  });
+
+  it('una fecha ilegible se muestra tal cual (no "1 undefined 2026")', () => {
+    expect(formatFechaCorta('2026-13-01')).toBe('2026-13-01');
+    expect(formatFechaCorta('ayer')).toBe('ayer');
   });
 });
