@@ -35,6 +35,22 @@ describe('applyCorrection', () => {
     if (r.ok) expect(r.patch.amount).toBe(30000);
   });
 
+  it.each([
+    ['$ 563.091,09', 563091],
+    ['45.400,00', 45400],
+    ['1.900.000', 1900000],
+    ['1,5M', 1500000],
+    ['563091.09', 563091],
+    ['2 palos', 2000000],
+  ])(
+    'corrige el monto interpretando %j como %d (formato colombiano)',
+    (valor, esperado) => {
+      const r = applyCorrection(ULTIMO, 'monto', valor);
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.patch.amount).toBe(esperado);
+    },
+  );
+
   it('rechaza un monto que no se puede interpretar', () => {
     expect(applyCorrection(ULTIMO, 'monto', 'como cinco').ok).toBe(false);
   });

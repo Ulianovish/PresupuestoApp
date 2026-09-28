@@ -3,6 +3,8 @@
  *
  * A specialized input component for entering monetary values.
  * Handles currency formatting with Colombian peso format ($123.456).
+ * Accepts "," as decimal separator while typing ("$563.091,09") and parses
+ * pasted text with `parseCopAmount`; the emitted value is always whole pesos.
  *
  * @param value - The current monetary value
  * @param onChange - Callback when value changes
@@ -25,6 +27,12 @@ import { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
+import {
+  editCurrencyText,
+  formatCurrencyDisplay,
+  pasteCurrencyText,
+} from './currency-input-format';
+
 interface CurrencyInputProps {
   value: number;
   onChange: (value: number) => void;
@@ -45,25 +53,21 @@ export default function CurrencyInput({
   // Internal state for display formatting
   const [displayValue, setDisplayValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  // Último valor que emitió el propio input. Mientras se escribe "1.234,5" el
+  // padre recibe 1235 y lo devuelve por `value`: si reformateáramos ahí, la
+  // coma y los decimales desaparecerían a mitad de escribir.
+  const lastEmittedRef = useRef<number | null>(null);
 
-  // Format number to Colombian currency format
-  const formatCurrency = (num: number): string => {
-    if (num === 0) return '';
-    return `$${num.toLocaleString('es-CO')}`;
+  const emit = (num: number) => {
+    lastEmittedRef.current = num;
+    onChange(num);
   };
 
-  // Parse formatted currency string to number
-  const parseCurrency = (str: string): number => {
-    if (!str || str === '$') return 0;
-    // Remove $ and dots, then parse
-    const cleanStr = str.replace(/[$.,]/g, '');
-    const num = parseInt(cleanStr, 10);
-    return isNaN(num) ? 0 : num;
-  };
-
-  // Update display value when prop changes
+  // Update display value when prop changes (solo si el cambio vino de afuera)
   useEffect(() => {
-    setDisplayValue(formatCurrency(value));
+    if (value === lastEmittedRef.current) return;
+    lastEmittedRef.current = null;
+    setDisplayValue(formatCurrencyDisplay(value));
   }, [value]);
 
   // Handle input change with proper formatting
@@ -74,20 +78,14 @@ export default function CurrencyInput({
     // Allow empty string or just $ for better UX
     if (inputValue === '' || inputValue === '$') {
       setDisplayValue('');
-      onChange(0);
+      emit(0);
       return;
     }
 
-    // Only allow numbers, $ and dots
-    const cleanInput = inputValue.replace(/[^$0-9]/g, '');
-
-    // Parse the numeric value
-    const numValue = parseCurrency(cleanInput);
-
-    // Format and update display
-    const formatted = formatCurrency(numValue);
+    const { display: formatted, value: numValue } =
+      editCurrencyText(inputValue);
     setDisplayValue(formatted);
-    onChange(numValue);
+    emit(numValue);
 
     // Restore cursor position after formatting
     setTimeout(() => {
@@ -103,34 +101,29 @@ export default function CurrencyInput({
 
   // Handle key down for better UX
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Allow backspace, delete, tab, escape, enter
-    if (
-      [8, 9, 27, 13, 46].indexOf(e.keyCode) !== -1 ||
-      // Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
-      (e.keyCode === 65 && e.ctrlKey === true) ||
-      (e.keyCode === 67 && e.ctrlKey === true) ||
-      (e.keyCode === 86 && e.ctrlKey === true) ||
-      (e.keyCode === 88 && e.ctrlKey === true)
-    ) {
-      return;
-    }
-    // Ensure that it is a number and stop the keypress
-    if (
-      (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
-      (e.keyCode < 96 || e.keyCode > 105)
-    ) {
-      e.preventDefault();
-    }
+    // Teclas de control (Backspace, flechas, Tab, Enter...) y atajos
+    // (Ctrl/Cmd+A/C/V/X) pasan tal cual.
+    if (e.key.length > 1 || e.ctrlKey || e.metaKey) return;
+    // Dígitos y la coma decimal. El "." no: es la agrupación de miles que pone
+    // el propio input.
+    if (/^[0-9,]$/.test(e.key)) return;
+    e.preventDefault();
   };
 
   // Handle paste
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pastedText = e.clipboardData.getData('text');
-    const numValue = parseCurrency(pastedText);
-    const formatted = formatCurrency(numValue);
-    setDisplayValue(formatted);
-    onChange(numValue);
+    const pasted = pasteCurrencyText(e.clipboardData.getData('text'));
+    if (!pasted) return;
+    setDisplayValue(pasted.display);
+    emit(pasted.value);
+  };
+
+  // Al salir del campo se muestra el valor que realmente se guarda (pesos
+  // redondeados), sin la coma decimal a medio escribir.
+  const handleBlur = () => {
+    if (lastEmittedRef.current === null) return;
+    setDisplayValue(formatCurrencyDisplay(lastEmittedRef.current));
   };
 
   return (
@@ -141,6 +134,7 @@ export default function CurrencyInput({
       onChange={handleChange}
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
+      onBlur={handleBlur}
       placeholder={placeholder}
       disabled={disabled}
       className={cn(

@@ -1,6 +1,7 @@
 // Correcciones y consultas del agente de WhatsApp. `applyCorrection` es pura
 // para poder testear la interpretación sin base.
 
+import { parseCopAmount } from '@/lib/money/parse-cop';
 import {
   resolveItemNameToId,
   type BudgetItemRef,
@@ -22,16 +23,12 @@ export type CorrectionResult =
   | { ok: true; patch: CorrectionPatch }
   | { ok: false; error: string };
 
-/** Interpreta un monto escrito a mano: "30 mil", "30k", "30000". */
+/**
+ * Interpreta un monto escrito a mano: "30 mil", "30k", "30000", "$ 563.091,09".
+ * Las reglas de separadores viven en `parseCopAmount`.
+ */
 function parseMonto(valor: string): number | null {
-  const t = valor.toLowerCase().replace(/\$/g, '').trim();
-  const conMil = t.match(/^([\d.,]+)\s*(k|mil)$/);
-  if (conMil) {
-    const base = Number(conMil[1].replace(/\./g, '').replace(',', '.'));
-    return Number.isFinite(base) && base > 0 ? Math.round(base * 1000) : null;
-  }
-  const n = Number(t.replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.'));
-  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+  return parseCopAmount(valor);
 }
 
 export function applyCorrection(

@@ -28,6 +28,7 @@ import ExpensePageTemplate from '@/components/templates/ExpensePageTemplate/Expe
 import { useCategories } from '@/hooks/useCategories';
 import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
 import { createBudgetItemInMonth } from '@/lib/actions/categories';
+import { parseCopAmountAbs } from '@/lib/money/parse-cop';
 import { updateBudgetItem, deleteBudgetItem } from '@/lib/services/budget';
 import {
   ACCOUNT_TYPES,
@@ -563,19 +564,10 @@ export default function GastosPage() {
           if (typeof rawAmount === 'number') {
             amount = Math.abs(rawAmount);
           } else {
-            let str = String(rawAmount).replace(/[$\s]/g, '').trim();
-            // Detect comma-as-decimal format (e.g., "4.175,89" or "884,40")
-            // If last separator is comma and has 1-2 digits after it, treat comma as decimal
-            const lastComma = str.lastIndexOf(',');
-            const lastDot = str.lastIndexOf('.');
-            if (lastComma > lastDot && str.length - lastComma <= 3) {
-              // Comma is decimal separator: remove dots (thousands), replace comma with dot
-              str = str.replace(/\./g, '').replace(',', '.');
-            } else {
-              // Standard format: remove commas (thousands)
-              str = str.replace(/,/g, '');
-            }
-            amount = Math.abs(parseFloat(str) || 0);
+            // Formato colombiano ("4.175,89", "1.900.000") con las mismas
+            // reglas que el resto de la app. Un texto que no es monto queda en
+            // 0 y la fila se salta.
+            amount = parseCopAmountAbs(String(rawAmount)) ?? 0;
           }
 
           if (amount <= 0) {

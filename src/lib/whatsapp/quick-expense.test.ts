@@ -33,6 +33,52 @@ describe('parseQuickExpense', () => {
     expect(parseQuickExpense('1.5k café')).toEqual({ amount: 1500, description: 'café' });
   });
 
+  it('"$563.091,09 mercado" → 563091 (decimales con coma, no ×100 ni truncado raro)', () => {
+    expect(parseQuickExpense('$563.091,09 mercado')).toEqual({
+      amount: 563091,
+      description: 'mercado',
+    });
+  });
+
+  it('"1.900.000 arriendo" → 1900000 (varios puntos de miles)', () => {
+    expect(parseQuickExpense('1.900.000 arriendo')).toEqual({
+      amount: 1900000,
+      description: 'arriendo',
+    });
+  });
+
+  it('"1,5M moto" → 1500000 (millones con decimal)', () => {
+    expect(parseQuickExpense('1,5M moto')).toEqual({
+      amount: 1500000,
+      description: 'moto',
+    });
+  });
+
+  it('"2 millones arriendo" → 2000000 (sufijo como palabra suelta)', () => {
+    expect(parseQuickExpense('2 millones arriendo')).toEqual({
+      amount: 2000000,
+      description: 'arriendo',
+    });
+  });
+
+  it('"20 lucas almuerzo" → 20000', () => {
+    expect(parseQuickExpense('20 lucas almuerzo')).toEqual({
+      amount: 20000,
+      description: 'almuerzo',
+    });
+  });
+
+  it('"1.5 mil pan" → 1500 (decimal antes de "mil")', () => {
+    expect(parseQuickExpense('1.5 mil pan')).toEqual({
+      amount: 1500,
+      description: 'pan',
+    });
+  });
+
+  it('"1.23.456 algo" → null (grupos de miles mal formados no son monto)', () => {
+    expect(parseQuickExpense('1.23.456 algo')).toBeNull();
+  });
+
   it('sin monto → null', () => {
     expect(parseQuickExpense('hola')).toBeNull();
     expect(parseQuickExpense('')).toBeNull();

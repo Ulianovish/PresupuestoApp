@@ -1,6 +1,8 @@
 // Parser puro de un gasto escrito en lenguaje natural simple.
 // Reconoce un monto (con k/mil y separadores) y toma el resto como descripción.
 
+import { isCopAmountSuffix, parseCopAmount } from '@/lib/money/parse-cop';
+
 export interface QuickExpense {
   amount: number;
   description: string;
@@ -13,25 +15,12 @@ const STOPWORDS = new Set(['gasté', 'gaste', 'en', 'de', 'por', 'pague', 'pagu�
 // ("999999k"). Por encima de esto tratamos el texto como no-gasto (→ null).
 const MAX_AMOUNT = 100_000_000;
 
-/** Convierte un token de monto ("20k", "15.000", "2", "1.5k") a número, o null. */
+/**
+ * Convierte un token de monto ("20k", "15.000", "2", "1.5k", "563.091,09") a
+ * número, o null. Las reglas de separadores viven en `parseCopAmount`.
+ */
 function parseAmountToken(raw: string): number | null {
-  let t = raw.toLowerCase().replace(/\$/g, '');
-  let multiplier = 1;
-  if (t.endsWith('k')) {
-    multiplier = 1000;
-    t = t.slice(0, -1);
-  }
-  // Quitar separadores de miles con punto/coma cuando hay 3 dígitos detrás.
-  // "15.000" → "15000"; pero "1.5" (decimal con k) se respeta.
-  if (multiplier === 1000) {
-    t = t.replace(',', '.'); // decimal con k: "1,5k" → 1.5
-  } else {
-    t = t.replace(/[.,](?=\d{3}\b)/g, ''); // miles: "15.000" → "15000"
-    t = t.replace(',', '.');
-  }
-  const n = Number(t);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n * multiplier);
+  return parseCopAmount(raw);
 }
 
 export function parseQuickExpense(text: string): QuickExpense | null {
@@ -40,19 +29,19 @@ export function parseQuickExpense(text: string): QuickExpense | null {
 
   const tokens = trimmed.split(/\s+/);
 
-  // "2 mil" / "1.5 mil": número seguido de "mil".
+  // "2 mil" / "1.5 mil" / "2 millones" / "20 lucas": número seguido del
+  // sufijo como palabra aparte.
   for (let i = 0; i < tokens.length - 1; i++) {
-    if (/^mil$/i.test(tokens[i + 1])) {
-      const base = Number(tokens[i].replace(',', '.'));
-      if (Number.isFinite(base) && base > 0) {
+    if (isCopAmountSuffix(tokens[i + 1])) {
+      const suffixAmount = parseCopAmount(`${tokens[i]} ${tokens[i + 1]}`);
+      if (suffixAmount != null) {
         const rest = [...tokens.slice(0, i), ...tokens.slice(i + 2)]
           .filter(w => !STOPWORDS.has(w.toLowerCase()))
           .join(' ')
           .trim();
         if (!rest) return null;
-        const milAmount = Math.round(base * 1000);
-        if (milAmount > MAX_AMOUNT) return null;
-        return { amount: milAmount, description: rest };
+        if (suffixAmount > MAX_AMOUNT) return null;
+        return { amount: suffixAmount, description: rest };
       }
     }
   }
