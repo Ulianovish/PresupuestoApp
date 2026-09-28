@@ -50,6 +50,12 @@ export interface AgentDeps {
   ) => Promise<CufeOutcome>;
   /** Cuentas activas del usuario, para resolver con cuál se pagó la factura. */
   accounts: string[];
+  /**
+   * `true` si el número que escribió no tiene cédula/NIT cargado en Ajustes:
+   * si la DIAN rechaza los NIT, vale la pena sugerir cargarlo. Opcional: sin
+   * el dato no se sugiere nada.
+   */
+  remitenteSinDocumento?: boolean;
   /** Guarda el id de la factura ya persistida, esperando que el usuario diga con qué cuenta pagó. */
   savePending: (invoiceId: string) => Promise<void>;
   /** Registra la factura ya persistida y resuelta (sin aprobación manual). */
@@ -211,10 +217,14 @@ export async function handleAgentMessage(
   } else if (esRechazoDeNit(out.message)) {
     // Reintentar el mismo texto falla igual (es determinista), y el detalle
     // técnico del scraper no le dice nada al usuario. Lo que sí sirve es el
-    // bloque completo del QR (trae los NIT reales) o la foto.
+    // bloque completo del QR (trae los NIT reales) o la foto. Si el que
+    // escribe no tiene documento cargado, su cédula es el siguiente candidato.
+    const sugerenciaCedula = deps.remitenteSinDocumento
+      ? ' Si la factura está a tu nombre, cargá tu cédula en Ajustes para que la pueda buscar.'
+      : '';
     await deps.sendMessage(
       ctx.phone,
-      '❌ La DIAN no encontró la factura con el NIT del emisor ni del comprador. Revisá que hayas mandado el texto completo del QR (con NitFac y DocAdq), o mandame una foto de la factura.',
+      `❌ La DIAN no encontró la factura con el NIT del emisor ni del comprador. Revisá que hayas mandado el texto completo del QR (con NitFac y DocAdq), o mandame una foto de la factura.${sugerenciaCedula}`,
     );
   } else {
     await deps.sendMessage(

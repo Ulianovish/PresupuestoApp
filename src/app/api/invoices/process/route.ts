@@ -5,6 +5,7 @@
 
 import { after, NextRequest } from 'next/server';
 
+import { ordenarNitsBusqueda } from '@/lib/dian/nits-busqueda';
 import {
   prepareInvoiceProcessing,
   runInvoiceProcessing,
@@ -14,6 +15,7 @@ import {
   resolveUserCategoryNames,
   updateInvoiceProgress,
 } from '@/lib/services/invoices';
+import { listarDocumentosDeUsuario } from '@/lib/services/whatsapp-links';
 import { createClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
@@ -30,9 +32,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (!cufe) {
-    return Response.json({ error: 'El parámetro cufe es requerido' }, {
-      status: 400,
-    });
+    return Response.json(
+      { error: 'El parámetro cufe es requerido' },
+      {
+        status: 400,
+      },
+    );
   }
 
   const supabase = await createClient();
@@ -80,6 +85,19 @@ export async function POST(request: NextRequest) {
   const cufeValue = cufe;
   const invoiceId = prep.invoiceId;
 
+  // La DIAN pide el documento del emisor o del comprador, y desde la web no
+  // hay bloque del QR: se prueban las cédulas/NIT cargados en Ajustes para los
+  // números de la cuenta (el comprador casi siempre es uno de ellos). Se leen
+  // antes de `after()`, con la sesión de la cookie (RLS de dueño).
+  // Best-effort: sin documentos, los scrapers usan solo los genéricos.
+  const nits = ordenarNitsBusqueda({
+    qrNits: [],
+    docRemitente: null,
+    docsOtros: (await listarDocumentosDeUsuario(user.id, supabase)).map(
+      l => l.documento,
+    ),
+  });
+
   after(async () => {
     const categoryNames = await resolveUserCategoryNames();
 
@@ -91,11 +109,13 @@ export async function POST(request: NextRequest) {
       // pasa la fila a pending_review justo después, y persistirlo haría que la
       // barra saltara a 100 y volviera a 95 con el paso `categorizing`.
       if (event.step === 'complete') return;
-      const percent = typeof event.progress === 'number' ? event.progress : null;
+      const percent =
+        typeof event.progress === 'number' ? event.progress : null;
       const isMilestone =
         event.step === 'retrying' || event.step === 'categorizing';
       if (percent == null && !isMilestone) return;
-      if (percent != null && percent - lastPersisted < 5 && !isMilestone) return;
+      if (percent != null && percent - lastPersisted < 5 && !isMilestone)
+        return;
       lastPersisted = percent ?? lastPersisted;
       await updateInvoiceProgress(
         invoiceId,
@@ -107,6 +127,7 @@ export async function POST(request: NextRequest) {
     await runInvoiceProcessing(invoiceId, cufeValue, {
       categoryNames,
       onProgress,
+      nits,
     });
   });
 

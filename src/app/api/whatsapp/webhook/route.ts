@@ -6,6 +6,7 @@
 
 import { after, NextRequest } from 'next/server';
 
+import { ordenarNitsBusqueda } from '@/lib/dian/nits-busqueda';
 import { createInvoiceDirect } from '@/lib/services/invoices';
 import {
   createDirectExpense,
@@ -22,7 +23,10 @@ import { handleAgentMessage } from '@/lib/whatsapp/handle-agent';
 import { handleImageMessage } from '@/lib/whatsapp/handle-image';
 import { handleLinkingMessage } from '@/lib/whatsapp/handle-linking';
 import { normalizeWhatsappFrom } from '@/lib/whatsapp/message';
-import { processCufeForWhatsApp } from '@/lib/whatsapp/process-cufe';
+import {
+  documentosCompradorWhatsapp,
+  processCufeForWhatsApp,
+} from '@/lib/whatsapp/process-cufe';
 import {
   downloadTwilioMedia,
   sendWhatsAppMessage,
@@ -139,9 +143,10 @@ export async function POST(request: NextRequest) {
     const userId = link.userId;
     after(async () => {
       try {
-        const [accounts, estado] = await Promise.all([
+        const [accounts, estado, documentos] = await Promise.all([
           listarCuentas(userId),
           readState(phone),
+          documentosCompradorWhatsapp(userId, phone),
         ]);
         await handleAgentMessage(
           decision,
@@ -153,7 +158,16 @@ export async function POST(request: NextRequest) {
           },
           {
             sendMessage: sendWhatsAppMessage,
-            processCufe: processCufeForWhatsApp,
+            // La DIAN pide el documento del emisor o del comprador. Muchos QR
+            // traen solo el link: después de los NIT del QR se prueban la
+            // cédula del que escribió y las de los otros números de la cuenta.
+            processCufe: (uid, cufe, qrNits) =>
+              processCufeForWhatsApp(
+                uid,
+                cufe,
+                ordenarNitsBusqueda({ qrNits, ...documentos }),
+              ),
+            remitenteSinDocumento: !documentos.docRemitente,
             accounts,
             savePending: invoiceId =>
               writeState(phone, userId, {

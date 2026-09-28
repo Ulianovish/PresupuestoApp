@@ -11,6 +11,9 @@ vi.mock('@/lib/services/invoices', () => ({
 vi.mock('@/lib/supabase/server', () => ({
   createAdminClient: vi.fn(() => ({})),
 }));
+vi.mock('@/lib/services/whatsapp-links', () => ({
+  listarDocumentosDeUsuario: vi.fn(),
+}));
 
 import {
   prepareInvoiceProcessing,
@@ -20,8 +23,12 @@ import {
   getPendingInvoiceSummary,
   resolveUserCategoryNames,
 } from '@/lib/services/invoices';
+import { listarDocumentosDeUsuario } from '@/lib/services/whatsapp-links';
 
-import { processCufeForWhatsApp } from './process-cufe';
+import {
+  documentosCompradorWhatsapp,
+  processCufeForWhatsApp,
+} from './process-cufe';
 
 const mockedPrepare = vi.mocked(prepareInvoiceProcessing);
 const mockedRun = vi.mocked(runInvoiceProcessing);
@@ -99,9 +106,14 @@ describe('processCufeForWhatsApp', () => {
   });
 
   it('un fallo al releer proveedor/total NO rompe el flujo: el usuario igual recibe la pregunta de la cuenta', async () => {
-    mockedPrepare.mockResolvedValueOnce({ kind: 'ready', invoiceId: 'inv-new' });
+    mockedPrepare.mockResolvedValueOnce({
+      kind: 'ready',
+      invoiceId: 'inv-new',
+    });
     mockedRun.mockResolvedValueOnce({ ok: true, itemsFound: 3 });
-    mockedSummary.mockRejectedValueOnce(new Error('blip de red hacia Supabase'));
+    mockedSummary.mockRejectedValueOnce(
+      new Error('blip de red hacia Supabase'),
+    );
 
     const out = await processCufeForWhatsApp('u1', 'CUFE123');
 
@@ -115,7 +127,10 @@ describe('processCufeForWhatsApp', () => {
   });
 
   it('camino feliz: procesa, releé proveedor/total y arma el ok con invoiceId', async () => {
-    mockedPrepare.mockResolvedValueOnce({ kind: 'ready', invoiceId: 'inv-new' });
+    mockedPrepare.mockResolvedValueOnce({
+      kind: 'ready',
+      invoiceId: 'inv-new',
+    });
     mockedRun.mockResolvedValueOnce({ ok: true, itemsFound: 2 });
     mockedSummary.mockResolvedValueOnce({
       source: 'dian_cufe',
@@ -138,11 +153,18 @@ describe('processCufeForWhatsApp', () => {
   });
 
   it('error al preparar → propaga el mensaje sin procesar', async () => {
-    mockedPrepare.mockResolvedValueOnce({ kind: 'error', message: 'No se pudo crear el borrador' });
+    mockedPrepare.mockResolvedValueOnce({
+      kind: 'error',
+      message: 'No se pudo crear el borrador',
+    });
 
     const out = await processCufeForWhatsApp('u1', 'CUFE123');
 
-    expect(out).toEqual({ ok: false, reason: 'error', message: 'No se pudo crear el borrador' });
+    expect(out).toEqual({
+      ok: false,
+      reason: 'error',
+      message: 'No se pudo crear el borrador',
+    });
     expect(mockedRun).not.toHaveBeenCalled();
   });
 
@@ -157,7 +179,10 @@ describe('processCufeForWhatsApp', () => {
   });
 
   it('le pasa los NIT del QR a runInvoiceProcessing', async () => {
-    mockedPrepare.mockResolvedValueOnce({ kind: 'ready', invoiceId: 'inv-new' });
+    mockedPrepare.mockResolvedValueOnce({
+      kind: 'ready',
+      invoiceId: 'inv-new',
+    });
     mockedRun.mockResolvedValueOnce({ ok: true, itemsFound: 1 });
     mockedSummary.mockResolvedValueOnce(null);
 
@@ -171,7 +196,10 @@ describe('processCufeForWhatsApp', () => {
   });
 
   it('sin NIT (CUFE pelado) → nits vacío', async () => {
-    mockedPrepare.mockResolvedValueOnce({ kind: 'ready', invoiceId: 'inv-new' });
+    mockedPrepare.mockResolvedValueOnce({
+      kind: 'ready',
+      invoiceId: 'inv-new',
+    });
     mockedRun.mockResolvedValueOnce({ ok: true, itemsFound: 1 });
     mockedSummary.mockResolvedValueOnce(null);
 
@@ -182,5 +210,35 @@ describe('processCufeForWhatsApp', () => {
       'CUFE123',
       expect.objectContaining({ nits: [] }),
     );
+  });
+});
+
+describe('documentosCompradorWhatsapp', () => {
+  const mockedListar = vi.mocked(listarDocumentosDeUsuario);
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('separa el documento del número que mandó el CUFE del de los otros números de la cuenta', async () => {
+    mockedListar.mockResolvedValueOnce([
+      { phone_e164: '+573000000001', documento: '1000000001' },
+      { phone_e164: '+573000000002', documento: '1000000002' },
+    ]);
+
+    const out = await documentosCompradorWhatsapp('u1', '+573000000002');
+
+    expect(mockedListar).toHaveBeenCalledWith('u1');
+    expect(out).toEqual({
+      docRemitente: '1000000002',
+      docsOtros: ['1000000001'],
+    });
+  });
+
+  it('sin documentos cargados (o si la lectura falló y devolvió []) → nada que agregar', async () => {
+    mockedListar.mockResolvedValueOnce([]);
+
+    expect(await documentosCompradorWhatsapp('u1', '+573000000001')).toEqual({
+      docRemitente: null,
+      docsOtros: [],
+    });
   });
 });

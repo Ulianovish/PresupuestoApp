@@ -312,6 +312,35 @@ export interface Database {
           updated_at?: string;
         };
       };
+      whatsapp_links: {
+        Row: {
+          id: string;
+          phone_e164: string;
+          user_id: string;
+          display_name: string | null;
+          default_account_name: string | null;
+          linked_at: string;
+          documento: string | null;
+        };
+        Insert: {
+          id?: string;
+          phone_e164: string;
+          user_id: string;
+          display_name?: string | null;
+          default_account_name?: string | null;
+          linked_at?: string;
+          documento?: string | null;
+        };
+        Update: {
+          id?: string;
+          phone_e164?: string;
+          user_id?: string;
+          display_name?: string | null;
+          default_account_name?: string | null;
+          linked_at?: string;
+          documento?: string | null;
+        };
+      };
     };
     Views: {
       [_ in never]: never;

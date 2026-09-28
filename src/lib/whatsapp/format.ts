@@ -43,3 +43,15 @@ export function hoyBogotaDate(): Date {
   const [aa, mm, dd] = todayBogota().split('-').map(Number);
   return new Date(aa, mm - 1, dd);
 }
+
+/**
+ * Enmascara un número E.164 para mostrarlo en la app sin exponerlo entero:
+ * "+573001234567" → "+57 300 ••• 4567". Otros formatos dejan el prefijo y los
+ * últimos 4.
+ */
+export function enmascararTelefono(phone: string): string {
+  const colombiano = phone.match(/^\+57(\d{3})\d+(\d{4})$/);
+  if (colombiano) return `+57 ${colombiano[1]} ••• ${colombiano[2]}`;
+  if (phone.length < 9) return `••• ${phone.slice(-2)}`;
+  return `${phone.slice(0, 4)} ••• ${phone.slice(-4)}`;
+}
