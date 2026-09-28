@@ -3,7 +3,10 @@
 // posteriores, por WhatsApp. Conserva la resiliencia del route: reintento ante
 // errores transitorios, detección del error real del upstream y cierre prematuro.
 
-import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
+import {
+  categorizarConHistorial,
+  type EntradaHistorial,
+} from '@/lib/dian/historial-clasificacion';
 import { esRechazoDeNit } from '@/lib/dian/nit-rechazado';
 import { parseSSEEventLine } from '@/lib/dian/sse';
 import {
@@ -78,6 +81,12 @@ export interface RunOptions {
    * los scrapers usan solo los genéricos, como antes.
    */
   nits?: string[];
+  /**
+   * Asignaciones manuales recientes del usuario (`cargarHistorialManual`): los
+   * ítems con una descripción que el usuario ya clasificó a mano reutilizan
+   * esa categoría en vez de preguntarle al LLM. Vacío/ausente = solo IA.
+   */
+  historial?: EntradaHistorial[];
 }
 
 /** `&nits=a,b` para los scrapers, o nada: un scraper viejo ignora el parámetro. */
@@ -257,7 +266,9 @@ function withDeadline<T>(
     timer = setTimeout(
       () =>
         reject(
-          new Error(`${label} superó su presupuesto de ${Math.round(ms / 1000)}s`),
+          new Error(
+            `${label} superó su presupuesto de ${Math.round(ms / 1000)}s`,
+          ),
         ),
       ms,
     );
@@ -329,7 +340,14 @@ export async function runInvoiceProcessing(
   const baseUrl =
     process.env.FACTURA_DIAN_URL || 'https://factura-dian.vercel.app';
   const method = process.env.FACTURA_DIAN_METHOD || 'python';
-  const { categoryNames, onProgress, retryBaseMs, client, nits = [] } = opts;
+  const {
+    categoryNames,
+    onProgress,
+    retryBaseMs,
+    client,
+    nits = [],
+    historial = [],
+  } = opts;
 
   try {
     const upstreamUrl = `${baseUrl}/api/cufe-to-data-stream?cufe=${encodeURIComponent(
@@ -421,9 +439,11 @@ export async function runInvoiceProcessing(
       message: 'Clasificando ítems con IA...',
       progress: 95,
     });
-    const categories = await categorizeInvoiceItems(
+    const categories = await categorizarConHistorial(
       result.items.map(it => ({ description: it.description })),
       categoryNames,
+      historial,
+      { supplier: result.invoice_details.storeName },
     );
     const storedItems: StoredInvoiceItem[] = result.items.map((it, idx) => ({
       ...it,

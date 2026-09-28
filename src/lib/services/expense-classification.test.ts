@@ -5,8 +5,12 @@ vi.mock('@/lib/dian/expense-item-classifier', () => ({
 }));
 
 import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
+import { construirHistorial } from '@/lib/dian/historial-clasificacion';
 
-import { clasificarGastos } from './expense-classification';
+import {
+  clasificarGastos,
+  sugerirDesdeHistorial,
+} from './expense-classification';
 
 const mockedClassify = vi.mocked(classifyExpensesToItems);
 
@@ -35,11 +39,36 @@ function fakeSupabase(opts: {
     }
     throw new Error(`rpc inesperado: ${name}`);
   });
+  // update(...).eq(...).eq(...) para corregir la categoría de un gasto OTROS
+  const eqFinal = vi.fn().mockResolvedValue({ error: null });
+  const update = vi.fn(() => ({ eq: vi.fn(() => ({ eq: eqFinal })) }));
+  const from = vi.fn(() => ({ update }));
   return {
-    client: { rpc } as unknown as Parameters<typeof clasificarGastos>[0],
+    client: { rpc, from } as unknown as Parameters<typeof clasificarGastos>[0],
     rpc,
+    from,
+    update,
   };
 }
+
+const HISTORIAL = construirHistorial([
+  {
+    description:
+      'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+    category_name: 'VIVIENDA',
+    transaction_date: '2026-08-15',
+    budget_items: { name: 'Arriendo', categories: { name: 'VIVIENDA' } },
+  },
+  {
+    description: 'Cena',
+    category_name: 'GASTOS PERSONALES',
+    transaction_date: '2026-09-01',
+    budget_items: {
+      name: 'Restaurantes',
+      categories: { name: 'GASTOS PERSONALES' },
+    },
+  },
+]);
 
 describe('clasificarGastos', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -143,5 +172,121 @@ describe('clasificarGastos', () => {
     ]);
 
     expect(r.asignados).toHaveLength(1);
+  });
+
+  it('reutiliza el historial manual antes que la IA (origen "historial")', async () => {
+    mockedClassify.mockImplementation(async items => items.map(() => null));
+    const { client, rpc } = fakeSupabase({
+      itemsPorMes: { '2026-09': ITEMS_SEPT },
+    });
+
+    const r = await clasificarGastos(
+      client,
+      'u1',
+      [
+        {
+          id: 't1',
+          description: 'cena',
+          categoryName: 'GASTOS PERSONALES',
+          monthYear: '2026-09',
+        },
+        {
+          id: 't2',
+          description: 'Otra cosa',
+          categoryName: 'GASTOS PERSONALES',
+          monthYear: '2026-09',
+        },
+      ],
+      { historial: HISTORIAL },
+    );
+
+    expect(r.asignados).toEqual([
+      { expenseId: 't1', budgetItemId: 'rest', source: 'historial' },
+    ]);
+    expect(rpc).toHaveBeenCalledWith('assign_expense_budget_item', {
+      p_user_id: 'u1',
+      p_transaction_id: 't1',
+      p_budget_item_id: 'rest',
+      p_source: 'historial',
+    });
+    // Solo el que no estaba en el historial va a la IA.
+    expect(mockedClassify).toHaveBeenCalledTimes(1);
+    expect(mockedClassify.mock.calls[0][0]).toEqual([
+      { description: 'Otra cosa' },
+    ]);
+  });
+
+  it('un gasto en OTROS que el historial reconoce toma también la categoría', async () => {
+    const { client, from, update } = fakeSupabase({
+      itemsPorMes: { '2026-09': ITEMS_SEPT },
+    });
+
+    const r = await clasificarGastos(
+      client,
+      'u1',
+      [
+        {
+          id: 't1',
+          description:
+            'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+          categoryName: 'OTROS',
+          monthYear: '2026-09',
+        },
+      ],
+      { historial: HISTORIAL },
+    );
+
+    expect(from).toHaveBeenCalledWith('transactions');
+    expect(update).toHaveBeenCalledWith({ category_name: 'VIVIENDA' });
+    expect(r.asignados).toEqual([
+      { expenseId: 't1', budgetItemId: 'arriendo', source: 'historial' },
+    ]);
+    expect(mockedClassify).not.toHaveBeenCalled();
+  });
+});
+
+describe('sugerirDesdeHistorial', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('sugiere (sin asignar) el ítem del historial, solo si la categoría coincide', async () => {
+    const { client, rpc } = fakeSupabase({
+      itemsPorMes: { '2026-09': ITEMS_SEPT },
+    });
+
+    const sug = await sugerirDesdeHistorial(
+      client,
+      'u1',
+      [
+        {
+          id: 't1',
+          description: 'Cena',
+          categoryName: 'GASTOS PERSONALES',
+          monthYear: '2026-09',
+        },
+        // En OTROS: la sugerencia implicaría cambiar la categoría; eso lo hace
+        // "Clasificar con IA", no el desplegable.
+        {
+          id: 't2',
+          description:
+            'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+          categoryName: 'OTROS',
+          monthYear: '2026-09',
+        },
+        {
+          id: 't3',
+          description: 'Nada que ver',
+          categoryName: 'VIVIENDA',
+          monthYear: '2026-09',
+        },
+      ],
+      { historial: HISTORIAL },
+    );
+
+    expect(sug).toEqual({ t1: { budgetItemId: 'rest', source: 'historial' } });
+    expect(rpc).not.toHaveBeenCalledWith(
+      'assign_expense_budget_item',
+      expect.anything(),
+    );
+    expect(mockedClassify).not.toHaveBeenCalled();
   });
 });

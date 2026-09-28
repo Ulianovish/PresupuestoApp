@@ -5,6 +5,7 @@
 
 import { after, NextRequest } from 'next/server';
 
+import { cargarHistorialManual } from '@/lib/dian/historial-clasificacion';
 import {
   prepareInvoiceProcessing,
   runInvoiceProcessing,
@@ -30,9 +31,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (!cufe) {
-    return Response.json({ error: 'El parámetro cufe es requerido' }, {
-      status: 400,
-    });
+    return Response.json(
+      { error: 'El parámetro cufe es requerido' },
+      {
+        status: 400,
+      },
+    );
   }
 
   const supabase = await createClient();
@@ -80,8 +84,10 @@ export async function POST(request: NextRequest) {
   const cufeValue = cufe;
   const invoiceId = prep.invoiceId;
 
+  const userId = user.id;
   after(async () => {
     const categoryNames = await resolveUserCategoryNames();
+    const historial = await cargarHistorialManual(await createClient(), userId);
 
     // Persiste el avance, pero solo cuando el porcentaje sube ≥5 o el paso es
     // relevante, para no martillar la DB con cada evento del stream.
@@ -91,11 +97,13 @@ export async function POST(request: NextRequest) {
       // pasa la fila a pending_review justo después, y persistirlo haría que la
       // barra saltara a 100 y volviera a 95 con el paso `categorizing`.
       if (event.step === 'complete') return;
-      const percent = typeof event.progress === 'number' ? event.progress : null;
+      const percent =
+        typeof event.progress === 'number' ? event.progress : null;
       const isMilestone =
         event.step === 'retrying' || event.step === 'categorizing';
       if (percent == null && !isMilestone) return;
-      if (percent != null && percent - lastPersisted < 5 && !isMilestone) return;
+      if (percent != null && percent - lastPersisted < 5 && !isMilestone)
+        return;
       lastPersisted = percent ?? lastPersisted;
       await updateInvoiceProgress(
         invoiceId,
@@ -107,6 +115,7 @@ export async function POST(request: NextRequest) {
     await runInvoiceProcessing(invoiceId, cufeValue, {
       categoryNames,
       onProgress,
+      historial,
     });
   });
 

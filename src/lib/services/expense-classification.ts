@@ -7,6 +7,13 @@
 
 import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
 import {
+  cargarHistorialManual,
+  indexarHistorial,
+  itemDesdeHistorial,
+  type EntradaHistorial,
+  type IndiceHistorial,
+} from '@/lib/dian/historial-clasificacion';
+import {
   normalizarNombre,
   resolveItemNameToId,
   type BudgetItemRef,
@@ -87,9 +94,20 @@ export async function clasificarGastos(
   supabase: DBClient,
   userId: string,
   gastos: GastoAClasificar[],
-  deps: { clasificar?: Clasificador } = {},
+  deps: {
+    clasificar?: Clasificador;
+    /** Historial ya cargado (si no viene, se carga UNA vez para todo el lote). */
+    historial?: EntradaHistorial[];
+  } = {},
 ): Promise<ResultadoClasificacion> {
   const clasificar = deps.clasificar ?? classifyExpensesToItems;
+  let indice: IndiceHistorial | null = deps.historial
+    ? indexarHistorial(deps.historial)
+    : null;
+  const obtenerIndice = async () => {
+    indice ??= indexarHistorial(await cargarHistorialManual(supabase, userId));
+    return indice;
+  };
   const asignados: AsignacionHecha[] = [];
   let sinPresupuesto = 0;
 
@@ -119,9 +137,44 @@ export async function clasificarGastos(
         continue;
       }
 
-      // Agrupar por categoría y clasificar cada grupo en un lote, acotado a
-      // los ítems de esa categoría.
-      const porCategoria = agruparPor(delMes, g =>
+      // 1. Historial del usuario: lo que ya asignó a mano a un gasto con la
+      //    misma descripción. Gana sobre la IA.
+      const idx = await obtenerIndice();
+      const paraIA: GastoAClasificar[] = [];
+      for (const gasto of delMes) {
+        const hit = itemDesdeHistorial(
+          gasto.description,
+          gasto.categoryName,
+          idx,
+          items,
+        );
+        if (!hit) {
+          paraIA.push(gasto);
+          continue;
+        }
+        if (hit.cambiaCategoria) {
+          // El gasto estaba en OTROS: se le pone la categoría del historial
+          // para que no quede un ítem de VIVIENDA en un gasto OTROS. Si no se
+          // pudo, mejor no asignar por historial y dejar que siga la IA.
+          // Cast: `transactions` en database.ts no tiene category_name.
+          const { error } = await (supabase as unknown as SupabaseClient)
+            .from('transactions')
+            .update({ category_name: hit.categoria })
+            .eq('id', gasto.id)
+            .eq('user_id', userId);
+          if (error) {
+            paraIA.push(gasto);
+            continue;
+          }
+        }
+        const antes = asignados.length;
+        await asignar(gasto, hit.itemId, 'historial');
+        if (asignados.length === antes) paraIA.push(gasto);
+      }
+
+      // 2. IA para el resto: agrupar por categoría y clasificar cada grupo en
+      //    un lote, acotado a los ítems de esa categoría.
+      const porCategoria = agruparPor(paraIA, g =>
         normalizarNombre(g.categoryName),
       );
       for (const [categoria, grupo] of porCategoria) {
@@ -151,4 +204,43 @@ export async function clasificarGastos(
     sinPresupuesto,
     sinCoincidencia: gastos.length - asignados.length - sinPresupuesto,
   };
+}
+
+/**
+ * Sugerencias para el panel "sin clasificar" (NO asigna nada): el ítem que el
+ * historial manual del usuario propone para cada gasto. Solo cuando la
+ * categoría del gasto coincide con la del historial — cambiar la categoría es
+ * cosa de "Clasificar con IA", no de un desplegable acotado a la categoría.
+ */
+export async function sugerirDesdeHistorial(
+  supabase: DBClient,
+  userId: string,
+  gastos: GastoAClasificar[],
+  deps: { historial?: EntradaHistorial[] } = {},
+): Promise<Record<string, { budgetItemId: string; source: 'historial' }>> {
+  const out: Record<string, { budgetItemId: string; source: 'historial' }> = {};
+  if (gastos.length === 0) return out;
+  try {
+    const indice = indexarHistorial(
+      deps.historial ?? (await cargarHistorialManual(supabase, userId)),
+    );
+    if (indice.size === 0) return out;
+    for (const [monthYear, delMes] of agruparPor(gastos, g => g.monthYear)) {
+      const items = await cargarItemsDelMes(supabase, userId, monthYear);
+      for (const gasto of delMes) {
+        const hit = itemDesdeHistorial(
+          gasto.description,
+          gasto.categoryName,
+          indice,
+          items,
+        );
+        if (hit && !hit.cambiaCategoria) {
+          out[gasto.id] = { budgetItemId: hit.itemId, source: 'historial' };
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[historial] no se pudieron calcular sugerencias:', error);
+  }
+  return out;
 }

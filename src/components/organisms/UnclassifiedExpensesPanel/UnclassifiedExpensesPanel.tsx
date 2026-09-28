@@ -13,6 +13,7 @@ import {
   getBudgetItemsForMonth,
   assignExpenseToBudgetItem,
   classifyUnassignedForMonth,
+  getClassificationSuggestions,
   updateExpenseTransaction,
   formatCurrency,
   type UnclassifiedExpense,
@@ -46,7 +47,7 @@ export default function UnclassifiedExpensesPanel({
   const [selected, setSelected] = useState<SeleccionUsuario>({});
   // Sugerencias REALES (historial del usuario o IA). Sin sugerencia, el
   // desplegable arranca en "Sin asignar": nunca en el primer ítem alfabético.
-  const [suggestions] = useState<SugerenciasPorGasto>({});
+  const [suggestions, setSuggestions] = useState<SugerenciasPorGasto>({});
 
   const normalize = (s: string) =>
     s
@@ -81,12 +82,14 @@ export default function UnclassifiedExpensesPanel({
   const categoryNames = budgetCategories.map(c => c.name.toUpperCase());
 
   const load = useCallback(async () => {
-    const [exp, its] = await Promise.all([
+    const [exp, its, sug] = await Promise.all([
       getUnclassifiedExpenses(monthYear),
       getBudgetItemsForMonth(monthYear),
+      getClassificationSuggestions(monthYear),
     ]);
     setExpenses(exp);
     setItems(its);
+    setSuggestions(sug);
   }, [monthYear]);
 
   useEffect(() => {

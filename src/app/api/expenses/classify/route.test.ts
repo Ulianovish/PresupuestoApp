@@ -5,15 +5,20 @@ vi.mock('@/lib/supabase/server', () => ({
 }));
 vi.mock('@/lib/services/expense-classification', () => ({
   clasificarGastos: vi.fn(),
+  sugerirDesdeHistorial: vi.fn(),
 }));
 
-import { clasificarGastos } from '@/lib/services/expense-classification';
+import {
+  clasificarGastos,
+  sugerirDesdeHistorial,
+} from '@/lib/services/expense-classification';
 import { createClient } from '@/lib/supabase/server';
 
-import { POST } from './route';
+import { GET, POST } from './route';
 
 const mockedCreateClient = vi.mocked(createClient);
 const mockedClasificar = vi.mocked(clasificarGastos);
+const mockedSugerir = vi.mocked(sugerirDesdeHistorial);
 
 const PENDIENTES = [
   {
@@ -174,5 +179,36 @@ describe('POST /api/expenses/classify', () => {
     ]);
     expect(json.byHistory).toBe(1);
     expect(json.assigned).toBe(1);
+  });
+});
+
+describe('GET /api/expenses/classify', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('devuelve las sugerencias del historial para los pendientes del mes (sin asignar)', async () => {
+    fakeClient();
+    mockedSugerir.mockResolvedValue({
+      t2: { budgetItemId: 'arriendo', source: 'historial' },
+    });
+
+    const res = await GET(
+      new Request('http://localhost/api/expenses/classify?monthYear=2026-09'),
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toEqual({
+      suggestions: { t2: { budgetItemId: 'arriendo', source: 'historial' } },
+    });
+    expect(mockedSugerir.mock.calls[0][2]).toHaveLength(2);
+    expect(mockedClasificar).not.toHaveBeenCalled();
+  });
+
+  it('400 con un mes inválido', async () => {
+    fakeClient();
+    const res = await GET(
+      new Request('http://localhost/api/expenses/classify?monthYear=sept'),
+    );
+    expect(res.status).toBe(400);
   });
 });

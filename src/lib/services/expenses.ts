@@ -491,6 +491,32 @@ export async function classifyExpensesOnServer(
   return (await res.json()) as ClassificationSummary;
 }
 
+/**
+ * Sugerencias del historial manual para los gastos sin clasificar del mes (no
+ * asigna nada). Best-effort: ante error, sin sugerencias.
+ */
+export async function getClassificationSuggestions(
+  monthYear: string,
+): Promise<
+  Record<string, { budgetItemId: string; source: 'historial' | 'ai' }>
+> {
+  try {
+    const res = await fetch(
+      `/api/expenses/classify?monthYear=${encodeURIComponent(monthYear)}`,
+    );
+    if (!res.ok) return {};
+    const json = (await res.json()) as {
+      suggestions?: Record<
+        string,
+        { budgetItemId: string; source: 'historial' | 'ai' }
+      >;
+    };
+    return json.suggestions ?? {};
+  } catch {
+    return {};
+  }
+}
+
 /** Clasifica en lote los gastos sin asignar de un mes (botón "Clasificar con IA"). */
 export async function classifyUnassignedForMonth(
   monthYear: string,

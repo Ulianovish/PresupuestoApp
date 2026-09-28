@@ -1,8 +1,13 @@
 // Creación de gastos directos desde WhatsApp (texto libre). Usa service-role
 // (sin sesión) con el userId ya resuelto por el vínculo del número.
 
-import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
 import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
+import {
+  cargarHistorialManual,
+  categorizarConHistorial,
+  indexarHistorial,
+  itemDesdeHistorial,
+} from '@/lib/dian/historial-clasificacion';
 import {
   resolveItemNameToId,
   type BudgetItemRef,
@@ -82,9 +87,14 @@ export async function createDirectExpense(
   const supabase = createAdminClient();
 
   const categoryNames = await resolveUserCategoryNames(supabase, userId);
-  const [category] = await categorizeInvoiceItems(
+  // Historial manual del usuario (una consulta): si ya asignó a mano un gasto
+  // con esta misma descripción, se reutiliza su categoría (y abajo su ítem)
+  // antes de preguntarle al LLM.
+  const historial = await cargarHistorialManual(supabase, userId);
+  const [category] = await categorizarConHistorial(
     [{ description: input.description }],
     categoryNames,
+    historial,
   );
   const finalCategory = category ?? 'OTROS';
 
@@ -121,11 +131,21 @@ export async function createDirectExpense(
           category_name: r.category_name,
         }),
       );
-      budgetItemId = await pickBudgetItemId(
+      const desdeHistorial = itemDesdeHistorial(
         input.description,
         finalCategory,
+        indexarHistorial(historial),
         items,
       );
+      // Solo si no cambia la categoría: la categoría ya salió del historial
+      // arriba, así que un cambio acá sería un gasto OTROS que el historial no
+      // pudo categorizar (categoría que ya no existe) — mejor la IA.
+      const source: 'historial' | 'ai' =
+        desdeHistorial && !desdeHistorial.cambiaCategoria ? 'historial' : 'ai';
+      budgetItemId =
+        source === 'historial' && desdeHistorial
+          ? desdeHistorial.itemId
+          : await pickBudgetItemId(input.description, finalCategory, items);
       if (budgetItemId) {
         const { error: assignError } = await supabase.rpc(
           'assign_expense_budget_item',
@@ -133,7 +153,7 @@ export async function createDirectExpense(
             p_user_id: userId,
             p_transaction_id: transactionId,
             p_budget_item_id: budgetItemId,
-            p_source: 'ai',
+            p_source: source,
           },
         );
         if (assignError) {
@@ -190,9 +210,12 @@ export async function createVisionReceiptDraft(
   const supabase = createAdminClient();
 
   const categoryNames = await resolveUserCategoryNames(supabase, userId);
-  const categories = await categorizeInvoiceItems(
+  const historial = await cargarHistorialManual(supabase, userId);
+  const categories = await categorizarConHistorial(
     input.items.map(it => ({ description: it.description })),
     categoryNames,
+    historial,
+    { supplier: input.supplier },
   );
 
   const storedItems: StoredInvoiceItem[] = input.items.map((it, idx) => ({

@@ -5,6 +5,7 @@
 // medio — mismo criterio que separó `handle-image.ts`/`handle-agent.ts` del
 // route.
 
+import { cargarHistorialManual } from '@/lib/dian/historial-clasificacion';
 import {
   prepareInvoiceProcessing,
   runInvoiceProcessing,
@@ -29,7 +30,10 @@ async function safeReadSupplierTotal(
 ): Promise<{ supplier: string | null; total: number | null }> {
   try {
     const resumen = await getPendingInvoiceSummary(userId, invoiceId);
-    return { supplier: resumen?.supplier ?? null, total: resumen?.total ?? null };
+    return {
+      supplier: resumen?.supplier ?? null,
+      total: resumen?.total ?? null,
+    };
   } catch (err) {
     console.error(
       'processCufeForWhatsApp: no se pudo releer proveedor/total (se sigue sin ellos):',
@@ -51,7 +55,8 @@ export async function processCufeForWhatsApp(
   const admin = createAdminClient();
   const prep = await prepareInvoiceProcessing(userId, cufe, admin);
   if (prep.kind === 'duplicate') return { ok: false, reason: 'duplicate' };
-  if (prep.kind === 'error') return { ok: false, reason: 'error', message: prep.message };
+  if (prep.kind === 'error')
+    return { ok: false, reason: 'error', message: prep.message };
   // Factura registrada a medias: no se re-scrapea ni se vuelve a registrar
   // (duplicaría los ítems ya creados). Se le explica al usuario cuántos ya
   // quedaron y que los que faltan van a mano en Gastos.
@@ -70,7 +75,10 @@ export async function processCufeForWhatsApp(
     // duplicado real (nada que "ya se procesó" del todo) — se retoma sin
     // volver a scrapear, en vez de decir "ya la había procesado" y dejar al
     // usuario sin salida.
-    const { supplier, total } = await safeReadSupplierTotal(userId, prep.invoice.id);
+    const { supplier, total } = await safeReadSupplierTotal(
+      userId,
+      prep.invoice.id,
+    );
     return {
       ok: true,
       itemsFound: (prep.invoice.items || []).length,
@@ -81,10 +89,12 @@ export async function processCufeForWhatsApp(
   }
 
   const categoryNames = await resolveUserCategoryNames(admin, userId);
+  const historial = await cargarHistorialManual(admin, userId);
   const run = await runInvoiceProcessing(prep.invoiceId, cufe, {
     categoryNames,
     client: admin,
     nits,
+    historial,
   });
   if (!run.ok) return { ok: false, reason: 'error', message: run.message };
 
@@ -93,7 +103,10 @@ export async function processCufeForWhatsApp(
   // proveedor y el total, igual que hace la vía de imagen con la lectura de
   // la visión. `handleAgentMessage` necesita el id para resolver la cuenta o
   // guardar el `pending`, no la factura entera.
-  const { supplier, total } = await safeReadSupplierTotal(userId, prep.invoiceId);
+  const { supplier, total } = await safeReadSupplierTotal(
+    userId,
+    prep.invoiceId,
+  );
   return {
     ok: true,
     itemsFound: run.itemsFound,

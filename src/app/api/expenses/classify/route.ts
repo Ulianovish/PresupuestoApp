@@ -1,16 +1,21 @@
 // POST /api/expenses/classify
 // Body: { monthYear: 'YYYY-MM' } | { expenseIds: string[] }
+// GET  /api/expenses/classify?monthYear=YYYY-MM → { suggestions }
 //
 // Clasifica en el SERVIDOR los gastos sin ítem de presupuesto: botón
 // "Clasificar con IA" del panel (por mes) y alta desde el formulario web (por
 // ids). Antes esto corría en el navegador, donde no hay API key de IA: no se
 // clasificaba nada y la UI igual reportaba cada fila como hecha. Devuelve los
 // conteos REALES (solo lo que el RPC de asignación confirmó).
+//
+// El GET no asigna nada: devuelve las sugerencias del historial manual del
+// usuario para preseleccionarlas (marcadas) en el panel.
 
 import { z } from 'zod';
 
 import {
   clasificarGastos,
+  sugerirDesdeHistorial,
   type GastoAClasificar,
 } from '@/lib/services/expense-classification';
 import { createClient } from '@/lib/supabase/server';
@@ -38,6 +43,63 @@ export interface ClassifyResponse {
   skippedNoBudget: number;
   /** Con presupuesto, pero ningún ítem encajó (o la asignación falló). */
   unmatched: number;
+}
+
+type Cliente = Awaited<ReturnType<typeof createClient>>;
+
+/** Gastos del mes sin ítem asignado (mismo RPC que el panel). */
+async function pendientesDelMes(
+  supabase: Cliente,
+  userId: string,
+  monthYear: string,
+): Promise<{ gastos: GastoAClasificar[] } | { error: string }> {
+  const { data, error } = await supabase.rpc('get_unclassified_expenses', {
+    p_user_id: userId,
+    p_month_year: monthYear,
+  });
+  if (error) return { error: error.message };
+  return {
+    gastos: ((data as unknown[]) ?? []).map(row => {
+      const r = row as {
+        id: string;
+        description: string | null;
+        category_name: string | null;
+        transaction_date: string;
+      };
+      return {
+        id: r.id,
+        description: r.description ?? '',
+        categoryName: r.category_name ?? '',
+        monthYear: r.transaction_date.slice(0, 7),
+      };
+    }),
+  };
+}
+
+export async function GET(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return Response.json({ error: 'No autenticado' }, { status: 401 });
+  }
+
+  const monthYear = new URL(request.url).searchParams.get('monthYear') ?? '';
+  if (!/^\d{4}-\d{2}$/.test(monthYear)) {
+    return Response.json({ error: 'monthYear inválido' }, { status: 400 });
+  }
+
+  const pendientes = await pendientesDelMes(supabase, user.id, monthYear);
+  if ('error' in pendientes) {
+    return Response.json({ error: pendientes.error }, { status: 500 });
+  }
+  const suggestions = await sugerirDesdeHistorial(
+    supabase,
+    user.id,
+    pendientes.gastos,
+  );
+  return Response.json({ suggestions });
 }
 
 export async function POST(request: Request) {
@@ -87,28 +149,15 @@ export async function POST(request: Request) {
       };
     });
   } else {
-    const monthYear = body.monthYear as string;
-    const { data, error } = await supabase.rpc('get_unclassified_expenses', {
-      p_user_id: user.id,
-      p_month_year: monthYear,
-    });
-    if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+    const pendientes = await pendientesDelMes(
+      supabase,
+      user.id,
+      body.monthYear as string,
+    );
+    if ('error' in pendientes) {
+      return Response.json({ error: pendientes.error }, { status: 500 });
     }
-    gastos = ((data as unknown[]) ?? []).map(row => {
-      const r = row as {
-        id: string;
-        description: string | null;
-        category_name: string | null;
-        transaction_date: string;
-      };
-      return {
-        id: r.id,
-        description: r.description ?? '',
-        categoryName: r.category_name ?? '',
-        monthYear: r.transaction_date.slice(0, 7),
-      };
-    });
+    gastos = pendientes.gastos;
   }
 
   const r = await clasificarGastos(supabase, user.id, gastos);
