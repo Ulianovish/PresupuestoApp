@@ -33,6 +33,7 @@ import { updateBudgetItem, deleteBudgetItem } from '@/lib/services/budget';
 import {
   ACCOUNT_TYPES,
   createExpenseTransaction,
+  classifyExpensesOnServer,
   updateExpenseTransaction,
   formatCurrency,
   formatMonthName,
@@ -554,6 +555,7 @@ export default function GastosPage() {
       let skipped = 0;
       let errors = 0;
       const monthsAffected = new Set<string>();
+      const importedIds: string[] = [];
       const errorMessages: string[] = [];
 
       for (let i = 0; i < rows.length; i++) {
@@ -638,14 +640,20 @@ export default function GastosPage() {
           const place =
             placeCol && row[placeCol] ? String(row[placeCol]).trim() : '';
 
-          await createExpenseTransaction({
-            description,
-            amount,
-            transaction_date: transactionDate,
-            category_name: categoryName,
-            account_name: accountName,
-            place,
-          });
+          // Sin clasificar fila por fila: cada una sería un viaje al servidor
+          // (y quizás una llamada a la IA). Se clasifican todas al final.
+          const id = await createExpenseTransaction(
+            {
+              description,
+              amount,
+              transaction_date: transactionDate,
+              category_name: categoryName,
+              account_name: accountName,
+              place,
+            },
+            { clasificar: false },
+          );
+          if (id) importedIds.push(id);
           imported++;
         } catch (err) {
           errors++;
@@ -675,6 +683,30 @@ export default function GastosPage() {
         toast.error(
           `${errors} filas con error${errorMessages.length > 0 ? `: ${errorMessages.join('; ')}` : ''}`,
           { duration: 8000 },
+        );
+      }
+
+      // Clasificación de lo importado, en lotes para que cada llamada al
+      // servidor (historial + IA) quepa holgada en el tiempo de la función.
+      // Best-effort: lo que no se asigne queda en el panel "sin clasificar".
+      let classified = 0;
+      for (let i = 0; i < importedIds.length; i += 50) {
+        try {
+          const res = await classifyExpensesOnServer({
+            expenseIds: importedIds.slice(i, i + 50),
+          });
+          classified += res.assigned;
+        } catch (err) {
+          console.error(
+            'No se pudieron clasificar los gastos importados:',
+            err,
+          );
+          break;
+        }
+      }
+      if (importedIds.length > 0) {
+        toast.info(
+          `${classified} de ${importedIds.length} gastos importados quedaron asignados a un ítem del presupuesto`,
         );
       }
 
