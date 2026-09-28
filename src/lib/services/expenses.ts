@@ -10,6 +10,7 @@ import { toTitleCase } from '@/lib/text-case';
 import {
   resolveItemNameToId,
   type BudgetItemRef,
+  type BudgetItemSource,
   type UnclassifiedExpense,
 } from './expenses-rollup';
 
@@ -431,11 +432,11 @@ export async function getUnclassifiedExpenses(
   return data || [];
 }
 
-/** Asigna (o desasigna con null) un gasto a un ítem. source: 'ai' | 'manual'. */
+/** Asigna (o desasigna con null) un gasto a un ítem. source: 'ai' | 'manual' | 'historial'. */
 export async function assignExpenseToBudgetItem(
   expenseId: string,
   budgetItemId: string | null,
-  source: 'ai' | 'manual',
+  source: BudgetItemSource,
 ): Promise<void> {
   const {
     data: { user },
@@ -504,5 +505,6 @@ export async function classifyUnassignedForMonth(
 export {
   resolveItemNameToId,
   type BudgetItemRef,
+  type BudgetItemSource,
   type UnclassifiedExpense,
 } from './expenses-rollup';

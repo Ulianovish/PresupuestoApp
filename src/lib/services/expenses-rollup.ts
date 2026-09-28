@@ -9,6 +9,16 @@ export interface BudgetItemRef {
   category_name: string;
 }
 
+/**
+ * Origen del vínculo gasto → ítem (columna `transactions.budget_item_source`,
+ * VARCHAR(10) sin CHECK):
+ * - 'manual': el usuario lo eligió (desplegable, corrección por WhatsApp).
+ * - 'ai': lo eligió el clasificador por IA.
+ * - 'historial': se reutilizó lo que el usuario asignó antes a un gasto con la
+ *   misma descripción (ver `historial-clasificacion.ts`).
+ */
+export type BudgetItemSource = 'ai' | 'manual' | 'historial';
+
 export interface UnclassifiedExpense {
   id: string;
   description: string;
