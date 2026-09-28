@@ -39,7 +39,7 @@ describe('applyCorrection', () => {
     ['$ 563.091,09', 563091],
     ['45.400,00', 45400],
     ['1.900.000', 1900000],
-    ['1,5M', 1500000],
+    ['1,5 millones', 1500000],
     ['563091.09', 563091],
     ['2 palos', 2000000],
   ])(
@@ -232,7 +232,10 @@ describe('queryExpenseTotal', () => {
   it('sin fechas acota al mes en curso y lo reporta: "¿cuánto llevo en mercado?" es de este mes', async () => {
     // Sin este default se sumaba TODA la historia y el usuario recibía un
     // número que podía ser diez veces el real, sin ninguna señal.
-    const { chain, filtros } = fakeSelect([{ amount: 10000 }, { amount: 5000 }]);
+    const { chain, filtros } = fakeSelect([
+      { amount: 10000 },
+      { amount: 5000 },
+    ]);
     mockedAdmin.mockReturnValue({ from: vi.fn(() => chain) });
 
     const res = await queryExpenseTotal('user-1', { categoria: 'MERCADO' });

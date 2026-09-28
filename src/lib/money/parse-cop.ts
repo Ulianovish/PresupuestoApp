@@ -8,6 +8,10 @@
 /**
  * Sufijos que multiplican la base, del más largo al más corto para que la
  * alternancia del regex no corte "millones" en "mil".
+ *
+ * La "m" suelta NO está: "gasolina 5m" o "5m de tela" son metros (o un typo),
+ * y el parser degradado de WhatsApp (sin LLM) los registraba como
+ * $5.000.000. Para millones: "mm", "mill", "millón/millones", "palo(s)".
  */
 const SUFIJOS: Array<[string, number]> = [
   ['millones', 1_000_000],
@@ -19,7 +23,7 @@ const SUFIJOS: Array<[string, number]> = [
   ['palo', 1_000_000],
   ['luca', 1_000],
   ['mil', 1_000],
-  ['m', 1_000_000],
+  ['mm', 1_000_000],
   ['k', 1_000],
 ];
 
@@ -28,11 +32,10 @@ const SUFIJO_RE = new RegExp(`^(.*?)(${SUFIJOS.map(([s]) => s).join('|')})$`);
 
 /**
  * ¿Es `word` un sufijo de monto escrito como palabra aparte ("20 mil",
- * "2 millones")? Deja afuera la "m" suelta: "5 m de tela" son metros.
+ * "2 millones")? La "m" suelta no es sufijo: "5 m de tela" son metros.
  */
 export function isCopAmountSuffix(word: string): boolean {
-  const w = (word || '').toLowerCase();
-  return w !== 'm' && MULTIPLICADOR.has(w);
+  return MULTIPLICADOR.has((word || '').toLowerCase());
 }
 
 /** Grupos de miles bien formados: el primero de 1–3 dígitos, el resto de 3. */
@@ -91,7 +94,7 @@ function parseNumero(s: string): number | null {
 
 /**
  * Convierte un monto escrito en pesos a un entero de pesos, o null si no es un
- * monto positivo. Acepta "$ 563.091,09", "1.900.000", "40k", "1,5M",
+ * monto positivo. Acepta "$ 563.091,09", "1.900.000", "40k", "1,5mm",
  * "30 mil", "2 palos", "20 lucas", "COP 45.000", "+45.000".
  *
  * El resultado se redondea a pesos enteros con Math.round ("0,50" → 1). Cero,
@@ -122,14 +125,38 @@ export function parseCopAmount(input: string): number | null {
 
 /**
  * Como `parseCopAmount` pero ignorando el signo: los extractos bancarios traen
- * los gastos en negativo ("-45.000", "$ -45.000" o "(45.000)"). Para la
- * importación de archivos, donde el signo no distingue gasto de ingreso.
+ * los gastos en negativo ("-45.000", "$ -45.000", "45.000,00-" o "(45.000)").
+ * Para la importación de archivos, donde el signo no distingue gasto de
+ * ingreso.
  */
 export function parseCopAmountAbs(input: string): number | null {
   if (typeof input !== 'string') return null;
   const sinSigno = input
     .replace(/[$\s]/g, '')
     .replace(/^-/, '')
+    .replace(/-$/, '')
     .replace(/^\((.*)\)$/, '$1');
   return parseCopAmount(sinSigno);
+}
+
+/**
+ * Monto de una celda de un archivo importado (Excel/CSV): el número de pesos,
+ * `'vacio'` si no hay monto (celda vacía o cero: se omite en silencio) o
+ * `'ilegible'` si hay algo escrito que no se entiende como monto — esas filas
+ * se cuentan aparte para avisarle al usuario en vez de perderlas sin decir
+ * nada.
+ */
+export function montoDeCelda(celda: unknown): number | 'vacio' | 'ilegible' {
+  if (celda === null || celda === undefined) return 'vacio';
+  if (typeof celda === 'number') {
+    if (!Number.isFinite(celda)) return 'ilegible';
+    const pesos = Math.round(Math.abs(celda));
+    return pesos > 0 ? pesos : 'vacio';
+  }
+  const texto = String(celda).trim();
+  if (!texto) return 'vacio';
+  const monto = parseCopAmountAbs(texto);
+  if (monto !== null) return monto;
+  // "0", "0,00", "-", "$ 0": cero escrito de alguna forma.
+  return /^[\s$()+\-0.,]*$/.test(texto) ? 'vacio' : 'ilegible';
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isCopAmountSuffix,
+  montoDeCelda,
   parseCopAmount,
   parseCopAmountAbs,
 } from './parse-cop';
@@ -15,7 +16,7 @@ describe('parseCopAmount', () => {
     ['45.400,00', 45400],
     ['1.900.000', 1900000],
     ['40k', 40000],
-    ['1,5M', 1500000],
+    ['1,5mm', 1500000],
     ['563091.09', 563091],
     // Montos típicos de facturas y extractos.
     ['$4.542.819,00', 4542819],
@@ -40,8 +41,14 @@ describe('parseCopAmount', () => {
     ['30 mil', 30000],
     ['30mil', 30000],
     ['1.5 mil', 1500],
-    ['2m', 2000000],
+    ['2mm', 2000000],
+    ['2MM', 2000000],
     ['2 millones', 2000000],
+    // "m" suelta NO es millones: "5m" son metros ("5m de tela") o un typo, y
+    // en el parser degradado (sin LLM) daba $5.000.000.
+    ['5m', null],
+    ['1,5M', null],
+    ['100m', null],
     ['1 millón', 1000000],
     ['1 millon', 1000000],
     ['3 mill', 3000000],
@@ -99,6 +106,10 @@ describe('isCopAmountSuffix', () => {
     }
   });
 
+  it('"mm" (millones) sí es sufijo', () => {
+    expect(isCopAmountSuffix('mm')).toBe(true);
+  });
+
   it('no toma "m" suelta (puede ser metros) ni palabras comunes', () => {
     for (const w of ['m', 'pan', 'taxi', 'de', '']) {
       expect(isCopAmountSuffix(w)).toBe(false);
@@ -113,10 +124,38 @@ describe('parseCopAmountAbs (importación de extractos)', () => {
     ['$ -45.000', 45000],
     ['(45.000)', 45000],
     ['-4.175,89', 4176],
+    // Menos al final, como lo exportan algunos bancos.
+    ['45.000,00-', 45000],
+    ['$ 1.900.000 -', 1900000],
     ['884,40', 884],
     ['abc', null],
     ['', null],
   ])('%j → %j', (input, esperado) => {
     expect(parseCopAmountAbs(input)).toBe(esperado);
   });
+});
+
+describe('montoDeCelda (celda de monto de un archivo importado)', () => {
+  it.each([
+    [45000, 45000],
+    [-45000, 45000],
+    ['45.000,00-', 45000],
+    ['$ -1.900.000', 1900000],
+  ])('%j → %j', (celda, esperado) => {
+    expect(montoDeCelda(celda)).toBe(esperado);
+  });
+
+  it.each([[null], [undefined], [''], ['   '], [0], ['0'], ['0,00'], ['-']])(
+    '%j → vacío (se omite sin contarlo como ilegible)',
+    celda => {
+      expect(montoDeCelda(celda)).toBe('vacio');
+    },
+  );
+
+  it.each([['abc'], ['45.000,00 CR'], ['1.23.456'], [Number.NaN]])(
+    '%j → ilegible (se cuenta y se avisa)',
+    celda => {
+      expect(montoDeCelda(celda)).toBe('ilegible');
+    },
+  );
 });

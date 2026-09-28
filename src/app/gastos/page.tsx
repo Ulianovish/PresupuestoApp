@@ -28,7 +28,7 @@ import ExpensePageTemplate from '@/components/templates/ExpensePageTemplate/Expe
 import { useCategories } from '@/hooks/useCategories';
 import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
 import { createBudgetItemInMonth } from '@/lib/actions/categories';
-import { parseCopAmountAbs } from '@/lib/money/parse-cop';
+import { montoDeCelda } from '@/lib/money/parse-cop';
 import { updateBudgetItem, deleteBudgetItem } from '@/lib/services/budget';
 import {
   ACCOUNT_TYPES,
@@ -553,26 +553,28 @@ export default function GastosPage() {
 
       let imported = 0;
       let skipped = 0;
+      // Filas con algo escrito en el monto que no se entiende: se avisan
+      // aparte (antes se perdían dentro de "omitidas" sin decir por qué).
+      let unreadableAmount = 0;
       let errors = 0;
       const monthsAffected = new Set<string>();
       const importedIds: string[] = [];
+      // Ids cuya categoría se adivinó por palabras clave (no vino en el
+      // archivo): solo a esos el historial les puede cambiar la categoría.
+      const guessedCategoryIds: string[] = [];
       const errorMessages: string[] = [];
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         try {
-          const rawAmount = row[amountCol];
-          let amount: number;
-          if (typeof rawAmount === 'number') {
-            amount = Math.abs(rawAmount);
-          } else {
-            // Formato colombiano ("4.175,89", "1.900.000") con las mismas
-            // reglas que el resto de la app. Un texto que no es monto queda en
-            // 0 y la fila se salta.
-            amount = parseCopAmountAbs(String(rawAmount)) ?? 0;
+          // Formato colombiano ("4.175,89", "1.900.000", "45.000,00-") con
+          // las mismas reglas que el resto de la app.
+          const amount = montoDeCelda(row[amountCol]);
+          if (amount === 'ilegible') {
+            unreadableAmount++;
+            continue;
           }
-
-          if (amount <= 0) {
+          if (amount === 'vacio') {
             skipped++;
             continue;
           }
@@ -628,9 +630,10 @@ export default function GastosPage() {
               ? String(row[catCol]).toUpperCase().trim()
               : '';
           const knownUpper = categoryNames.map(c => c.toUpperCase());
-          const categoryName = knownUpper.includes(rawCat)
-            ? rawCat
-            : guessCategory(description, categoryNames);
+          const categoryGuessed = !knownUpper.includes(rawCat);
+          const categoryName = categoryGuessed
+            ? guessCategory(description, categoryNames)
+            : rawCat;
 
           const accountName =
             accountCol && row[accountCol]
@@ -653,7 +656,10 @@ export default function GastosPage() {
             },
             { clasificar: false },
           );
-          if (id) importedIds.push(id);
+          if (id) {
+            importedIds.push(id);
+            if (categoryGuessed) guessedCategoryIds.push(id);
+          }
           imported++;
         } catch (err) {
           errors++;
@@ -679,6 +685,13 @@ export default function GastosPage() {
         );
       }
 
+      if (unreadableAmount > 0) {
+        toast.warning(
+          `${unreadableAmount} ${unreadableAmount === 1 ? 'fila' : 'filas'} con monto ilegible (no se importaron): revisa la columna "${amountCol}"`,
+          { duration: 8000 },
+        );
+      }
+
       if (errors > 0) {
         toast.error(
           `${errors} filas con error${errorMessages.length > 0 ? `: ${errorMessages.join('; ')}` : ''}`,
@@ -690,12 +703,17 @@ export default function GastosPage() {
       // servidor (historial + IA) quepa holgada en el tiempo de la función.
       // Best-effort: lo que no se asigne queda en el panel "sin clasificar".
       let classified = 0;
+      let recategorized = 0;
+      const guessed = new Set(guessedCategoryIds);
       for (let i = 0; i < importedIds.length; i += 50) {
+        const lote = importedIds.slice(i, i + 50);
         try {
           const res = await classifyExpensesOnServer({
-            expenseIds: importedIds.slice(i, i + 50),
+            expenseIds: lote,
+            guessedCategoryIds: lote.filter(id => guessed.has(id)),
           });
           classified += res.assigned;
+          recategorized += res.recategorized;
         } catch (err) {
           console.error(
             'No se pudieron clasificar los gastos importados:',
@@ -706,11 +724,16 @@ export default function GastosPage() {
       }
       if (importedIds.length > 0) {
         toast.info(
-          `${classified} de ${importedIds.length} gastos importados quedaron asignados a un ítem del presupuesto`,
+          `${classified} de ${importedIds.length} gastos importados quedaron asignados a un ítem del presupuesto${recategorized > 0 ? ` (${recategorized} cambiaron de categoría según tu historial)` : ''}`,
         );
       }
 
-      if (imported === 0 && errors === 0 && skipped === 0) {
+      if (
+        imported === 0 &&
+        errors === 0 &&
+        skipped === 0 &&
+        unreadableAmount === 0
+      ) {
         toast.warning('No se encontraron datos válidos en el archivo');
       }
 

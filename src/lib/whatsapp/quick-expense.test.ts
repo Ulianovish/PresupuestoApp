@@ -4,11 +4,17 @@ import { parseQuickExpense } from './quick-expense';
 
 describe('parseQuickExpense', () => {
   it('"20k taxi" → 20000 / taxi', () => {
-    expect(parseQuickExpense('20k taxi')).toEqual({ amount: 20000, description: 'taxi' });
+    expect(parseQuickExpense('20k taxi')).toEqual({
+      amount: 20000,
+      description: 'taxi',
+    });
   });
 
   it('"taxi 20k" → 20000 / taxi (monto al final)', () => {
-    expect(parseQuickExpense('taxi 20k')).toEqual({ amount: 20000, description: 'taxi' });
+    expect(parseQuickExpense('taxi 20k')).toEqual({
+      amount: 20000,
+      description: 'taxi',
+    });
   });
 
   it('"gasté 35000 en mercado" → 35000 / mercado', () => {
@@ -26,11 +32,17 @@ describe('parseQuickExpense', () => {
   });
 
   it('"2 mil pan" → 2000 / pan', () => {
-    expect(parseQuickExpense('2 mil pan')).toEqual({ amount: 2000, description: 'pan' });
+    expect(parseQuickExpense('2 mil pan')).toEqual({
+      amount: 2000,
+      description: 'pan',
+    });
   });
 
   it('"1.5k café" → 1500 / café (k con decimal)', () => {
-    expect(parseQuickExpense('1.5k café')).toEqual({ amount: 1500, description: 'café' });
+    expect(parseQuickExpense('1.5k café')).toEqual({
+      amount: 1500,
+      description: 'café',
+    });
   });
 
   it('"$563.091,09 mercado" → 563091 (decimales con coma, no ×100 ni truncado raro)', () => {
@@ -47,11 +59,17 @@ describe('parseQuickExpense', () => {
     });
   });
 
-  it('"1,5M moto" → 1500000 (millones con decimal)', () => {
-    expect(parseQuickExpense('1,5M moto')).toEqual({
+  it('"1,5mm moto" → 1500000 (millones con decimal)', () => {
+    expect(parseQuickExpense('1,5mm moto')).toEqual({
       amount: 1500000,
       description: 'moto',
     });
+  });
+
+  it('una "m" suelta no es millones: "gasolina 5m" / "5m de tela" no son $5.000.000', () => {
+    expect(parseQuickExpense('gasolina 5m')).toBeNull();
+    expect(parseQuickExpense('5m de tela')).toBeNull();
+    expect(parseQuickExpense('cena 100m')).toBeNull();
   });
 
   it('"2 millones arriendo" → 2000000 (sufijo como palabra suelta)', () => {
@@ -91,6 +109,15 @@ describe('parseQuickExpense', () => {
   it('monto absurdo (typo) → null', () => {
     expect(parseQuickExpense('999999k taxi')).toBeNull();
     expect(parseQuickExpense('500000 mil pan')).toBeNull();
+  });
+
+  it('el tope es exclusivo: 100 millones o más → null', () => {
+    expect(parseQuickExpense('cena 100 millones')).toBeNull();
+    expect(parseQuickExpense('100000000 cena')).toBeNull();
+    expect(parseQuickExpense('99999999 carro')).toEqual({
+      amount: 99999999,
+      description: 'carro',
+    });
   });
 
   it('monto grande pero válido (≤100M) sí pasa', () => {
