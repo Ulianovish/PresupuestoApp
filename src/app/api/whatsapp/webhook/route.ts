@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
             mediaUrl,
             body,
             existingPendingId: estado.pending?.invoiceId ?? null,
+            previousTurns: estado.turns,
           },
           {
             sendMessage: sendWhatsAppMessage,
@@ -118,6 +119,7 @@ export async function POST(request: NextRequest) {
               writeState(phone, userId, {
                 pending: { kind: 'invoice_account', invoiceId },
               }),
+            saveState: patch => writeState(phone, userId, patch),
             registerInvoice: (invoiceId, accountName) =>
               createInvoiceDirect(userId, invoiceId, accountName),
             onExpenseCreated: e =>
