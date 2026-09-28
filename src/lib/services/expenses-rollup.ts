@@ -27,13 +27,22 @@ export interface UnclassifiedExpense {
   transaction_date: string;
 }
 
-/** Resuelve un nombre de ítem al id dentro de una lista (helper puro y testeable). */
+/**
+ * Resuelve un nombre de ítem al id dentro de una lista (helper puro y
+ * testeable). Primero exacto; si no, sin distinguir mayúsculas, tildes ni
+ * espacios sobrantes (el modelo o el usuario rara vez copian el nombre
+ * exacto: "VERDURAS Y FRUTAS" vs "Verduras y frutas").
+ */
 export function resolveItemNameToId(
   name: string | null,
   items: BudgetItemRef[],
 ): string | null {
   if (!name) return null;
-  const found = items.find(i => i.name === name);
+  const exacto = items.find(i => i.name === name);
+  if (exacto) return exacto.id;
+  const buscado = normalizarNombre(name);
+  if (!buscado) return null;
+  const found = items.find(i => normalizarNombre(i.name) === buscado);
   return found ? found.id : null;
 }
 

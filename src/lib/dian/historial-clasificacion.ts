@@ -18,7 +18,10 @@
  * hace UNA consulta por lote y es best-effort.
  */
 
-import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
+import {
+  categorizeInvoiceItems,
+  type CategorizationContext,
+} from '@/lib/dian/categorizer';
 import {
   normalizarNombre,
   type BudgetItemRef,
@@ -251,18 +254,67 @@ export async function cargarHistorialManual(
 type Categorizador = (
   items: Array<{ description: string }>,
   categories: string[],
+  context?: CategorizationContext,
 ) => Promise<string[]>;
+
+/** Cuántos ejemplos few-shot van al prompt del categorizador. */
+const MAX_EJEMPLOS = 15;
+
+/**
+ * Ejemplos few-shot para el prompt ("<descripción> → <CATEGORÍA>"), sacados de
+ * las asignaciones manuales recientes: sin descripciones repetidas, solo de
+ * categorías que el usuario todavía tiene (con su grafía) y repartidos en
+ * ronda entre categorías, para que no se llenen todos con MERCADO.
+ */
+export function ejemplosParaPrompt(
+  entradas: EntradaHistorial[],
+  categorias: string[],
+  max = MAX_EJEMPLOS,
+): Array<{ description: string; category: string }> {
+  const porNombre = new Map(categorias.map(c => [normalizarNombre(c), c]));
+  const vistas = new Set<string>();
+  const porCategoria = new Map<
+    string,
+    Array<{ description: string; category: string }>
+  >();
+  const recientes = [...entradas].sort((a, b) =>
+    b.fecha.localeCompare(a.fecha),
+  );
+  for (const e of recientes) {
+    const categoria = porNombre.get(normalizarNombre(e.categoria));
+    if (!categoria || vistas.has(e.clave)) continue;
+    vistas.add(e.clave);
+    const arr = porCategoria.get(categoria) ?? [];
+    arr.push({ description: e.descripcion, category: categoria });
+    porCategoria.set(categoria, arr);
+  }
+
+  const grupos = [...porCategoria.values()];
+  const out: Array<{ description: string; category: string }> = [];
+  for (let ronda = 0; out.length < max; ronda++) {
+    let agrego = false;
+    for (const g of grupos) {
+      if (ronda < g.length && out.length < max) {
+        out.push(g[ronda]);
+        agrego = true;
+      }
+    }
+    if (!agrego) break;
+  }
+  return out;
+}
 
 /**
  * Categoriza ítems reutilizando primero el historial del usuario; solo lo que
- * no está en el historial va al LLM. La categoría del historial se devuelve
- * con la grafía de la lista del usuario y solo si todavía existe.
+ * no está en el historial va al LLM, con el proveedor y ejemplos few-shot del
+ * mismo historial. La categoría del historial se devuelve con la grafía de la
+ * lista del usuario y solo si todavía existe.
  */
 export async function categorizarConHistorial(
   items: Array<{ description: string }>,
   categorias: string[],
   entradas: EntradaHistorial[],
-  _opts: { supplier?: string | null } = {},
+  opts: { supplier?: string | null } = {},
   categorizar: Categorizador = categorizeInvoiceItems,
 ): Promise<string[]> {
   const indice = indexarHistorial(entradas);
@@ -282,6 +334,10 @@ export async function categorizarConHistorial(
     const cats = await categorizar(
       pendientes.map(p => p.it),
       categorias,
+      {
+        supplier: opts.supplier ?? null,
+        examples: ejemplosParaPrompt(entradas, categorias),
+      },
     );
     pendientes.forEach(({ i }, k) => {
       resultado[i] = cats[k] ?? 'OTROS';

@@ -7,6 +7,7 @@ import {
   cargarHistorialManual,
   categorizarConHistorial,
   construirHistorial,
+  ejemplosParaPrompt,
   indexarHistorial,
   itemDesdeHistorial,
   normalizarDescripcion,
@@ -309,5 +310,59 @@ describe('categorizarConHistorial', () => {
       categorizar,
     );
     expect(cats).toEqual(['MERCADO']);
+  });
+});
+
+describe('ejemplosParaPrompt', () => {
+  it('toma hasta N ejemplos distintos, repartidos entre categorías', () => {
+    const entradas = construirHistorial([
+      fila('Pan', 'MERCADO', 'Lacena', '2026-09-10'),
+      fila('pan', 'MERCADO', 'Lacena', '2026-09-09'),
+      fila('Arroz', 'MERCADO', 'Lacena', '2026-09-08'),
+      fila('Leche', 'MERCADO', 'Lacteos', '2026-09-07'),
+      fila('Gaseosa', 'GASTOS HORMIGA', 'Bebidas', '2026-09-06'),
+      fila('Blusa niña', 'ALICE', 'Vestuario Alice', '2026-09-05'),
+    ]);
+    const ej = ejemplosParaPrompt(
+      entradas,
+      ['MERCADO', 'Gastos Hormiga', 'ALICE'],
+      4,
+    );
+    expect(ej).toHaveLength(4);
+    // Ronda por categoría: no se llena todo con MERCADO.
+    expect(ej.map(e => e.category)).toEqual(
+      expect.arrayContaining(['MERCADO', 'Gastos Hormiga', 'ALICE']),
+    );
+    // Sin descripciones repetidas.
+    expect(new Set(ej.map(e => e.description.toLowerCase())).size).toBe(4);
+  });
+
+  it('descarta ejemplos de categorías que el usuario ya no tiene', () => {
+    const entradas = construirHistorial([fila('Pan', 'PANADERIA', null)]);
+    expect(ejemplosParaPrompt(entradas, ['MERCADO'])).toEqual([]);
+  });
+
+  it('categorizarConHistorial manda proveedor y ejemplos al categorizador', async () => {
+    const entradas = construirHistorial([
+      fila('Gaseosa', 'GASTOS HORMIGA', null),
+    ]);
+    const categorizar = vi.fn(async (items: Array<{ description: string }>) =>
+      items.map(() => 'MERCADO'),
+    );
+    await categorizarConHistorial(
+      [{ description: 'Arroz' }],
+      ['MERCADO', 'GASTOS HORMIGA'],
+      entradas,
+      { supplier: 'D1' },
+      categorizar,
+    );
+    expect(categorizar).toHaveBeenCalledWith(
+      [{ description: 'Arroz' }],
+      ['MERCADO', 'GASTOS HORMIGA'],
+      {
+        supplier: 'D1',
+        examples: [{ description: 'Gaseosa', category: 'GASTOS HORMIGA' }],
+      },
+    );
   });
 });

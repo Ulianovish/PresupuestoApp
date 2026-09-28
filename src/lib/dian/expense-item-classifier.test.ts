@@ -24,3 +24,12 @@ test('parseo: nombres válidos se respetan; inválido y NINGUNO -> null', () => 
 test('parseo: contenido nulo -> todos null', () => {
   expect(parseExpenseItemResponse(null, 2, ['Carnes'])).toEqual([null, null]);
 });
+
+test('parseo: un nombre con otra capitalización o sin tildes se mapea al nombre real', () => {
+  const content = '{"items": ["VERDURAS Y FRUTAS", "lacteos"]}';
+  const result = parseExpenseItemResponse(content, 2, [
+    'Verduras y frutas',
+    'Lácteos',
+  ]);
+  expect(result).toEqual(['Verduras y frutas', 'Lácteos']);
+});

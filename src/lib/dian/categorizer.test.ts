@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import {
   buildCategorizationPrompt,
+  categorizeInvoiceItems,
   parseCategorizationResponse,
 } from './categorizer';
 
@@ -16,6 +17,40 @@ describe('buildCategorizationPrompt', () => {
     expect(prompt).toContain('MERCADO');
     expect(prompt).toContain('Arroz 1kg');
     expect(prompt).toContain('Gasolina');
+  });
+
+  it('incluye el proveedor cuando se conoce', () => {
+    const prompt = buildCategorizationPrompt([{ description: 'Arroz' }], CATS, {
+      supplier: 'Tiendas D1',
+    });
+    expect(prompt).toContain('Tiendas D1');
+  });
+
+  it('incluye ejemplos del historial del usuario como "descripción → CATEGORÍA"', () => {
+    const prompt = buildCategorizationPrompt(
+      [{ description: 'Gaseosa' }],
+      CATS,
+      {
+        examples: [
+          { description: 'Jabón en polvo', category: 'MERCADO' },
+          { description: 'Arriendo Luisa', category: 'VIVIENDA' },
+        ],
+      },
+    );
+    expect(prompt).toContain('Jabón en polvo → MERCADO');
+    expect(prompt).toContain('Arriendo Luisa → VIVIENDA');
+  });
+
+  it('no empuja a OTROS ante la duda (solo como último recurso)', () => {
+    const prompt = buildCategorizationPrompt([{ description: 'Arroz' }], CATS);
+    expect(prompt).not.toMatch(/si dudas, usa OTROS/i);
+    expect(prompt).toMatch(/OTROS solo si/i);
+  });
+
+  it('sin proveedor ni ejemplos no agrega esas secciones', () => {
+    const prompt = buildCategorizationPrompt([{ description: 'Arroz' }], CATS);
+    expect(prompt).not.toContain('Proveedor');
+    expect(prompt).not.toContain('→');
   });
 });
 
@@ -71,5 +106,72 @@ describe('parseCategorizationResponse', () => {
       'TRANSPORTE',
       'OTROS',
     ]);
+  });
+});
+
+describe('fallback a OTROS: distinguible en los logs', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it('avisa (console.warn) cuando la respuesta no se puede parsear', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(parseCategorizationResponse('no es json', 1, CATS)).toEqual([
+      'OTROS',
+    ]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('OTROS'));
+  });
+
+  it('avisa cuando el modelo devuelve categorías que no existen', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    parseCategorizationResponse('{"categories":["COMIDA"]}', 1, CATS);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('no avisa si el modelo eligió OTROS a propósito', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    parseCategorizationResponse('{"categories":["OTROS"]}', 1, CATS);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('avisa cuando cae a OTROS por error de la IA', async () => {
+    vi.stubEnv('AI_GATEWAY_API_KEY', 'test');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 500 })),
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const cats = await categorizeInvoiceItems([{ description: 'x' }], CATS);
+
+    expect(cats).toEqual(['OTROS']);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('OTROS'),
+      expect.anything(),
+    );
+  });
+
+  it('manda proveedor y ejemplos al modelo', async () => {
+    vi.stubEnv('AI_GATEWAY_API_KEY', 'test');
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ content: [{ text: '{"categories":["MERCADO"]}' }] }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await categorizeInvoiceItems([{ description: 'Arroz' }], CATS, {
+      supplier: 'Éxito',
+      examples: [{ description: 'Gaseosa', category: 'MERCADO' }],
+    });
+
+    const body = JSON.parse(
+      (fetchMock.mock.calls[0] as unknown as [string, { body: string }])[1]
+        .body,
+    );
+    expect(body.messages[0].content).toContain('Éxito');
+    expect(body.messages[0].content).toContain('Gaseosa → MERCADO');
   });
 });

@@ -1,3 +1,5 @@
+import { normalizarNombre } from '@/lib/services/expenses-rollup';
+
 import { extractJsonObject } from './categorizer';
 
 /**
@@ -39,11 +41,17 @@ export function parseExpenseItemResponse(
   const items = (parsed as { items?: unknown })?.items;
   if (!Array.isArray(items)) return result;
 
+  // Exacto primero; si no, sin distinguir mayúsculas ni tildes, devolviendo
+  // siempre el nombre REAL del ítem (el modelo no siempre lo copia exacto).
   const valid = new Set(itemNames);
+  const porNormalizado = new Map(itemNames.map(n => [normalizarNombre(n), n]));
   for (let i = 0; i < itemCount; i++) {
     const v = items[i];
-    if (typeof v === 'string' && valid.has(v)) {
+    if (typeof v !== 'string') continue;
+    if (valid.has(v)) {
       result[i] = v;
+    } else {
+      result[i] = porNormalizado.get(normalizarNombre(v)) ?? null;
     }
   }
   return result;
