@@ -271,6 +271,11 @@ export async function createInvoiceDirect(
      * el ítem de presupuesto se busque dentro de la categoría correcta.
      */
     categoryOverrides?: Record<number, string>;
+    /**
+     * Número de WhatsApp que registró la factura (queda en
+     * `transactions.registered_phone`). Sin él (la app) no se marca.
+     */
+    registeredPhone?: string;
   } = {},
 ): Promise<{
   ok: boolean;
@@ -358,6 +363,13 @@ export async function createInvoiceDirect(
     if (error) {
       // Corte a mitad de camino: lo ya creado son transacciones reales, no se
       // revierte. Se clasifica lo que sí se pudo (best-effort).
+      await marcarGastosDeFactura(
+        supabase,
+        userId,
+        createdExpenses.map(e => e.id),
+        invoiceId,
+        deps.registeredPhone,
+      );
       const budgetItemIds =
         createdExpenses.length > 0
           ? await clasificar(supabase, userId, createdExpenses)
@@ -408,6 +420,13 @@ export async function createInvoiceDirect(
     }
   }
 
+  await marcarGastosDeFactura(
+    supabase,
+    userId,
+    createdExpenses.map(e => e.id),
+    invoiceId,
+    deps.registeredPhone,
+  );
   const budgetItemIds = await clasificar(supabase, userId, createdExpenses);
 
   const { error: updateError } = await supabase
@@ -437,6 +456,44 @@ export async function createInvoiceDirect(
     // El mes de la factura, no el de hoy (ver el campo en la firma).
     monthYear: fecha.slice(0, 7),
   };
+}
+
+/**
+ * Marca los gastos de una factura con su `electronic_invoice_id` (así una
+ * factura cuenta como UN gasto en el ranking de cuentas del bot y un cambio de
+ * cuenta posterior encuentra sus ítems) y con el número que la registró.
+ *
+ * Dos UPDATE separados a propósito: si la columna `registered_phone` todavía
+ * no existe (migración sin aplicar), la marca de la factura sale igual.
+ * Best-effort: los gastos YA están escritos, esto nunca puede tumbar el
+ * registro.
+ */
+async function marcarGastosDeFactura(
+  supabase: DBClient,
+  userId: string,
+  ids: string[],
+  invoiceId: string,
+  registeredPhone?: string,
+): Promise<void> {
+  if (ids.length === 0) return;
+  const cambios: Array<Record<string, string>> = [
+    { electronic_invoice_id: invoiceId },
+  ];
+  if (registeredPhone) cambios.push({ registered_phone: registeredPhone });
+  for (const cambio of cambios) {
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .update(cambio)
+        .eq('user_id', userId)
+        .in('id', ids);
+      if (error) {
+        console.error('marcarGastosDeFactura:', error.message);
+      }
+    } catch (err) {
+      console.error('marcarGastosDeFactura:', err);
+    }
+  }
 }
 
 /**

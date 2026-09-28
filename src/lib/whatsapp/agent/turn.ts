@@ -8,6 +8,7 @@ import {
   getPendingInvoiceSummary,
   resolveUserCategoryNames,
 } from '@/lib/services/invoices';
+import { cerrarPromptsDeFactura } from '@/lib/services/whatsapp-account-prompts';
 import {
   createDirectExpense,
   resolveDefaultAccount,
@@ -18,6 +19,8 @@ import {
   queryExpenseTotal,
 } from '@/lib/services/whatsapp-queries';
 import { createAdminClient } from '@/lib/supabase/server';
+import { preguntarCuenta } from '@/lib/whatsapp/account-prompt';
+import { depsPreguntaCuenta } from '@/lib/whatsapp/account-prompt-deps';
 import { dispararAlertasWhatsapp, pegarAlertas } from '@/lib/whatsapp/alerts';
 import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
 import { parseQuickExpense } from '@/lib/whatsapp/quick-expense';
@@ -74,6 +77,17 @@ interface TurnCtx {
   userId: string;
   phone: string;
   body: string;
+}
+
+/**
+ * Gastos del turno que quedaron en la cuenta por defecto porque el usuario no
+ * dijo cuál (o nombró una ambigua): al final del turno se manda UNA sola
+ * lista de cuentas que los cubre a todos.
+ */
+interface CuentasPorDefinir {
+  cuenta: string;
+  transactionIds: string[];
+  candidatas: string[];
 }
 
 /**
@@ -151,16 +165,58 @@ async function responderYGuardar(
   turnosPrevios: Turn[],
   texto: string,
   lastEntity?: LastEntity | null,
+  porDefinir?: CuentasPorDefinir,
 ): Promise<void> {
-  await sendWhatsAppMessage(ctx.phone, texto);
+  const enviado = await responder(ctx, texto, porDefinir);
   await writeState(ctx.phone, ctx.userId, {
     turns: [
       ...turnosPrevios,
       { role: 'user', content: ctx.body },
-      { role: 'assistant', content: texto },
+      { role: 'assistant', content: enviado },
     ],
     ...(lastEntity !== undefined ? { lastEntity } : {}),
   });
+}
+
+/**
+ * Manda la respuesta. Si quedaron gastos en la cuenta por defecto, la
+ * respuesta va arriba de la lista de cuentas (un solo mensaje, ver
+ * `preguntarCuenta`). Devuelve lo que vio el usuario, para la memoria.
+ */
+async function responder(
+  ctx: TurnCtx,
+  texto: string,
+  porDefinir?: CuentasPorDefinir,
+): Promise<string> {
+  const n = porDefinir?.transactionIds.length ?? 0;
+  if (!porDefinir || n === 0) {
+    await sendWhatsAppMessage(ctx.phone, texto);
+    return texto;
+  }
+  const pregunta =
+    n === 1
+      ? `Lo anoté en ${porDefinir.cuenta}. ¿Con qué cuenta fue?`
+      : `Esos ${n} gastos los anoté en ${porDefinir.cuenta}. ¿Con qué cuenta fueron?`;
+  try {
+    await preguntarCuenta(depsPreguntaCuenta(), {
+      userId: ctx.userId,
+      phone: ctx.phone,
+      targetKind: 'transactions',
+      targetIds: porDefinir.transactionIds,
+      previo: texto,
+      pregunta,
+      candidatas: porDefinir.candidatas,
+    });
+  } catch (err) {
+    // Los gastos YA están guardados (y el texto dice en qué cuenta): que la
+    // lista falle no puede dejar al usuario sin la confirmación.
+    console.error('handleAgentTurn: no pude mandar la lista de cuentas:', err);
+    await sendWhatsAppMessage(ctx.phone, texto);
+    return texto;
+  }
+  return `${texto}
+
+${pregunta}`;
 }
 
 export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
@@ -209,13 +265,26 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
   // varios rubros, se juntan todas acá.
   const alertasPendientes: string[] = [];
 
+  // Gastos de este turno sin cuenta clara (ver `CuentasPorDefinir`).
+  const porDefinir: CuentasPorDefinir = {
+    cuenta: cuentaDefecto,
+    transactionIds: [],
+    candidatas: [],
+  };
+
   const deps: ToolDeps = {
     accounts: cuentas,
     categories: categorias,
     defaultAccount: cuentaDefecto,
     today: todayBogota,
-    createExpense: async input => {
+    createExpense: async ({ cuentaPorDefinir, ...input }) => {
       const res = await createDirectExpense(ctx.userId, ctx.phone, input);
+      if (cuentaPorDefinir && res.ok && res.transactionId) {
+        porDefinir.transactionIds.push(res.transactionId);
+        for (const c of cuentaPorDefinir.candidatas) {
+          if (!porDefinir.candidatas.includes(c)) porDefinir.candidatas.push(c);
+        }
+      }
       // El último gasto registrado queda disponible para "no, eran 30 mil":
       // si el mensaje trae varios gastos, el último en guardarse gana, que es
       // el comportamiento esperado de "lo último".
@@ -263,7 +332,28 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
       estado = { ...estado, pending: null, lastEntity: null };
       lastEntityDirty = true;
       await writeState(ctx.phone, ctx.userId, { pending: null });
-      return createInvoiceDirect(ctx.userId, invoiceId, accountName);
+      const res = await createInvoiceDirect(
+        ctx.userId,
+        invoiceId,
+        accountName,
+        {
+          registeredPhone: ctx.phone,
+        },
+      );
+      if (res.ok || res.itemsFound > 0) {
+        // La lista de cuentas de esa factura sigue en el chat: se cierra para
+        // que un toque posterior se trate como corrección y el nombre escrito
+        // no vuelva a apuntarle. Best-effort.
+        try {
+          await cerrarPromptsDeFactura(invoiceId);
+        } catch (err) {
+          console.error(
+            'handleAgentTurn: no pude cerrar la lista de la factura:',
+            err,
+          );
+        }
+      }
+      return res;
     },
     correctLast: async (campo: string, valor: string) => {
       if (!estado.lastEntity) {
@@ -347,6 +437,7 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
       estado.turns,
       conAlertas(texto),
       lastEntityDirty ? estado.lastEntity : undefined,
+      porDefinir,
     );
     return;
   }
@@ -357,5 +448,6 @@ export async function handleAgentTurn(ctx: TurnCtx): Promise<void> {
     estado.turns,
     conAlertas(texto),
     lastEntityDirty ? estado.lastEntity : undefined,
+    porDefinir,
   );
 }

@@ -3,7 +3,7 @@
 // registro directo (o pregunta la cuenta si no se puede resolver).
 
 import type { LastEntity, Turn } from '@/lib/whatsapp/agent/state';
-import { normalizar, resolverCuenta } from '@/lib/whatsapp/agent/tools';
+import { candidatasPorTexto, resolverCuenta } from '@/lib/whatsapp/agent/tools';
 import { pegarAlertas } from '@/lib/whatsapp/alerts';
 import {
   avisoFechaDescartada,
@@ -21,14 +21,7 @@ import type { VisionResult } from '@/lib/whatsapp/vision';
  * de una cuenta matchea, es ambigua y se trata como no resuelta.
  */
 function resolverPorTexto(texto: string, accounts: string[]): string | null {
-  const t = normalizar(texto || '');
-  if (!t) return null;
-
-  const candidatas = accounts.filter(a =>
-    normalizar(a)
-      .split(/\s+/)
-      .some(palabra => palabra.length >= 4 && t.includes(palabra)),
-  );
+  const candidatas = candidatasPorTexto(texto, accounts);
   if (candidatas.length !== 1) return null;
 
   // La candidata ya es una cuenta real (viene de `accounts`); se pasa por
@@ -63,6 +56,24 @@ export function resolveAccountFromMessage(
   return null;
 }
 
+/**
+ * Cuentas que el texto (o, si no dice nada, la visión) nombró sin decidir
+ * entre ellas: "con nequi" → Nequi Migue y Nequi Milo. Van primero en la
+ * lista de cuentas.
+ */
+function candidatasDeCuenta(
+  texto: string,
+  visionAccount: string | null,
+  accounts: string[],
+): string[] {
+  const porTexto = candidatasPorTexto(texto, accounts);
+  if (porTexto.length > 0) return porTexto;
+  if (!visionAccount) return [];
+  const r = resolverCuenta(visionAccount, accounts);
+  if (r.kind === 'ambigua') return r.candidatas;
+  return candidatasPorTexto(visionAccount, accounts);
+}
+
 export interface ReceiptDraftInput {
   supplier: string | null;
   date: string;
@@ -89,6 +100,8 @@ export interface ImageDeps {
       description: string;
       accountName: string;
       date: string;
+      /** Destinatario impreso en el comprobante (queda como lugar del gasto). */
+      place?: string;
     },
   ) => Promise<{
     ok: boolean;
@@ -150,6 +163,20 @@ export interface ImageDeps {
     error?: string;
   }>;
   resolveDefaultAccount: (phone: string) => Promise<string>;
+  /**
+   * Pregunta con qué cuenta fue (la lista de WhatsApp, o texto si no se
+   * puede): para una factura retenida (`invoice`) o para gastos ya
+   * registrados con la cuenta por defecto (`transactions`). `previo` va
+   * arriba de la pregunta en el mismo mensaje; `candidatas` (lo que matcheó
+   * el texto) van primero en la lista. Ver `preguntarCuenta`.
+   */
+  askAccount: (input: {
+    targetKind: 'invoice' | 'transactions';
+    targetIds: string[];
+    previo?: string | null;
+    pregunta: string;
+    candidatas?: string[];
+  }) => Promise<void>;
   today: () => string;
   /**
    * Guarda la memoria de la conversación (mismo `writeState` que usa el
@@ -235,9 +262,17 @@ export async function handleImageMessage(
     // cuenta nueva en silencio que después aparecía en el prompt de todos los
     // mensajes. Se canonicaliza igual que la rama de recibo (el texto del
     // usuario le gana a la visión) y, si no resuelve, se usa la por defecto.
+    //
+    // Si no resuelve, se REGISTRA igual con la por defecto (el gasto no queda
+    // colgado) y después se pregunta con la lista: el mensaje dice en qué
+    // cuenta quedó, así que no es un Efectivo silencioso.
+    const cuentaResuelta = resolveAccountFromMessage(
+      ctx.body,
+      result.account,
+      deps.accounts,
+    );
     const accountName =
-      resolveAccountFromMessage(ctx.body, result.account, deps.accounts) ??
-      (await deps.resolveDefaultAccount(ctx.phone));
+      cuentaResuelta ?? (await deps.resolveDefaultAccount(ctx.phone));
     // Fecha del GASTO (la que leyó la visión, o hoy si no la leyó o no es
     // creíble): es la que se escribe en la transacción y la que tiene que
     // viajar a las alertas, para comparar contra el mes que corresponde.
@@ -254,6 +289,7 @@ export async function handleImageMessage(
       description: descripcion,
       accountName,
       date: fecha,
+      ...(result.recipient ? { place: result.recipient } : {}),
     });
     if (res.ok) {
       // Best-effort: el gasto YA está guardado (mismo criterio que executeTool).
@@ -272,11 +308,18 @@ export async function handleImageMessage(
           errAlerta,
         );
       }
+      const preguntar = !cuentaResuelta && Boolean(res.transactionId);
       const base = conAvisoFecha(
-        `✅ Registré ${formatCOP(result.amount)} · ${descripcion} en ${res.category} (${accountName}). Si algo está mal, edítalo en la app.`,
+        preguntar
+          ? `✅ Registré ${formatCOP(result.amount)} · ${descripcion} en ${res.category}.`
+          : `✅ Registré ${formatCOP(result.amount)} · ${descripcion} en ${res.category} (${accountName}). Si algo está mal, edítalo en la app.`,
         descartada,
       );
-      const respuesta = pegarAlertas(base, alertas);
+      const confirmacion = pegarAlertas(base, alertas);
+      const pregunta = `Lo anoté en ${accountName}. ¿Con qué cuenta fue?`;
+      const respuesta = preguntar
+        ? `${confirmacion}\n\n${pregunta}`
+        : confirmacion;
       await guardarMemoria(
         ctx,
         deps,
@@ -293,7 +336,21 @@ export async function handleImageMessage(
             }
           : null,
       );
-      await deps.sendMessage(ctx.phone, respuesta);
+      if (preguntar && res.transactionId) {
+        await deps.askAccount({
+          targetKind: 'transactions',
+          targetIds: [res.transactionId],
+          previo: confirmacion,
+          pregunta,
+          candidatas: candidatasDeCuenta(
+            ctx.body,
+            result.account,
+            deps.accounts,
+          ),
+        });
+      } else {
+        await deps.sendMessage(ctx.phone, respuesta);
+      }
     } else {
       await deps.sendMessage(
         ctx.phone,
@@ -349,7 +406,15 @@ export async function handleImageMessage(
       // Una factura no deja un "último gasto" corregible (son N ítems): sin
       // limpiar, un "si quedó mal es $X" iba a un gasto viejo y ajeno.
       await guardarMemoria(ctx, deps, pregunta, null);
-      await deps.sendMessage(ctx.phone, pregunta);
+      // La factura queda retenida (pending_review) hasta que elija la cuenta
+      // en la lista; `savePending` de arriba es el respaldo para cuando la
+      // contesta escribiendo algo que el agente tiene que interpretar.
+      await deps.askAccount({
+        targetKind: 'invoice',
+        targetIds: [draft.invoiceId],
+        pregunta,
+        candidatas: candidatasPorTexto(ctx.body, deps.accounts),
+      });
       return;
     }
 

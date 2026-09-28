@@ -22,6 +22,29 @@ export async function sendWhatsAppMessage(
   to: string,
   body: string,
 ): Promise<SendResult> {
+  return postMessage(to, { Body: body });
+}
+
+/**
+ * Envía un mensaje con plantilla de Twilio Content (p. ej. la lista
+ * `twilio/list-picker` de cuentas). `variables` va como JSON en
+ * `ContentVariables`. Mismo contrato que `sendWhatsAppMessage`: nunca lanza.
+ */
+export async function sendWhatsAppContent(
+  to: string,
+  contentSid: string,
+  variables: Record<string, string>,
+): Promise<SendResult> {
+  return postMessage(to, {
+    ContentSid: contentSid,
+    ContentVariables: JSON.stringify(variables),
+  });
+}
+
+async function postMessage(
+  to: string,
+  contenido: Record<string, string>,
+): Promise<SendResult> {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const from = process.env.TWILIO_WHATSAPP_FROM;
@@ -33,7 +56,9 @@ export async function sendWhatsAppMessage(
   const params = new URLSearchParams();
   params.set('From', from);
   params.set('To', toWhatsApp(to));
-  params.set('Body', body);
+  for (const [clave, valor] of Object.entries(contenido)) {
+    params.set(clave, valor);
+  }
 
   try {
     const res = await fetch(

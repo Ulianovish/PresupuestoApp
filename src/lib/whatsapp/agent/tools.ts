@@ -84,6 +84,28 @@ export function resolverCuenta(
   return r.kind === 'ok' ? { kind: 'ok', cuenta: r.valor } : r;
 }
 
+/**
+ * Cuentas cuyo nombre tiene alguna palabra distintiva (4+ letras) que aparece
+ * en el texto libre: "con la Davivienda" → Davivienda y TC Davivienda. Varias
+ * candidatas = ambigua (p. ej. "nequi" → Nequi Migue y Nequi Milo); la lista
+ * de cuentas del bot las pone primero para que el usuario elija.
+ *
+ * Vive acá (y no en `handle-image.ts`, que la usa) para que el agente también
+ * la pueda usar sin un import circular.
+ */
+export function candidatasPorTexto(
+  texto: string,
+  accounts: string[],
+): string[] {
+  const t = normalizar(texto || '');
+  if (!t) return [];
+  return accounts.filter(a =>
+    normalizar(a)
+      .split(/\s+/)
+      .some(palabra => palabra.length >= 4 && t.includes(palabra)),
+  );
+}
+
 export function validateGasto(
   input: GastoInput,
   accounts: string[],
@@ -251,6 +273,13 @@ export interface ToolDeps {
     description: string;
     accountName: string;
     date: string;
+    /**
+     * Presente cuando el usuario no dijo la cuenta (o nombró una ambigua): el
+     * gasto se registra con la por defecto y el turno manda después la lista
+     * de WhatsApp para elegir la real. `candidatas` = lo que matcheó lo que
+     * nombró (nequi → Nequi Migue, Nequi Milo), para ponerlas primero.
+     */
+    cuentaPorDefinir?: { candidatas: string[] };
   }) => Promise<{
     ok: boolean;
     category: string;
@@ -338,8 +367,33 @@ export async function executeTool(
 ): Promise<ToolOutcome> {
   try {
     if (name === 'registrar_gasto') {
-      const v = validateGasto(input as unknown as GastoInput, deps.accounts);
+      // Una cuenta que nombra a varias ("nequi" con Nequi Migue y Nequi Milo)
+      // no frena el gasto: se registra con la por defecto y la lista de
+      // WhatsApp le pregunta al usuario con esas candidatas primero. Una
+      // palabra que apunta a UNA sola cuenta ("la davivienda") se usa. Una
+      // cuenta que no existe sigue siendo un error: ahí el modelo pregunta.
+      const gasto = input as unknown as GastoInput;
+      let entrada = gasto;
+      let candidatas: string[] = [];
+      if (typeof gasto.cuenta === 'string' && gasto.cuenta.trim()) {
+        const r = resolverCuenta(gasto.cuenta, deps.accounts);
+        const porPalabra =
+          r.kind === 'no-existe'
+            ? candidatasPorTexto(gasto.cuenta, deps.accounts)
+            : [];
+        if (r.kind === 'ambigua') {
+          candidatas = r.candidatas;
+          entrada = { ...gasto, cuenta: undefined };
+        } else if (porPalabra.length === 1) {
+          entrada = { ...gasto, cuenta: porPalabra[0] };
+        } else if (porPalabra.length > 1) {
+          candidatas = porPalabra;
+          entrada = { ...gasto, cuenta: undefined };
+        }
+      }
+      const v = validateGasto(entrada, deps.accounts);
       if (!v.ok) return { ok: false, summary: v.error };
+      const porDefinir = !v.value.cuenta;
 
       // Fecha del GASTO (la que el modelo mandó, o hoy si no mandó ninguna):
       // es la misma que se usa para escribir la transacción y la que tiene
@@ -351,6 +405,7 @@ export async function executeTool(
         description: v.value.descripcion,
         accountName: v.value.cuenta ?? deps.defaultAccount,
         date: fecha,
+        ...(porDefinir ? { cuentaPorDefinir: { candidatas } } : {}),
       });
       if (!res.ok)
         return {
@@ -375,10 +430,16 @@ export async function executeTool(
         );
       }
       const cuentaUsada = v.value.cuenta ?? deps.defaultAccount;
+      // El modelo tiene que saber que la cuenta la resuelve la lista: si no,
+      // contesta "¿con qué cuenta fue?" por texto y el usuario recibe la
+      // pregunta dos veces.
+      const notaCuenta = porDefinir
+        ? ', cuenta por defecto. Al final del turno el sistema le manda al usuario una lista para elegir la cuenta real: no se la preguntes ni le digas que se la vas a preguntar'
+        : '';
       return {
         ok: true,
         wrote: true,
-        summary: `Guardado: ${v.value.monto} "${v.value.descripcion}" en ${res.category} (${cuentaUsada}).`,
+        summary: `Guardado: ${v.value.monto} "${v.value.descripcion}" en ${res.category} (${cuentaUsada}${notaCuenta}).`,
         userSummary: `✅ Anotado ${formatCOP(v.value.monto)} en ${res.category} (${cuentaUsada}) · ${v.value.descripcion}.`,
       };
     }

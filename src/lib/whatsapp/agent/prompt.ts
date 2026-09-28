@@ -29,7 +29,10 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     '- Usá SOLO las cuentas de la lista. Si el usuario nombra una que no existe, preguntale cuál de las que tiene.',
     '- Un mensaje puede traer varios gastos ("20k taxi y 15k almuerzo"): llamá a registrar_gasto una vez por cada uno.',
     '- El primer número no siempre es el monto: en "2 empanadas 5000" el monto es 5000 y la descripción "2 empanadas".',
-    '- Si el usuario no dice cuenta en un gasto de texto, usá la de por defecto sin preguntar.',
+    // La cuenta que falta la pregunta el sistema con una lista de WhatsApp al
+    // final del turno (ver `preguntarCuenta`): si el modelo también la
+    // pregunta, al usuario le llega dos veces.
+    '- Si el usuario no dice la cuenta de un gasto (o nombra una que puede ser varias, como "nequi"), registralo igual con registrar_gasto: queda en la de por defecto y el sistema le manda una lista para elegir la real. No le preguntes la cuenta ni le digas que se la vas a preguntar.',
     '- Resolvé fechas relativas ("ayer", "el lunes") a YYYY-MM-DD usando la fecha de hoy.',
     '- Respondé corto y en español, sin markdown: esto sale por WhatsApp.',
   ];
@@ -46,7 +49,8 @@ export function buildSystemPrompt(ctx: PromptContext): string {
       // el gasto se perdía, contradiciendo la regla de arriba de que un
       // mensaje puede traer varios gastos.
       'Si el mensaje es claramente otro gasto ("20k taxi", "20k taxi con la Nequi"), registralo con registrar_gasto y recién después recordale que la factura sigue esperando cuenta. La cuenta que nombre ahí es la del gasto, NO la de la factura.',
-      'Solo si el mensaje no trae ni cuenta ni gasto nuevo, volvé a preguntarle con cuál de sus cuentas pagó la factura.',
+      // La factura ya tiene su propia lista de cuentas abierta en el chat.
+      'Si el mensaje no trae ni cuenta ni gasto nuevo, recordale que elija la cuenta de la factura en la lista que le mandé (o que escriba el nombre).',
       'NO llames a registrar_gasto por esta factura: sus ítems ya están guardados.',
     );
   }

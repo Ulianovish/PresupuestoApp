@@ -14,6 +14,7 @@
 // `handle-image.ts` para que las dos vías respondan igual.
 
 import { esRechazoDeNit } from '@/lib/dian/nit-rechazado';
+import { candidatasPorTexto } from '@/lib/whatsapp/agent/tools';
 import { pegarAlertas } from '@/lib/whatsapp/alerts';
 import { extractCufe, extractQrNits } from '@/lib/whatsapp/classify';
 import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
@@ -58,6 +59,17 @@ export interface AgentDeps {
   remitenteSinDocumento?: boolean;
   /** Guarda el id de la factura ya persistida, esperando que el usuario diga con qué cuenta pagó. */
   savePending: (invoiceId: string) => Promise<void>;
+  /**
+   * Pregunta con qué cuenta se pagó: la lista de WhatsApp (o texto si no se
+   * puede), apuntando a la factura retenida. Mismo contrato que en
+   * `handle-image.ts` (ver `preguntarCuenta`).
+   */
+  askAccount: (input: {
+    targetKind: 'invoice';
+    targetIds: string[];
+    pregunta: string;
+    candidatas?: string[];
+  }) => Promise<void>;
   /** Registra la factura ya persistida y resuelta (sin aprobación manual). */
   registerInvoice: (
     invoiceId: string,
@@ -137,11 +149,15 @@ export async function handleAgentMessage(
           '📝 Ya tenías otra factura esperando cuenta; quedó guardada como borrador en la app, la podés completar ahí cuando quieras.',
         );
       }
+      // `savePending` queda de respaldo: si contesta escribiendo algo que no
+      // es solo el nombre, el agente la registra con `registrar_factura`.
       await deps.savePending(out.invoiceId);
-      await deps.sendMessage(
-        ctx.phone,
-        `🧾 Leí tu factura${supplierTexto}${totalTexto} (${out.itemsFound} ítems). ¿Con qué cuenta la pagaste?`,
-      );
+      await deps.askAccount({
+        targetKind: 'invoice',
+        targetIds: [out.invoiceId],
+        pregunta: `🧾 Leí tu factura${supplierTexto}${totalTexto} (${out.itemsFound} ítems). ¿Con qué cuenta la pagaste?`,
+        candidatas: candidatasPorTexto(ctx.body, deps.accounts),
+      });
       return;
     }
 

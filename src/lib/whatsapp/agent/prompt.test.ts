@@ -59,6 +59,30 @@ describe('buildSystemPrompt', () => {
     expect(p).not.toMatch(/si dice cualquier otra cosa/i);
   });
 
+  it('sin cuenta: registra con la por defecto y NO pregunta por texto (la lista la manda el sistema)', () => {
+    const p = buildSystemPrompt(BASE);
+    expect(p).toMatch(/lista/i);
+    expect(p).toMatch(/no le preguntes la cuenta/i);
+    // Ni siquiera prometer que va a preguntar: el usuario vería la pregunta dos veces.
+    expect(p).toMatch(/ni (le )?digas que se la vas a preguntar/i);
+  });
+
+  it('con factura pendiente, ya no le pide volver a preguntar la cuenta por texto', () => {
+    const p = buildSystemPrompt({
+      ...BASE,
+      pendingInvoice: {
+        source: 'vision_receipt',
+        cufe: null,
+        supplier: 'ÉXITO',
+        date: '2026-08-17',
+        total: 89400,
+        items: [{ description: 'arroz', amount: 5000 }],
+      },
+    });
+    expect(p).not.toMatch(/volvé a preguntarle/i);
+    expect(p).toMatch(/lista/i);
+  });
+
   it('no menciona factura pendiente cuando no la hay', () => {
     expect(buildSystemPrompt(BASE)).not.toContain('registrar_factura');
   });

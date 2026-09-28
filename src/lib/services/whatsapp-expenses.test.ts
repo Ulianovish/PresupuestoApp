@@ -84,6 +84,77 @@ describe('createDirectExpense', () => {
     });
   });
 
+  it('pasa el lugar al RPC (el destinatario de una transferencia) y marca el número que lo registró', async () => {
+    const rpc = vi.fn(async (name: string) => {
+      if (name === 'upsert_monthly_expense')
+        return { data: 'tx-7', error: null };
+      return { data: [], error: null };
+    });
+    const txIn = vi.fn();
+    const txEq = vi.fn().mockResolvedValue({ error: null });
+    const txUpdate = vi.fn(() => ({
+      eq: vi.fn(() => ({ eq: txEq, in: txIn })),
+    }));
+    const from = vi.fn((tabla: string) =>
+      tabla === 'transactions' && txUpdate
+        ? {
+            update: txUpdate,
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            gte: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }
+        : {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            order: vi.fn().mockResolvedValue({ data: [{ name: 'MERCADO' }] }),
+          },
+    );
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    const res = await createDirectExpense('user-1', '+573001234567', {
+      amount: 20000,
+      description: 'Huevos',
+      accountName: 'Efectivo',
+      date: '2026-06-11',
+      place: 'Carlos Gomez',
+    });
+
+    expect(res.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith(
+      'upsert_monthly_expense',
+      expect.objectContaining({ p_place: 'Carlos Gomez' }),
+    );
+    expect(txUpdate).toHaveBeenCalledWith({
+      registered_phone: '+573001234567',
+    });
+    expect(txEq).toHaveBeenCalledWith('id', 'tx-7');
+  });
+
+  it('un lugar vacío cae a WhatsApp', async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const catFrom = vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [{ name: 'MERCADO' }] }),
+    }));
+    mockedAdmin.mockReturnValue({ rpc, from: catFrom });
+
+    await createDirectExpense('user-1', '+57300', {
+      amount: 1000,
+      description: 'x',
+      accountName: 'Efectivo',
+      date: '2026-06-11',
+      place: '   ',
+    });
+
+    expect(rpc).toHaveBeenCalledWith(
+      'upsert_monthly_expense',
+      expect.objectContaining({ p_place: 'WhatsApp' }),
+    );
+  });
+
   it('devuelve ok:false si el RPC falla', async () => {
     const rpc = vi.fn().mockResolvedValue({ error: { message: 'boom' } });
     const catFrom = vi.fn(() => ({

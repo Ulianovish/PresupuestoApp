@@ -567,6 +567,7 @@ export type Database = {
           id: string;
           month_year: string;
           place: string | null;
+          registered_phone: string | null;
           transaction_date: string;
           type_id: string;
           updated_at: string | null;
@@ -583,6 +584,7 @@ export type Database = {
           id?: string;
           month_year: string;
           place?: string | null;
+          registered_phone?: string | null;
           transaction_date: string;
           type_id: string;
           updated_at?: string | null;
@@ -599,6 +601,7 @@ export type Database = {
           id?: string;
           month_year?: string;
           place?: string | null;
+          registered_phone?: string | null;
           transaction_date?: string;
           type_id?: string;
           updated_at?: string | null;
@@ -641,6 +644,39 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      whatsapp_account_prompts: {
+        Row: {
+          created_at: string;
+          id: string;
+          phone_e164: string;
+          resolved_account_id: string | null;
+          resolved_at: string | null;
+          target_ids: string[];
+          target_kind: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          phone_e164: string;
+          resolved_account_id?: string | null;
+          resolved_at?: string | null;
+          target_ids: string[];
+          target_kind: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          phone_e164?: string;
+          resolved_account_id?: string | null;
+          resolved_at?: string | null;
+          target_ids?: string[];
+          target_kind?: string;
+          user_id?: string;
+        };
+        Relationships: [];
       };
       whatsapp_links: {
         Row: {
@@ -803,6 +839,15 @@ export type Database = {
           p_user_id: string;
         };
         Returns: string;
+      };
+      whatsapp_account_usage: {
+        Args: { p_days?: number; p_phone: string; p_user_id: string };
+        Returns: {
+          account_id: string;
+          last_used: string;
+          uses_phone: number;
+          uses_user: number;
+        }[];
       };
     };
     Enums: {
