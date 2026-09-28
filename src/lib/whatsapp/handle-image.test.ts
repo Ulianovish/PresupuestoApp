@@ -13,8 +13,21 @@ vi.mock('@/lib/whatsapp/agent/state', async importOriginal => ({
 import { handleImageMessage, resolveAccountFromMessage } from './handle-image';
 
 function makeDeps(overrides = {}) {
+  const sendMessage = vi.fn(async (_to: string, _body: string) => ({
+    ok: true,
+  }));
   return {
-    sendMessage: vi.fn(async () => ({ ok: true })),
+    sendMessage,
+    // Por defecto simula la pregunta por texto (sin plantilla): lo que
+    // pregunta sale por `sendMessage` como antes de la lista.
+    askAccount: vi.fn(
+      async (i: { previo?: string | null; pregunta: string }) => {
+        await sendMessage(
+          '+57300',
+          i.previo ? `${i.previo}\n\n${i.pregunta}` : i.pregunta,
+        );
+      },
+    ),
     downloadMedia: vi.fn(async () => ({ base64: 'b64', mime: 'image/png' })),
     analyzeImage: vi.fn(),
     createDirectExpense: vi.fn(async () => ({ ok: true, category: 'OTROS' })),
@@ -64,7 +77,10 @@ describe('handleImageMessage', () => {
       description: 'Juan',
       accountName: 'Nequi',
       date: '2026-06-11',
+      place: 'Juan',
     });
+    // La cuenta salió clara: no hay lista.
+    expect(deps.askAccount).not.toHaveBeenCalled();
     expect(deps.sendMessage).toHaveBeenCalledWith(
       '+57300',
       expect.stringMatching(/50.?000/),
@@ -418,6 +434,10 @@ describe('handleImageMessage', () => {
     await handleImageMessage({ ...ctx, body: '' }, deps);
     expect(deps.savePending).toHaveBeenCalledWith('inv-1');
     expect(deps.registerInvoice).not.toHaveBeenCalled();
+    // La factura queda retenida y la pregunta es la lista, apuntando a ella.
+    expect(deps.askAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ targetKind: 'invoice', targetIds: ['inv-1'] }),
+    );
     const mensaje = (deps.sendMessage as ReturnType<typeof vi.fn>).mock
       .calls[0][1];
     expect(mensaje).toMatch(/qué cuenta/i);
@@ -608,9 +628,69 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
       description: 'Huevos',
       accountName: 'Nequi',
       date: '2026-06-11',
+      place: 'Carlos Gomez',
     });
     expect(mensajes(deps)[0]).toMatch(
       /^✅ Registré \$\s?9\.000 · Huevos en MERCADO \(Nequi\)\./,
+    );
+  });
+
+  it('caption ambigua ("con nequi" y hay dos Nequi): registra YA con la por defecto, lo dice y manda la lista con las dos primero', async () => {
+    const deps = makeDeps({
+      accounts: ['Efectivo', 'Nequi Migue', 'Nequi Milo', 'TC Davivienda'],
+      analyzeImage: transferencia(),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'MERCADO',
+        transactionId: 'tx-foto',
+      })),
+    });
+    await handleImageMessage({ ...ctx, body: 'Huevos con nequi' }, deps);
+
+    expect(deps.resolveDefaultAccount).toHaveBeenCalledWith('+57300');
+    expect(deps.createDirectExpense).toHaveBeenCalledWith(
+      'u1',
+      '+57300',
+      expect.objectContaining({
+        accountName: 'Efectivo',
+        place: 'Carlos Gomez',
+      }),
+    );
+    expect(deps.askAccount).toHaveBeenCalledTimes(1);
+    const pedido = deps.askAccount.mock.calls[0][0] as unknown as {
+      targetKind: string;
+      targetIds: string[];
+      previo: string;
+      pregunta: string;
+      candidatas: string[];
+    };
+    expect(pedido.targetKind).toBe('transactions');
+    expect(pedido.targetIds).toEqual(['tx-foto']);
+    expect(pedido.candidatas).toEqual(['Nequi Migue', 'Nequi Milo']);
+    expect(pedido.previo).toMatch(
+      /^✅ Registré \$\s?9\.000 · Huevos en MERCADO\./,
+    );
+    expect(pedido.pregunta).toBe('Lo anoté en Efectivo. ¿Con qué cuenta fue?');
+    // La confirmación sale UNA vez (dentro de la pregunta), no aparte.
+    expect(mensajes(deps)).toHaveLength(1);
+  });
+
+  it('sin cuenta en el texto ni en la visión: también pregunta (sin candidatas)', async () => {
+    const deps = makeDeps({
+      analyzeImage: transferencia(),
+      createDirectExpense: vi.fn(async () => ({
+        ok: true,
+        category: 'MERCADO',
+        transactionId: 'tx-foto',
+      })),
+    });
+    await handleImageMessage(ctx, deps);
+    expect(deps.askAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetKind: 'transactions',
+        targetIds: ['tx-foto'],
+        candidatas: [],
+      }),
     );
   });
 

@@ -193,6 +193,87 @@ describe('executeTool', () => {
     expect(usada).toBe('Efectivo');
   });
 
+  describe('cuenta por definir (la lista de WhatsApp)', () => {
+    type Entrada = Parameters<ToolDeps['createExpense']>[0];
+
+    it('sin cuenta: registra con la por defecto, lo marca para la lista y le dice al modelo que NO pregunte', async () => {
+      let recibido: Entrada | null = null;
+      const deps = depsFalsas({
+        createExpense: async input => {
+          recibido = input;
+          return { ok: true, category: 'MERCADO', transactionId: 'tx-1' };
+        },
+      });
+      const r = await executeTool(
+        'registrar_gasto',
+        { monto: 40000, descripcion: 'huevos' },
+        deps,
+      );
+      expect(recibido).toMatchObject({
+        accountName: 'Efectivo',
+        cuentaPorDefinir: { candidatas: [] },
+      });
+      expect(r.ok).toBe(true);
+      expect(r.summary).toMatch(/lista/i);
+      expect(r.summary).toMatch(/no (se la|le) pregunt/i);
+    });
+
+    it('con cuenta explícita: no hay nada por definir', async () => {
+      let recibido: Entrada | null = null;
+      const deps = depsFalsas({
+        createExpense: async input => {
+          recibido = input;
+          return { ok: true, category: 'MERCADO', transactionId: 'tx-1' };
+        },
+      });
+      await executeTool(
+        'registrar_gasto',
+        { monto: 40000, descripcion: 'huevos', cuenta: 'Nequi' },
+        deps,
+      );
+      expect(recibido).toMatchObject({ accountName: 'Nequi' });
+      expect(recibido!.cuentaPorDefinir).toBeUndefined();
+    });
+
+    it('cuenta ambigua ("nequi" con dos Nequi): registra con la por defecto y las dos quedan de candidatas', async () => {
+      let recibido: Entrada | null = null;
+      const deps = depsFalsas({
+        accounts: ['Efectivo', 'Nequi Migue', 'Nequi Milo'],
+        createExpense: async input => {
+          recibido = input;
+          return { ok: true, category: 'MERCADO', transactionId: 'tx-1' };
+        },
+      });
+      const r = await executeTool(
+        'registrar_gasto',
+        { monto: 40000, descripcion: 'huevos', cuenta: 'nequi' },
+        deps,
+      );
+      expect(r.ok).toBe(true);
+      expect(recibido).toMatchObject({
+        accountName: 'Efectivo',
+        cuentaPorDefinir: { candidatas: ['Nequi Migue', 'Nequi Milo'] },
+      });
+    });
+
+    it('una palabra que apunta a UNA sola cuenta se usa ("davivienda" → Davivienda Crédito)', async () => {
+      let recibido: Entrada | null = null;
+      const deps = depsFalsas({
+        createExpense: async input => {
+          recibido = input;
+          return { ok: true, category: 'MERCADO', transactionId: 'tx-1' };
+        },
+      });
+      await executeTool(
+        'registrar_gasto',
+        { monto: 40000, descripcion: 'huevos', cuenta: 'la davivienda' },
+        deps,
+      );
+      expect(recibido).toMatchObject({ accountName: 'Davivienda Crédito' });
+      expect(recibido!.cuentaPorDefinir).toBeUndefined();
+    });
+  });
+
   it('no escribe nada si la cuenta no existe y le explica al modelo', async () => {
     let escribio = false;
     const deps = depsFalsas({

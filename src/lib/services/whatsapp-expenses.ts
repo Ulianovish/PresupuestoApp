@@ -38,6 +38,11 @@ export interface DirectExpenseInput {
   description: string;
   accountName: string;
   date: string; // YYYY-MM-DD
+  /**
+   * Comercio o destinatario (el de una transferencia leída por visión). Sin
+   * él, o vacío, queda 'WhatsApp' como hasta ahora.
+   */
+  place?: string;
 }
 
 export interface DirectExpenseResult {
@@ -81,7 +86,7 @@ export async function pickBudgetItemId(
  */
 export async function createDirectExpense(
   userId: string,
-  _phoneE164: string,
+  phoneE164: string,
   input: DirectExpenseInput,
 ): Promise<DirectExpenseResult> {
   const supabase = createAdminClient();
@@ -105,7 +110,7 @@ export async function createDirectExpense(
     p_transaction_date: input.date,
     p_category_name: finalCategory,
     p_account_name: input.accountName,
-    p_place: 'WhatsApp',
+    p_place: input.place?.trim() || 'WhatsApp',
   });
 
   if (error) {
@@ -113,6 +118,27 @@ export async function createDirectExpense(
   }
 
   const transactionId = typeof data === 'string' ? data : undefined;
+
+  // Qué número lo registró: la lista de cuentas del bot rankea primero las
+  // que usa cada persona. Best-effort y aparte del RPC (no se le cambia la
+  // firma): si falla, o la columna no existe todavía, el gasto ya está.
+  if (transactionId && phoneE164) {
+    try {
+      const { error: phoneError } = await supabase
+        .from('transactions')
+        .update({ registered_phone: phoneE164 })
+        .eq('user_id', userId)
+        .eq('id', transactionId);
+      if (phoneError) {
+        console.error(
+          'No se pudo marcar el número del gasto:',
+          phoneError.message,
+        );
+      }
+    } catch (err) {
+      console.error('No se pudo marcar el número del gasto:', err);
+    }
+  }
 
   // Asignar el ítem del presupuesto. Best-effort: si falla, el gasto YA está
   // guardado y aparece en el panel "Sin clasificar" — nunca se pierde.

@@ -1,6 +1,8 @@
 // POST /api/whatsapp/webhook
 // Webhook público de Twilio. Valida la firma, resuelve identidad y:
 //  - número NO vinculado → flujo de vinculación síncrono (TwiML).
+//  - toque en la lista de cuentas (`ListId`) → aplica la cuenta en after(),
+//    ANTES de clasificar: el Body de un toque es el título ("TC Davivienda").
 //  - vinculado → clasifica el texto, responde un ACK síncrono y, si hay trabajo
 //    lento (CUFE / gasto), lo corre en after() respondiendo por la REST API.
 
@@ -14,6 +16,16 @@ import {
   resolveDefaultAccount,
 } from '@/lib/services/whatsapp-expenses';
 import { getLinkByPhone, redeemLinkCode } from '@/lib/services/whatsapp-links';
+import { parsearIdOpcion } from '@/lib/whatsapp/account-picker';
+import {
+  intentarCuentaEscrita,
+  manejarEleccionCuenta,
+  preguntarCuenta,
+} from '@/lib/whatsapp/account-prompt';
+import {
+  depsEleccionCuenta,
+  depsPreguntaCuenta,
+} from '@/lib/whatsapp/account-prompt-deps';
 import { readState, writeState } from '@/lib/whatsapp/agent/state';
 import { handleAgentTurn, listarCuentas } from '@/lib/whatsapp/agent/turn';
 import { dispararAlertasWhatsapp } from '@/lib/whatsapp/alerts';
@@ -83,6 +95,49 @@ export async function POST(request: NextRequest) {
     return xml(twimlMessage(reply));
   }
 
+  // Respuestas interactivas. La documentación de Twilio no lista qué
+  // parámetros manda un toque en un `twilio/list-picker` (se espera ListId,
+  // ListTitle, quizás ListDescription): se loguean los NOMBRES —nunca los
+  // valores, que traen el número y los ids— para confirmarlo en producción.
+  // La firma HMAC de arriba ya cubre todos los parámetros.
+  const listId = params.ListId || '';
+  if (listId || params.ButtonPayload) {
+    // eslint-disable-next-line no-console -- diagnóstico buscado a propósito (no es un error)
+    console.info(
+      'WhatsApp interactivo, parámetros recibidos:',
+      Object.keys(params).sort().join(','),
+    );
+  }
+  if (listId) {
+    const opcion = parsearIdOpcion(listId);
+    if (!opcion) {
+      return xml(
+        twimlMessage(
+          'No reconocí esa opción 🤔. Escribime el nombre de la cuenta.',
+        ),
+      );
+    }
+    const userId = link.userId;
+    after(async () => {
+      try {
+        await manejarEleccionCuenta(depsEleccionCuenta(userId, phone), {
+          userId,
+          phone,
+          ...opcion,
+        });
+      } catch (err) {
+        // Puede haber reventado después de registrar la factura: no invitar
+        // a repetir a ciegas.
+        console.error('Error en manejarEleccionCuenta (background):', err);
+        await sendWhatsAppMessage(
+          phone,
+          '❌ Tuve un problema aplicando la cuenta. Revisá en la app si quedó antes de volver a tocarla.',
+        );
+      }
+    });
+    return xml(twimlEmpty());
+  }
+
   const decision = classifyText(body, numMedia);
 
   if (decision === 'image') {
@@ -119,9 +174,18 @@ export async function POST(request: NextRequest) {
               writeState(phone, userId, {
                 pending: { kind: 'invoice_account', invoiceId },
               }),
+            askAccount: async pedido => {
+              await preguntarCuenta(depsPreguntaCuenta(), {
+                userId,
+                phone,
+                ...pedido,
+              });
+            },
             saveState: patch => writeState(phone, userId, patch),
             registerInvoice: (invoiceId, accountName) =>
-              createInvoiceDirect(userId, invoiceId, accountName),
+              createInvoiceDirect(userId, invoiceId, accountName, {
+                registeredPhone: phone,
+              }),
             onExpenseCreated: e =>
               dispararAlertasWhatsapp(userId, e.budgetItemIds, e.monthYear),
           },
@@ -175,8 +239,17 @@ export async function POST(request: NextRequest) {
               writeState(phone, userId, {
                 pending: { kind: 'invoice_account', invoiceId },
               }),
+            askAccount: async pedido => {
+              await preguntarCuenta(depsPreguntaCuenta(), {
+                userId,
+                phone,
+                ...pedido,
+              });
+            },
             registerInvoice: (invoiceId, accountName) =>
-              createInvoiceDirect(userId, invoiceId, accountName),
+              createInvoiceDirect(userId, invoiceId, accountName, {
+                registeredPhone: phone,
+              }),
             onExpenseCreated: e =>
               dispararAlertasWhatsapp(userId, e.budgetItemIds, e.monthYear),
           },
@@ -203,6 +276,19 @@ export async function POST(request: NextRequest) {
     const userId = link.userId;
     after(async () => {
       try {
+        // "Nequi Milo" contestando la lista con texto en vez de tocarla: si
+        // hay una pregunta de cuenta abierta y el mensaje es solo un nombre
+        // de cuenta, se aplica acá y no pasa por el agente.
+        // Si esto falla (p. ej. la tabla sin migrar), el mensaje sigue al
+        // agente como antes.
+        const eraCuenta = await intentarCuentaEscrita(
+          depsEleccionCuenta(userId, phone),
+          { userId, phone, body },
+        ).catch(err => {
+          console.error('intentarCuentaEscrita falló:', err);
+          return false;
+        });
+        if (eraCuenta) return;
         await handleAgentTurn({ userId, phone, body });
       } catch (err) {
         // Mismo criterio que la imagen: acá adentro corren las herramientas

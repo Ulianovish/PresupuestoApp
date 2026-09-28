@@ -264,6 +264,56 @@ describe('createInvoiceDirect', () => {
     expect(esRegistroParcial(res.error ?? null)).toBe(false);
   });
 
+  it('marca los gastos creados con su factura y con el número que la registró', async () => {
+    // La lista de cuentas del bot rankea por número (cada persona tiene el
+    // suyo) y cuenta una factura como UN gasto: sin estas dos marcas, los
+    // ítems de una factura no se pueden agrupar ni atribuir a nadie.
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({ data: 'tx-1', error: null })
+      .mockResolvedValueOnce({ data: 'tx-2', error: null });
+    const txIn = vi.fn().mockResolvedValue({ error: null });
+    const txUpdate = vi.fn(() => ({ eq: vi.fn(() => ({ in: txIn })) }));
+    const factura = makeSupabaseMock({ row: invoiceRow(), rpc });
+    const from = vi.fn((tabla: string) =>
+      tabla === 'transactions' ? { update: txUpdate } : factura.from(),
+    );
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    const res = await createInvoiceDirect('user-1', 'inv-1', 'Nequi', {
+      classify: async () => [],
+      registeredPhone: '+573001111111',
+    });
+
+    expect(res.ok).toBe(true);
+    expect(txUpdate).toHaveBeenCalledWith({ electronic_invoice_id: 'inv-1' });
+    expect(txUpdate).toHaveBeenCalledWith({
+      registered_phone: '+573001111111',
+    });
+    expect(txIn).toHaveBeenCalledWith('id', ['tx-1', 'tx-2']);
+  });
+
+  it('sin número (la app) marca la factura pero no inventa un número', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: 'tx-1', error: null });
+    const txUpdate = vi.fn(() => ({
+      eq: vi.fn(() => ({ in: vi.fn().mockResolvedValue({ error: null }) })),
+    }));
+    const factura = makeSupabaseMock({ row: invoiceRow(), rpc });
+    const from = vi.fn((tabla: string) =>
+      tabla === 'transactions' ? { update: txUpdate } : factura.from(),
+    );
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    await createInvoiceDirect('user-1', 'inv-1', 'Nequi', {
+      classify: async () => [],
+    });
+
+    expect(txUpdate).toHaveBeenCalledWith({ electronic_invoice_id: 'inv-1' });
+    expect(txUpdate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ registered_phone: expect.anything() }),
+    );
+  });
+
   it('factura inexistente → ok:false sin tocar el RPC', async () => {
     const rpc = vi.fn();
     const { from } = makeSupabaseMock({ row: null, rpc });

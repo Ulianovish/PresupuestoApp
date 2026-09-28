@@ -5,8 +5,15 @@ import { handleAgentMessage } from './handle-agent';
 const CUFE = 'a'.repeat(96);
 
 function makeDeps(overrides = {}) {
+  const sendMessage = vi.fn(async (_to: string, _body: string) => ({
+    ok: true as const,
+  }));
   return {
-    sendMessage: vi.fn(async () => ({ ok: true as const })),
+    sendMessage,
+    // Simula la pregunta por texto (sin plantilla de lista).
+    askAccount: vi.fn(async (i: { pregunta: string }) => {
+      await sendMessage('+573001234567', i.pregunta);
+    }),
     processCufe: vi.fn(async () => ({
       ok: true as const,
       itemsFound: 3,
@@ -40,6 +47,14 @@ describe('handleAgentMessage', () => {
     expect(deps.processCufe).toHaveBeenCalledWith('u1', CUFE, []);
     expect(deps.savePending).toHaveBeenCalledWith('inv-1');
     expect(deps.registerInvoice).not.toHaveBeenCalled();
+    // La factura queda retenida y se pregunta con la lista, apuntando a ella.
+    expect(deps.askAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetKind: 'invoice',
+        targetIds: ['inv-1'],
+        pregunta: expect.stringMatching(/¿con qué cuenta la pagaste\?/i),
+      }),
+    );
     expect(deps.sendMessage).toHaveBeenCalledWith(
       '+573001234567',
       expect.stringMatching(/cuenta/i),
@@ -64,6 +79,7 @@ describe('handleAgentMessage', () => {
     );
     expect(deps.registerInvoice).toHaveBeenCalledWith('inv-1', 'Nequi');
     expect(deps.savePending).not.toHaveBeenCalled();
+    expect(deps.askAccount).not.toHaveBeenCalled();
     expect(deps.sendMessage).not.toHaveBeenCalledWith(
       expect.anything(),
       expect.stringMatching(/¿con qué cuenta/i),

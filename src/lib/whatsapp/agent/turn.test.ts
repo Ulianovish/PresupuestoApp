@@ -34,6 +34,15 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/whatsapp/transport', () => ({
   sendWhatsAppMessage: vi.fn(),
 }));
+vi.mock('@/lib/services/whatsapp-account-prompts', () => ({
+  cerrarPromptsDeFactura: vi.fn(),
+}));
+vi.mock('@/lib/whatsapp/account-prompt-deps', () => ({
+  depsPreguntaCuenta: vi.fn(() => ({})),
+}));
+vi.mock('@/lib/whatsapp/account-prompt', () => ({
+  preguntarCuenta: vi.fn(),
+}));
 vi.mock('./run', () => ({
   callGatewayReal: vi.fn(),
   runAgent: vi.fn(),
@@ -50,6 +59,7 @@ import {
   getPendingInvoiceSummary,
   resolveUserCategoryNames,
 } from '@/lib/services/invoices';
+import { cerrarPromptsDeFactura } from '@/lib/services/whatsapp-account-prompts';
 import {
   createDirectExpense,
   resolveDefaultAccount,
@@ -59,6 +69,7 @@ import {
   queryExpenseTotal,
 } from '@/lib/services/whatsapp-queries';
 import { createAdminClient } from '@/lib/supabase/server';
+import { preguntarCuenta } from '@/lib/whatsapp/account-prompt';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/transport';
 
 import { callGatewayReal, runAgent } from './run';
@@ -79,6 +90,8 @@ const mockedSendWhatsAppMessage = vi.mocked(sendWhatsAppMessage);
 const mockedRunAgent = vi.mocked(runAgent);
 const mockedCallGatewayReal = vi.mocked(callGatewayReal);
 const mockedReadState = vi.mocked(readState);
+const mockedPreguntarCuenta = vi.mocked(preguntarCuenta);
+const mockedCerrarPrompts = vi.mocked(cerrarPromptsDeFactura);
 const mockedWriteState = vi.mocked(writeState);
 
 const ESTADO_VACIO = { turns: [], pending: null, lastEntity: null };
@@ -117,6 +130,14 @@ describe('handleAgentTurn', () => {
       {} as unknown as ReturnType<typeof alertDepsSupabase>,
     );
     mockedDispararAlertas.mockResolvedValue([]);
+    // Simula la pregunta por texto: lo que pregunta sale por el transporte.
+    mockedPreguntarCuenta.mockImplementation(async (_deps, i) => {
+      await sendWhatsAppMessage(
+        i.phone,
+        i.previo ? `${i.previo}\n\n${i.pregunta}` : i.pregunta,
+      );
+      return { via: 'texto', promptId: 'p-1' };
+    });
   });
 
   it('camino feliz: manda el texto del agente y guarda el estado', async () => {
@@ -513,8 +534,11 @@ describe('handleAgentTurn — registrar_factura', () => {
       'u1',
       'inv-1',
       'Nequi',
+      { registeredPhone: '+57300' },
     );
     expect(mockedCreateInvoiceDirect).toHaveBeenCalledTimes(1);
+    // La lista de esa factura queda cerrada: un toque posterior es corrección.
+    expect(mockedCerrarPrompts).toHaveBeenCalledWith('inv-1');
     expect(mockedWriteState).toHaveBeenCalledWith('+57300', 'u1', {
       pending: null,
     });
@@ -885,5 +909,137 @@ describe('handleAgentTurn — corregir_ultimo y consultar_gastos', () => {
       desde: undefined,
       hasta: undefined,
     });
+  });
+});
+
+describe('handleAgentTurn: lista de cuentas', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedReadState.mockResolvedValue(ESTADO_VACIO);
+    mockedResolveCategoryNames.mockResolvedValue(['MERCADO', 'TRANSPORTE']);
+    mockedResolveDefaultAccount.mockResolvedValue('Efectivo');
+    mockedCreateAdminClient.mockReturnValue(
+      fakeAdmin([
+        'Efectivo',
+        'Nequi Migue',
+        'Nequi Milo',
+      ]) as unknown as ReturnType<typeof createAdminClient>,
+    );
+    mockedSendWhatsAppMessage.mockResolvedValue({ ok: true });
+    mockedWriteState.mockResolvedValue(undefined);
+    mockedDispararAlertas.mockResolvedValue([]);
+    mockedPreguntarCuenta.mockResolvedValue({ via: 'lista', promptId: 'p-1' });
+    let n = 0;
+    mockedCreateDirectExpense.mockImplementation(async () => ({
+      ok: true,
+      category: 'MERCADO',
+      transactionId: `tx-${++n}`,
+    }));
+  });
+
+  it('dos gastos sin cuenta en un turno → UNA sola lista que cubre los dos', async () => {
+    mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
+      await deps.executeTool('registrar_gasto', {
+        monto: 20000,
+        descripcion: 'taxi',
+      });
+      await deps.executeTool('registrar_gasto', {
+        monto: 15000,
+        descripcion: 'almuerzo',
+        cuenta: 'nequi',
+      });
+      return { text: 'Listo, anoté los dos.', calls: [] };
+    });
+
+    await handleAgentTurn({
+      userId: 'u1',
+      phone: '+57300',
+      body: '20k taxi y 15k almuerzo con nequi',
+    });
+
+    expect(mockedPreguntarCuenta).toHaveBeenCalledTimes(1);
+    const pedido = mockedPreguntarCuenta.mock.calls[0][1];
+    expect(pedido).toMatchObject({
+      userId: 'u1',
+      phone: '+57300',
+      targetKind: 'transactions',
+      targetIds: ['tx-1', 'tx-2'],
+      previo: 'Listo, anoté los dos.',
+      candidatas: ['Nequi Migue', 'Nequi Milo'],
+    });
+    expect(pedido.pregunta).toContain('Efectivo');
+    expect(pedido.pregunta).toMatch(/¿con qué cuenta fueron\?/i);
+    // El texto del agente sale DENTRO de la lista, no en un mensaje aparte.
+    expect(mockedSendWhatsAppMessage).not.toHaveBeenCalled();
+    // createDirectExpense no recibe el marcador interno.
+    expect(mockedCreateDirectExpense).toHaveBeenCalledWith('u1', '+57300', {
+      amount: 20000,
+      description: 'taxi',
+      accountName: 'Efectivo',
+      date: expect.any(String),
+    });
+    // La memoria guarda lo que el usuario vio: respuesta + pregunta.
+    const guardado = mockedWriteState.mock.calls.at(-1)![2].turns!;
+    expect(guardado.at(-1)!.content).toContain('¿Con qué cuenta fueron?');
+  });
+
+  it('un solo gasto sin cuenta → la pregunta dice en qué cuenta quedó', async () => {
+    mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
+      const out = await deps.executeTool('registrar_gasto', {
+        monto: 40000,
+        descripcion: 'huevos',
+      });
+      return { text: out.userSummary ?? '', calls: [] };
+    });
+    await handleAgentTurn({
+      userId: 'u1',
+      phone: '+57300',
+      body: '40k huevos',
+    });
+    expect(mockedPreguntarCuenta.mock.calls[0][1]).toMatchObject({
+      targetIds: ['tx-1'],
+      pregunta: 'Lo anoté en Efectivo. ¿Con qué cuenta fue?',
+    });
+  });
+
+  it('con la cuenta explícita no manda ninguna lista', async () => {
+    mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
+      await deps.executeTool('registrar_gasto', {
+        monto: 40000,
+        descripcion: 'huevos',
+        cuenta: 'Nequi Milo',
+      });
+      return { text: 'Anotado.', calls: [] };
+    });
+    await handleAgentTurn({
+      userId: 'u1',
+      phone: '+57300',
+      body: '40k huevos nequi milo',
+    });
+    expect(mockedPreguntarCuenta).not.toHaveBeenCalled();
+    expect(mockedSendWhatsAppMessage).toHaveBeenCalledWith(
+      '+57300',
+      'Anotado.',
+    );
+  });
+
+  it('si la lista revienta, la respuesta del agente sale igual por texto', async () => {
+    mockedPreguntarCuenta.mockRejectedValue(new Error('boom'));
+    mockedRunAgent.mockImplementation(async (_mensaje, _ctx, deps) => {
+      await deps.executeTool('registrar_gasto', {
+        monto: 40000,
+        descripcion: 'huevos',
+      });
+      return { text: 'Anotado.', calls: [] };
+    });
+    await handleAgentTurn({
+      userId: 'u1',
+      phone: '+57300',
+      body: '40k huevos',
+    });
+    expect(mockedSendWhatsAppMessage).toHaveBeenCalledWith(
+      '+57300',
+      expect.stringContaining('Anotado.'),
+    );
   });
 });
