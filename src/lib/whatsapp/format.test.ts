@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatCOP, hoyBogotaDate, todayBogota } from './format';
+import {
+  enmascararTelefono,
+  formatCOP,
+  hoyBogotaDate,
+  todayBogota,
+} from './format';
 
 describe('formatCOP', () => {
   it('formatea con separador de miles y sin decimales', () => {
@@ -22,5 +27,17 @@ describe('hoyBogotaDate', () => {
     expect(d.getHours()).toBe(0);
     expect(d.getMinutes()).toBe(0);
     expect(d.getSeconds()).toBe(0);
+  });
+});
+
+describe('enmascararTelefono', () => {
+  it('celular colombiano → "+57 3XX ••• últimos 4"', () => {
+    expect(enmascararTelefono('+573001234567')).toBe('+57 300 ••• 4567');
+  });
+  it('otro formato → deja el prefijo y los últimos 4', () => {
+    expect(enmascararTelefono('+14155550123')).toBe('+141 ••• 0123');
+  });
+  it('muy corto → lo tapa entero salvo los últimos 2', () => {
+    expect(enmascararTelefono('+5712')).toBe('••• 12');
   });
 });

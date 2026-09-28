@@ -4,6 +4,7 @@
 
 import { randomInt } from 'crypto';
 
+import type { LinkConDocumento } from '@/lib/dian/nits-busqueda';
 import { createAdminClient } from '@/lib/supabase/server';
 
 const CODE_TTL_MINUTES = 10;
@@ -17,7 +18,9 @@ export function generateSixDigitCode(): string {
 export async function createLinkCode(userId: string): Promise<string> {
   const supabase = createAdminClient();
   const code = generateSixDigitCode();
-  const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60_000).toISOString();
+  const expiresAt = new Date(
+    Date.now() + CODE_TTL_MINUTES * 60_000,
+  ).toISOString();
   const { error } = await supabase
     .from('whatsapp_link_codes')
     .insert({ code, user_id: userId, expires_at: expiresAt });
@@ -88,4 +91,46 @@ export async function getLinkByPhone(
     .eq('phone_e164', phoneE164)
     .maybeSingle();
   return data ? { userId: (data as { user_id: string }).user_id } : null;
+}
+
+/**
+ * Número y documento (cédula/NIT para buscar facturas en la DIAN) de cada
+ * número vinculado al usuario, del más viejo al más nuevo. Sin `client` usa
+ * service-role (webhook); el route web le pasa el de la cookie (RLS de dueño).
+ *
+ * Best-effort: si la consulta falla (red, o la migración de `documento` aún
+ * sin aplicar) devuelve [] y la búsqueda sigue con los NIT del QR y los
+ * genéricos. Nunca loguea los documentos, solo el error.
+ */
+export async function listarDocumentosDeUsuario(
+  userId: string,
+  client: Pick<
+    ReturnType<typeof createAdminClient>,
+    'from'
+  > = createAdminClient(),
+): Promise<LinkConDocumento[]> {
+  try {
+    const { data, error } = await client
+      .from('whatsapp_links')
+      .select('phone_e164, documento')
+      .eq('user_id', userId)
+      .order('linked_at', { ascending: true });
+    if (error) {
+      console.error(
+        'listarDocumentosDeUsuario: no se pudieron leer los documentos:',
+        error.message,
+      );
+      return [];
+    }
+    return ((data ?? []) as LinkConDocumento[]).map(l => ({
+      phone_e164: l.phone_e164,
+      documento: l.documento ?? null,
+    }));
+  } catch (err) {
+    console.error(
+      'listarDocumentosDeUsuario: no se pudieron leer los documentos:',
+      err instanceof Error ? err.message : err,
+    );
+    return [];
+  }
 }

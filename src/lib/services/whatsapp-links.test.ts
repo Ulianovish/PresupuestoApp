@@ -9,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/server';
 import {
   generateSixDigitCode,
   getLinkByPhone,
+  listarDocumentosDeUsuario,
   redeemLinkCode,
 } from './whatsapp-links';
 
@@ -33,7 +34,9 @@ describe('redeemLinkCode', () => {
       eq: vi.fn().mockReturnThis(),
       is: vi.fn().mockReturnThis(),
       gt: vi.fn().mockReturnThis(),
-      select: vi.fn().mockResolvedValue({ data: [{ user_id: 'user-1' }], error: null }),
+      select: vi
+        .fn()
+        .mockResolvedValue({ data: [{ user_id: 'user-1' }], error: null }),
     };
     const from = vi.fn((table: string) => {
       if (table === 'whatsapp_link_codes') return updateChain;
@@ -83,7 +86,9 @@ describe('getLinkByPhone', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('devuelve userId si el número está vinculado', async () => {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: { user_id: 'user-9' } });
+    const maybeSingle = vi
+      .fn()
+      .mockResolvedValue({ data: { user_id: 'user-9' } });
     const from = vi.fn(() => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -103,5 +108,60 @@ describe('getLinkByPhone', () => {
     mockedAdmin.mockReturnValue({ from });
 
     expect(await getLinkByPhone('+573009999999')).toBeNull();
+  });
+});
+
+describe('listarDocumentosDeUsuario', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function clienteCon(resultado: { data: unknown; error: unknown }) {
+    const chain = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue(resultado),
+    };
+    return { client: { from: vi.fn(() => chain) }, chain };
+  }
+
+  it('devuelve número y documento de cada link del usuario (filtra por user_id)', async () => {
+    const { client, chain } = clienteCon({
+      data: [
+        { phone_e164: '+573000000001', documento: '1000000001' },
+        { phone_e164: '+573000000002', documento: null },
+      ],
+      error: null,
+    });
+
+    const out = await listarDocumentosDeUsuario('user-1', client as never);
+
+    expect(out).toEqual([
+      { phone_e164: '+573000000001', documento: '1000000001' },
+      { phone_e164: '+573000000002', documento: null },
+    ]);
+    expect(client.from).toHaveBeenCalledWith('whatsapp_links');
+    expect(chain.select).toHaveBeenCalledWith('phone_e164, documento');
+    expect(chain.eq).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(mockedAdmin).not.toHaveBeenCalled();
+  });
+
+  it('sin cliente usa el service-role (el webhook corre sin sesión)', async () => {
+    const { client } = clienteCon({ data: [], error: null });
+    mockedAdmin.mockReturnValue(client);
+
+    expect(await listarDocumentosDeUsuario('user-1')).toEqual([]);
+    expect(mockedAdmin).toHaveBeenCalled();
+  });
+
+  it('best-effort: si la consulta falla (p. ej. la columna aún no existe) devuelve [] sin lanzar', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { client } = clienteCon({
+      data: null,
+      error: { message: 'column whatsapp_links.documento does not exist' },
+    });
+
+    expect(await listarDocumentosDeUsuario('user-1', client as never)).toEqual(
+      [],
+    );
+    errorSpy.mockRestore();
   });
 });

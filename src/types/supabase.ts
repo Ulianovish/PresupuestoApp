@@ -642,6 +642,36 @@ export type Database = {
           },
         ];
       };
+      whatsapp_links: {
+        Row: {
+          default_account_name: string | null;
+          display_name: string | null;
+          documento: string | null;
+          id: string;
+          linked_at: string;
+          phone_e164: string;
+          user_id: string;
+        };
+        Insert: {
+          default_account_name?: string | null;
+          display_name?: string | null;
+          documento?: string | null;
+          id?: string;
+          linked_at?: string;
+          phone_e164: string;
+          user_id: string;
+        };
+        Update: {
+          default_account_name?: string | null;
+          display_name?: string | null;
+          documento?: string | null;
+          id?: string;
+          linked_at?: string;
+          phone_e164?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

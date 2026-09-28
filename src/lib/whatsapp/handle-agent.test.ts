@@ -390,4 +390,42 @@ describe('handleAgentMessage', () => {
     expect(mensaje).not.toMatch(/DIAN_SEARCH_NIT/);
     expect(mensaje).not.toMatch(/más tarde/i);
   });
+
+  describe('rechazo de NIT según si el remitente tiene documento cargado', () => {
+    const rechazo = () =>
+      vi.fn(async () => ({
+        ok: false,
+        reason: 'error',
+        message:
+          'La DIAN rechazó todos los NIT probados (222222222222, 2222222222)',
+      }));
+    const correr = async (overrides: Record<string, unknown>) => {
+      const deps = makeDeps({ processCufe: rechazo(), ...overrides });
+      await handleAgentMessage(
+        'cufe',
+        { userId: 'u1', phone: '+57300', body: CUFE, existingPendingId: null },
+        deps,
+      );
+      return (deps.sendMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][1] as string;
+    };
+
+    it('sin documento del remitente → sugiere cargar la cédula en Ajustes', async () => {
+      const mensaje = await correr({ remitenteSinDocumento: true });
+      expect(mensaje).toMatch(
+        /Si la factura está a tu nombre, cargá tu cédula en Ajustes para que la pueda buscar\./,
+      );
+      expect(mensaje).toMatch(/NitFac/);
+    });
+
+    it('con documento cargado → no la sugiere (ya se probó)', async () => {
+      const mensaje = await correr({ remitenteSinDocumento: false });
+      expect(mensaje).not.toMatch(/Ajustes/);
+    });
+
+    it('sin el dato (deps viejas) → no la sugiere', async () => {
+      const mensaje = await correr({});
+      expect(mensaje).not.toMatch(/Ajustes/);
+    });
+  });
 });

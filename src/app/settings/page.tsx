@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import AccountsPanel from '@/components/organisms/AccountsPanel/AccountsPanel';
 import CategoriesPanel from '@/components/organisms/CategoriesPanel/CategoriesPanel';
+import DocumentosDianPanel from '@/components/organisms/DocumentosDianPanel/DocumentosDianPanel';
 import WhatsAppLinkPanel from '@/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel';
 import { createClient } from '@/lib/supabase/server';
 
@@ -64,6 +65,8 @@ export default async function SettingsPage() {
           </p>
         )}
       </section>
+
+      <DocumentosDianPanel />
     </main>
   );
 }
