@@ -5,6 +5,7 @@
 
 import { after, NextRequest } from 'next/server';
 
+import { cargarHistorialManual } from '@/lib/dian/historial-clasificacion';
 import { ordenarNitsBusqueda } from '@/lib/dian/nits-busqueda';
 import {
   prepareInvoiceProcessing,
@@ -98,8 +99,10 @@ export async function POST(request: NextRequest) {
     ),
   });
 
+  const userId = user.id;
   after(async () => {
     const categoryNames = await resolveUserCategoryNames();
+    const historial = await cargarHistorialManual(await createClient(), userId);
 
     // Persiste el avance, pero solo cuando el porcentaje sube ≥5 o el paso es
     // relevante, para no martillar la DB con cada evento del stream.
@@ -128,6 +131,7 @@ export async function POST(request: NextRequest) {
       categoryNames,
       onProgress,
       nits,
+      historial,
     });
   });
 

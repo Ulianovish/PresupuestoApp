@@ -14,12 +14,14 @@ vi.mock('@/lib/services/invoices', () => ({
   parseRegistroParcial: (m: string | null) => {
     if (!(m ?? '').startsWith('Registro parcial:')) return null;
     const match = (m ?? '').match(/(\d+) de (\d+) ítems/);
-    return match ? { itemsFound: Number(match[1]), totalItems: Number(match[2]) } : null;
+    return match
+      ? { itemsFound: Number(match[1]), totalItems: Number(match[2]) }
+      : null;
   },
 }));
 vi.mock('@/lib/dian/categorizer', () => ({
-  categorizeInvoiceItems: vi.fn(
-    async (items: Array<{ description: string }>) => items.map(() => 'MERCADO'),
+  categorizeInvoiceItems: vi.fn(async (items: Array<{ description: string }>) =>
+    items.map(() => 'MERCADO'),
   ),
 }));
 
@@ -48,7 +50,8 @@ function sseStream(lines: string[]): ReadableStream<Uint8Array> {
   });
 }
 
-const sse = (obj: Record<string, unknown>) => `data: ${JSON.stringify(obj)}\n\n`;
+const sse = (obj: Record<string, unknown>) =>
+  `data: ${JSON.stringify(obj)}\n\n`;
 
 const COMPLETE_RESULT = {
   success: true,
@@ -62,8 +65,20 @@ const COMPLETE_RESULT = {
     total_amount: 12000,
   },
   items: [
-    { description: 'Arroz', quantity: 1, unit_price: 5000, total_price: 5000, total_with_tax: 6000 },
-    { description: 'Leche', quantity: 1, unit_price: 5000, total_price: 5000, total_with_tax: 6000 },
+    {
+      description: 'Arroz',
+      quantity: 1,
+      unit_price: 5000,
+      total_price: 5000,
+      total_with_tax: 6000,
+    },
+    {
+      description: 'Leche',
+      quantity: 1,
+      unit_price: 5000,
+      total_price: 5000,
+      total_with_tax: 6000,
+    },
   ],
 };
 
@@ -93,17 +108,20 @@ describe('runInvoiceProcessing', () => {
     expect(onProgress).toHaveBeenCalledWith(
       expect.objectContaining({ step: 'categorizing' }),
     );
+    // El proveedor de la factura viaja al prompt (sin historial: sin ejemplos).
     expect(categorizeInvoiceItems).toHaveBeenCalledWith(
       [{ description: 'Arroz' }, { description: 'Leche' }],
       ['MERCADO', 'OTROS'],
+      { supplier: 'D1', examples: [] },
     );
     expect(saveProcessedInvoice).toHaveBeenCalledWith(
       'inv-1',
       expect.objectContaining({ supplierName: 'D1', totalAmount: 12000 }),
       undefined,
     );
-    const savedItems = (saveProcessedInvoice as unknown as ReturnType<typeof vi.fn>)
-      .mock.calls[0][1].items;
+    const savedItems = (
+      saveProcessedInvoice as unknown as ReturnType<typeof vi.fn>
+    ).mock.calls[0][1].items;
     expect(savedItems[0].category).toBe('MERCADO');
   });
 
@@ -132,8 +150,14 @@ describe('runInvoiceProcessing', () => {
   it('reintenta ante cierre prematuro y tiene éxito en el 2º intento', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ ok: true, body: sseStream([sse({ step: 'fetching', progress: 10 })]) })
-      .mockResolvedValueOnce({ ok: true, body: sseStream([sse({ step: 'complete', result: COMPLETE_RESULT })]) });
+      .mockResolvedValueOnce({
+        ok: true,
+        body: sseStream([sse({ step: 'fetching', progress: 10 })]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        body: sseStream([sse({ step: 'complete', result: COMPLETE_RESULT })]),
+      });
     vi.stubGlobal('fetch', fetchMock);
     const onProgress = vi.fn();
 
@@ -151,7 +175,11 @@ describe('runInvoiceProcessing', () => {
   });
 
   it('NO reintenta un error no transitorio (4xx) y marca error', async () => {
-    const fetchMock = vi.fn(async () => ({ ok: false, status: 404, body: null }));
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 404,
+      body: null,
+    }));
     vi.stubGlobal('fetch', fetchMock);
 
     const res = await runInvoiceProcessing('inv-4', 'CUFE123', {
@@ -161,7 +189,11 @@ describe('runInvoiceProcessing', () => {
 
     expect(res.ok).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(markInvoiceError).toHaveBeenCalledWith('inv-4', expect.stringContaining('404'), undefined);
+    expect(markInvoiceError).toHaveBeenCalledWith(
+      'inv-4',
+      expect.stringContaining('404'),
+      undefined,
+    );
   });
 
   it('el primario agota el presupuesto → NO arranca el respaldo y reporta el fallo', async () => {
@@ -171,7 +203,9 @@ describe('runInvoiceProcessing', () => {
     vi.stubEnv('DIAN_VPS_URL', 'http://vps.test');
     const base = Date.now();
     let elapsed = 0;
-    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => base + elapsed);
+    const nowSpy = vi
+      .spyOn(Date, 'now')
+      .mockImplementation(() => base + elapsed);
 
     const fetchMock = vi.fn(async () => {
       elapsed = 250_000; // el VPS se comió casi todo el presupuesto
@@ -297,7 +331,8 @@ describe('NIT del QR hacia los scrapers', () => {
     const fetchMock = vi.fn(async () => ({
       ok: false,
       status: 500,
-      text: async () => JSON.stringify({ success: false, error: 'Chrome se cerró' }),
+      text: async () =>
+        JSON.stringify({ success: false, error: 'Chrome se cerró' }),
     }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -315,7 +350,9 @@ describe('NIT del QR hacia los scrapers', () => {
     }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(fetchFromVps('CUFE123')).rejects.toThrow(/^VPS respondió 502$/);
+    await expect(fetchFromVps('CUFE123')).rejects.toThrow(
+      /^VPS respondió 502$/,
+    );
   });
 
   it('la DIAN rechazó todos los NIT en el VPS → NO arranca Vercel (es determinista) y reporta la causa', async () => {
@@ -326,7 +363,8 @@ describe('NIT del QR hacia los scrapers', () => {
       text: async () =>
         JSON.stringify({
           success: false,
-          error: 'La DIAN rechazó todos los NIT probados (222222222222, 2222222222)',
+          error:
+            'La DIAN rechazó todos los NIT probados (222222222222, 2222222222)',
         }),
     }));
     vi.stubGlobal('fetch', fetchMock);
@@ -349,12 +387,10 @@ describe('NIT del QR hacia los scrapers', () => {
 const getInvoiceByCufeMock = getInvoiceByCufe as unknown as ReturnType<
   typeof vi.fn
 >;
-const createProcessingInvoiceMock = createProcessingInvoice as unknown as ReturnType<
-  typeof vi.fn
->;
-const resetInvoiceToProcessingMock = resetInvoiceToProcessing as unknown as ReturnType<
-  typeof vi.fn
->;
+const createProcessingInvoiceMock =
+  createProcessingInvoice as unknown as ReturnType<typeof vi.fn>;
+const resetInvoiceToProcessingMock =
+  resetInvoiceToProcessing as unknown as ReturnType<typeof vi.fn>;
 
 function fakeInvoice(status: string, id = 'inv-existing') {
   return { id, status };
@@ -390,8 +426,7 @@ describe('prepareInvoiceProcessing', () => {
     // quedaban duplicados como transacciones reales.
     const invoice = {
       ...fakeInvoice('error', 'inv-parcial'),
-      error_message:
-        'Registro parcial: 2 de 5 ítems ("leche" falló: boom).',
+      error_message: 'Registro parcial: 2 de 5 ítems ("leche" falló: boom).',
     };
     getInvoiceByCufeMock.mockResolvedValueOnce(invoice);
 
@@ -413,7 +448,10 @@ describe('prepareInvoiceProcessing', () => {
 
     const res = await prepareInvoiceProcessing('user-1', 'CUFE123');
 
-    expect(resetInvoiceToProcessingMock).toHaveBeenCalledWith('inv-err', undefined);
+    expect(resetInvoiceToProcessingMock).toHaveBeenCalledWith(
+      'inv-err',
+      undefined,
+    );
     expect(res).toEqual({ kind: 'ready', invoiceId: 'inv-err' });
   });
 

@@ -11,6 +11,7 @@ vi.mock('@/lib/dian/expense-item-classifier', () => ({
 }));
 
 import { categorizeInvoiceItems } from '@/lib/dian/categorizer';
+import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
 import { createAdminClient } from '@/lib/supabase/server';
 
 import {
@@ -207,13 +208,89 @@ describe('createDirectExpense', () => {
     expect(res.transactionId).toBe('tx-123');
     expect(res.budgetItemId).toBeNull();
   });
+
+  it('reutiliza el historial manual: categoría e ítem del mismo nombre, sin IA', async () => {
+    // El usuario ya asignó a mano "Carlos Gomez" → MERCADO/Huevos en agosto.
+    const historial = [
+      {
+        description: 'Carlos Gomez',
+        category_name: 'MERCADO',
+        transaction_date: '2026-08-20',
+        budget_items: { name: 'Huevos', categories: { name: 'MERCADO' } },
+      },
+    ];
+    const rpc = vi.fn(async (name: string) => {
+      if (name === 'upsert_monthly_expense')
+        return { data: 'tx-9', error: null };
+      if (name === 'get_budget_items_for_month')
+        return {
+          data: [
+            {
+              item_id: 'sep-carnes',
+              item_name: 'Carnes',
+              category_name: 'MERCADO',
+            },
+            {
+              item_id: 'sep-huevos',
+              item_name: 'Huevos',
+              category_name: 'MERCADO',
+            },
+          ],
+          error: null,
+        };
+      if (name === 'assign_expense_budget_item') return { error: null };
+      throw new Error(`rpc inesperado: ${name}`);
+    });
+    const from = vi.fn((table: string) => {
+      if (table === 'categories') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockResolvedValue({
+            data: [{ name: 'MERCADO' }, { name: 'OTROS' }],
+          }),
+        };
+      }
+      if (table === 'transactions') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          gte: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockResolvedValue({ data: historial, error: null }),
+        };
+      }
+      throw new Error(`tabla inesperada ${table}`);
+    });
+    mockedAdmin.mockReturnValue({ rpc, from });
+
+    const res = await createDirectExpense('user-1', '+573001234567', {
+      amount: 15000,
+      description: 'carlos gómez',
+      accountName: 'Nequi',
+      date: '2026-09-10',
+    });
+
+    expect(res.category).toBe('MERCADO');
+    expect(res.budgetItemId).toBe('sep-huevos');
+    expect(categorizeInvoiceItems).not.toHaveBeenCalled();
+    expect(classifyExpensesToItems).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith('assign_expense_budget_item', {
+      p_user_id: 'user-1',
+      p_transaction_id: 'tx-9',
+      p_budget_item_id: 'sep-huevos',
+      p_source: 'historial',
+    });
+  });
 });
 
 describe('createVisionReceiptDraft', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('categoriza ítems e inserta un borrador con source vision_receipt', async () => {
-    const single = vi.fn().mockResolvedValue({ data: { id: 'inv-1' }, error: null });
+    const single = vi
+      .fn()
+      .mockResolvedValue({ data: { id: 'inv-1' }, error: null });
     const insert = vi
       .fn()
       .mockReturnValue({ select: vi.fn().mockReturnThis(), single });

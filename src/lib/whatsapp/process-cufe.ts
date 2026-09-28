@@ -5,6 +5,7 @@
 // medio — mismo criterio que separó `handle-image.ts`/`handle-agent.ts` del
 // route.
 
+import { cargarHistorialManual } from '@/lib/dian/historial-clasificacion';
 import { separarDocumentosPorRemitente } from '@/lib/dian/nits-busqueda';
 import {
   prepareInvoiceProcessing,
@@ -107,10 +108,12 @@ export async function processCufeForWhatsApp(
   }
 
   const categoryNames = await resolveUserCategoryNames(admin, userId);
+  const historial = await cargarHistorialManual(admin, userId);
   const run = await runInvoiceProcessing(prep.invoiceId, cufe, {
     categoryNames,
     client: admin,
     nits,
+    historial,
   });
   if (!run.ok) return { ok: false, reason: 'error', message: run.message };
 

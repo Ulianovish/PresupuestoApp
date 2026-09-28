@@ -1,8 +1,10 @@
 // Servicio para gestionar facturas electrónicas DIAN (tabla electronic_invoices)
 
 import { EXPENSE_CATEGORIES } from '@/lib/constants/expense-categories';
-import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
-import { resolveItemNameToId } from '@/lib/services/expenses-rollup';
+import {
+  clasificarGastos,
+  type GastoAClasificar,
+} from '@/lib/services/expense-classification';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import type { PendingInvoice } from '@/lib/whatsapp/agent/state';
 import type { Database } from '@/types/database';
@@ -454,87 +456,11 @@ export async function createInvoiceDirect(
 export async function classifyApprovedExpenses(
   supabase: DBClient,
   userId: string,
-  expenses: Array<{
-    id: string;
-    description: string;
-    categoryName: string;
-    monthYear: string;
-  }>,
+  expenses: GastoAClasificar[],
 ): Promise<string[]> {
-  const asignados = new Set<string>();
-  try {
-    if (expenses.length === 0) return [];
-
-    // Agrupar por mes (una factura suele ser un solo mes, pero por si acaso)
-    const byMonth = new Map<string, typeof expenses>();
-    for (const e of expenses) {
-      const arr = byMonth.get(e.monthYear) ?? [];
-      arr.push(e);
-      byMonth.set(e.monthYear, arr);
-    }
-
-    for (const [monthYear, monthExpenses] of byMonth) {
-      const { data: itemsRaw } = await supabase.rpc(
-        'get_budget_items_for_month',
-        { p_user_id: userId, p_month_year: monthYear },
-      );
-      const items = ((itemsRaw as unknown[]) || []).map(row => {
-        const r = row as {
-          item_id: string;
-          item_name: string;
-          category_name: string;
-        };
-        return {
-          id: r.item_id,
-          name: r.item_name,
-          category_name: r.category_name,
-        };
-      });
-      if (items.length === 0) continue;
-
-      // Agrupar por categoría del gasto y clasificar cada grupo en un lote
-      const byCategory = new Map<string, typeof monthExpenses>();
-      for (const e of monthExpenses) {
-        const arr = byCategory.get(e.categoryName) ?? [];
-        arr.push(e);
-        byCategory.set(e.categoryName, arr);
-      }
-
-      for (const [categoryName, catExpenses] of byCategory) {
-        const inCategory = items.filter(i => i.category_name === categoryName);
-        if (inCategory.length === 0) continue;
-
-        const names = await classifyExpensesToItems(
-          catExpenses.map(e => ({ description: e.description })),
-          inCategory.map(i => i.name),
-        );
-
-        for (let i = 0; i < catExpenses.length; i++) {
-          const itemId = resolveItemNameToId(names[i], inCategory);
-          if (itemId) {
-            const { error: assignError } = await supabase.rpc(
-              'assign_expense_budget_item',
-              {
-                p_user_id: userId,
-                p_transaction_id: catExpenses[i].id,
-                p_budget_item_id: itemId,
-                p_source: 'ai',
-              },
-            );
-            // Solo cuenta como asignado si el RPC confirmó: avisar por un
-            // rubro que no quedó escrito sería una alerta sobre un gasto que
-            // no está ahí.
-            if (!assignError) asignados.add(itemId);
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error clasificando gastos de factura aprobada:', error);
-    // best-effort: no relanzar
-  }
-  // Afuera del catch a propósito: una falla parcial (p.ej. el segundo rubro
-  // truena) igual tiene que devolver lo que sí se asignó antes de fallar.
-  // Mismo criterio que dispararAlertas en budget/alerts.ts.
-  return [...asignados];
+  // Mismo camino que la ruta /api/expenses/classify. `clasificarGastos` nunca
+  // relanza y solo reporta lo que el RPC confirmó; acá solo se deduplican los
+  // rubros porque las alertas son por rubro.
+  const { asignados } = await clasificarGastos(supabase, userId, expenses);
+  return [...new Set(asignados.map(a => a.budgetItemId))];
 }

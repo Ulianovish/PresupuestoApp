@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
 import { AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 
 import Button from '@/components/atoms/Button/Button';
 import InlineCombobox from '@/components/molecules/InlineCombobox/InlineCombobox';
@@ -12,11 +13,21 @@ import {
   getBudgetItemsForMonth,
   assignExpenseToBudgetItem,
   classifyUnassignedForMonth,
+  getClassificationSuggestions,
   updateExpenseTransaction,
   formatCurrency,
   type UnclassifiedExpense,
   type BudgetItemRef,
 } from '@/lib/services/expenses';
+
+import {
+  asignacionesAGuardar,
+  mensajeClasificacion,
+  sugerenciaVisible,
+  valorDelSelect,
+  type SeleccionUsuario,
+  type SugerenciasPorGasto,
+} from './seleccion';
 
 interface Props {
   monthYear: string;
@@ -32,23 +43,17 @@ export default function UnclassifiedExpensesPanel({
   const [items, setItems] = useState<BudgetItemRef[]>([]);
   const [isBusy, setIsBusy] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
-  // Selección por gasto (el ítem elegido en el desplegable, aún sin asignar).
-  // Si no hay entrada para un gasto, se usa el ítem sugerido por su categoría.
-  const [selected, setSelected] = useState<Record<string, string>>({});
+  // Lo que el usuario tocó en el desplegable, por gasto ('' = Sin asignar).
+  const [selected, setSelected] = useState<SeleccionUsuario>({});
+  // Sugerencias REALES (historial del usuario o IA). Sin sugerencia, el
+  // desplegable arranca en "Sin asignar": nunca en el primer ítem alfabético.
+  const [suggestions, setSuggestions] = useState<SugerenciasPorGasto>({});
 
-  /** Ítem sugerido por defecto: el primero de la misma categoría del gasto
-   * (comparando sin distinguir mayúsculas ni acentos). */
   const normalize = (s: string) =>
     s
       .normalize('NFD')
       .replace(/\p{Diacritic}/gu, '')
       .toLowerCase();
-  const suggestedItemId = (categoryName: string) =>
-    items.find(i => normalize(i.category_name) === normalize(categoryName))
-      ?.id ?? '';
-  /** Valor efectivo del desplegable: lo elegido, o la sugerencia por categoría. */
-  const effectiveItemId = (exp: UnclassifiedExpense) =>
-    selected[exp.id] ?? suggestedItemId(exp.category_name);
 
   /**
    * Ítems visibles para un gasto: solo los de su categoría. Si esa categoría no
@@ -77,30 +82,39 @@ export default function UnclassifiedExpensesPanel({
   const categoryNames = budgetCategories.map(c => c.name.toUpperCase());
 
   const load = useCallback(async () => {
-    const [exp, its] = await Promise.all([
+    const [exp, its, sug] = await Promise.all([
       getUnclassifiedExpenses(monthYear),
       getBudgetItemsForMonth(monthYear),
+      getClassificationSuggestions(monthYear),
     ]);
     setExpenses(exp);
     setItems(its);
+    setSuggestions(sug);
   }, [monthYear]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // Asigna en lote todos los gastos con un ítem elegido en el desplegable.
-  // Los que queden en "Sin asignar" permanecen pendientes.
+  const effectiveItemId = (exp: UnclassifiedExpense) =>
+    valorDelSelect(exp, selected, suggestions, items);
+
+  // Asigna en lote solo las filas con valor. Una sugerencia aceptada sin tocar
+  // se guarda con su origen ('historial'/'ai'); 'manual' solo si el usuario
+  // cambió el desplegable. Las que queden en "Sin asignar" siguen pendientes.
   const handleAssignSelected = async () => {
-    const entries = expenses
-      .map(exp => [exp.id, effectiveItemId(exp)] as const)
-      .filter(([, itemId]) => !!itemId);
+    const entries = asignacionesAGuardar(
+      expenses,
+      selected,
+      suggestions,
+      items,
+    );
     if (entries.length === 0) return;
 
     setIsAssigning(true);
     try {
-      for (const [expenseId, itemId] of entries) {
-        await assignExpenseToBudgetItem(expenseId, itemId, 'manual');
+      for (const { expenseId, budgetItemId, source } of entries) {
+        await assignExpenseToBudgetItem(expenseId, budgetItemId, source);
       }
       setSelected({});
       await load();
@@ -111,7 +125,7 @@ export default function UnclassifiedExpensesPanel({
   };
 
   // Cambiar la categoría del gasto: al cambiarla, se descarta la selección
-  // previa para que el ítem sugerido se recalcule con la nueva categoría.
+  // previa (el ítem elegido era de la categoría anterior).
   const handleCategoryChange = async (
     expenseId: string,
     categoryName: string,
@@ -128,9 +142,16 @@ export default function UnclassifiedExpensesPanel({
   const handleClassifyAll = async () => {
     setIsBusy(true);
     try {
-      await classifyUnassignedForMonth(monthYear);
+      const resumen = await classifyUnassignedForMonth(monthYear);
+      const mensaje = mensajeClasificacion(resumen);
+      if (resumen.assigned > 0) toast.success(mensaje);
+      else toast.warning(mensaje);
       await load();
       onChanged?.();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'No se pudo clasificar',
+      );
     } finally {
       setIsBusy(false);
     }
@@ -139,7 +160,12 @@ export default function UnclassifiedExpensesPanel({
   if (expenses.length === 0) return null;
 
   const total = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-  const selectedCount = expenses.filter(e => effectiveItemId(e)).length;
+  const selectedCount = asignacionesAGuardar(
+    expenses,
+    selected,
+    suggestions,
+    items,
+  ).length;
 
   return (
     <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/5 p-4">
@@ -171,11 +197,12 @@ export default function UnclassifiedExpensesPanel({
       </div>
 
       <p className="text-xs text-red-300/80 mb-3">
-        Cada gasto viene con un ítem sugerido de su categoría. Ajusta el que
-        quieras y presiona <span className="font-semibold">Asignar</span> para
-        asignar todos de una vez; los que dejes en “Sin asignar” quedan
-        pendientes. Estos gastos aún NO suman en el Presupuesto Real. Total sin
-        contar: <span className="font-semibold">{formatCurrency(total)}</span>
+        Elige el ítem de cada gasto (los marcados como “Sugerido” vienen de tu
+        historial o de la IA) y presiona{' '}
+        <span className="font-semibold">Asignar</span> para asignar todos de una
+        vez; los que dejes en “Sin asignar” quedan pendientes. Estos gastos aún
+        NO suman en el Presupuesto Real. Total sin contar:{' '}
+        <span className="font-semibold">{formatCurrency(total)}</span>
       </p>
 
       <div className="space-y-2">
@@ -207,26 +234,43 @@ export default function UnclassifiedExpensesPanel({
             </div>
 
             {/* Ítem: solo el nombre; la categoría ya está al lado */}
-            <select
-              value={effectiveItemId(exp)}
-              onChange={e =>
-                setSelected(s => ({ ...s, [exp.id]: e.target.value }))
-              }
-              className="bg-slate-700/60 border border-slate-600 rounded-lg text-white text-sm px-2 py-1 w-56 flex-shrink-0"
-            >
-              <option value="">Sin asignar</option>
-              {groupByCategory(visibleItems(exp.category_name)).map(
-                ([cat, its]) => (
-                  <optgroup key={cat} label={cat}>
-                    {its.map(it => (
-                      <option key={it.id} value={it.id}>
-                        {it.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ),
-              )}
-            </select>
+            <div className="w-56 flex-shrink-0">
+              <select
+                value={effectiveItemId(exp)}
+                onChange={e =>
+                  setSelected(s => ({ ...s, [exp.id]: e.target.value }))
+                }
+                className="bg-slate-700/60 border border-slate-600 rounded-lg text-white text-sm px-2 py-1 w-full"
+              >
+                <option value="">Sin asignar</option>
+                {groupByCategory(visibleItems(exp.category_name)).map(
+                  ([cat, its]) => (
+                    <optgroup key={cat} label={cat}>
+                      {its.map(it => (
+                        <option key={it.id} value={it.id}>
+                          {it.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ),
+                )}
+              </select>
+              {(() => {
+                const sug = sugerenciaVisible(
+                  exp,
+                  selected,
+                  suggestions,
+                  items,
+                );
+                return sug ? (
+                  <p className="mt-1 text-[11px] text-amber-300/90">
+                    Sugerido (
+                    {sug.source === 'historial' ? 'tu historial' : 'IA'}) —
+                    revisa y presiona Asignar
+                  </p>
+                ) : null;
+              })()}
+            </div>
           </div>
         ))}
       </div>
