@@ -83,6 +83,11 @@ interface BudgetTableProps {
   ) => Promise<void>;
   classifications?: LookupItem[];
   controls?: LookupItem[];
+  /** Sobregastos del mes anterior, indexados por id del ítem del mes actual. */
+  overspendByItem?: Record<
+    string,
+    { previousMonthLabel: string; excess: number }
+  >;
   isLoading?: boolean;
   formatCurrency: (amount: number) => string;
   getClasificacionColor: (clasificacion: string) => string;
@@ -102,6 +107,7 @@ export default function BudgetTable({
   onInlineUpdate,
   classifications,
   controls,
+  overspendByItem,
   isLoading,
   formatCurrency,
   getClasificacionColor,
@@ -174,6 +180,7 @@ export default function BudgetTable({
                       <BudgetItemRow
                         key={item.id}
                         item={item}
+                        overspend={overspendByItem?.[item.id]}
                         categoryId={categoria.id}
                         onEdit={onEditItem}
                         onDelete={onDeleteItem}

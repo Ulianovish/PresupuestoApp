@@ -12,9 +12,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 
-import { Edit, Trash2 } from 'lucide-react';
+import { AlertTriangle, Edit, Trash2 } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
+import { mensajeSobregasto } from '@/lib/budget-overspend';
 
 interface BudgetItem {
   id: string;
@@ -34,6 +35,8 @@ interface LookupItem {
 
 interface BudgetItemRowProps {
   item: BudgetItem;
+  /** Sobregasto del MES ANTERIOR de este mismo ítem, si lo hubo. */
+  overspend?: { previousMonthLabel: string; excess: number };
   categoryId: string;
   onEdit: (categoryId: string, item: BudgetItem) => void;
   onDelete?: (itemId: string) => void;
@@ -113,6 +116,7 @@ function InlineDropdown({
 
 export default function BudgetItemRow({
   item,
+  overspend,
   categoryId,
   onEdit,
   onDelete,
@@ -131,8 +135,28 @@ export default function BudgetItemRow({
 
   return (
     <tr className="hover:bg-white/5 transition-colors bg-slate-900/30">
-      {/* Descripción del item */}
-      <td className="px-4 py-3 pl-12 text-gray-200">{item.descripcion}</td>
+      {/* Descripción del item, con la alerta histórica si el mes anterior se pasó */}
+      <td className="px-4 py-3 pl-12 text-gray-200">
+        <span className="inline-flex items-center gap-1.5">
+          {item.descripcion}
+          {overspend && (
+            <span
+              role="img"
+              aria-label={mensajeSobregasto(
+                overspend.previousMonthLabel,
+                overspend.excess,
+              )}
+              title={mensajeSobregasto(
+                overspend.previousMonthLabel,
+                overspend.excess,
+              )}
+              className="inline-flex cursor-help"
+            >
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-400" />
+            </span>
+          )}
+        </span>
+      </td>
 
       {/* Fecha */}
       <td className="px-4 py-3 text-gray-300">{item.fecha}</td>

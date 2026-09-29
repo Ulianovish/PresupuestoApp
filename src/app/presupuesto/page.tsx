@@ -26,12 +26,15 @@ import {
   rubrosEnRiesgo,
   type RubroEstado,
 } from '@/lib/budget/alerts';
+import { porItem } from '@/lib/budget-overspend';
 import {
   formatCurrency,
   getClassifications,
   getControls,
   getItemNameSuggestions,
+  getPreviousMonthOverspend,
 } from '@/lib/services/budget';
+import { formatMonthName } from '@/lib/services/expenses';
 import { obtenerDeudas, type Deuda } from '@/lib/services/ingresos-deudas';
 import { createClient } from '@/lib/supabase/client';
 import { hoyBogotaDate, todayBogota } from '@/lib/whatsapp/format';
@@ -633,6 +636,40 @@ export default function PresupuestoPage() {
   };
 
   const monthOptions = getAvailableMonths();
+  // Alerta histórica: ítems que el MES ANTERIOR se pasaron del presupuesto.
+  // Solo informa; no altera ningún valor del mes que se está viendo.
+  const [overspendByItem, setOverspendByItem] = useState<
+    Record<string, { previousMonthLabel: string; excess: number }>
+  >({});
+
+  // Cuenta de ítems: dispara la recarga cuando se copia el mes anterior o se
+  // agrega/borra un ítem. Es un número, no el array, para que la dependencia
+  // sea estable y el efecto no se repita en cada render.
+  const totalItems = categories.reduce((n, c) => n + c.items.length, 0);
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      const sobregastos = await getPreviousMonthOverspend(selectedMonth);
+      if (cancelado) return;
+      const indexados = porItem(sobregastos);
+      const conEtiqueta: Record<
+        string,
+        { previousMonthLabel: string; excess: number }
+      > = {};
+      for (const [itemId, s] of Object.entries(indexados)) {
+        conEtiqueta[itemId] = {
+          previousMonthLabel: formatMonthName(s.previousMonth),
+          excess: s.excess,
+        };
+      }
+      setOverspendByItem(conEtiqueta);
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [selectedMonth, totalItems]);
+
   const selectedMonthLabel =
     monthOptions.find(m => m.value === selectedMonth)?.label || selectedMonth;
 
@@ -696,6 +733,7 @@ export default function PresupuestoPage() {
                 onInlineUpdate={handleInlineUpdate}
                 classifications={classifications}
                 controls={controls}
+                overspendByItem={overspendByItem}
                 isLoading={isLoading}
                 formatCurrency={formatCurrency}
                 getClasificacionColor={getClasificacionColor}
