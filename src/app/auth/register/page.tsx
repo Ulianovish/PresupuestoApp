@@ -122,12 +122,13 @@ function RegisterForm() {
                   variant="glass"
                   placeholder="••••••••"
                   required
+                  minLength={8}
+                  maxLength={72}
+                  autoComplete="new-password"
                   disabled={isSubmitting}
                   className="w-full"
                 />
-                <p className="text-xs text-gray-400">
-                  Mínimo 6 caracteres, incluye mayúscula, minúscula y número
-                </p>
+                <p className="text-xs text-gray-400">Mínimo 8 caracteres.</p>
               </div>
 
               {/* Campo Confirmar Contraseña */}
@@ -145,6 +146,8 @@ function RegisterForm() {
                   variant="glass"
                   placeholder="••••••••"
                   required
+                  maxLength={72}
+                  autoComplete="new-password"
                   disabled={isSubmitting}
                   className="w-full"
                 />
