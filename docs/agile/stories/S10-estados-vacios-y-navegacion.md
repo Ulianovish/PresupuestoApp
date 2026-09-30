@@ -504,7 +504,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   ```
   Se eliminan `hasData`, `selectedMonth` y `onCreateBudget`. El único consumidor es `src/app/presupuesto/page.tsx` (verificado con grep).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.test.ts`:
 
@@ -563,12 +563,12 @@ describe('/presupuesto cablea el panel vacío (S10)', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.test.ts`
 Expected: FAIL — 5 fallos (p. ej. `expected '…Migrar Datos de Julio…' not to contain 'Migrar Datos de Julio'`, `expected … to contain 'ensureStarterKitAction()'`).
 
-- [ ] **Step 3a: Reescribir el panel**
+- [x] **Step 3a: Reescribir el panel**
 
 Reemplazar todo `src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.tsx` por:
 
@@ -696,7 +696,7 @@ export default function BudgetStatusPanels({
 }
 ```
 
-- [ ] **Step 3b: Imports de la página**
+- [x] **Step 3b: Imports de la página**
 
 En `src/app/presupuesto/page.tsx`, justo después de la línea
 `import { deleteCategory, updateCategory } from '@/lib/actions/categories';`
@@ -722,7 +722,7 @@ import { starterKitToast } from '@/lib/onboarding/budget-empty-state';
 
 (S08 ya agregó `import { defaultItemFormNames } from '@/lib/budget/catalog-defaults';` justo **antes** de ese bloque; no lo toques.)
 
-- [ ] **Step 3c: Quitar `initializeMonth` de la página**
+- [x] **Step 3c: Quitar `initializeMonth` de la página**
 
 En el destructuring de `useMonthlyBudget(selectedMonth)` (líneas 69-81), cambiar:
 
@@ -739,7 +739,7 @@ por:
 
 (`initializeMonth` solo se usaba en `onCreateBudget`; el hook lo sigue exportando.)
 
-- [ ] **Step 3d: Handler del kit**
+- [x] **Step 3d: Handler del kit**
 
 Justo después de la función `showToast` (termina en la línea ~296 con `  };`), agregar:
 
@@ -769,7 +769,7 @@ Justo después de la función `showToast` (termina en la línea ~296 con `  };`)
   };
 ```
 
-- [ ] **Step 3e: JSX del panel**
+- [x] **Step 3e: JSX del panel**
 
 Reemplazar:
 
@@ -800,7 +800,7 @@ por:
         }
 ```
 
-- [ ] **Step 4: Run tests and type-check**
+- [x] **Step 4: Run tests and type-check**
 
 Run: `bun run test src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.test.ts src/lib/onboarding/budget-empty-state.test.ts`
 Expected: PASS (5 + 12 tests).
@@ -808,7 +808,7 @@ Expected: PASS (5 + 12 tests).
 Run: `bun run type-check`
 Expected: sin errores. Si `tsc` reporta `hasData`/`onCreateBudget` en otro archivo, es un consumidor que el grep no vio: ajústalo a las props nuevas y anótalo.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.tsx src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.test.ts src/app/presupuesto/page.tsx

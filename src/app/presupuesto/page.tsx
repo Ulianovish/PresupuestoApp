@@ -21,12 +21,14 @@ import BudgetPageTemplate from '@/components/templates/BudgetPageTemplate/Budget
 import { useMonth } from '@/contexts/MonthContext';
 import { useMonthlyBudget } from '@/hooks/useMonthlyBudget';
 import { deleteCategory, updateCategory } from '@/lib/actions/categories';
+import { ensureStarterKitAction } from '@/lib/actions/onboarding';
 import {
   mapRubroEstado,
   rubrosEnRiesgo,
   type RubroEstado,
 } from '@/lib/budget/alerts';
 import { defaultItemFormNames } from '@/lib/budget/catalog-defaults';
+import { starterKitToast } from '@/lib/onboarding/budget-empty-state';
 import {
   formatCurrency,
   getClassifications,
@@ -78,7 +80,6 @@ export default function PresupuestoPage() {
     addBudgetItem,
     editBudgetItem,
     deleteBudgetItem,
-    initializeMonth,
   } = useMonthlyBudget(selectedMonth);
 
   // Lookups dinámicos desde la BD
@@ -290,6 +291,30 @@ export default function PresupuestoPage() {
     setTimeout(() => {
       setToast(prev => ({ ...prev, show: false }));
     }, 3000);
+  };
+
+  // Estado vacío (S10): cargar el kit inicial de categorías sugeridas.
+  const [isLoadingStarterKit, setIsLoadingStarterKit] = useState(false);
+
+  const handleLoadStarterKit = async () => {
+    setIsLoadingStarterKit(true);
+    try {
+      // Nunca lanza (contratos §5.2): los fallos llegan en result.error. Hasta
+      // que se aplique la migración de S09 (H8) la RPC no existe y el aviso es
+      // de error; el usuario puede seguir con "Crear categoría".
+      const result = await ensureStarterKitAction();
+      const aviso = starterKitToast(
+        result,
+        selectedMonth,
+        todayBogota().slice(0, 7),
+      );
+      showToast(aviso.message, aviso.type);
+      if (!result.error) {
+        await handleCategoryCreated();
+      }
+    } finally {
+      setIsLoadingStarterKit(false);
+    }
   };
 
   const openNextItemForEdit = (
@@ -665,10 +690,11 @@ export default function PresupuestoPage() {
           <BudgetStatusPanels
             isLoading={isLoading}
             error={error}
-            hasData={categories.length > 0}
-            selectedMonth={selectedMonth}
+            categoryCount={categories.length}
             selectedMonthLabel={selectedMonthLabel}
-            onCreateBudget={initializeMonth}
+            onCreateCategory={() => setShowCategoryModal(true)}
+            onLoadStarterKit={handleLoadStarterKit}
+            isLoadingStarterKit={isLoadingStarterKit}
           />
         }
         budgetTable={
