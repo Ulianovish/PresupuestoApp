@@ -20,7 +20,6 @@ import {
   Calendar,
   ChevronsLeft,
   CreditCard,
-  FlaskConical,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -44,7 +43,6 @@ const NAV_ITEMS = [
   { href: '/presupuesto', label: 'Presupuesto', icon: PieChart },
   { href: '/gastos', label: 'Gastos', icon: Wallet },
   { href: '/deudas', label: 'Deudas', icon: CreditCard },
-  { href: '/test', label: 'Test', icon: FlaskConical },
 ];
 
 interface SidebarProps {

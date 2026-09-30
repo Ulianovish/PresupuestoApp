@@ -833,7 +833,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: `logoutAction` de `src/lib/actions/auth.ts` (server action ya existente, se usa como `<form action={logoutAction}>` igual que en `Sidebar.tsx:236`).
 - Produces: nada que usen otras tareas. Props de `MobileSidebar` sin cambios (`isOpen`, `onClose`, `className`), así que `Sidebar.tsx` no cambia su uso.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/components/molecules/MobileSidebar/MobileSidebar.test.ts`:
 
@@ -874,12 +874,12 @@ describe('/test fuera de los menús (S10)', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/components/molecules/MobileSidebar/MobileSidebar.test.ts`
 Expected: FAIL — 4 fallos (`expected … to contain 'href="/settings"'`, `… to contain "import { logoutAction }…"`, y los dos `not to contain "'/test'"`).
 
-- [ ] **Step 3a: Sidebar de escritorio (cambio mínimo; S07 ya lo modificó)**
+- [x] **Step 3a: Sidebar de escritorio (cambio mínimo; S07 ya lo modificó)**
 
 Antes: `grep -n "useBudgetData\|formatCurrency" src/components/organisms/Sidebar/Sidebar.tsx` no debe imprimir nada (S07 ya quitó la tarjeta de montos). Si imprime algo, detente: S07 no está hecha.
 
@@ -890,7 +890,7 @@ En `src/components/organisms/Sidebar/Sidebar.tsx`:
 
 No tocar nada más del archivo. El test de S07 (`Sidebar.test.ts`) debe seguir en verde.
 
-- [ ] **Step 3b: MobileSidebar**
+- [x] **Step 3b: MobileSidebar**
 
 En `src/components/molecules/MobileSidebar/MobileSidebar.tsx`:
 
@@ -971,7 +971,7 @@ import { cn } from '@/lib/utils';
 
 (El `MobileSidebar` solo se monta desde `Sidebar.tsx`, que vive dentro de `AppShell` en páginas con sesión; por eso "Cerrar sesión" se muestra siempre, sin el `user &&` del escritorio.)
 
-- [ ] **Step 4: Run tests and type-check**
+- [x] **Step 4: Run tests and type-check**
 
 Run: `bun run test src/components/molecules/MobileSidebar/MobileSidebar.test.ts`
 Expected: PASS (4 tests).
@@ -979,7 +979,7 @@ Expected: PASS (4 tests).
 Run: `bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/molecules/MobileSidebar/MobileSidebar.tsx src/components/molecules/MobileSidebar/MobileSidebar.test.ts src/components/organisms/Sidebar/Sidebar.tsx
