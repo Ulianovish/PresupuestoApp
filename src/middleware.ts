@@ -124,8 +124,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - archivos con extensión
+     * - archivos con extensión (imágenes, fuentes, css/js, json, txt, xml, map, webmanifest)
      */
-    '/((?!api/|api$|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js|ico|ttf|woff|woff2)$).*)',
+    '/((?!api/|api$|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js|ico|ttf|woff|woff2|json|txt|xml|map|webmanifest)$).*)',
   ],
 };
