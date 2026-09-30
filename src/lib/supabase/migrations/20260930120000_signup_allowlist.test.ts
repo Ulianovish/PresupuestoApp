@@ -3,8 +3,12 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-// Test de texto: no hay Postgres local. Se lee la migración y se verifica
-// que tenga las piezas de seguridad del contrato §1.1 y ADR-002.
+// Test de humo de texto: no hay Postgres local. Se lee la migración y se
+// verifica que tenga las piezas de seguridad del contrato §1.1 y ADR-002. El
+// comportamiento real (el trigger rechaza un email NULL, el hook responde '{}'
+// o el 403) queda en los 6 bloques de verificación manual del final del .sql,
+// pendientes de H8. Si algún día hay Postgres efímero (pglite o
+// `supabase start`), conviene convertirlo en un test de comportamiento.
 const MIGRATION_PATH = resolve(
   process.cwd(),
   'supabase/migrations/20260930120000_signup_allowlist.sql',
@@ -35,6 +39,31 @@ function functionBlock(name: string): string {
   return end === -1 ? sql.slice(start) : sql.slice(start, end + 3);
 }
 
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Roles del `REVOKE <privilegio> ON <objeto> FROM …;`, ordenados: el orden en
+ * que la migración los escriba no importa.
+ */
+function revokedRoles(privilege: string, objeto: string): string[] {
+  const m = sql.match(
+    new RegExp(
+      `revoke ${escapeRegex(privilege)} on ${escapeRegex(objeto)} from ([^;]+);`,
+    ),
+  );
+  return m
+    ? m[1]
+        .split(',')
+        .map(r => r.trim())
+        .sort()
+    : [];
+}
+
+const ROLES_CLIENTE = ['anon', 'authenticated', 'public'];
+const ROLES_CLIENTE_Y_SERVICE = [...ROLES_CLIENTE, 'service_role'].sort();
+
 describe('migración 20260930120000_signup_allowlist', () => {
   it('existe el archivo de la migración', () => {
     expect(existsSync(MIGRATION_PATH)).toBe(true);
@@ -61,8 +90,8 @@ describe('tabla signup_allowlist', () => {
   });
 
   it('quita todos los privilegios a los roles de cliente', () => {
-    expect(sql).toContain(
-      'revoke all on table public.signup_allowlist from public, anon, authenticated;',
+    expect(revokedRoles('all', 'table public.signup_allowlist')).toEqual(
+      ROLES_CLIENTE,
     );
   });
 });
@@ -82,9 +111,9 @@ describe('is_signup_allowed', () => {
   });
 
   it('solo supabase_auth_admin la puede ejecutar', () => {
-    expect(sql).toContain(
-      'revoke execute on function public.is_signup_allowed(text) from public, anon, authenticated, service_role;',
-    );
+    expect(
+      revokedRoles('execute', 'function public.is_signup_allowed(text)'),
+    ).toEqual(ROLES_CLIENTE_Y_SERVICE);
     expect(sql).toContain(
       'grant execute on function public.is_signup_allowed(text) to supabase_auth_admin;',
     );
@@ -97,7 +126,7 @@ describe('is_signup_allowed', () => {
 describe('backfill de usuarios existentes', () => {
   it('inserta los correos de auth.users normalizados y es idempotente', () => {
     expect(sql).toMatch(
-      /insert into public\.signup_allowlist \(email, note\) select lower\(btrim\(u\.email\)\), '[^']+' from auth\.users u where u\.email is not null and btrim\(u\.email\) <> '' on conflict \(email\) do nothing;/,
+      /insert into public\.signup_allowlist \(email, note\) select lower\(btrim\((\w+\.)?email\)\), '[^']+' from auth\.users( (as )?\w+)? where (\w+\.)?email is not null and btrim\((\w+\.)?email\) <> '' on conflict \(email\) do nothing;/,
     );
   });
 });
@@ -129,9 +158,12 @@ describe('hook_before_user_created', () => {
     expect(sql).toContain(
       'grant usage on schema public to supabase_auth_admin;',
     );
-    expect(sql).toContain(
-      'revoke execute on function public.hook_before_user_created(jsonb) from public, anon, authenticated, service_role;',
-    );
+    expect(
+      revokedRoles(
+        'execute',
+        'function public.hook_before_user_created(jsonb)',
+      ),
+    ).toEqual(ROLES_CLIENTE_Y_SERVICE);
     expect(sql).toContain(
       'grant execute on function public.hook_before_user_created(jsonb) to supabase_auth_admin;',
     );
@@ -166,9 +198,9 @@ describe('trigger de respaldo enforce_signup_allowlist', () => {
   });
 
   it('nadie la ejecuta directo salvo supabase_auth_admin', () => {
-    expect(sql).toContain(
-      'revoke execute on function public.enforce_signup_allowlist() from public, anon, authenticated, service_role;',
-    );
+    expect(
+      revokedRoles('execute', 'function public.enforce_signup_allowlist()'),
+    ).toEqual(ROLES_CLIENTE_Y_SERVICE);
     expect(sql).toContain(
       'grant execute on function public.enforce_signup_allowlist() to supabase_auth_admin;',
     );

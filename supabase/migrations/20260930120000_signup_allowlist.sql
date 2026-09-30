@@ -81,8 +81,11 @@ GRANT EXECUTE ON FUNCTION public.hook_before_user_created(jsonb) TO supabase_aut
 
 -- 5) Trigger de respaldo. Protege antes de activar el hook (H5) y cubre
 --    auth.admin.createUser / "Add user" del dashboard, que no llaman al hook.
---    El cliente ve 'Database error saving new user' (translateAuthError lo
---    traduce). Con el hook activo, un correo no invitado nunca llega aquí.
+--    El cliente ve 'Database error saving new user'; lo traducirá
+--    translateAuthError, que llega con S04 (§2.2): hasta entonces se ve el
+--    mensaje crudo en inglés. Con el hook activo, un correo no invitado nunca
+--    llega aquí. También rechaza toda alta sin email (teléfono, anónimo),
+--    incluso desde auth.admin: es intencional (riesgo aceptado en S03).
 CREATE OR REPLACE FUNCTION public.enforce_signup_allowlist()
 RETURNS trigger
 LANGUAGE plpgsql
