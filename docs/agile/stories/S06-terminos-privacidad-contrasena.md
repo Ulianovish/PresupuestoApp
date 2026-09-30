@@ -46,15 +46,15 @@
 
 ## Criterios de aceptación
 
-- [ ] `passwordSchema` exportado desde `src/lib/validations/schemas.ts`: rechaza 7 caracteres con "Usa al menos 8 caracteres", acepta 8 y 72, rechaza 73 con "Usa como máximo 72 caracteres", y no exige mayúsculas, números ni símbolos.
-- [ ] `registerSchema.password` usa `passwordSchema`; `confirmPassword` solo exige no estar vacío ("Confirma tu contraseña") y debe coincidir ("Las contraseñas no coinciden").
-- [ ] El registro muestra "Mínimo 8 caracteres." como único texto de ayuda de la contraseña; ya no menciona mayúsculas, minúsculas ni números. Los inputs tienen `minLength={8}` y `maxLength={72}`.
-- [ ] `/privacy` existe, es pública (ya lo es por middleware) y dice, de forma breve: quién la administra (sin nombre), qué se guarda (cuenta, presupuesto, gastos, facturas con CUFE, números de WhatsApp, cédula/NIT, últimos mensajes con el bot), qué no se guarda (fotos, números de tarjeta, cookies de publicidad), para qué se usa, con quién se comparte (Supabase, Vercel, Twilio y Meta, Vercel AI Gateway y MiniMax, Resend, DIAN vía servicio propio), cuánto tiempo y cómo pedir copia, corrección o borrado escribiendo a `CONTACT_EMAIL`.
-- [ ] `/terms` existe y dice: acceso por invitación, responsabilidades de la cuenta, que los números vinculados ven y registran en el presupuesto, que la IA se equivoca, que la app solo maneja COP, que no es asesoría financiera, uso aceptable, cómo cerrar la cuenta, enlace a privacidad.
-- [ ] Ningún texto legal contiene correos distintos de `CONTACT_EMAIL`, números de teléfono ni secuencias de 7+ dígitos, ni voseo.
-- [ ] `middleware.ts`, `src/lib/auth/route-access.ts` y `vitest.config.ts` sin cambios de esta historia.
-- [ ] La tarea humana H9 (cambiar `CONTACT_EMAIL` por un buzón real antes de abrir el registro) queda anotada en el comentario de `legal.ts` y en la sección de tareas humanas.
-- [ ] `bun run test && bun run type-check` en verde.
+- [x] `passwordSchema` exportado desde `src/lib/validations/schemas.ts`: rechaza 7 caracteres con "Usa al menos 8 caracteres", acepta 8 y 72, rechaza 73 con "Usa como máximo 72 caracteres", y no exige mayúsculas, números ni símbolos.
+- [x] `registerSchema.password` usa `passwordSchema`; `confirmPassword` solo exige no estar vacío ("Confirma tu contraseña") y debe coincidir ("Las contraseñas no coinciden").
+- [x] El registro muestra "Mínimo 8 caracteres." como único texto de ayuda de la contraseña; ya no menciona mayúsculas, minúsculas ni números. Los inputs tienen `minLength={8}` y `maxLength={72}`.
+- [x] `/privacy` existe, es pública (ya lo es por middleware) y dice, de forma breve: quién la administra (sin nombre), qué se guarda (cuenta, presupuesto, gastos, facturas con CUFE, números de WhatsApp, cédula/NIT, últimos mensajes con el bot), qué no se guarda (fotos, números de tarjeta, cookies de publicidad), para qué se usa, con quién se comparte (Supabase, Vercel, Twilio y Meta, Vercel AI Gateway y MiniMax, Resend, DIAN vía servicio propio), cuánto tiempo y cómo pedir copia, corrección o borrado escribiendo a `CONTACT_EMAIL`.
+- [x] `/terms` existe y dice: acceso por invitación, responsabilidades de la cuenta, que los números vinculados ven y registran en el presupuesto, que la IA se equivoca, que la app solo maneja COP, que no es asesoría financiera, uso aceptable, cómo cerrar la cuenta, enlace a privacidad.
+- [x] Ningún texto legal contiene correos distintos de `CONTACT_EMAIL`, números de teléfono ni secuencias de 7+ dígitos, ni voseo.
+- [x] `middleware.ts`, `src/lib/auth/route-access.ts` y `vitest.config.ts` sin cambios de esta historia.
+- [x] La tarea humana H9 (cambiar `CONTACT_EMAIL` por un buzón real antes de abrir el registro) queda anotada en el comentario de `legal.ts` y en la sección de tareas humanas.
+- [x] `bun run test && bun run type-check` en verde.
 
 ---
 
@@ -990,17 +990,17 @@ EOF
 
 **Interfaces:** ninguna.
 
-- [ ] **Step 1: Confirmar que las páginas son públicas y que no se tocaron archivos ajenos**
+- [x] **Step 1: Confirmar que las páginas son públicas y que no se tocaron archivos ajenos**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n "'/terms'\|'/privacy'" src/lib/auth/route-access.ts middleware.ts; git status --short -- middleware.ts src/lib/auth/route-access.ts vitest.config.ts; git log --oneline main..HEAD -- vitest.config.ts`
 Expected: `/terms` y `/privacy` dentro de `PUBLIC_ROUTES` de `src/lib/auth/route-access.ts` (lo dejó S04; si S04 aún no está en la rama, en `publicRoutes` de `middleware.ts`), y **ninguna** salida de `git status` ni de `git log` para `vitest.config.ts` (contratos §5.0). Los commits de esta historia no tocan `middleware.ts` ni `route-access.ts`. Si alguna ruta faltara, **no** edites esos archivos: repórtalo a S04, que es su dueña.
 
-- [ ] **Step 2: Suite completa y tipos**
+- [x] **Step 2: Suite completa y tipos**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: todos los tests en verde (incluidos los 31 nuevos: 10 + 4 + 10 + 7) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 3: Confirmar que no quedaron datos personales ni marcadores**
+- [x] **Step 3: Confirmar que no quedaron datos personales ni marcadores**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rnE "TODO|TBD|@(gmail|hotmail|outlook)\.|\+57[0-9]" src/lib/constants/legal.ts src/app/terms src/app/privacy src/lib/validations/schemas.test.ts src/app/auth/register/register-page.test.ts; echo "salida: $?"`
 Expected: sin coincidencias (`salida: 1`).
