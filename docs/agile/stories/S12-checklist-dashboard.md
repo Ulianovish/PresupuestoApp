@@ -314,7 +314,7 @@ EOF
 - Consumes también: `todayBogota()` de `@/lib/whatsapp/format` (mes actual por defecto).
 - Produces: `export async function loadChecklistInput(supabase: SupabaseClient, userId: string, monthYear?: string): Promise<ChecklistInput>` — la firma del contrato más un `monthYear` opcional (`'YYYY-MM'`, por defecto `todayBogota().slice(0, 7)`) para no depender de la hora real en los tests. Lanza `Error('loadChecklistInput: <consulta> <código>')` si alguna consulta devuelve `error`.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 En `src/lib/onboarding/checklist.test.ts`:
 
@@ -550,12 +550,12 @@ describe('loadChecklistInput', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y ver que falla**
+- [x] **Step 2: Correr el test y ver que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: FAIL — `loadChecklistInput is not a function` en los 5 tests nuevos (los 4 de `computeChecklist` siguen en verde).
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/onboarding/checklist.ts`, agrega justo después del comentario inicial del archivo (antes de `export type ChecklistInput`):
 
@@ -636,17 +636,17 @@ export async function loadChecklistInput(
 }
 ```
 
-- [ ] **Step 4: Correr el test y ver que pasa**
+- [x] **Step 4: Correr el test y ver que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: PASS (9 tests).
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts && git commit -m "$(cat <<'EOF'
