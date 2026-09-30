@@ -419,9 +419,10 @@ export default function GastosPage() {
     }
 
     // Sin categoría no se guarda (el botón ya está deshabilitado; esto cubre
-    // un envío con Enter).
+    // un envío con Enter). Mientras las categorías cargan no se avisa: aún no
+    // se sabe si el usuario tiene.
     if (!form.category_name) {
-      toast.error(NO_CATEGORIES_LABEL);
+      if (!categoriesLoading) toast.error(NO_CATEGORIES_LABEL);
       return;
     }
 
@@ -868,8 +869,8 @@ export default function GastosPage() {
           formData={form}
           expenseCategories={categoryNames}
           accountTypes={buildAccountOptions(accountNames, form.account_name)}
-          submitDisabled={saveBlocked}
-          submitDisabledLabel={NO_CATEGORIES_LABEL}
+          submitDisabled={saveBlocked || (!isEditing && categoriesLoading)}
+          submitDisabledLabel={saveBlocked ? NO_CATEGORIES_LABEL : undefined}
           creditAccounts={creditAccountNames}
           onFormChange={handleFormChange}
           onSubmit={handleSubmitExpense}

@@ -12,8 +12,29 @@ const pagina = readFileSync(
 
 describe('/gastos sin categorías (contratos §2.6 y §5.2)', () => {
   it('el modal recibe el bloqueo calculado y el texto del contrato', () => {
-    expect(pagina).toMatch(/submitDisabled=\{saveBlocked\}/);
-    expect(pagina).toMatch(/submitDisabledLabel=\{NO_CATEGORIES_LABEL\}/);
+    expect(pagina).toMatch(
+      /submitDisabled=\{saveBlocked \|\| \(!isEditing && categoriesLoading\)\}/,
+    );
+    expect(pagina).toMatch(
+      /submitDisabledLabel=\{saveBlocked \? NO_CATEGORIES_LABEL : undefined\}/,
+    );
+  });
+
+  it('mientras las categorías cargan (al crear) no se puede guardar ni se avisa', () => {
+    // El aviso "sin categorías" del modal sale solo cuando hay texto del
+    // bloqueo (saveBlocked), no por estar cargando.
+    const modal = readFileSync(
+      resolve(
+        process.cwd(),
+        'src/components/organisms/ExpenseModal/ExpenseModal.tsx',
+      ),
+      'utf8',
+    );
+    expect(modal).toMatch(/\{submitDisabled && submitDisabledLabel && \(/);
+    // El guard del submit no dispara el toast mientras carga.
+    expect(pagina).toMatch(
+      /if \(!form\.category_name\) \{\s*if \(!categoriesLoading\) toast\.error\(NO_CATEGORIES_LABEL\);\s*return;\s*\}/,
+    );
   });
 
   it('el bloqueo espera a que las categorías carguen y no aplica al editar', () => {

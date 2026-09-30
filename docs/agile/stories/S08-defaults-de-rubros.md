@@ -1371,6 +1371,21 @@ Sin commit en esta tarea (no cambia archivos).
 
 ---
 
+### Task 7 (adicional, deuda de S07): /gastos no deja guardar mientras cargan las categorías
+
+- [x] Test de texto en `src/__tests__/gastos-page.test.ts`: `submitDisabled={saveBlocked || (!isEditing && categoriesLoading)}`, etiqueta solo si `saveBlocked`, aviso del modal solo con etiqueta, y el guard del submit sin toast mientras carga.
+- [x] `src/app/gastos/page.tsx` y `ExpenseModal.tsx` cableados; test en verde; commit.
+
+### Task 8 (adicional, deuda de S07): fixtures y comentarios sin aspecto de datos reales
+
+- [ ] Reemplazar en `src/lib/dian/historial-clasificacion.test.ts` y el comentario de `historial-clasificacion.ts` los valores con aspecto de teléfono o nombre real por inventados; buscar con grep otros casos en `src/`.
+
+### Task 9 (adicional, deuda de S07): Global Constraints de S07
+
+- [ ] `docs/agile/stories/S07-sin-datos-del-dueno.md`: commits con `--no-verify` + eslint/prettier a mano; ruta del worktree `PresupuestoApp-app`.
+
+---
+
 ## Autorrevisión
 
 - **Cobertura de criterios:** 1 → Task 1; 2 → Task 3; 3 → Task 4; 4 → Task 2 (warn + respaldo) y Task 1 (`pickCatalogId`); 5 → Task 2 (`ok:false`) y Tasks 3–4 (mensajes y no-insert); 6 → Task 5; 7 → Task 6; 8 → Task 6 Step 3.

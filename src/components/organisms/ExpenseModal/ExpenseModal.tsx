@@ -72,7 +72,10 @@ interface ExpenseModalProps {
   creditAccounts?: string[];
   /** Deshabilita el botón de guardar (p. ej. el usuario no tiene categorías). */
   submitDisabled?: boolean;
-  /** Texto del botón de guardar mientras está deshabilitado. */
+  /**
+   * Texto del botón de guardar mientras está deshabilitado. Si viene, también
+   * se muestra el aviso de crear una categoría.
+   */
   submitDisabledLabel?: string;
 }
 
@@ -151,7 +154,9 @@ export default function ExpenseModal({
               onFormChange={onFormChange}
             />
 
-            {submitDisabled && (
+            {/* Aviso solo si el bloqueo trae su texto (sin categorías), no
+                mientras las categorías cargan. */}
+            {submitDisabled && submitDisabledLabel && (
               <p className="pt-4 text-sm text-amber-300">
                 Aún no tienes categorías para clasificar el gasto.{' '}
                 <Link href="/settings" className="underline">
