@@ -526,7 +526,7 @@ EOF
 
 > No hay tests de componentes en el repo (vitest corre en `environment: 'node'` sin testing-library). La lógica del enlace está cubierta por la Task 1; esta tarea se verifica con `type-check`, `lint` y una revisión visual opcional.
 
-- [ ] **Step 1: Reemplazar el panel**
+- [x] **Step 1: Reemplazar el panel**
 
 Reemplazar todo `src/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel.tsx` por:
 
@@ -626,7 +626,7 @@ export default function WhatsAppLinkPanel() {
 }
 ```
 
-- [ ] **Step 2: Agregar la variable al final de `.env.example`**
+- [x] **Step 2: Agregar la variable al final de `.env.example`**
 
 Agregar al **final** de `.env.example` (después de la última línea existente; S04 no está en este worktree: al integrar, su `NEXT_PUBLIC_SITE_URL` y esta variable se conservan ambas):
 
@@ -638,7 +638,7 @@ Agregar al **final** de `.env.example` (después de la última línea existente;
 NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000
 ```
 
-- [ ] **Step 3: Verificar tipos y lint**
+- [x] **Step 3: Verificar tipos y lint**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check && bunx eslint src/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel.tsx`
 Expected: `tsc --noEmit` sin errores; eslint sin errores (orden de imports incluido).
@@ -646,11 +646,11 @@ Expected: `tsc --noEmit` sin errores; eslint sin errores (orden de imports inclu
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && tail -n 1 .env.example`
 Expected: `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000`
 
-- [ ] **Step 4 (solo humano, opcional; nunca producción): revisión visual**
+- [x] **Step 4 (solo humano, opcional; nunca producción): revisión visual**
 
 El implementador **no** corre `bun run dev` ni `next build` (`.env.local` apunta a producción, §5.0). El humano, en un entorno con base de desarrollo y `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000`, entra a `/settings`, tocar "Generar código de vinculación" y comprobar que el botón "Abrir WhatsApp" apunta a `https://wa.me/573000000000?text=VINCULAR%20<código>`. Sin la variable, el panel no muestra el botón. No uses datos de producción.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel.tsx .env.example && git commit -m "$(cat <<'EOF'
