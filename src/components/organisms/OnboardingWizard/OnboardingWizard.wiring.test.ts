@@ -30,6 +30,11 @@ describe('OnboardingWizard (cableado con wizard-steps)', () => {
     expect(wizard).toContain('buildFirstExpense({');
   });
 
+  it('el paso 2 compara con lo cargado/guardado para enviar solo lo que cambió', () => {
+    expect(wizard).toContain('cargados: montosGuardados');
+    expect(wizard).toContain('setMontosGuardados(montos)');
+  });
+
   it('recuerda el ingreso y el gasto ya guardados para no duplicarlos', () => {
     expect(wizard).toContain('guardado: ingresoGuardado');
     expect(wizard).toContain('setIngresoGuardado(guardado)');

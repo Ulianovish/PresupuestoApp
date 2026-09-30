@@ -10,6 +10,7 @@ import {
   FINISH_ERROR_MESSAGE,
   finishOnboarding,
   ingresoSinCambios,
+  montosCambiados,
   saveBudgetStep,
   saveExpenseAndFinish,
   saveIncomeStep,
@@ -160,7 +161,7 @@ describe('saveBudgetStep', () => {
     const notify = vi.fn();
 
     await expect(
-      saveBudgetStep({ montos: { a: 1000 }, save, notify }),
+      saveBudgetStep({ montos: { a: 1000 }, cargados: {}, save, notify }),
     ).resolves.toBe(true);
     expect(save).toHaveBeenCalledWith({ a: 1000 });
     expect(notify).not.toHaveBeenCalled();
@@ -172,6 +173,7 @@ describe('saveBudgetStep', () => {
     await expect(
       saveBudgetStep({
         montos: { a: 1000 },
+        cargados: {},
         save: vi.fn().mockResolvedValue({ ok: false, error: 'Mal' }),
         notify,
       }),
@@ -184,7 +186,8 @@ describe('saveBudgetStep', () => {
 
     await expect(
       saveBudgetStep({
-        montos: {},
+        montos: { a: 1000 },
+        cargados: {},
         save: vi.fn().mockRejectedValue(new Error('red')),
         notify,
       }),
@@ -193,6 +196,54 @@ describe('saveBudgetStep', () => {
       'No pudimos guardar tu presupuesto. Intenta de nuevo.',
       'error',
     );
+  });
+});
+
+describe('montosCambiados', () => {
+  it('deja solo los rubros cuyo monto cambió respecto a lo cargado', () => {
+    expect(
+      montosCambiados(
+        { a: 1000, b: 2000, c: 0 },
+        { a: 1000, b: 2500, c: 0, d: 300 },
+      ),
+    ).toEqual({ b: 2500, d: 300 });
+  });
+
+  it('sin cambios devuelve un objeto vacío', () => {
+    expect(montosCambiados({ a: 1000 }, { a: 1000 })).toEqual({});
+  });
+});
+
+describe('saveBudgetStep (solo lo que cambió)', () => {
+  it('envía solo los rubros editados: no pisa montos de otra pestaña ni decimales', async () => {
+    const save = vi.fn().mockResolvedValue({ ok: true });
+
+    await expect(
+      saveBudgetStep({
+        // 'a' llegó redondeado (1500.5 → 1501) y no se tocó; 'b' se editó.
+        cargados: { a: 1501, b: 0 },
+        montos: { a: 1501, b: 200_000 },
+        save,
+        notify: vi.fn(),
+      }),
+    ).resolves.toBe(true);
+    expect(save).toHaveBeenCalledWith({ b: 200_000 });
+  });
+
+  it('si nada cambió no llama la acción y sigue', async () => {
+    const save = vi.fn();
+    const notify = vi.fn();
+
+    await expect(
+      saveBudgetStep({
+        cargados: { a: 1000 },
+        montos: { a: 1000 },
+        save,
+        notify,
+      }),
+    ).resolves.toBe(true);
+    expect(save).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 });
 

@@ -1156,3 +1156,8 @@ EOF
 - **Task 5, tests de componente:** S11 habilitó JSX en vitest (oxc), así que `OnboardingChecklist.render.test.tsx` renderiza con `renderToStaticMarkup` y verifica el cableado con `hideChecklist`; `page.test.tsx` además verifica por texto que `DashboardContent` pinta la checklist encima de las acciones rápidas.
 - **Task 5, `createClient`:** la página crea el cliente una vez y lo usa para el perfil y para `loadDashboardChecklist`; compila sin el cast alternativo.
 
+## Alcance adicional (deuda de S11, instrucción del orquestador)
+
+- [x] **Extra 1 — el paso 2 del wizard envía solo lo que cambió:** `montosCambiados(cargados, montos)` y `saveBudgetStep({ montos, cargados, save, notify })` en `src/lib/onboarding/wizard-steps.ts` (tests: solo los editados, sin cambios no llama la acción; los tests viejos pasan `cargados: {}`). `OnboardingWizard` guarda `montosGuardados` (inicial = lo cargado; tras guardar = lo enviado) y lo pasa como `cargados` (test de cableado). Así no se pisan montos editados en otra pestaña ni los decimales que llegaron redondeados.
+- [x] **Extra 2 — notas de desviación que faltaban en `S11-bienvenida.md`** (Tasks 3, 5, 7 y 8).
+

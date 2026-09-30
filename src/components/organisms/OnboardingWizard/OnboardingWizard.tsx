@@ -87,6 +87,10 @@ export default function OnboardingWizard({
   const [montos, setMontos] = useState<Record<string, number>>(() =>
     Object.fromEntries(items.map(i => [i.id, i.budgetedAmount])),
   );
+  // Lo cargado o guardado por última vez: solo se envían los que cambian.
+  const [montosGuardados, setMontosGuardados] = useState<
+    Record<string, number>
+  >(() => Object.fromEntries(items.map(i => [i.id, i.budgetedAmount])));
   const [ahorroSinAsignar, setAhorroSinAsignar] = useState<number | null>(null);
   const [guardandoPresupuesto, setGuardandoPresupuesto] = useState(false);
 
@@ -165,10 +169,14 @@ export default function OnboardingWizard({
     try {
       const ok = await saveBudgetStep({
         montos,
+        cargados: montosGuardados,
         save: saveOnboardingBudgetAction,
         notify,
       });
-      if (ok) setPaso(3);
+      if (ok) {
+        setMontosGuardados(montos);
+        setPaso(3);
+      }
     } finally {
       setGuardandoPresupuesto(false);
     }

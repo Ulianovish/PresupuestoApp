@@ -90,14 +90,36 @@ export async function saveIncomeStep(deps: {
   }
 }
 
-/** Paso 2: guarda los montos. Devuelve false si falló (ya avisó). */
+/**
+ * Rubros cuyo monto en `montos` difiere de `cargados` (lo que se cargó o se
+ * guardó por última vez). Un rubro que no estaba en `cargados` cuenta como
+ * cambiado.
+ */
+export function montosCambiados(
+  cargados: Record<string, number>,
+  montos: Record<string, number>,
+): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(montos).filter(([id, monto]) => cargados[id] !== monto),
+  );
+}
+
+/**
+ * Paso 2: guarda solo los montos que cambiaron respecto a `cargados`, para no
+ * pisar montos editados en otra pestaña ni los decimales de los rubros que
+ * llegaron redondeados y no se tocaron. Sin cambios no llama la acción.
+ * Devuelve false si falló (ya avisó).
+ */
 export async function saveBudgetStep(deps: {
   montos: Record<string, number>;
+  cargados: Record<string, number>;
   save: (montos: Record<string, number>) => Promise<ResultadoAccion>;
   notify: WizardNotify;
 }): Promise<boolean> {
+  const cambios = montosCambiados(deps.cargados, deps.montos);
+  if (Object.keys(cambios).length === 0) return true;
   try {
-    const r = await deps.save(deps.montos);
+    const r = await deps.save(cambios);
     if (!r.ok) {
       deps.notify(r.error ?? BUDGET_ERROR_MESSAGE, 'error');
       return false;
