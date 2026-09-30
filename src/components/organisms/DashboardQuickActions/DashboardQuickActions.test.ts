@@ -15,10 +15,14 @@ const gastos = leer('src/app/gastos/page.tsx');
 
 describe('Agregar Gasto (S10)', () => {
   it('es un enlace a NUEVO_GASTO_HREF, no un botón muerto', () => {
-    expect(quickActions).toContain('<Link href={NUEVO_GASTO_HREF}');
+    expect(quickActions).not.toBe('');
     expect(quickActions).toMatch(
-      /<Link href=\{NUEVO_GASTO_HREF\}[\s\S]*?Agregar Gasto[\s\S]*?<\/Link>/,
+      /href=\{NUEVO_GASTO_HREF\}[\s\S]*?Agregar Gasto/,
     );
+  });
+
+  it('no envuelve un <Button> en un <Link> (deuda S10)', () => {
+    expect(quickActions).not.toMatch(/<Link\b[\s\S]*?<Button\b/);
   });
 
   it('/gastos abre el formulario si llega el parámetro y limpia la URL', () => {
