@@ -195,7 +195,7 @@ git commit -m "feat(auth): getSiteUrl para los enlaces de los correos" -m "Co-Au
 - Consumes: nada.
 - Produces: `export function safeRedirectPath(input: string | null | undefined, fallback?: string): string` — fallback por defecto `'/dashboard'`. Devuelve la ruta normalizada (`pathname + search + hash`) o `fallback`. Con `fallback = ''` sirve para preguntar "¿es segura?" (lo usa Task 7).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/auth/safe-redirect.test.ts`:
 
@@ -250,12 +250,12 @@ describe('safeRedirectPath', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/auth/safe-redirect.test.ts`
 Expected: FAIL con `Failed to resolve import "./safe-redirect"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/auth/safe-redirect.ts`:
 
@@ -306,12 +306,12 @@ export function safeRedirectPath(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/auth/safe-redirect.test.ts`
 Expected: PASS (todos los casos de `it.each`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/auth/safe-redirect.ts src/lib/auth/safe-redirect.test.ts
