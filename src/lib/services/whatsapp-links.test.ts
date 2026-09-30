@@ -10,15 +10,15 @@ import {
   createLinkCode,
   generateSixDigitCode,
   getLinkByPhone,
-  isLinkAttemptLimitReached,
   isOverLinkAttemptLimit,
   LINK_ATTEMPTS_WINDOW_MINUTES,
   LINK_MAX_FAILED_ATTEMPTS,
   linkAttemptsWindowStart,
   listarDocumentosDeUsuario,
   MAX_CODE_ATTEMPTS,
-  recordFailedLinkAttempt,
   redeemLinkCode,
+  releaseLinkAttempt,
+  reserveLinkAttempt,
 } from './whatsapp-links';
 
 const mockedAdmin = createAdminClient as unknown as ReturnType<typeof vi.fn>;
@@ -348,6 +348,57 @@ describe('redeemLinkCode', () => {
     errorSpy.mockRestore();
   });
 
+  it('si no se puede borrar la conversación ajena, libera el código para reintentarlo', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const codigos = codigoValido();
+    clienteCanje({
+      whatsapp_link_codes: codigos,
+      whatsapp_links: tablaLinks({ data: null, error: null }),
+      whatsapp_conversations: tablaConversaciones({
+        error: { code: 'XX000', message: 'boom' },
+      }),
+    });
+
+    await redeemLinkCode('482913', TEL, now);
+
+    // Segundo UPDATE: vuelve used_at a NULL solo si lo marcó este canje.
+    expect(codigos.update).toHaveBeenLastCalledWith({ used_at: null });
+    expect(codigos.eq).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(codigos.eq).toHaveBeenCalledWith('used_at', NOW_ISO);
+    errorSpy.mockRestore();
+  });
+
+  it('si el upsert falla, libera el código para reintentarlo', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const codigos = codigoValido();
+    clienteCanje({
+      whatsapp_link_codes: codigos,
+      whatsapp_links: tablaLinks(
+        { data: null, error: null },
+        { error: { code: 'XX000', message: 'boom' } },
+      ),
+      whatsapp_conversations: tablaConversaciones(),
+    });
+
+    await redeemLinkCode('482913', TEL, now);
+
+    expect(codigos.update).toHaveBeenLastCalledWith({ used_at: null });
+    errorSpy.mockRestore();
+  });
+
+  it('un canje exitoso no libera el código', async () => {
+    const codigos = codigoValido();
+    clienteCanje({
+      whatsapp_link_codes: codigos,
+      whatsapp_links: tablaLinks({ data: null, error: null }),
+      whatsapp_conversations: tablaConversaciones(),
+    });
+
+    await redeemLinkCode('482913', TEL, now);
+
+    expect(codigos.update).toHaveBeenCalledTimes(1);
+  });
+
   it('si el upsert del vínculo falla devuelve link_failed', async () => {
     const links = tablaLinks(
       { data: null, error: null },
@@ -464,124 +515,186 @@ describe('límite de intentos de vinculación (lógica pura)', () => {
   });
 });
 
-/** Tabla whatsapp_link_attempts: conteo select().eq().gte() + insert. */
-function tablaIntentos(
-  conteo: { count: number | null; error: unknown },
-  insertResult: { error: unknown } = { error: null },
-) {
-  return {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    gte: vi.fn().mockResolvedValue(conteo),
-    insert: vi.fn().mockResolvedValue(insertResult),
-  };
+/**
+ * Una consulta encadenable (cada método devuelve la misma cadena) que al
+ * esperarse resuelve a `result`. Cada `from()` recibe una cadena nueva.
+ */
+function consulta(result: unknown) {
+  const c: Record<string, unknown> = {};
+  for (const m of [
+    'delete',
+    'eq',
+    'lt',
+    'gte',
+    'select',
+    'insert',
+    'single',
+    'update',
+    'is',
+    'gt',
+    'neq',
+  ]) {
+    c[m] = vi.fn(() => c);
+  }
+  c.then = (res: (v: unknown) => unknown, rej: (e: unknown) => unknown) =>
+    Promise.resolve(result).then(res, rej);
+  return c as Record<string, ReturnType<typeof vi.fn>>;
 }
 
-describe('isLinkAttemptLimitReached', () => {
+/** Cliente cuyas llamadas a from() devuelven las consultas dadas, en orden. */
+function clienteIntentos(...consultas: Array<ReturnType<typeof consulta>>) {
+  const from = vi.fn();
+  for (const q of consultas) from.mockReturnValueOnce(q);
+  mockedAdmin.mockReturnValue({ from });
+  return from;
+}
+
+describe('reserveLinkAttempt', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('cuenta los fallos del número desde hace 15 minutos (reloj inyectado)', async () => {
-    const tabla = tablaIntentos({ count: 5, error: null });
-    const from = vi.fn(() => tabla);
-    mockedAdmin.mockReturnValue({ from });
+  it('purga lo viejo del número, registra el intento ANTES de contar y cuenta la ventana con él incluido', async () => {
+    const purga = consulta({ error: null });
+    const insert = consulta({ data: { id: 42 }, error: null });
+    const conteo = consulta({ count: 5, error: null });
+    const from = clienteIntentos(purga, insert, conteo);
 
-    expect(await isLinkAttemptLimitReached(TEL, now)).toBe(true);
+    const res = await reserveLinkAttempt(TEL, now);
+
+    expect(res).toEqual({ allowed: true, attemptId: 42 });
     expect(from).toHaveBeenCalledWith('whatsapp_link_attempts');
-    expect(tabla.select).toHaveBeenCalledWith('id', {
-      count: 'exact',
-      head: true,
-    });
-    expect(tabla.eq).toHaveBeenCalledWith('phone_e164', TEL);
-    expect(tabla.gte).toHaveBeenCalledWith(
+    // Purga: solo las filas del número anteriores a la ventana.
+    expect(purga.delete).toHaveBeenCalled();
+    expect(purga.eq).toHaveBeenCalledWith('phone_e164', TEL);
+    expect(purga.lt).toHaveBeenCalledWith(
       'created_at',
       '2026-09-30T11:45:00.000Z',
     );
-  });
-
-  it('con 4 fallos en la ventana no bloquea', async () => {
-    mockedAdmin.mockReturnValue({
-      from: vi.fn(() => tablaIntentos({ count: 4, error: null })),
+    expect(insert.insert).toHaveBeenCalledWith({
+      phone_e164: TEL,
+      created_at: NOW_ISO,
     });
-
-    expect(await isLinkAttemptLimitReached(TEL, now)).toBe(false);
-  });
-
-  it('sin conteo (null) no bloquea', async () => {
-    mockedAdmin.mockReturnValue({
-      from: vi.fn(() => tablaIntentos({ count: null, error: null })),
+    expect(insert.select).toHaveBeenCalledWith('id');
+    expect(conteo.select).toHaveBeenCalledWith('id', {
+      count: 'exact',
+      head: true,
     });
-
-    expect(await isLinkAttemptLimitReached(TEL, now)).toBe(false);
+    expect(conteo.eq).toHaveBeenCalledWith('phone_e164', TEL);
+    expect(conteo.gte).toHaveBeenCalledWith(
+      'created_at',
+      '2026-09-30T11:45:00.000Z',
+    );
+    expect(insert.insert.mock.invocationCallOrder[0]).toBeLessThan(
+      conteo.select.mock.invocationCallOrder[0],
+    );
   });
 
-  it('si la consulta falla (p. ej. la migración sin aplicar) no bloquea y no loguea el número', async () => {
+  it('con 6 en la ventana (5 fallos + este) rechaza y borra su propia reserva', async () => {
+    expect(LINK_MAX_FAILED_ATTEMPTS).toBe(5);
+    const borrado = consulta({ error: null });
+    clienteIntentos(
+      consulta({ error: null }),
+      consulta({ data: { id: 42 }, error: null }),
+      consulta({ count: 6, error: null }),
+      borrado,
+    );
+
+    expect(await reserveLinkAttempt(TEL, now)).toEqual({ allowed: false });
+    expect(borrado.delete).toHaveBeenCalled();
+    expect(borrado.eq).toHaveBeenCalledWith('id', 42);
+  });
+
+  it('si la purga falla sigue igual (best-effort)', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockedAdmin.mockReturnValue({
-      from: vi.fn(() =>
-        tablaIntentos({
-          count: null,
-          error: {
-            code: '42P01',
-            message: 'relation "whatsapp_link_attempts" does not exist',
-          },
-        }),
-      ),
-    });
+    clienteIntentos(
+      consulta({ error: { code: 'XX000', message: 'boom' } }),
+      consulta({ data: { id: 1 }, error: null }),
+      consulta({ count: 1, error: null }),
+    );
 
-    expect(await isLinkAttemptLimitReached(TEL, now)).toBe(false);
+    expect(await reserveLinkAttempt(TEL, now)).toEqual({
+      allowed: true,
+      attemptId: 1,
+    });
+    errorSpy.mockRestore();
+  });
+
+  it('si el insert falla (p. ej. la migración sin aplicar) deja pasar sin reserva y no loguea el número', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    clienteIntentos(
+      consulta({ error: null }),
+      consulta({
+        data: null,
+        error: {
+          code: '42P01',
+          message: 'relation "whatsapp_link_attempts" does not exist',
+        },
+      }),
+    );
+
+    expect(await reserveLinkAttempt(TEL, now)).toEqual({
+      allowed: true,
+      attemptId: null,
+    });
     expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('isLinkAttemptLimitReached'),
+      expect.stringContaining('reserveLinkAttempt'),
       '42P01',
     );
     expect(errorSpy.mock.calls.flat().join(' ')).not.toContain(TEL);
     errorSpy.mockRestore();
   });
 
-  it('si el cliente lanza, no bloquea', async () => {
+  it('si el conteo falla deja pasar y conserva la reserva', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    clienteIntentos(
+      consulta({ error: null }),
+      consulta({ data: { id: 9 }, error: null }),
+      consulta({ count: null, error: { code: '57014', message: 'timeout' } }),
+    );
+
+    expect(await reserveLinkAttempt(TEL, now)).toEqual({
+      allowed: true,
+      attemptId: 9,
+    });
+    errorSpy.mockRestore();
+  });
+
+  it('si el cliente lanza, deja pasar sin reserva', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockedAdmin.mockImplementationOnce(() => {
       throw new Error('sin variables de entorno');
     });
 
-    expect(await isLinkAttemptLimitReached(TEL, now)).toBe(false);
+    expect(await reserveLinkAttempt(TEL, now)).toEqual({
+      allowed: true,
+      attemptId: null,
+    });
     errorSpy.mockRestore();
   });
 });
 
-describe('recordFailedLinkAttempt', () => {
+describe('releaseLinkAttempt', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('inserta el intento del número con la hora del reloj inyectado', async () => {
-    const tabla = tablaIntentos({ count: 0, error: null });
-    const from = vi.fn(() => tabla);
-    mockedAdmin.mockReturnValue({ from });
+  it('borra el intento por id', async () => {
+    const borrado = consulta({ error: null });
+    const from = clienteIntentos(borrado);
 
-    await recordFailedLinkAttempt(TEL, now);
+    await releaseLinkAttempt(42);
 
     expect(from).toHaveBeenCalledWith('whatsapp_link_attempts');
-    expect(tabla.insert).toHaveBeenCalledWith({
-      phone_e164: TEL,
-      created_at: NOW_ISO,
-    });
+    expect(borrado.delete).toHaveBeenCalled();
+    expect(borrado.eq).toHaveBeenCalledWith('id', 42);
   });
 
-  it('si el insert falla no lanza y loguea solo el código de error', async () => {
+  it('si el borrado falla no lanza y loguea solo el código de error', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockedAdmin.mockReturnValue({
-      from: vi.fn(() =>
-        tablaIntentos(
-          { count: 0, error: null },
-          { error: { code: '42P01', message: 'no existe' } },
-        ),
-      ),
-    });
+    clienteIntentos(consulta({ error: { code: 'XX000', message: 'boom' } }));
 
-    await expect(recordFailedLinkAttempt(TEL, now)).resolves.toBeUndefined();
+    await expect(releaseLinkAttempt(42)).resolves.toBeUndefined();
     expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('recordFailedLinkAttempt'),
-      '42P01',
+      expect.stringContaining('releaseLinkAttempt'),
+      'XX000',
     );
-    expect(errorSpy.mock.calls.flat().join(' ')).not.toContain(TEL);
     errorSpy.mockRestore();
   });
 
@@ -591,7 +704,7 @@ describe('recordFailedLinkAttempt', () => {
       throw new Error('sin variables de entorno');
     });
 
-    await expect(recordFailedLinkAttempt(TEL, now)).resolves.toBeUndefined();
+    await expect(releaseLinkAttempt(42)).resolves.toBeUndefined();
     errorSpy.mockRestore();
   });
 });

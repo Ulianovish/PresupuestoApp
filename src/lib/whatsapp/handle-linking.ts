@@ -1,16 +1,23 @@
 // Orquesta la respuesta a un mensaje entrante en la fase de vinculación.
 // Recibe las dependencias inyectadas para ser testeable sin tocar la DB.
 
-import type { RedeemResult } from '@/lib/services/whatsapp-links';
+import type {
+  LinkAttemptReservation,
+  RedeemResult,
+} from '@/lib/services/whatsapp-links';
 import { parseCommand } from '@/lib/whatsapp/message';
 
 export interface LinkingDeps {
   redeemLinkCode: (code: string, phoneE164: string) => Promise<RedeemResult>;
   getLinkByPhone: (phoneE164: string) => Promise<{ userId: string } | null>;
-  /** true si el número ya tiene 5 VINCULAR fallidos en los últimos 15 min. */
-  isLinkAttemptLimitReached: (phoneE164: string) => Promise<boolean>;
-  /** Suma un VINCULAR fallido (código inexistente o vencido) al número. */
-  recordFailedLinkAttempt: (phoneE164: string) => Promise<void>;
+  /**
+   * Registra el intento ANTES de canjear y cuenta los de la ventana (este
+   * incluido): con más de 5 no deja pasar. Así una ráfaga en paralelo no
+   * puede probar más de 5 códigos.
+   */
+  reserveLinkAttempt: (phoneE164: string) => Promise<LinkAttemptReservation>;
+  /** Borra un intento reservado que al final no fue un fallo del usuario. */
+  releaseLinkAttempt: (attemptId: number) => Promise<void>;
 }
 
 const MSG_LINKED_OK =
@@ -39,21 +46,31 @@ export async function handleLinkingMessage(
 
   if (cmd.kind === 'link') {
     // Con el límite alcanzado ni se mira el código: adivinar los 6 dígitos a
-    // fuerza de intentos deja de ser posible. Estos intentos no se registran,
-    // así que al pasar 15 minutos el número vuelve a poder.
-    if (await deps.isLinkAttemptLimitReached(phoneE164)) {
+    // fuerza de intentos deja de ser posible. La reserva rechazada se borra
+    // sola, así que al pasar 15 minutos el número vuelve a poder.
+    const reserva = await deps.reserveLinkAttempt(phoneE164);
+    if (!reserva.allowed) {
       return MSG_TOO_MANY_ATTEMPTS;
     }
-    const res = await deps.redeemLinkCode(cmd.code, phoneE164);
-    if (res.ok) {
-      return MSG_LINKED_OK;
+    const liberar = async () => {
+      if (reserva.attemptId !== null) {
+        await deps.releaseLinkAttempt(reserva.attemptId);
+      }
+    };
+
+    let res: RedeemResult;
+    try {
+      res = await deps.redeemLinkCode(cmd.code, phoneE164);
+    } catch (err) {
+      await liberar();
+      throw err;
     }
-    // Solo un código inexistente o vencido cuenta; un error de base no es
-    // culpa de quien escribe.
-    if (res.reason === 'invalid_or_expired') {
-      await deps.recordFailedLinkAttempt(phoneE164);
+    // Solo un código inexistente o vencido cuenta (su reserva queda como el
+    // fallo); un canje exitoso o un error de base no es culpa de quien escribe.
+    if (res.ok || res.reason === 'link_failed') {
+      await liberar();
     }
-    return MSG_CODE_INVALID;
+    return res.ok ? MSG_LINKED_OK : MSG_CODE_INVALID;
   }
 
   const link = await deps.getLinkByPhone(phoneE164);

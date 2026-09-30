@@ -17,9 +17,9 @@ import {
 } from '@/lib/services/whatsapp-expenses';
 import {
   getLinkByPhone,
-  isLinkAttemptLimitReached,
-  recordFailedLinkAttempt,
   redeemLinkCode,
+  releaseLinkAttempt,
+  reserveLinkAttempt,
 } from '@/lib/services/whatsapp-links';
 import { parsearIdOpcion } from '@/lib/whatsapp/account-picker';
 import {
@@ -96,8 +96,8 @@ export async function POST(request: NextRequest) {
     const reply = await handleLinkingMessage(phone, body, {
       redeemLinkCode,
       getLinkByPhone,
-      isLinkAttemptLimitReached,
-      recordFailedLinkAttempt,
+      reserveLinkAttempt,
+      releaseLinkAttempt,
     });
     return xml(twimlMessage(reply));
   }

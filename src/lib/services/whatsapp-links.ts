@@ -89,7 +89,8 @@ export type RedeemResult =
  * - `invalid_or_expired`: el código no existe, ya se usó o venció. Es lo único
  *   que cuenta como intento fallido para el límite por número.
  * - `link_failed`: falló la base (el UPDATE, borrar la conversación ajena o el
- *   upsert). No es culpa de quien escribe, así que no suma al límite.
+ *   upsert). No es culpa de quien escribe, así que no suma al límite, y si el
+ *   código ya se había consumido se libera (best-effort) para reintentarlo.
  *
  * El canje es un UPDATE condicional (sin usar y vigente) en un único
  * statement: un código se canjea una sola vez aunque lleguen dos peticiones a
@@ -128,6 +129,24 @@ export async function redeemLinkCode(
 
   const userId = (row as { user_id: string }).user_id;
 
+  // Si algo falla después de consumir el código, se devuelve a pendiente para
+  // que la persona pueda reintentar el mismo VINCULAR: el error fue de la base,
+  // no suyo. Solo si lo marcó este canje (used_at = nowIso). Best-effort.
+  const liberarCodigo = async () => {
+    const { error: liberarError } = await supabase
+      .from('whatsapp_link_codes')
+      .update({ used_at: null })
+      .eq('code', code)
+      .eq('user_id', userId)
+      .eq('used_at', nowIso);
+    if (liberarError) {
+      console.error(
+        'redeemLinkCode: no se pudo liberar el código:',
+        liberarError.code,
+      );
+    }
+  };
+
   // El documento (cédula/NIT para la DIAN) es de la persona del número en SU
   // presupuesto: si el número pasa a otro usuario, no se hereda el del dueño
   // anterior. Solo se conserva si se sabe que el dueño es el mismo; ante la
@@ -152,6 +171,7 @@ export async function redeemLinkCode(
       'redeemLinkCode: no se pudo borrar la conversación del dueño anterior:',
       conversacionError.code,
     );
+    await liberarCodigo();
     return { ok: false, reason: 'link_failed' };
   }
 
@@ -164,12 +184,13 @@ export async function redeemLinkCode(
     { onConflict: 'phone_e164' },
   );
   if (upsertError) {
-    // El código ya quedó consumido; reportamos fallo para que el usuario
-    // reintente con uno nuevo en vez de creer que quedó vinculado.
+    // Reportamos fallo para que el usuario no crea que quedó vinculado; el
+    // código se libera para que pueda reintentar el mismo.
     console.error(
       'redeemLinkCode: no se pudo guardar el vínculo:',
       upsertError.code,
     );
+    await liberarCodigo();
     return { ok: false, reason: 'link_failed' };
   }
 
@@ -249,65 +270,105 @@ export function isOverLinkAttemptLimit(failedAttempts: number): boolean {
 }
 
 /**
- * ¿El número agotó sus intentos de VINCULAR? Cuenta sus fallos de los últimos
- * 15 minutos en `whatsapp_link_attempts`.
+ * Resultado de reservar un intento de VINCULAR. `attemptId` es null si la
+ * reserva no se pudo guardar (fail-open): no hay nada que liberar.
+ */
+export type LinkAttemptReservation =
+  | { allowed: false }
+  | { allowed: true; attemptId: number | null };
+
+function logIntentos(funcion: string, err: unknown) {
+  const code =
+    err && typeof err === 'object' && 'code' in err
+      ? (err as { code: unknown }).code
+      : err instanceof Error
+        ? err.name
+        : 'error desconocido';
+  console.error(`${funcion}: fallo en whatsapp_link_attempts:`, code);
+}
+
+/**
+ * Reserva un intento de VINCULAR del número ANTES de canjear el código.
  *
- * Ante cualquier error devuelve false (deja intentar): el código puede llegar
- * a producción antes de que se aplique la migración (H8) y un error de base no
- * debe dejar a nadie sin poder vincular. Solo se loguea el código del error,
+ * 1. Borra (best-effort) las filas del número anteriores a la ventana: solo se
+ *    usan los últimos 15 minutos y así la tabla no crece sin límite.
+ * 2. Inserta la fila del intento.
+ * 3. Cuenta las filas del número en la ventana, esta incluida. Si pasan de 5,
+ *    borra la propia y rechaza (los intentos bloqueados no se registran).
+ *
+ * Como cada petición inserta antes de contar, en una ráfaga en paralelo la
+ * k-ésima en contar ya ve las k reservas anteriores: como mucho 5 pasan. El
+ * llamador libera la reserva (`releaseLinkAttempt`) si el canje salió bien o
+ * falló por la base; si el código no existía o venció, la fila queda como el
+ * fallo.
+ *
+ * Fail-open (§5.1): ante cualquier error deja intentar (el código puede llegar
+ * a producción antes de la migración, H8). Solo se loguea el código del error,
  * nunca el número.
  */
-export async function isLinkAttemptLimitReached(
+export async function reserveLinkAttempt(
   phoneE164: string,
   now: () => Date = () => new Date(),
-): Promise<boolean> {
+): Promise<LinkAttemptReservation> {
+  let attemptId: number | null = null;
   try {
     const supabase = createAdminClient();
-    const { count, error } = await supabase
+    const ahora = now();
+    const desde = linkAttemptsWindowStart(ahora);
+
+    const { error: purgaError } = await supabase
+      .from('whatsapp_link_attempts')
+      .delete()
+      .eq('phone_e164', phoneE164)
+      .lt('created_at', desde);
+    if (purgaError) logIntentos('reserveLinkAttempt', purgaError);
+
+    const { data, error: insertError } = await supabase
+      .from('whatsapp_link_attempts')
+      .insert({ phone_e164: phoneE164, created_at: ahora.toISOString() })
+      .select('id')
+      .single();
+    if (insertError || !data) {
+      logIntentos('reserveLinkAttempt', insertError);
+      return { allowed: true, attemptId: null };
+    }
+    attemptId = (data as { id: number }).id;
+
+    const { count, error: conteoError } = await supabase
       .from('whatsapp_link_attempts')
       .select('id', { count: 'exact', head: true })
       .eq('phone_e164', phoneE164)
-      .gte('created_at', linkAttemptsWindowStart(now()));
-    if (error) {
-      console.error(
-        'isLinkAttemptLimitReached: no se pudieron contar los intentos:',
-        error.code,
-      );
-      return false;
+      .gte('created_at', desde);
+    if (conteoError) {
+      logIntentos('reserveLinkAttempt', conteoError);
+      return { allowed: true, attemptId };
     }
-    return isOverLinkAttemptLimit(count ?? 0);
+
+    // `count` incluye este intento: bloquea si los ANTERIORES ya son 5.
+    if (isOverLinkAttemptLimit((count ?? 0) - 1)) {
+      await releaseLinkAttempt(attemptId);
+      return { allowed: false };
+    }
+    return { allowed: true, attemptId };
   } catch (err) {
-    console.error(
-      'isLinkAttemptLimitReached: no se pudieron contar los intentos:',
-      err instanceof Error ? err.name : 'error desconocido',
-    );
-    return false;
+    logIntentos('reserveLinkAttempt', err);
+    return { allowed: true, attemptId };
   }
 }
 
 /**
- * Registra un VINCULAR fallido (código inexistente o vencido) del número.
- * Nunca lanza: si no se puede guardar, la respuesta al usuario sigue igual.
+ * Borra un intento reservado que no terminó siendo un fallo del usuario.
+ * Nunca lanza.
  */
-export async function recordFailedLinkAttempt(
-  phoneE164: string,
-  now: () => Date = () => new Date(),
-): Promise<void> {
+export async function releaseLinkAttempt(attemptId: number): Promise<void> {
   try {
     const supabase = createAdminClient();
     const { error } = await supabase
       .from('whatsapp_link_attempts')
-      .insert({ phone_e164: phoneE164, created_at: now().toISOString() });
-    if (error) {
-      console.error(
-        'recordFailedLinkAttempt: no se pudo registrar el intento:',
-        error.code,
-      );
-    }
+      .delete()
+      .eq('id', attemptId);
+    if (error) logIntentos('releaseLinkAttempt', error);
   } catch (err) {
-    console.error(
-      'recordFailedLinkAttempt: no se pudo registrar el intento:',
-      err instanceof Error ? err.name : 'error desconocido',
-    );
+    logIntentos('releaseLinkAttempt', err);
   }
 }
