@@ -8,6 +8,7 @@ vi.mock('@/lib/budget/item-defaults-supabase', () => ({
 
 import { resolveBudgetItemDefaults } from '@/lib/budget/item-defaults-supabase';
 import { createClient } from '@/lib/supabase/server';
+import { cadena } from '@/test-utils/postgrest-chain';
 
 import {
   createBudgetItemInMonth,
@@ -27,27 +28,12 @@ const IDS = {
 const GENERAL = { classification: 'Estilo de Vida', control: 'Reducir' };
 const DEUDA = { classification: 'Basico', control: 'Necesario' };
 
-/**
- * Cadena falsa de PostgREST: todos los métodos devuelven la misma cadena y,
- * al hacer await (directo, o vía single/maybeSingle), resuelve `resultado`.
- */
-function cadena(resultado: unknown) {
-  const chain: Record<string, unknown> = {};
-  for (const metodo of ['select', 'eq', 'ilike', 'order', 'insert']) {
-    chain[metodo] = vi.fn(() => chain);
-  }
-  chain.single = vi.fn().mockResolvedValue(resultado);
-  chain.maybeSingle = vi.fn().mockResolvedValue(resultado);
-  chain.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) =>
-    Promise.resolve(resultado).then(ok, ko);
-  return chain as Record<string, ReturnType<typeof vi.fn>>;
-}
-
 function clienteFalso({
   user = { id: 'user-1' } as { id: string } | null,
   categoria = { name: 'VIVIENDA' } as { name: string } | null,
+  errorCategoria = null as unknown,
 } = {}) {
-  const categories = cadena({ data: categoria, error: null });
+  const categories = cadena({ data: categoria, error: errorCategoria });
   const budgetItems = cadena({ data: { id: 'item-1' }, error: null });
   const client = {
     auth: {
@@ -159,13 +145,31 @@ describe('createBudgetItemInMonth', () => {
     expect(mockedResolve).toHaveBeenCalledWith(client, DEUDA);
   });
 
-  it('categoría no encontrada → valores generales, igual crea el rubro', async () => {
-    const { client } = clienteFalso({ categoria: null });
+  it('categoría no encontrada (o de otro usuario) → error y no inserta', async () => {
+    const { budgetItems } = clienteFalso({ categoria: null });
 
     const r = await createBudgetItemInMonth('cat-x', 'Algo', '2026-09');
 
-    expect(r).toEqual({ success: true, itemId: 'item-1' });
-    expect(mockedResolve).toHaveBeenCalledWith(client, GENERAL);
+    expect(r).toEqual({ success: false, error: 'Categoría no encontrada' });
+    expect(mockedResolve).not.toHaveBeenCalled();
+    expect(budgetItems.insert).not.toHaveBeenCalled();
+  });
+
+  it('falla la consulta de la categoría → error, console.error y no inserta', async () => {
+    const { budgetItems } = clienteFalso({
+      categoria: null,
+      errorCategoria: { message: 'timeout' },
+    });
+
+    const r = await createBudgetItemInMonth('cat-1', 'Algo', '2026-09');
+
+    expect(r).toEqual({
+      success: false,
+      error: 'No se pudo leer la categoría',
+    });
+    expect(console.error).toHaveBeenCalled();
+    expect(mockedResolve).not.toHaveBeenCalled();
+    expect(budgetItems.insert).not.toHaveBeenCalled();
   });
 
   it('sin valores por defecto → error y no inserta', async () => {

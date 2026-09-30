@@ -8,6 +8,7 @@ vi.mock('@/lib/budget/item-defaults-supabase', () => ({
 
 import { resolveBudgetItemDefaults } from '@/lib/budget/item-defaults-supabase';
 import { createClient } from '@/lib/supabase/server';
+import { cadena } from '@/test-utils/postgrest-chain';
 
 import { createBudgetItemsForDeuda } from './deudas-budget';
 
@@ -21,22 +22,6 @@ const IDS = {
   controlId: 'ctl-necesario',
   statusId: 'st-activo',
 };
-
-/**
- * Cadena falsa de PostgREST: todos los métodos devuelven la misma cadena y,
- * al hacer await (directo, o vía single/maybeSingle), resuelve `resultado`.
- */
-function cadena(resultado: unknown) {
-  const chain: Record<string, unknown> = {};
-  for (const metodo of ['select', 'eq', 'ilike', 'order', 'insert']) {
-    chain[metodo] = vi.fn(() => chain);
-  }
-  chain.single = vi.fn().mockResolvedValue(resultado);
-  chain.maybeSingle = vi.fn().mockResolvedValue(resultado);
-  chain.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) =>
-    Promise.resolve(resultado).then(ok, ko);
-  return chain as Record<string, ReturnType<typeof vi.fn>>;
-}
 
 /**
  * budget_items se consulta dos veces: primero los templates que ya tienen

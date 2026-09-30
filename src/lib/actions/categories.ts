@@ -368,17 +368,27 @@ export async function createBudgetItemInMonth(
     }
 
     // Nombre de la categoría (del usuario) para saber si es DEUDAS
-    const { data: category } = await supabase
+    // (de paso valida que la categoría exista y sea del usuario).
+    const { data: category, error: categoryError } = await supabase
       .from('categories')
       .select('name')
       .eq('id', categoryId)
       .eq('user_id', user.id)
       .maybeSingle();
 
+    if (categoryError) {
+      console.error('Error leyendo la categoría del ítem:', categoryError);
+      return { success: false, error: 'No se pudo leer la categoría' };
+    }
+
+    if (!category) {
+      return { success: false, error: 'Categoría no encontrada' };
+    }
+
     // Clasificación, control y estado por nombre (contratos §2.5)
     const defaults = await resolveBudgetItemDefaults(
       supabase,
-      itemDefaultNamesFor(category?.name),
+      itemDefaultNamesFor(category.name),
     );
 
     if (!defaults.ok) {
