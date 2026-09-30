@@ -1,33 +1,109 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { createElement, type ReactNode } from 'react';
 
-import { describe, expect, it } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, it, vi } from 'vitest';
 
-// Test de texto (vitest corre en `node`, sin DOM): se verifica el código
-// fuente del modal. vitest corre desde la raíz del repo.
-const modal = readFileSync(
-  resolve(
-    process.cwd(),
-    'src/components/organisms/ExpenseModal/ExpenseModal.tsx',
-  ),
-  'utf8',
-);
+// El Dialog de Radix monta el contenido en un portal, que no se renderiza en
+// servidor: se sustituye por contenedores simples para ver el contenido.
+vi.mock('@/components/ui/dialog', () => {
+  const contenedor = ({ children }: { children?: ReactNode }) =>
+    createElement('div', null, children);
+  return {
+    Dialog: contenedor,
+    DialogContent: contenedor,
+    DialogDescription: contenedor,
+    DialogHeader: contenedor,
+    DialogTitle: contenedor,
+  };
+});
+
+import ExpenseModal from './ExpenseModal';
+
+function renderizar(props: {
+  submitDisabled?: boolean;
+  submitDisabledLabel?: string;
+  isEditing?: boolean;
+}): string {
+  return renderToStaticMarkup(
+    createElement(ExpenseModal, {
+      isOpen: true,
+      isEditing: props.isEditing ?? false,
+      formData: {
+        description: '',
+        amount: 0,
+        transaction_date: '2026-09-01',
+        category_name: '',
+        account_name: 'Efectivo',
+        place: '',
+      },
+      expenseCategories: [],
+      accountTypes: ['Efectivo'],
+      onFormChange: () => {},
+      onSubmit: () => {},
+      onClose: () => {},
+      submitDisabled: props.submitDisabled,
+      submitDisabledLabel: props.submitDisabledLabel,
+    }),
+  );
+}
+
+/** El <button type="submit"> del formulario, con sus atributos y texto. */
+function botonGuardar(html: string): { disabled: boolean; texto: string } {
+  const m = html.match(/<button([^>]*type="submit"[^>]*)>([\s\S]*?)<\/button>/);
+  if (!m) throw new Error('No se encontró el botón de guardar');
+  return {
+    disabled: /\sdisabled(=""|\s|$)/.test(m[1]),
+    texto: m[2].replace(/<[^>]*>/g, '').trim(),
+  };
+}
 
 describe('ExpenseModal sin categorías (contratos §2.6 y §5.2)', () => {
-  it('el botón de guardar se deshabilita con submitDisabled', () => {
-    expect(modal).toMatch(/disabled=\{submitDisabled\}/);
+  it('bloqueado por falta de categorías: botón deshabilitado con el texto y aviso a /settings', () => {
+    const html = renderizar({
+      submitDisabled: true,
+      submitDisabledLabel: 'Primero crea una categoría',
+    });
+
+    expect(botonGuardar(html)).toEqual({
+      disabled: true,
+      texto: 'Primero crea una categoría',
+    });
+    expect(html).toContain('href="/settings"');
+    expect(html).toContain('Aún no tienes categorías');
   });
 
-  it('el botón muestra submitDisabledLabel mientras está deshabilitado', () => {
-    expect(modal).toMatch(
-      /submitDisabled && submitDisabledLabel\s*\?\s*submitDisabledLabel/,
-    );
+  it('deshabilitado sin texto (categorías cargando): sin aviso ni enlace a /settings', () => {
+    const html = renderizar({ submitDisabled: true });
+
+    expect(botonGuardar(html)).toEqual({
+      disabled: true,
+      texto: 'Agregar Gasto',
+    });
+    expect(html).not.toContain('href="/settings"');
+    expect(html).not.toContain('Aún no tienes categorías');
   });
 
-  it('el aviso enlaza a /settings solo cuando el guardado está deshabilitado por falta de categorías (trae texto)', () => {
-    // Mientras las categorías cargan, /gastos deshabilita sin texto: sin aviso.
-    expect(modal).toMatch(
-      /\{submitDisabled && submitDisabledLabel && \([\s\S]*?<Link href="\/settings"[\s\S]*?\)\}/,
-    );
+  it('habilitado: botón normal y sin aviso', () => {
+    const html = renderizar({});
+
+    expect(botonGuardar(html)).toEqual({
+      disabled: false,
+      texto: 'Agregar Gasto',
+    });
+    expect(html).not.toContain('href="/settings"');
+  });
+
+  it('un texto sin deshabilitar no muestra el aviso', () => {
+    const html = renderizar({
+      submitDisabled: false,
+      submitDisabledLabel: 'Primero crea una categoría',
+      isEditing: true,
+    });
+
+    expect(botonGuardar(html)).toEqual({
+      disabled: false,
+      texto: 'Actualizar Gasto',
+    });
+    expect(html).not.toContain('href="/settings"');
   });
 });

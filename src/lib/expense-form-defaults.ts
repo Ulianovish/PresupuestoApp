@@ -50,6 +50,42 @@ export function isSaveBlockedByCategories({
   return !isEditing && !categoriesLoading && !hasCategories;
 }
 
+export interface ExpenseSubmitGuard {
+  /** El botón de guardar del modal está deshabilitado. */
+  disabled: boolean;
+  /**
+   * Texto del botón deshabilitado. Solo viene cuando el bloqueo es por falta
+   * de categorías: con él el modal muestra el aviso que enlaza a /settings.
+   */
+  disabledLabel?: string;
+}
+
+/**
+ * Estado del botón de guardar del modal de /gastos. Al crear, mientras las
+ * categorías cargan se deshabilita sin texto (no se avisa "sin categorías"
+ * antes de saberlo); si la carga terminó vacía, se deshabilita con
+ * `NO_CATEGORIES_LABEL`. Al editar nunca se bloquea.
+ */
+export function expenseSubmitGuard(
+  input: SaveBlockedInput,
+): ExpenseSubmitGuard {
+  const blocked = isSaveBlockedByCategories(input);
+  return {
+    disabled: blocked || (!input.isEditing && input.categoriesLoading),
+    disabledLabel: blocked ? NO_CATEGORIES_LABEL : undefined,
+  };
+}
+
+/**
+ * Aviso al intentar guardar un gasto sin categoría (p. ej. con Enter). Null
+ * mientras las categorías cargan: aún no se sabe si el usuario tiene.
+ */
+export function missingCategoryMessage(
+  categoriesLoading: boolean,
+): string | null {
+  return categoriesLoading ? null : NO_CATEGORIES_LABEL;
+}
+
 /** Categoría por defecto: la primera del usuario, o '' si no tiene. */
 export function pickDefaultCategory(categoryNames: readonly string[]): string {
   return categoryNames[0] ?? '';

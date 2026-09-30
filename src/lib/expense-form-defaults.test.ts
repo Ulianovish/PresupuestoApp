@@ -4,7 +4,9 @@ import { DEFAULT_ACCOUNT_NAME } from '@/lib/constants/expense-categories';
 
 import {
   buildAccountOptions,
+  expenseSubmitGuard,
   isSaveBlockedByCategories,
+  missingCategoryMessage,
   NO_CATEGORIES_LABEL,
   pickDefaultAccount,
   pickDefaultCategory,
@@ -176,6 +178,60 @@ describe('isSaveBlockedByCategories', () => {
         hasCategories: false,
       }),
     ).toBe(false);
+  });
+});
+
+describe('expenseSubmitGuard', () => {
+  it('al crear, mientras las categorías cargan: deshabilitado y sin texto (sin aviso)', () => {
+    expect(
+      expenseSubmitGuard({
+        isEditing: false,
+        categoriesLoading: true,
+        hasCategories: false,
+      }),
+    ).toEqual({ disabled: true, disabledLabel: undefined });
+  });
+
+  it('al crear, sin categorías tras cargar: deshabilitado con el texto del contrato', () => {
+    expect(
+      expenseSubmitGuard({
+        isEditing: false,
+        categoriesLoading: false,
+        hasCategories: false,
+      }),
+    ).toEqual({ disabled: true, disabledLabel: NO_CATEGORIES_LABEL });
+  });
+
+  it('al crear, con categorías: habilitado', () => {
+    expect(
+      expenseSubmitGuard({
+        isEditing: false,
+        categoriesLoading: false,
+        hasCategories: true,
+      }),
+    ).toEqual({ disabled: false, disabledLabel: undefined });
+  });
+
+  it('al editar: habilitado aunque carguen o no haya categorías', () => {
+    for (const categoriesLoading of [true, false]) {
+      expect(
+        expenseSubmitGuard({
+          isEditing: true,
+          categoriesLoading,
+          hasCategories: false,
+        }),
+      ).toEqual({ disabled: false, disabledLabel: undefined });
+    }
+  });
+});
+
+describe('missingCategoryMessage', () => {
+  it('mientras las categorías cargan no hay aviso (aún no se sabe si tiene)', () => {
+    expect(missingCategoryMessage(true)).toBeNull();
+  });
+
+  it('con la carga terminada avisa con el texto del contrato', () => {
+    expect(missingCategoryMessage(false)).toBe(NO_CATEGORIES_LABEL);
   });
 });
 

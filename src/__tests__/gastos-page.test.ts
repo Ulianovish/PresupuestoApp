@@ -11,39 +11,18 @@ const pagina = readFileSync(
 );
 
 describe('/gastos sin categorías (contratos §2.6 y §5.2)', () => {
-  it('el modal recibe el bloqueo calculado y el texto del contrato', () => {
-    expect(pagina).toMatch(
-      /submitDisabled=\{saveBlocked \|\| \(!isEditing && categoriesLoading\)\}/,
-    );
-    expect(pagina).toMatch(
-      /submitDisabledLabel=\{saveBlocked \? NO_CATEGORIES_LABEL : undefined\}/,
-    );
+  // La lógica (cuándo se bloquea, con qué texto, cuándo se avisa) vive en
+  // expenseSubmitGuard y missingCategoryMessage, probadas en
+  // src/lib/expense-form-defaults.test.ts; el aviso del modal se prueba
+  // renderizando ExpenseModal. Aquí solo se comprueba que la página las usa.
+  it('el modal recibe el estado del guard puro', () => {
+    expect(pagina).toContain('expenseSubmitGuard({');
+    expect(pagina).toContain('submitDisabled={submitGuard.disabled}');
+    expect(pagina).toContain('submitDisabledLabel={submitGuard.disabledLabel}');
   });
 
-  it('mientras las categorías cargan (al crear) no se puede guardar ni se avisa', () => {
-    // El aviso "sin categorías" del modal sale solo cuando hay texto del
-    // bloqueo (saveBlocked), no por estar cargando.
-    const modal = readFileSync(
-      resolve(
-        process.cwd(),
-        'src/components/organisms/ExpenseModal/ExpenseModal.tsx',
-      ),
-      'utf8',
-    );
-    expect(modal).toMatch(/\{submitDisabled && submitDisabledLabel && \(/);
-    // El guard del submit no dispara el toast mientras carga.
-    expect(pagina).toMatch(
-      /if \(!form\.category_name\) \{\s*if \(!categoriesLoading\) toast\.error\(NO_CATEGORIES_LABEL\);\s*return;\s*\}/,
-    );
-  });
-
-  it('el bloqueo espera a que las categorías carguen y no aplica al editar', () => {
-    expect(pagina).toMatch(
-      /const saveBlocked = isSaveBlockedByCategories\(\{\s*isEditing,\s*categoriesLoading,\s*hasCategories,\s*\}\)/,
-    );
-    expect(pagina).toMatch(
-      /isLoading: categoriesLoading[\s\S]*?\}\s*=\s*useCategories\(\)/,
-    );
+  it('el submit sin categoría avisa solo según missingCategoryMessage', () => {
+    expect(pagina).toContain('missingCategoryMessage(categoriesLoading)');
   });
 
   it('useCategories arranca cargando, para no mostrar el aviso en el primer render', () => {

@@ -36,8 +36,8 @@ import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
 import { createBudgetItemInMonth } from '@/lib/actions/categories';
 import {
   buildAccountOptions,
-  isSaveBlockedByCategories,
-  NO_CATEGORIES_LABEL,
+  expenseSubmitGuard,
+  missingCategoryMessage,
   pickDefaultAccount,
   todayLocalISO,
   withFormDefaults,
@@ -193,7 +193,7 @@ export default function GastosPage() {
   const hasCategories = categoryNames.length > 0;
   // "Primero crea una categoría" solo cuando la carga terminó y vino vacía,
   // y nunca al editar un gasto que ya trae su categoría.
-  const saveBlocked = isSaveBlockedByCategories({
+  const submitGuard = expenseSubmitGuard({
     isEditing,
     categoriesLoading,
     hasCategories,
@@ -422,7 +422,8 @@ export default function GastosPage() {
     // un envío con Enter). Mientras las categorías cargan no se avisa: aún no
     // se sabe si el usuario tiene.
     if (!form.category_name) {
-      if (!categoriesLoading) toast.error(NO_CATEGORIES_LABEL);
+      const aviso = missingCategoryMessage(categoriesLoading);
+      if (aviso) toast.error(aviso);
       return;
     }
 
@@ -869,8 +870,8 @@ export default function GastosPage() {
           formData={form}
           expenseCategories={categoryNames}
           accountTypes={buildAccountOptions(accountNames, form.account_name)}
-          submitDisabled={saveBlocked || (!isEditing && categoriesLoading)}
-          submitDisabledLabel={saveBlocked ? NO_CATEGORIES_LABEL : undefined}
+          submitDisabled={submitGuard.disabled}
+          submitDisabledLabel={submitGuard.disabledLabel}
           creditAccounts={creditAccountNames}
           onFormChange={handleFormChange}
           onSubmit={handleSubmitExpense}
