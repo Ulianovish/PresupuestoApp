@@ -250,18 +250,19 @@ describe('registerAction', () => {
         status: 500,
       },
     ],
-  ])('correo fuera de la allowlist (%j) → sin invitación', async error => {
-    clienteFalso({ signUp: { data: { user: null, session: null }, error } });
+  ])(
+    'correo fuera de la allowlist (%j) → código sin invitación',
+    async error => {
+      clienteFalso({ signUp: { data: { user: null, session: null }, error } });
 
-    const url = await destino(registerAction(form(campos)));
+      const url = await destino(registerAction(form(campos)));
 
-    expect(url.startsWith('/auth/register?')).toBe(true);
-    expect(query(url).get('error')).toBe(
-      'Este correo no tiene invitación. Pídele acceso a quien administra la app.',
-    );
-  });
+      expect(url.startsWith('/auth/register?')).toBe(true);
+      expect(query(url).get('error')).toBe('signup_not_allowed');
+    },
+  );
 
-  it('límite de correos → texto traducido', async () => {
+  it('límite de correos → código, no texto', async () => {
     clienteFalso({
       signUp: {
         data: { user: null, session: null },
@@ -274,12 +275,23 @@ describe('registerAction', () => {
 
     const url = await destino(registerAction(form(campos)));
 
-    expect(query(url).get('error')).toBe(
-      'Enviamos demasiados correos. Intenta de nuevo en unos minutos.',
-    );
+    expect(query(url).get('error')).toBe('over_email_send_rate_limit');
   });
 
-  it('contraseñas distintas → mensaje de validación, sin llamar a Supabase', async () => {
+  it('error desconocido de Supabase → código genérico, nunca su texto', async () => {
+    clienteFalso({
+      signUp: {
+        data: { user: null, session: null },
+        error: { code: 'algo_raro', message: 'Detalle interno de Supabase' },
+      },
+    });
+
+    const url = await destino(registerAction(form(campos)));
+
+    expect(query(url).get('error')).toBe('error_desconocido');
+  });
+
+  it('contraseñas distintas → código de validación, sin llamar a Supabase', async () => {
     const { auth } = clienteFalso();
 
     const url = await destino(
@@ -289,11 +301,11 @@ describe('registerAction', () => {
     );
 
     expect(url.startsWith('/auth/register?')).toBe(true);
-    expect(query(url).get('error')).toBe('Las contraseñas no coinciden');
+    expect(query(url).get('error')).toBe('no_coinciden');
     expect(auth.signUp).not.toHaveBeenCalled();
   });
 
-  it('correo inválido → primer mensaje de Zod, nunca "Datos inválidos"', async () => {
+  it('correo inválido → código del campo, no el texto de Zod', async () => {
     const { auth } = clienteFalso();
 
     const url = await destino(
@@ -301,8 +313,19 @@ describe('registerAction', () => {
     );
 
     expect(url.startsWith('/auth/register?')).toBe(true);
-    expect(query(url).get('error')).toBe('Debe ser un email válido');
-    expect(query(url).get('error')).not.toBe('Datos inválidos');
+    expect(query(url).get('error')).toBe('email_invalido');
     expect(auth.signUp).not.toHaveBeenCalled();
+  });
+
+  it('contraseña corta → password_corta', async () => {
+    clienteFalso();
+
+    const url = await destino(
+      registerAction(
+        form({ ...campos, password: 'corta', confirmPassword: 'corta' }),
+      ),
+    );
+
+    expect(query(url).get('error')).toBe('password_corta');
   });
 });

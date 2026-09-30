@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
-import { authErrorCode, translateAuthError } from '@/lib/auth/error-messages';
+import { authErrorCode } from '@/lib/auth/error-messages';
 import { CHECK_EMAIL_MESSAGE_CODE } from '@/lib/auth/login-feedback';
+import { registerValidationErrorCode } from '@/lib/auth/register-feedback';
 import { safeRedirectPath } from '@/lib/auth/safe-redirect';
 import { getPostLoginPath } from '@/lib/onboarding/post-login';
 import { getSiteUrl } from '@/lib/site-url';
@@ -18,14 +19,15 @@ function texto(formData: FormData, campo: string): string {
 
 /**
  * '/auth/login?error=…' (y redirectTo si es una ruta interna segura).
- * Al login va un CÓDIGO (la página lo traduce); al registro, el texto.
+ * Siempre va un CÓDIGO, nunca texto: la página lo traduce con una lista
+ * cerrada (resolveLoginFeedback / resolveRegisterError).
  */
 function urlConError(
   base: '/auth/login' | '/auth/register',
-  mensaje: string,
+  codigo: string,
   redirectTo?: string,
 ): string {
-  const params = new URLSearchParams({ error: mensaje });
+  const params = new URLSearchParams({ error: codigo });
   const seguro = redirectTo ? safeRedirectPath(redirectTo, '') : '';
   if (seguro) params.set('redirectTo', seguro);
   return `${base}?${params.toString()}`;
@@ -86,7 +88,7 @@ export async function registerAction(formData: FormData) {
     redirect(
       urlConError(
         '/auth/register',
-        parsed.error.issues[0]?.message ?? translateAuthError(null),
+        registerValidationErrorCode(parsed.error.issues),
       ),
     );
   }
@@ -108,7 +110,7 @@ export async function registerAction(formData: FormData) {
       code: error.code ?? 'sin_codigo',
       status: error.status,
     });
-    redirect(urlConError('/auth/register', translateAuthError(error)));
+    redirect(urlConError('/auth/register', authErrorCode(error)));
   }
 
   // Con confirmación de correo activa no hay sesión: hay que abrir el enlace.

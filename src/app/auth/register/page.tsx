@@ -13,6 +13,12 @@ import Card, {
 } from '@/components/atoms/Card/Card';
 import Input from '@/components/atoms/Input/Input';
 import { registerAction } from '@/lib/actions/auth';
+import { resolveRegisterError } from '@/lib/auth/register-feedback';
+import {
+  PASSWORD_HINT,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+} from '@/lib/validations/password-rules';
 
 /**
  * RegisterForm - Formulario de registro que usa useSearchParams
@@ -21,22 +27,16 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
-  // Obtener errores y mensajes de los query parameters
+  // `?error=` trae un código: nunca se pinta texto de la URL.
   useEffect(() => {
-    const errorParam = searchParams.get('error');
-    const messageParam = searchParams.get('message');
-
-    setError(errorParam);
-    setMessage(messageParam);
+    setError(resolveRegisterError(searchParams.get('error')));
   }, [searchParams]);
 
   // Función para manejar el envío del formulario
   async function handleSubmit(formData: FormData) {
     setIsSubmitting(true);
     setError(null);
-    setMessage(null);
 
     try {
       await registerAction(formData);
@@ -122,13 +122,13 @@ function RegisterForm() {
                   variant="glass"
                   placeholder="••••••••"
                   required
-                  minLength={8}
-                  maxLength={72}
+                  minLength={PASSWORD_MIN_LENGTH}
+                  maxLength={PASSWORD_MAX_LENGTH}
                   autoComplete="new-password"
                   disabled={isSubmitting}
                   className="w-full"
                 />
-                <p className="text-xs text-gray-400">Mínimo 8 caracteres.</p>
+                <p className="text-xs text-gray-400">{PASSWORD_HINT}</p>
               </div>
 
               {/* Campo Confirmar Contraseña */}
@@ -146,7 +146,7 @@ function RegisterForm() {
                   variant="glass"
                   placeholder="••••••••"
                   required
-                  maxLength={72}
+                  maxLength={PASSWORD_MAX_LENGTH}
                   autoComplete="new-password"
                   disabled={isSubmitting}
                   className="w-full"
@@ -157,13 +157,6 @@ function RegisterForm() {
               {error && (
                 <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
                   <p className="text-red-400 text-sm">{error}</p>
-                </div>
-              )}
-
-              {/* Success Message */}
-              {message && (
-                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                  <p className="text-green-400 text-sm">{message}</p>
                 </div>
               )}
 
