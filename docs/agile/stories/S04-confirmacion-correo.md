@@ -1844,7 +1844,7 @@ git commit -m "feat(auth): registro con emailRedirectTo a /auth/confirm y login 
 
 `auth` y `protected` conservan `startsWith` como el middleware actual: `/ingresos-deudas` hoy está protegida por el prefijo `/ingresos` y debe seguir así (test incluido).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/auth/route-access.test.ts`:
 
@@ -1899,12 +1899,12 @@ describe('redirectsSignedInUser', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/auth/route-access.test.ts`
 Expected: FAIL con `Failed to resolve import "./route-access"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/auth/route-access.ts`:
 
@@ -2048,7 +2048,7 @@ export const config = {
 
 Cambios respecto al anterior: `/auth/confirm` en rutas de auth; `/bienvenida` protegida; `redirectTo` incluye la query (`/gastos?nuevo=1` vuelve completo); el log de desarrollo dice "con sesión"/"sin sesión" en vez del correo.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/auth/route-access.test.ts`
 Expected: PASS.
@@ -2056,7 +2056,7 @@ Expected: PASS.
 Run: `bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/auth/route-access.ts src/lib/auth/route-access.test.ts middleware.ts
