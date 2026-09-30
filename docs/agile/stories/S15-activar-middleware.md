@@ -20,9 +20,9 @@ Alineado con contratos v2 (§5). Escrito por el orquestador (sin planificador): 
 
 ## Criterios de aceptación
 
-- [ ] CA1: `src/middleware.ts` existe y exporta `middleware` y `config`; `middleware.ts` en la raíz no existe (test).
-- [ ] CA2: el matcher NO coincide con `/api/whatsapp/webhook`, `/api/cron/alertas-pendientes`, `/_next/static/x.js`, `/favicon.ico`, `/logo.png`; SÍ coincide con `/gastos`, `/bienvenida`, `/auth/login`, `/` (test que compila el patrón de `config.matcher[0]` con `new RegExp('^' + patron + '$')`).
-- [ ] CA3: los tests existentes de `src/middleware.test.ts` siguen pasando con el import nuevo.
+- [x] CA1: `src/middleware.ts` existe y exporta `middleware` y `config`; `middleware.ts` en la raíz no existe (test).
+- [x] CA2: el matcher NO coincide con `/api/whatsapp/webhook`, `/api/cron/alertas-pendientes`, `/_next/static/x.js`, `/favicon.ico`, `/logo.png`; SÍ coincide con `/gastos`, `/bienvenida`, `/auth/login`, `/` (test que compila el patrón de `config.matcher[0]` con `new RegExp('^' + patron + '$')`).
+- [x] CA3: los tests existentes de `src/middleware.test.ts` siguen pasando con el import nuevo.
 - [ ] CA4: `assertContactEmailReady` ya no lanza: en producción con el correo de ejemplo hace `console.warn` con un texto sin datos personales ("CONTACT_EMAIL sigue siendo el de ejemplo: resuelve H9 antes de abrir el registro"). Decisión de la persona, 2026-09-30.
 - [ ] CA5 (deuda S05): constante `RESET_LINK_EXPIRED_PATH` en `password-reset-feedback.ts` usada por la página y por `resetPasswordAction`; el test comprueba el uso de la constante.
 - [ ] CA6 (deuda S05): el texto de `LOGIN_VALIDATION_ERROR_CODE` pasa a "Revisa tu correo y tu contraseña.".
@@ -32,7 +32,7 @@ Alineado con contratos v2 (§5). Escrito por el orquestador (sin planificador): 
 
 ## Tareas (TDD, un commit por tarea, siempre `git commit --no-verify` tras `bunx eslint` y `bunx prettier --check` de los archivos tocados)
 
-- [ ] **T1 — Ubicación.** Escribe `src/middleware-location.test.ts` con CA1 y CA2 (usa `fs.existsSync(path.join(process.cwd(), 'middleware.ts'))` y `import { config } from './middleware'`). Córrelo: falla (no existe `src/middleware.ts`). `git mv middleware.ts src/middleware.ts`; cambia el import de `src/middleware.test.ts` a `./middleware`. Corre `bun run test src/middleware` → verde. Commit `fix(auth): mover el middleware a src/ para que Next.js lo ejecute`.
+- [x] **T1 — Ubicación.** Escribe `src/middleware-location.test.ts` con CA1 y CA2 (usa `fs.existsSync(path.join(process.cwd(), 'middleware.ts'))` y `import { config } from './middleware'`). Córrelo: falla (no existe `src/middleware.ts`). `git mv middleware.ts src/middleware.ts`; cambia el import de `src/middleware.test.ts` a `./middleware`. Corre `bun run test src/middleware` → verde. Commit `fix(auth): mover el middleware a src/ para que Next.js lo ejecute`.
 - [ ] **T2 — Aviso de CONTACT_EMAIL.** Cambia el test de `legal.test.ts` que espera que lance en producción: ahora espera `console.warn` (con `vi.spyOn(console, 'warn')`) y que no lance. Rojo → cambia `assertContactEmailReady` → verde. Commit.
 - [ ] **T3 — Deuda S05** (CA5–CA8), un commit por criterio o uno solo si son pequeños.
 - [ ] **T4 — ADR-004 y limpieza** (CA9). Commit de docs.
