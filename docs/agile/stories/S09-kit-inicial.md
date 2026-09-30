@@ -21,7 +21,7 @@
 - **No se toca `src/lib/onboarding/`** (contratos §5.3): ese directorio es del flujo APP (S10–S12). S09 solo crea la migración y su test en `src/lib/supabase/migrations/`.
 - `src/types/database.ts` no se regenera: **nunca** correr `bun run db:types` (§5.0).
 - Datos personales: ningún correo, teléfono, cédula o nombre real en código, tests ni comentarios. En la verificación manual se usa `usuario@ejemplo.com` y UUIDs inventados.
-- Verificación del proyecto: `bun run test && bun run type-check`. Commits con archivos en `src/` van normales (husky corre lint-staged sobre el test); commits de solo SQL/docs van con `git commit --no-verify`.
+- Verificación del proyecto: `bun run test && bun run type-check`. Commits siempre con `git commit --no-verify`; antes de cada commit que toque `src/`, correr `bunx eslint` y `bunx prettier --check` sobre los archivos de `src/` del commit.
 - Mensajes de commit en español y terminan con `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ---
@@ -967,4 +967,4 @@ Recarga del kit robusta (la migración `20260930130000` aún no está aplicada, 
 - [x] **2. Rubros inactivos:** los rubros del kit que ya existen inactivos en la plantilla (misma categoría + `lower(name)`) se reactivan con un `UPDATE` antes del `INSERT … NOT EXISTS`.
 - [x] **3. Categorías por `upper(btrim(name))`:** antes del `INSERT` se reactivan las categorías del usuario que coinciden con una del kit; solo se insertan las que no existen con ese criterio (no se duplica `Vivienda` vs `VIVIENDA`). Los rubros usan esas categorías por id.
 - [x] **4. Verificación manual:** caso con plantilla y un rubro del kit inactivos + categoría `Vivienda` en minúsculas → recargar → todo reactivado, sin duplicados.
-- [ ] **5. Global Constraints:** commits siempre con `git commit --no-verify`; antes de cada commit que toque `src/`, `bunx eslint` y `bunx prettier --check`.
+- [x] **5. Global Constraints:** commits siempre con `git commit --no-verify`; antes de cada commit que toque `src/`, `bunx eslint` y `bunx prettier --check`.
