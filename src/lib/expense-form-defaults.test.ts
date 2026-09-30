@@ -1,12 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_ACCOUNT_NAME } from '@/lib/constants/expense-categories';
 
 import {
   buildAccountOptions,
+  isSaveBlockedByCategories,
   NO_CATEGORIES_LABEL,
   pickDefaultAccount,
   pickDefaultCategory,
+  todayLocalISO,
   withFormDefaults,
 } from './expense-form-defaults';
 
@@ -132,5 +134,66 @@ describe('withFormDefaults', () => {
     expect(
       withFormDefaults(vacio, { categoryNames: [], accountNames: [] }),
     ).toEqual({ description: '', category_name: '', account_name: 'Efectivo' });
+  });
+});
+
+describe('isSaveBlockedByCategories', () => {
+  it('bloquea al crear cuando la carga terminó y no hay categorías', () => {
+    expect(
+      isSaveBlockedByCategories({
+        isEditing: false,
+        categoriesLoading: false,
+        hasCategories: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('no bloquea mientras las categorías cargan', () => {
+    expect(
+      isSaveBlockedByCategories({
+        isEditing: false,
+        categoriesLoading: true,
+        hasCategories: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('no bloquea si el usuario tiene categorías', () => {
+    expect(
+      isSaveBlockedByCategories({
+        isEditing: false,
+        categoriesLoading: false,
+        hasCategories: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('no bloquea la edición de un gasto viejo aunque no queden categorías', () => {
+    expect(
+      isSaveBlockedByCategories({
+        isEditing: true,
+        categoriesLoading: false,
+        hasCategories: false,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('todayLocalISO', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('a las 20:00 en Bogotá sigue siendo el mismo día (no el de UTC)', () => {
+    vi.useFakeTimers();
+    // 20:00 -05:00 del 15 de marzo = 01:00 UTC del 16 de marzo
+    vi.setSystemTime(new Date('2026-03-15T20:00:00-05:00'));
+    expect(todayLocalISO()).toBe('2026-03-15');
+  });
+
+  it('a las 00:30 en Bogotá ya es el día nuevo', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-16T00:30:00-05:00'));
+    expect(todayLocalISO()).toBe('2026-03-16');
   });
 });

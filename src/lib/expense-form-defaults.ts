@@ -19,6 +19,37 @@ export function pickDefaultAccount(accountNames: readonly string[]): string {
   return efectivo ?? accountNames[0] ?? DEFAULT_ACCOUNT_NAME;
 }
 
+/** Zona horaria de la app (mono-país): define qué día es "hoy". */
+const APP_TIME_ZONE = 'America/Bogota';
+
+/**
+ * Fecha de hoy (YYYY-MM-DD) en la zona de la app. `toISOString()` da la de
+ * UTC, que desde las 19:00 en Colombia ya es mañana.
+ */
+export function todayLocalISO(now: Date = new Date()): string {
+  return now.toLocaleDateString('en-CA', { timeZone: APP_TIME_ZONE });
+}
+
+export interface SaveBlockedInput {
+  isEditing: boolean;
+  categoriesLoading: boolean;
+  hasCategories: boolean;
+}
+
+/**
+ * El guardado se bloquea por falta de categorías solo al crear un gasto y
+ * solo cuando la carga ya terminó y vino vacía. Mientras carga no se muestra
+ * el aviso, y al editar un gasto viejo (que ya trae su categoría) se deja
+ * corregir el monto o la fecha.
+ */
+export function isSaveBlockedByCategories({
+  isEditing,
+  categoriesLoading,
+  hasCategories,
+}: SaveBlockedInput): boolean {
+  return !isEditing && !categoriesLoading && !hasCategories;
+}
+
 /** Categoría por defecto: la primera del usuario, o '' si no tiene. */
 export function pickDefaultCategory(categoryNames: readonly string[]): string {
   return categoryNames[0] ?? '';

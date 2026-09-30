@@ -36,8 +36,10 @@ import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
 import { createBudgetItemInMonth } from '@/lib/actions/categories';
 import {
   buildAccountOptions,
+  isSaveBlockedByCategories,
   NO_CATEGORIES_LABEL,
   pickDefaultAccount,
+  todayLocalISO,
   withFormDefaults,
 } from '@/lib/expense-form-defaults';
 import { montoDeCelda } from '@/lib/money/parse-cop';
@@ -182,12 +184,20 @@ export default function GastosPage() {
 
   // Cargar categorías dinámicas desde la BD. Memorizadas: el efecto que
   // completa los valores por defecto del formulario depende de ellas.
-  const { categories: budgetCategories } = useCategories();
+  const { categories: budgetCategories, isLoading: categoriesLoading } =
+    useCategories();
   const categoryNames = useMemo(
     () => budgetCategories.map(c => c.name.toUpperCase()),
     [budgetCategories],
   );
   const hasCategories = categoryNames.length > 0;
+  // "Primero crea una categoría" solo cuando la carga terminó y vino vacía,
+  // y nunca al editar un gasto que ya trae su categoría.
+  const saveBlocked = isSaveBlockedByCategories({
+    isEditing,
+    categoriesLoading,
+    hasCategories,
+  });
 
   // Ítems del presupuesto del mes, para asignar cada gasto a un ítem
   const [budgetItems, setBudgetItems] = useState<BudgetItemRef[]>([]);
@@ -286,6 +296,9 @@ export default function GastosPage() {
   const [accountNames, setAccountNames] = useState<string[]>([]);
   // Las tarjetas de crédito habilitan los campos de compra a cuotas
   const [creditAccountNames, setCreditAccountNames] = useState<string[]>([]);
+  // Hasta que las cuentas cargan no se importa Excel: las filas sin columna
+  // de cuenta caerían todas en la cuenta por defecto.
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
   const loadAccounts = useCallback(async () => {
     try {
       const accts = await getUserAccounts();
@@ -293,7 +306,10 @@ export default function GastosPage() {
       setCreditAccountNames(
         accts.filter(a => a.type === 'credit').map(a => a.name),
       );
-    } catch {
+      setAccountsLoaded(true);
+    } catch (err) {
+      console.error('Error cargando cuentas:', err);
+      toast.error('No se pudieron cargar tus cuentas');
       setAccountNames([]);
       setCreditAccountNames([]);
     }
@@ -324,7 +340,7 @@ export default function GastosPage() {
       {
         description: '',
         amount: 0,
-        transaction_date: new Date().toISOString().slice(0, 10),
+        transaction_date: todayLocalISO(),
         category_name: '',
         account_name: '',
         place: '',
@@ -611,7 +627,7 @@ export default function GastosPage() {
           }
 
           // Parsear fecha
-          let transactionDate = new Date().toISOString().slice(0, 10);
+          let transactionDate = todayLocalISO();
           if (dateCol && row[dateCol]) {
             const rawDate = row[dateCol];
             if (typeof rawDate === 'number') {
@@ -785,6 +801,7 @@ export default function GastosPage() {
           onAutoRecategorize={handleAutoRecategorize}
           isLoading={loading}
           isImporting={isImporting}
+          importDisabled={!accountsLoaded}
           isRecategorizing={isRecategorizing}
         />
       }
@@ -851,7 +868,7 @@ export default function GastosPage() {
           formData={form}
           expenseCategories={categoryNames}
           accountTypes={buildAccountOptions(accountNames, form.account_name)}
-          submitDisabled={!hasCategories}
+          submitDisabled={saveBlocked}
           submitDisabledLabel={NO_CATEGORIES_LABEL}
           creditAccounts={creditAccountNames}
           onFormChange={handleFormChange}

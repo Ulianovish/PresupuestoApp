@@ -30,6 +30,8 @@ interface ExpenseHeaderProps {
   onAutoRecategorize?: () => void;
   isLoading: boolean;
   isImporting?: boolean;
+  /** Deshabilita «Importar Excel» (p. ej. mientras cargan las cuentas). */
+  importDisabled?: boolean;
   isRecategorizing?: boolean;
 }
 
@@ -40,6 +42,7 @@ export default function ExpenseHeader({
   onAutoRecategorize,
   isLoading,
   isImporting,
+  importDisabled = false,
   isRecategorizing,
 }: ExpenseHeaderProps) {
   return (
@@ -62,7 +65,7 @@ export default function ExpenseHeader({
             variant="outline"
             size="sm"
             onClick={onImportExcel}
-            disabled={isLoading || isImporting}
+            disabled={isLoading || isImporting || importDisabled}
             className="flex items-center gap-2 border-green-500/50 text-green-300 hover:bg-green-500/10"
           >
             <Upload
