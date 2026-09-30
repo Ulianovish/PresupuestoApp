@@ -70,7 +70,19 @@ export async function handleLinkingMessage(
     if (res.ok || res.reason === 'link_failed') {
       await liberar();
     }
-    return res.ok ? MSG_LINKED_OK : MSG_CODE_INVALID;
+    if (res.ok) return MSG_LINKED_OK;
+
+    // Twilio reintenta el webhook si la primera respuesta tardó: el código ya
+    // se canjeó y el reintento lo ve como inválido. Si el número ya quedó
+    // vinculado, no fue un fallo: se libera la reserva y se confirma.
+    if (res.reason === 'invalid_or_expired') {
+      const vinculado = await deps.getLinkByPhone(phoneE164).catch(() => null);
+      if (vinculado) {
+        await liberar();
+        return MSG_LINKED_OK;
+      }
+    }
+    return MSG_CODE_INVALID;
   }
 
   const link = await deps.getLinkByPhone(phoneE164);
