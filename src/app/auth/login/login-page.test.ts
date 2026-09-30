@@ -14,6 +14,14 @@ describe('página de login', () => {
     expect(fuente).toContain('resolveLoginFeedback(');
   });
 
+  it('setError y setMessage (desde la URL) solo reciben lo que resuelve la función pura', () => {
+    expect(fuente).toMatch(/setError\(\s*feedback\.error\s*\)/);
+    expect(fuente).toMatch(/setMessage\(\s*feedback\.message\s*\)/);
+    // Cualquier otro setMessage(...) sería texto sin pasar por la lista.
+    expect(fuente.match(/setMessage\(/g) ?? []).toHaveLength(2);
+    expect(fuente).toMatch(/setMessage\(\s*null\s*\)/);
+  });
+
   it('nunca pinta el texto crudo de la URL', () => {
     expect(fuente).not.toMatch(/setError\(\s*errorParam\s*\)/);
     expect(fuente).not.toMatch(/setMessage\(\s*messageParam\s*\)/);
