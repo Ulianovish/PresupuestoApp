@@ -69,7 +69,7 @@ Se usan **los dos**: hook como barrera principal y trigger como respaldo. Fuente
   - `functionBlock(name: string): string` — texto normalizado desde `create or replace function public.<name>(` hasta el `$$;` que la cierra (`''` si no existe).
 - Produces (en SQL): `public.signup_allowlist`, `public.is_signup_allowed(text)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`:
 
@@ -179,12 +179,12 @@ describe('backfill de usuarios existentes', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
 Expected: FAIL — `existe el archivo de la migración` con `expected false to be true`, y el resto con `expected '' to contain …` / `to match`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `supabase/migrations/20260930120000_signup_allowlist.sql`:
 
@@ -243,12 +243,12 @@ WHERE u.email IS NOT NULL AND btrim(u.email) <> ''
 ON CONFLICT (email) DO NOTHING;
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
 Expected: PASS (8 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 El commit incluye un archivo de `src/`, así que va sin `--no-verify` (lint-staged formatea el test).
 
