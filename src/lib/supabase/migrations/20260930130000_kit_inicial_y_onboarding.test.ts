@@ -147,13 +147,33 @@ describe('migración 20260930130000: _seed_starter_kit', () => {
     expect(body).toMatch(/RETURN true; END;/);
   });
 
-  it('crea exactamente las 6 categorías del kit, en MAYÚSCULAS y activas (reactiva las inactivas)', () => {
+  it('crea solo las categorías del kit que falten (por upper(btrim(name))), en MAYÚSCULAS y activas', () => {
     const match = seed().match(
-      /INSERT INTO public\.categories \(user_id, name, is_active\) SELECT p_user_id, c\.name, true FROM \(VALUES (.*?)\) AS c\(name\) ON CONFLICT \(name, user_id\) DO UPDATE SET is_active = true;/,
+      /INSERT INTO public\.categories \(user_id, name, is_active\) SELECT p_user_id, c\.name, true FROM \(VALUES (.*?)\) AS c\(name\) WHERE NOT EXISTS \( SELECT 1 FROM public\.categories e WHERE e\.user_id = p_user_id AND upper\(btrim\(e\.name\)\) = c\.name \) ON CONFLICT \(name, user_id\) DO NOTHING;/,
     );
     expect(match).not.toBeNull();
     const names = [...(match?.[1] ?? '').matchAll(/'([^']+)'/g)].map(m => m[1]);
     expect(names).toEqual(KIT_CATEGORIES);
+  });
+
+  it('reactiva ANTES del INSERT las categorías del usuario que coinciden con el kit por upper(btrim(name))', () => {
+    const body = seed();
+    const update = body.indexOf(
+      "UPDATE public.categories c SET is_active = true WHERE c.user_id = p_user_id AND upper(btrim(c.name)) IN ( SELECT kit.item->>'categoria' FROM jsonb_array_elements(v_kit) AS kit(item) );",
+    );
+    expect(update).toBeGreaterThan(-1);
+    expect(update).toBeLessThan(body.indexOf('INSERT INTO public.categories'));
+  });
+
+  it('resuelve el id de categoría de cada rubro por upper(btrim(name)) después de crear las categorías', () => {
+    const body = seed();
+    const map = body.indexOf(
+      "SELECT jsonb_agg(kit.item || jsonb_build_object('category_id', ( SELECT c.id FROM public.categories c WHERE c.user_id = p_user_id AND upper(btrim(c.name)) = kit.item->>'categoria' ORDER BY (c.name = kit.item->>'categoria') DESC, c.id LIMIT 1 ))) INTO v_kit FROM jsonb_array_elements(v_kit) AS kit(item);",
+    );
+    expect(map).toBeGreaterThan(body.indexOf('INSERT INTO public.categories'));
+    expect(map).toBeLessThan(body.indexOf('UPDATE public.budget_items'));
+    // Ni el UPDATE ni el INSERT de rubros vuelven a buscar la categoría por nombre exacto.
+    expect(body).not.toContain("cat.name = kit.item->>'categoria'");
   });
 
   it('crea los 12 rubros exactos con su clasificación, control y alertas', () => {
@@ -178,18 +198,15 @@ describe('migración 20260930130000: _seed_starter_kit', () => {
       "SELECT id INTO v_status_id FROM public.budget_statuses WHERE name = 'Activo';",
     );
     expect(body).toContain(
-      "INSERT INTO public.budget_items (user_id, template_id, category_id, classification_id, control_id, status_id, name, budgeted_amount, is_active, alerts_enabled) SELECT p_user_id, v_template_id, cat.id, (kit.item->>'classification_id')::uuid, (kit.item->>'control_id')::uuid, v_status_id, kit.item->>'rubro', 0, true, (kit.item->>'alerts')::boolean FROM jsonb_array_elements(v_kit) AS kit(item)",
-    );
-    expect(body).toContain(
-      "JOIN public.categories cat ON cat.user_id = p_user_id AND cat.name = kit.item->>'categoria'",
+      "INSERT INTO public.budget_items (user_id, template_id, category_id, classification_id, control_id, status_id, name, budgeted_amount, is_active, alerts_enabled) SELECT p_user_id, v_template_id, (kit.item->>'category_id')::uuid, (kit.item->>'classification_id')::uuid, (kit.item->>'control_id')::uuid, v_status_id, kit.item->>'rubro', 0, true, (kit.item->>'alerts')::boolean FROM jsonb_array_elements(v_kit) AS kit(item)",
     );
   });
 
-  it('no duplica rubros: NOT EXISTS sobre (template_id, category_id, lower(name))', () => {
+  it('no duplica rubros: NOT EXISTS sobre (template_id, category_id del kit, lower(name))', () => {
     const body = seed();
     const insert = body.indexOf('INSERT INTO public.budget_items');
     const notExists = body.indexOf(
-      "WHERE NOT EXISTS ( SELECT 1 FROM public.budget_items bi WHERE bi.template_id = v_template_id AND bi.category_id = cat.id AND lower(bi.name) = lower(kit.item->>'rubro') );",
+      "WHERE NOT EXISTS ( SELECT 1 FROM public.budget_items bi WHERE bi.template_id = v_template_id AND bi.category_id = (kit.item->>'category_id')::uuid AND lower(bi.name) = lower(kit.item->>'rubro') );",
     );
     expect(insert).toBeGreaterThan(-1);
     expect(notExists).toBeGreaterThan(insert);
@@ -202,7 +219,7 @@ describe('migración 20260930130000: _seed_starter_kit', () => {
       'UPDATE public.budget_items bi SET is_active = true FROM jsonb_array_elements(v_kit) AS kit(item)',
     );
     const match = body.indexOf(
-      "WHERE bi.template_id = v_template_id AND bi.category_id = cat.id AND lower(bi.name) = lower(kit.item->>'rubro') AND bi.is_active = false;",
+      "WHERE bi.template_id = v_template_id AND bi.category_id = (kit.item->>'category_id')::uuid AND lower(bi.name) = lower(kit.item->>'rubro') AND bi.is_active = false;",
     );
     const insert = body.indexOf('INSERT INTO public.budget_items');
     expect(template).toBeGreaterThan(-1);
