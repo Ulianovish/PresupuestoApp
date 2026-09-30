@@ -99,12 +99,12 @@ describe('get_previous_month_overspend', () => {
     expect(block.match(/WHERE bt\.user_id = p_user_id/g)).toHaveLength(2);
   });
 
-  it('solo service_role la ejecuta (no tiene llamadores en src/)', () => {
+  it('la ejecutan authenticated (getPreviousMonthOverspend en services/budget.ts, desde el navegador) y service_role; anon no', () => {
     const code = codeOnly(readMigration());
     expect(code).toContain(
-      'REVOKE EXECUTE ON FUNCTION public.get_previous_month_overspend(uuid, character varying) FROM PUBLIC, anon, authenticated;',
+      'REVOKE EXECUTE ON FUNCTION public.get_previous_month_overspend(uuid, character varying) FROM PUBLIC, anon;',
     );
-    expect(grantedRoles(code, NAME)).toEqual(['service_role']);
+    expect(grantedRoles(code, NAME)).toEqual(['authenticated', 'service_role']);
   });
 });
 

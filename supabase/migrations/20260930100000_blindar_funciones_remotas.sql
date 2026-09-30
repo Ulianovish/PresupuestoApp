@@ -22,7 +22,8 @@
 --   1. get_previous_month_overspend: SÍ (bt.user_id = p_user_id en ambos meses),
 --      pero era SECURITY DEFINER abierta a anon: cualquiera con la anon key leía
 --      presupuestado/gastado de otra persona pasando su uuid.
---      -> guard + search_path + solo service_role (no tiene llamadores en src/).
+--      -> guard + search_path; EXECUTE a authenticated y service_role (la llama
+--         getPreviousMonthOverspend en src/lib/services/budget.ts desde el navegador).
 --   2. copy_budget_items_from_template: NO. Copiaba los rubros de CUALQUIER
 --      plantilla fuente (no verificaba el dueño) hacia cualquier plantilla
 --      destino. Solo la ejecutaban service_role y las llamadas anidadas desde
@@ -46,7 +47,7 @@
 
 
 -- ============================================================================
--- 1. get_previous_month_overspend: guard + search_path + solo service_role
+-- 1. get_previous_month_overspend: guard + search_path + authenticated/service_role
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.get_previous_month_overspend(p_user_id uuid, p_month_year character varying)
  RETURNS TABLE(item_id uuid, previous_month character varying, budgeted numeric, spent numeric, excess numeric)
@@ -108,8 +109,11 @@ BEGIN
 END;
 $function$;
 
-REVOKE EXECUTE ON FUNCTION public.get_previous_month_overspend(uuid, character varying) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.get_previous_month_overspend(uuid, character varying) TO service_role;
+-- La llama el navegador con sesión (getPreviousMonthOverspend en
+-- src/lib/services/budget.ts, alerta de sobregasto de origin/main 2b799df)
+-- con su propio user.id: el guard de arriba impide pedir el de otro.
+REVOKE EXECUTE ON FUNCTION public.get_previous_month_overspend(uuid, character varying) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_previous_month_overspend(uuid, character varying) TO authenticated, service_role;
 
 
 -- ============================================================================
@@ -419,8 +423,9 @@ GRANT EXECUTE ON FUNCTION public.get_budget_by_month(uuid, character varying) TO
 --                     'get_electronic_invoices_by_date_range', 'get_invoice_stats_by_supplier',
 --                     'get_budget_by_month')
 -- ORDER BY 1;
--- -- esperado: get_budget_by_month -> prosecdef = f, execute_para = postgres,authenticated,service_role
--- --           las otras 6         -> prosecdef = t, execute_para = postgres,service_role
+-- -- esperado: get_budget_by_month          -> prosecdef = f, execute_para = postgres,authenticated,service_role
+-- --           get_previous_month_overspend -> prosecdef = t, execute_para = postgres,authenticated,service_role
+-- --           las otras 5                  -> prosecdef = t, execute_para = postgres,service_role
 -- --           las 7 con proconfig = {"search_path=public, pg_temp"}
 --
 -- 3) Tablas de public sin RLS (esperado: 0 filas; el 2026-09-30 las 24 tenían RLS):
