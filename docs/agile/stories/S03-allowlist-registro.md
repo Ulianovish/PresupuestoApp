@@ -711,6 +711,14 @@ Requisito: la migración `20260930120000_signup_allowlist.sql` ya está aplicada
 - **El trigger bloquea toda alta sin email.** `enforce_signup_allowlist` rechaza cualquier INSERT en `auth.users` con `email` NULL o vacío (registro por teléfono, anónimo), incluso desde `auth.admin.createUser`. Es intencional: la app solo usa correo y ningún usuario actual es anónimo. Si algún día se quiere teléfono o anónimos, hay que cambiar el trigger y el hook.
 - **Mensaje crudo hasta S04.** El rechazo del trigger llega como `Database error saving new user` (`unexpected_failure`); lo traduce `translateAuthError` (contratos §2.2), que llega con S04. Hasta entonces, quien no está invitado y entra por un camino que no pasa por el hook ve ese texto en inglés.
 - **El test de la migración es de humo.** Compara texto (con los roles de cada `REVOKE` en cualquier orden y cualquier alias en el backfill); no ejecuta el SQL. El comportamiento real queda en los 6 bloques de verificación manual del final del `.sql`.
+- **Reintento de VINCULAR ratificado (deuda de S02).** El orquestador ratificó `already_redeemed_same_link` (contratos §5.1, viñeta §1.5): solo confirma el vínculo si el mismo código lo canjeó el dueño del vínculo del número en los últimos 2 minutos. Se descartó la variante literal «número ya vinculado → OK», porque permitía probar códigos sin límite.
+- **Deuda de S02 cerrada dentro de S03** (commits de esta rama):
+  - `646140a` fix(whatsapp): la purga de intentos de VINCULAR borra todo lo anterior a la ventana.
+  - `7fe36b9` fix(whatsapp): un reintento de VINCULAR con el número ya vinculado confirma el vínculo (primera versión, luego acotada).
+  - `1534270` docs(whatsapp): S02 al día con la ronda 1, la deuda cerrada en S03 y los riesgos aceptados.
+  - `9e28263` fix(whatsapp): un VINCULAR inválido desde un número vinculado vuelve a contar como intento (variante acotada `already_redeemed_same_link`).
+  - `154d367` perf(whatsapp): índice por `created_at` en `whatsapp_link_attempts` para la purga.
+  - `b596c2c` docs: S03 y S02 al día con la ronda de corrección 1.
 - **Pendiente de H8 — resultado de la verificación manual** (anotar aquí al aplicar la migración):
   - [ ] 1) RLS activo y sin políticas.
   - [ ] 2) Privilegios de tabla, funciones y esquema.
