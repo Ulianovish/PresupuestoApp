@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 
 import { z } from 'zod';
 
+import { itemDefaultNamesFor } from '@/lib/budget/catalog-defaults';
+import { resolveBudgetItemDefaults } from '@/lib/budget/item-defaults-supabase';
 import { createClient } from '@/lib/supabase/server';
 
 // Schema de validación para crear una nueva categoría
@@ -281,40 +283,13 @@ export async function createDefaultBudgetItemForCategory(
       };
     }
 
-    // Valores por defecto de clasificación, control y estado
-    const [classificationResult, controlResult, statusResult] =
-      await Promise.all([
-        supabase
-          .from('classifications')
-          .select('id')
-          .eq('is_active', true)
-          .order('name')
-          .limit(1)
-          .single(),
-        supabase
-          .from('controls')
-          .select('id')
-          .eq('is_active', true)
-          .order('name')
-          .limit(1)
-          .single(),
-        supabase
-          .from('budget_statuses')
-          .select('id')
-          .eq('name', 'Activo')
-          .single(),
-      ]);
+    // Clasificación, control y estado por nombre (contratos §2.5)
+    const defaults = await resolveBudgetItemDefaults(
+      supabase,
+      itemDefaultNamesFor(categoryName),
+    );
 
-    if (
-      classificationResult.error ||
-      controlResult.error ||
-      statusResult.error
-    ) {
-      console.error('Error obteniendo valores por defecto:', {
-        classificationResult: classificationResult.error,
-        controlResult: controlResult.error,
-        statusResult: statusResult.error,
-      });
+    if (!defaults.ok) {
       return {
         success: false,
         error: 'No se pudieron obtener los valores por defecto del ítem',
@@ -325,9 +300,9 @@ export async function createDefaultBudgetItemForCategory(
       user_id: user.id,
       template_id: templateId,
       category_id: categoryId,
-      classification_id: classificationResult.data.id,
-      control_id: controlResult.data.id,
-      status_id: statusResult.data.id,
+      classification_id: defaults.ids.classificationId,
+      control_id: defaults.ids.controlId,
+      status_id: defaults.ids.statusId,
       name: categoryName,
       budgeted_amount: 0,
       real_amount: 0,
@@ -392,40 +367,31 @@ export async function createBudgetItemInMonth(
       };
     }
 
-    // Valores por defecto de clasificación, control y estado
-    const [classificationResult, controlResult, statusResult] =
-      await Promise.all([
-        supabase
-          .from('classifications')
-          .select('id')
-          .eq('is_active', true)
-          .order('name')
-          .limit(1)
-          .single(),
-        supabase
-          .from('controls')
-          .select('id')
-          .eq('is_active', true)
-          .order('name')
-          .limit(1)
-          .single(),
-        supabase
-          .from('budget_statuses')
-          .select('id')
-          .eq('name', 'Activo')
-          .single(),
-      ]);
+    // Nombre de la categoría (del usuario) para saber si es DEUDAS
+    // (de paso valida que la categoría exista y sea del usuario).
+    const { data: category, error: categoryError } = await supabase
+      .from('categories')
+      .select('name')
+      .eq('id', categoryId)
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-    if (
-      classificationResult.error ||
-      controlResult.error ||
-      statusResult.error
-    ) {
-      console.error('Error obteniendo valores por defecto:', {
-        classificationResult: classificationResult.error,
-        controlResult: controlResult.error,
-        statusResult: statusResult.error,
-      });
+    if (categoryError) {
+      console.error('Error leyendo la categoría del ítem:', categoryError);
+      return { success: false, error: 'No se pudo leer la categoría' };
+    }
+
+    if (!category) {
+      return { success: false, error: 'Categoría no encontrada' };
+    }
+
+    // Clasificación, control y estado por nombre (contratos §2.5)
+    const defaults = await resolveBudgetItemDefaults(
+      supabase,
+      itemDefaultNamesFor(category.name),
+    );
+
+    if (!defaults.ok) {
       return {
         success: false,
         error: 'No se pudieron obtener los valores por defecto del ítem',
@@ -438,9 +404,9 @@ export async function createBudgetItemInMonth(
         user_id: user.id,
         template_id: templateId,
         category_id: categoryId,
-        classification_id: classificationResult.data.id,
-        control_id: controlResult.data.id,
-        status_id: statusResult.data.id,
+        classification_id: defaults.ids.classificationId,
+        control_id: defaults.ids.controlId,
+        status_id: defaults.ids.statusId,
         name: trimmed,
         budgeted_amount: 0,
         real_amount: 0,

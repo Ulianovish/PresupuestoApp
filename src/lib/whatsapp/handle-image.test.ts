@@ -591,7 +591,7 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
       date: '2026-06-11',
       account: null,
       concept: 'Pago',
-      recipient: 'Carlos Gomez',
+      recipient: 'Persona Ejemplo Dos',
       confidence: 0.9,
       ...extra,
     }));
@@ -628,7 +628,7 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
       description: 'Huevos',
       accountName: 'Nequi',
       date: '2026-06-11',
-      place: 'Carlos Gomez',
+      place: 'Persona Ejemplo Dos',
     });
     expect(mensajes(deps)[0]).toMatch(
       /^✅ Registré \$\s?9\.000 · Huevos en MERCADO \(Nequi\)\./,
@@ -637,7 +637,7 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
 
   it('caption ambigua ("con nequi" y hay dos Nequi): registra YA con la por defecto, lo dice y manda la lista con las dos primero', async () => {
     const deps = makeDeps({
-      accounts: ['Efectivo', 'Nequi Migue', 'Nequi Milo', 'TC Davivienda'],
+      accounts: ['Efectivo', 'Nequi Bruno', 'Nequi Coco', 'TC Davivienda'],
       analyzeImage: transferencia(),
       createDirectExpense: vi.fn(async () => ({
         ok: true,
@@ -653,7 +653,7 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
       '+57300',
       expect.objectContaining({
         accountName: 'Efectivo',
-        place: 'Carlos Gomez',
+        place: 'Persona Ejemplo Dos',
       }),
     );
     expect(deps.askAccount).toHaveBeenCalledTimes(1);
@@ -666,7 +666,7 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
     };
     expect(pedido.targetKind).toBe('transactions');
     expect(pedido.targetIds).toEqual(['tx-foto']);
-    expect(pedido.candidatas).toEqual(['Nequi Migue', 'Nequi Milo']);
+    expect(pedido.candidatas).toEqual(['Nequi Bruno', 'Nequi Coco']);
     expect(pedido.previo).toMatch(
       /^✅ Registré \$\s?9\.000 · Huevos en MERCADO\./,
     );
@@ -712,7 +712,7 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
     expect(deps.createDirectExpense).toHaveBeenCalledWith(
       'u1',
       '+57300',
-      expect.objectContaining({ description: 'Carlos Gomez' }),
+      expect.objectContaining({ description: 'Persona Ejemplo Dos' }),
     );
   });
 

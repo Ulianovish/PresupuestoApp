@@ -39,9 +39,9 @@ export default function PendingInvoicesPanel({
   const { categories: budgetCategories } = useCategories();
   const categoryNames = budgetCategories.map(c => c.name.toUpperCase());
 
-  // Cuentas reales del usuario (tabla `accounts`), no la lista fija de
-  // ACCOUNT_TYPES: con esa, rescatar una factura la registraría con una
-  // cuenta que puede no existir para el usuario.
+  // Cuentas reales del usuario (tabla `accounts`), no una lista fija: con
+  // esa, rescatar una factura la registraría con una cuenta que puede no
+  // existir para el usuario.
   useEffect(() => {
     let active = true;
     getUserAccounts()

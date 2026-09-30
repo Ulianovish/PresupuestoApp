@@ -19,6 +19,8 @@ vi.mock('@/lib/whatsapp/twilio-signature', () => ({
 vi.mock('@/lib/services/whatsapp-links', () => ({
   getLinkByPhone: vi.fn(),
   redeemLinkCode: vi.fn(),
+  reserveLinkAttempt: vi.fn(),
+  releaseLinkAttempt: vi.fn(),
 }));
 vi.mock('@/lib/whatsapp/classify', async importOriginal => {
   const real = await importOriginal<typeof import('@/lib/whatsapp/classify')>();
@@ -43,7 +45,12 @@ vi.mock('@/lib/whatsapp/transport', () => ({
   downloadTwilioMedia: vi.fn(),
 }));
 
-import { getLinkByPhone } from '@/lib/services/whatsapp-links';
+import {
+  getLinkByPhone,
+  redeemLinkCode,
+  releaseLinkAttempt,
+  reserveLinkAttempt,
+} from '@/lib/services/whatsapp-links';
 import {
   intentarCuentaEscrita,
   manejarEleccionCuenta,
@@ -131,12 +138,12 @@ describe('webhook de WhatsApp: lista de cuentas', () => {
 
   it('texto normal: primero prueba si es el nombre de una cuenta; si lo es, no pasa al agente', async () => {
     vi.mocked(intentarCuentaEscrita).mockResolvedValue(true);
-    await post({ From: `whatsapp:${TEL}`, Body: 'Nequi Milo', NumMedia: '0' });
+    await post({ From: `whatsapp:${TEL}`, Body: 'Nequi Coco', NumMedia: '0' });
     await terminar();
 
     expect(intentarCuentaEscrita).toHaveBeenCalledWith(
       { fake: 'eleccion' },
-      { userId: 'u1', phone: TEL, body: 'Nequi Milo' },
+      { userId: 'u1', phone: TEL, body: 'Nequi Coco' },
     );
     expect(handleAgentTurn).not.toHaveBeenCalled();
   });
@@ -150,5 +157,52 @@ describe('webhook de WhatsApp: lista de cuentas', () => {
       phone: TEL,
       body: '40k huevos',
     });
+  });
+});
+
+describe('webhook de WhatsApp: número sin vincular', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    enSegundoPlano.length = 0;
+    vi.stubEnv('TWILIO_AUTH_TOKEN', 'tok');
+    vi.stubEnv('WHATSAPP_WEBHOOK_URL', 'https://app.test/api/whatsapp/webhook');
+    vi.mocked(getLinkByPhone).mockResolvedValue(null);
+    vi.mocked(reserveLinkAttempt).mockResolvedValue({
+      allowed: true,
+      attemptId: 7,
+    });
+    vi.mocked(releaseLinkAttempt).mockResolvedValue(undefined);
+  });
+
+  it('con el límite de intentos alcanzado responde que espere y no canjea el código', async () => {
+    vi.mocked(reserveLinkAttempt).mockResolvedValue({ allowed: false });
+
+    const res = await post({
+      From: `whatsapp:${TEL}`,
+      Body: 'VINCULAR 123456',
+      NumMedia: '0',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('Hiciste demasiados intentos');
+    expect(reserveLinkAttempt).toHaveBeenCalledWith(TEL);
+    expect(redeemLinkCode).not.toHaveBeenCalled();
+  });
+
+  it('un código inválido deja la reserva como intento fallido del número', async () => {
+    vi.mocked(redeemLinkCode).mockResolvedValue({
+      ok: false,
+      reason: 'invalid_or_expired',
+    });
+
+    await post({
+      From: `whatsapp:${TEL}`,
+      Body: 'VINCULAR 123456',
+      NumMedia: '0',
+    });
+
+    expect(redeemLinkCode).toHaveBeenCalledWith('123456', TEL);
+    expect(reserveLinkAttempt).toHaveBeenCalledWith(TEL);
+    expect(releaseLinkAttempt).not.toHaveBeenCalled();
   });
 });

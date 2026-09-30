@@ -133,3 +133,48 @@ export async function guardarDocumentoDianAction(input: {
   revalidatePath('/settings');
   return { ok: true, documento: validacion.documento };
 }
+
+export type UnlinkLinkResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Desvincula un número de WhatsApp del usuario autenticado por el `id` de su
+ * fila en `whatsapp_links` (contratos §5.2): el navegador solo conoce el id y
+ * el número enmascarado, nunca el completo. Con el cliente de la cookie: la
+ * política DELETE solo deja borrar filas propias; el filtro por `user_id` es
+ * además explícito. El `.select('id')` (RETURNING, cubierto por la política
+ * SELECT del dueño) distingue "borrado" de "no era tuyo". Nunca loguea el
+ * número.
+ */
+export async function unlinkWhatsAppLinkAction(
+  linkId: string,
+): Promise<UnlinkLinkResult> {
+  if (!linkIdSchema.safeParse(linkId).success) {
+    return { ok: false, error: 'Número inválido.' };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: 'No autenticado' };
+  }
+
+  const { data, error } = await supabase
+    .from('whatsapp_links')
+    .delete()
+    .eq('id', linkId)
+    .eq('user_id', user.id)
+    .select('id');
+  if (error) {
+    // Solo el código: el detalle de Postgres puede traer la fila con el número.
+    console.error('unlinkWhatsAppLinkAction: error desvinculando:', error.code);
+    return { ok: false, error: 'No se pudo desvincular el número.' };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, error: 'No encontramos ese número entre los tuyos.' };
+  }
+
+  revalidatePath('/settings');
+  return { ok: true };
+}

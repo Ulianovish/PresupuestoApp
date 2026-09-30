@@ -13,6 +13,9 @@ import Card, {
 } from '@/components/atoms/Card/Card';
 import Input from '@/components/atoms/Input/Input';
 import { loginAction } from '@/lib/actions/auth';
+import { resolveLoginFeedback } from '@/lib/auth/login-feedback';
+
+import AuthLoadingFallback from '../AuthLoadingFallback';
 
 /**
  * LoginForm - Formulario de inicio de sesión que usa useSearchParams
@@ -22,14 +25,17 @@ function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // Lo pone el middleware al mandar aquí desde una ruta protegida.
+  const redirectTo = searchParams.get('redirectTo');
 
-  // Obtener errores y mensajes de los query parameters
+  // `?error=` y `?message=` traen códigos: nunca se pinta texto de la URL.
   useEffect(() => {
-    const errorParam = searchParams.get('error');
-    const messageParam = searchParams.get('message');
-
-    setError(errorParam);
-    setMessage(messageParam);
+    const feedback = resolveLoginFeedback({
+      error: searchParams.get('error'),
+      message: searchParams.get('message'),
+    });
+    setError(feedback.error);
+    setMessage(feedback.message);
   }, [searchParams]);
 
   // Función para manejar el envío del formulario
@@ -67,6 +73,10 @@ function LoginForm() {
 
           <CardContent>
             <form action={handleSubmit} className="space-y-6">
+              {redirectTo && (
+                <input type="hidden" name="redirectTo" value={redirectTo} />
+              )}
+
               {/* Campo Email */}
               <div className="space-y-2">
                 <label
@@ -176,23 +186,7 @@ function LoginForm() {
  */
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/5 to-emerald-500/10" />
-          <div className="relative">
-            <Card variant="glass" className="p-8">
-              <CardContent>
-                <div className="text-center text-white">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
-                  <p>Cargando...</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<AuthLoadingFallback />}>
       <LoginForm />
     </Suspense>
   );

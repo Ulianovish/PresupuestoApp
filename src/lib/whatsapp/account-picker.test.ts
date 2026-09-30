@@ -29,11 +29,11 @@ const CUENTAS = [
   cuenta('Ahorros Nu'),
   cuenta('Davivienda'),
   cuenta('Efectivo', { type: 'cash' }),
-  cuenta('Nequi Migue'),
-  cuenta('Nequi Milo'),
+  cuenta('Nequi Bruno'),
+  cuenta('Nequi Coco'),
   cuenta('TC Davivienda', { type: 'credit' }),
   cuenta('TC Falabella', { type: 'credit' }),
-  cuenta('TC Nu Bank Migue', { type: 'credit' }),
+  cuenta('TC Nu Bank Bruno', { type: 'credit' }),
 ];
 
 function uso(
@@ -52,12 +52,12 @@ describe('rankearCuentas', () => {
     const r = rankearCuentas(CUENTAS, [
       uso('TC Davivienda', 0, 170),
       uso('TC Falabella', 0, 88),
-      uso('Nequi Milo', 12, 16),
-      uso('TC Nu Bank Migue', 3, 88),
+      uso('Nequi Coco', 12, 16),
+      uso('TC Nu Bank Bruno', 3, 88),
     ]);
     expect(nombres(r).slice(0, 4)).toEqual([
-      'Nequi Milo',
-      'TC Nu Bank Migue',
+      'Nequi Coco',
+      'TC Nu Bank Bruno',
       'TC Davivienda',
       'TC Falabella',
     ]);
@@ -81,14 +81,14 @@ describe('rankearCuentas', () => {
       CUENTAS,
       [
         uso('TC Davivienda', 5, 170),
-        uso('Nequi Migue', 0, 2),
-        uso('Nequi Milo', 1, 16),
+        uso('Nequi Bruno', 0, 2),
+        uso('Nequi Coco', 1, 16),
       ],
-      ['Nequi Migue', 'Nequi Milo'],
+      ['Nequi Bruno', 'Nequi Coco'],
     );
     expect(nombres(r).slice(0, 3)).toEqual([
-      'Nequi Milo',
-      'Nequi Migue',
+      'Nequi Coco',
+      'Nequi Bruno',
       'TC Davivienda',
     ]);
   });
@@ -111,7 +111,7 @@ describe('rankearCuentas', () => {
 
 describe('truncarTitulo', () => {
   it('deja intacto un nombre de hasta 24 caracteres', () => {
-    expect(truncarTitulo('TC Nu Bank Migue')).toBe('TC Nu Bank Migue');
+    expect(truncarTitulo('TC Nu Bank Bruno')).toBe('TC Nu Bank Bruno');
     expect(truncarTitulo('x'.repeat(24))).toBe('x'.repeat(24));
   });
 
@@ -201,11 +201,11 @@ describe('armarVariablesLista', () => {
 describe('textoPreguntaCuenta', () => {
   it('lista las opciones en orden y pide responder con el nombre', () => {
     const t = textoPreguntaCuenta('¿Con qué cuenta fue?', [
-      cuenta('Nequi Migue'),
-      cuenta('Nequi Milo'),
+      cuenta('Nequi Bruno'),
+      cuenta('Nequi Coco'),
     ]);
     expect(t).toContain('¿Con qué cuenta fue?');
-    expect(t).toContain('Nequi Migue, Nequi Milo');
+    expect(t).toContain('Nequi Bruno, Nequi Coco');
     expect(t).toMatch(/respondé con el nombre/i);
   });
 });
@@ -214,13 +214,13 @@ describe('pareceRespuestaDeCuenta / interpretarRespuestaCuenta', () => {
   const NOMBRES = nombres(CUENTAS);
 
   it('un nombre corto y exacto se aplica', () => {
-    expect(interpretarRespuestaCuenta('Nequi Milo', NOMBRES)).toEqual({
+    expect(interpretarRespuestaCuenta('Nequi Coco', NOMBRES)).toEqual({
       kind: 'ok',
-      cuenta: 'Nequi Milo',
+      cuenta: 'Nequi Coco',
     });
-    expect(interpretarRespuestaCuenta('con la nequi milo', NOMBRES)).toEqual({
+    expect(interpretarRespuestaCuenta('con la nequi coco', NOMBRES)).toEqual({
       kind: 'ok',
-      cuenta: 'Nequi Milo',
+      cuenta: 'Nequi Coco',
     });
     expect(interpretarRespuestaCuenta('efectivo', NOMBRES)).toEqual({
       kind: 'ok',
@@ -235,7 +235,7 @@ describe('pareceRespuestaDeCuenta / interpretarRespuestaCuenta', () => {
   it('un nombre que matchea varias cuentas devuelve las candidatas', () => {
     expect(interpretarRespuestaCuenta('nequi', NOMBRES)).toEqual({
       kind: 'ambigua',
-      candidatas: ['Nequi Migue', 'Nequi Milo'],
+      candidatas: ['Nequi Bruno', 'Nequi Coco'],
     });
   });
 
@@ -250,7 +250,7 @@ describe('pareceRespuestaDeCuenta / interpretarRespuestaCuenta', () => {
   });
 
   it('un mensaje largo o una pregunta no es una respuesta de cuenta', () => {
-    expect(pareceRespuestaDeCuenta('pagué con la nequi de milo ayer')).toBe(
+    expect(pareceRespuestaDeCuenta('pagué con la nequi de coco ayer')).toBe(
       false,
     );
     expect(pareceRespuestaDeCuenta('¿cuánto llevo en efectivo?')).toBe(false);

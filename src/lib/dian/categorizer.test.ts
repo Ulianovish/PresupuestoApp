@@ -33,12 +33,12 @@ describe('buildCategorizationPrompt', () => {
       {
         examples: [
           { description: 'Jabón en polvo', category: 'MERCADO' },
-          { description: 'Arriendo Luisa', category: 'VIVIENDA' },
+          { description: 'Arriendo Persona Ejemplo', category: 'VIVIENDA' },
         ],
       },
     );
     expect(prompt).toContain('Jabón en polvo → MERCADO');
-    expect(prompt).toContain('Arriendo Luisa → VIVIENDA');
+    expect(prompt).toContain('Arriendo Persona Ejemplo → VIVIENDA');
   });
 
   it('no empuja a OTROS ante la duda (solo como último recurso)', () => {

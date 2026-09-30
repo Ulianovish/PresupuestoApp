@@ -71,7 +71,7 @@ interface BudgetTableProps {
   categories: BudgetCategory[];
   budgetData: BudgetData | null;
   onToggleCategory: (categoryId: string) => void;
-  onAddItem: (categoryId: string) => void;
+  onAddItem: (categoryId: string, categoryName: string) => void;
   onEditItem: (categoryId: string, item: BudgetItem) => void;
   onDeleteCategory: (categoryId: string) => void;
   onRenameCategory?: (categoryId: string, newName: string) => Promise<void>;

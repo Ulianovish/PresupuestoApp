@@ -5,7 +5,7 @@
  * Sigue el patrón Atomic Design para composición de componentes.
  *
  * @param header - Componente del header con selector de mes
- * @param migrationPanel - Panel de migración de datos (opcional)
+ * @param migrationPanel - Paneles extra sobre la tabla (opcional; p. ej. facturas pendientes)
  * @param statusPanels - Paneles de estado (error, loading)
  * @param expenseSummary - Resumen de gastos por categoría
  * @param expenseTable - Tabla de transacciones
@@ -15,7 +15,7 @@
  * @example
  * <ExpensePageTemplate
  *   header={<ExpenseHeader />}
- *   migrationPanel={<ExpenseMigrationPanel />}
+ *   migrationPanel={<PendingInvoicesPanel />}
  *   statusPanels={<ExpenseStatusPanels />}
  *   expenseSummary={<ExpenseSummary />}
  *   expenseTable={<ExpenseTable />}

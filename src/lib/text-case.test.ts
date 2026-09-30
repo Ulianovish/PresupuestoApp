@@ -22,7 +22,7 @@ describe('toTitleCase', () => {
   });
 
   it('mantiene acentos y maneja vacíos', () => {
-    expect(toTitleCase('ALIMENTACIÓN ABRIL')).toBe('Alimentación Abril');
+    expect(toTitleCase('ALIMENTACIÓN MASCOTAS')).toBe('Alimentación Mascotas');
     expect(toTitleCase('')).toBe('');
     expect(toTitleCase(null)).toBe('');
   });

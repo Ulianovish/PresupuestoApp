@@ -23,8 +23,9 @@ import { usePathname } from 'next/navigation';
 
 import {
   LayoutDashboard,
+  LogOut,
   PieChart,
-  FlaskConical,
+  Settings,
   TrendingUp,
   CreditCard,
   Wallet,
@@ -32,6 +33,7 @@ import {
   Home,
 } from 'lucide-react';
 
+import { logoutAction } from '@/lib/actions/auth';
 import { cn } from '@/lib/utils';
 
 interface MobileSidebarProps {
@@ -71,12 +73,6 @@ const navigationLinks = [
     label: 'Deudas',
     icon: CreditCard,
     description: 'Gestión de deudas',
-  },
-  {
-    href: '/test',
-    label: 'Test',
-    icon: FlaskConical,
-    description: 'Página de pruebas',
   },
 ];
 
@@ -204,6 +200,32 @@ export default function MobileSidebar({
               })}
             </ul>
           </nav>
+
+          {/* Ajustes y cerrar sesión (igual que en Sidebar.tsx) */}
+          <div className="space-y-2 border-t border-white/20 p-6">
+            <Link
+              href="/settings"
+              onClick={onClose}
+              className={cn(
+                'flex items-center gap-3 p-3 rounded-lg transition-all duration-200 border',
+                pathname === '/settings' || pathname?.startsWith('/settings/')
+                  ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                  : 'text-gray-300 hover:text-white hover:bg-white/10 border-transparent',
+              )}
+            >
+              <Settings size={20} />
+              <span className="font-medium">Ajustes y cuentas</span>
+            </Link>
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="flex w-full items-center gap-3 p-3 rounded-lg border border-transparent text-gray-300 transition-all duration-200 hover:bg-white/10 hover:text-white"
+              >
+                <LogOut size={20} />
+                <span className="font-medium">Cerrar sesión</span>
+              </button>
+            </form>
+          </div>
 
           {/* Footer del menú */}
           <div className="p-6 border-t border-white/20">

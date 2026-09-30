@@ -22,8 +22,10 @@ import DashboardHeader from '@/components/organisms/DashboardHeader/DashboardHea
 import DashboardMainContent from '@/components/organisms/DashboardMainContent/DashboardMainContent';
 import DashboardQuickActions from '@/components/organisms/DashboardQuickActions/DashboardQuickActions';
 import DashboardSummaryCards from '@/components/organisms/DashboardSummaryCards/DashboardSummaryCards';
+import OnboardingChecklist from '@/components/organisms/OnboardingChecklist/OnboardingChecklist';
 import DashboardPageTemplate from '@/components/templates/DashboardPageTemplate/DashboardPageTemplate';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import type { ChecklistItem } from '@/lib/onboarding/checklist';
 import { BudgetCategory } from '@/lib/services/budget';
 import { getCreditCardsSummary } from '@/lib/services/credit-cards';
 import { conMovimiento } from '@/lib/services/credit-cards-filter';
@@ -43,10 +45,13 @@ interface User {
 
 interface DashboardContentProps {
   user: User;
+  /** Pasos de configuración pendientes; null o ausente = no mostrar. */
+  checklist?: ChecklistItem[] | null;
 }
 
 export default function DashboardContent({
   user: _user,
+  checklist = null,
 }: DashboardContentProps) {
   // Usar el hook personalizado para obtener datos integrados
   const { summary, budgetData, isLoading, error, refreshData, selectedMonth } =
@@ -150,7 +155,12 @@ export default function DashboardContent({
     />
   );
 
-  const quickActions = <DashboardQuickActions />;
+  const quickActions = (
+    <div className="space-y-6">
+      {checklist && <OnboardingChecklist items={checklist} />}
+      <DashboardQuickActions />
+    </div>
+  );
 
   const mainContent = (
     <div className="space-y-6">

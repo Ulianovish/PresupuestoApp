@@ -53,8 +53,7 @@ function fakeSupabase(opts: {
 
 const HISTORIAL = construirHistorial([
   {
-    description:
-      'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+    description: 'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
     category_name: 'VIVIENDA',
     transaction_date: '2026-08-15',
     budget_items: { name: 'Arriendo', categories: { name: 'VIVIENDA' } },
@@ -227,8 +226,7 @@ describe('clasificarGastos', () => {
       [
         {
           id: 't1',
-          description:
-            'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+          description: 'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
           categoryName: 'OTROS',
           monthYear: '2026-09',
           categoriaAdivinada: true,
@@ -263,8 +261,7 @@ describe('clasificarGastos', () => {
       [
         {
           id: 't1',
-          description:
-            'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+          description: 'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
           categoryName: 'OTROS',
           monthYear: '2026-09',
         },
@@ -277,8 +274,7 @@ describe('clasificarGastos', () => {
     expect(mockedClassify).toHaveBeenCalledWith(
       [
         {
-          description:
-            'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+          description: 'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
         },
       ],
       ['Varios'],
@@ -308,8 +304,7 @@ describe('sugerirDesdeHistorial', () => {
         // "Clasificar con IA", no el desplegable.
         {
           id: 't2',
-          description:
-            'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+          description: 'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
           categoryName: 'OTROS',
           monthYear: '2026-09',
         },

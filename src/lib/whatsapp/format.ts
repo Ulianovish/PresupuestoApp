@@ -55,3 +55,15 @@ export function enmascararTelefono(phone: string): string {
   if (phone.length < 9) return `••• ${phone.slice(-2)}`;
   return `${phone.slice(0, 4)} ••• ${phone.slice(-4)}`;
 }
+
+/**
+ * Fecha de un timestamp ISO en horario de Bogotá, p. ej. "29/9/2026". Las
+ * páginas se renderizan en el servidor, que en producción corre en UTC: sin
+ * `timeZone`, lo vinculado entre las 7pm y la medianoche saldría con el día
+ * siguiente.
+ */
+export function formatearFechaBogota(iso: string): string {
+  return new Date(iso).toLocaleDateString('es-CO', {
+    timeZone: 'America/Bogota',
+  });
+}

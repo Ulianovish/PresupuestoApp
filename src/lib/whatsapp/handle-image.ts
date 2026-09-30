@@ -62,7 +62,7 @@ export function resolveAccountFromMessage(
 
 /**
  * Cuentas que el texto (o, si no dice nada, la visión) nombró sin decidir
- * entre ellas: "con nequi" → Nequi Migue y Nequi Milo. Van primero en la
+ * entre ellas: "con nequi" → Nequi Bruno y Nequi Coco. Van primero en la
  * lista de cuentas.
  */
 function candidatasDeCuenta(
@@ -306,7 +306,7 @@ export async function handleImageMessage(
     );
     // La descripción sale de lo que escribió el usuario ("Huevos con nequi"
     // → "Huevos"), no del destinatario impreso: la categoría y el rubro se
-    // deciden sobre ella, y "Carlos Gomez" terminaba en OTROS.
+    // deciden sobre ella, y "Persona Ejemplo Dos" terminaba en OTROS.
     const descripcion = describirTransferencia(ctx.body, result, deps.accounts);
     const res = await deps.createDirectExpense(ctx.userId, ctx.phone, {
       amount: result.amount,

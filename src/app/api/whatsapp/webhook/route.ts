@@ -15,7 +15,12 @@ import {
   createVisionReceiptDraft,
   resolveDefaultAccount,
 } from '@/lib/services/whatsapp-expenses';
-import { getLinkByPhone, redeemLinkCode } from '@/lib/services/whatsapp-links';
+import {
+  getLinkByPhone,
+  redeemLinkCode,
+  releaseLinkAttempt,
+  reserveLinkAttempt,
+} from '@/lib/services/whatsapp-links';
 import { parsearIdOpcion } from '@/lib/whatsapp/account-picker';
 import {
   intentarCuentaEscrita,
@@ -91,6 +96,8 @@ export async function POST(request: NextRequest) {
     const reply = await handleLinkingMessage(phone, body, {
       redeemLinkCode,
       getLinkByPhone,
+      reserveLinkAttempt,
+      releaseLinkAttempt,
     });
     return xml(twimlMessage(reply));
   }
@@ -276,7 +283,7 @@ export async function POST(request: NextRequest) {
     const userId = link.userId;
     after(async () => {
       try {
-        // "Nequi Milo" contestando la lista con texto en vez de tocarla: si
+        // "Nequi Coco" contestando la lista con texto en vez de tocarla: si
         // hay una pregunta de cuenta abierta y el mensaje es solo un nombre
         // de cuenta, se aplica acá y no pasa por el agente.
         // Si esto falla (p. ej. la tabla sin migrar), el mensaje sigue al

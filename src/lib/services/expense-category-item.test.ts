@@ -4,11 +4,11 @@ import { itemSigueEnCategoria } from './expense-category-item';
 
 describe('itemSigueEnCategoria', () => {
   it('el ítem sigue valiendo si es de la misma categoría', () => {
-    expect(itemSigueEnCategoria('ALICE', 'ALICE')).toBe(true);
+    expect(itemSigueEnCategoria('NINOS', 'NINOS')).toBe(true);
   });
 
-  it('el caso real: prenda de ALICE con ítem de GASTOS PERSONALES', () => {
-    expect(itemSigueEnCategoria('ALICE', 'GASTOS PERSONALES')).toBe(false);
+  it('el caso real: prenda de NINOS con ítem de GASTOS PERSONALES', () => {
+    expect(itemSigueEnCategoria('NINOS', 'GASTOS PERSONALES')).toBe(false);
   });
 
   it('ignora mayúsculas, acentos y espacios', () => {
@@ -17,7 +17,7 @@ describe('itemSigueEnCategoria', () => {
   });
 
   it('un gasto sin ítem no tiene nada que soltar', () => {
-    expect(itemSigueEnCategoria('ALICE', null)).toBe(true);
+    expect(itemSigueEnCategoria('NINOS', null)).toBe(true);
     expect(itemSigueEnCategoria(null, null)).toBe(true);
   });
 

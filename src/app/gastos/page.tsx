@@ -9,7 +9,13 @@
  */
 'use client';
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from 'react';
 
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -28,10 +34,21 @@ import ExpensePageTemplate from '@/components/templates/ExpensePageTemplate/Expe
 import { useCategories } from '@/hooks/useCategories';
 import { useMonthlyExpenses } from '@/hooks/useMonthlyExpenses';
 import { createBudgetItemInMonth } from '@/lib/actions/categories';
+import {
+  buildAccountOptions,
+  expenseSubmitGuard,
+  missingCategoryMessage,
+  pickDefaultAccount,
+  todayLocalISO,
+  withFormDefaults,
+} from '@/lib/expense-form-defaults';
 import { montoDeCelda } from '@/lib/money/parse-cop';
+import {
+  stripNewExpenseParam,
+  wantsNewExpenseForm,
+} from '@/lib/onboarding/nuevo-gasto';
 import { updateBudgetItem, deleteBudgetItem } from '@/lib/services/budget';
 import {
-  ACCOUNT_TYPES,
   createExpenseTransaction,
   classifyExpensesOnServer,
   updateExpenseTransaction,
@@ -169,9 +186,35 @@ export default function GastosPage() {
     deleteExpense,
   } = useMonthlyExpenses();
 
-  // Cargar categorías dinámicas desde la BD
-  const { categories: budgetCategories } = useCategories();
-  const categoryNames = budgetCategories.map(c => c.name.toUpperCase());
+  // "Agregar Gasto" del dashboard llega con ?nuevo=1 (S10): abrir el
+  // formulario y quitar el parámetro para que recargar no lo reabra. Se lee
+  // window.location en vez de useSearchParams para no exigir un Suspense.
+  useEffect(() => {
+    if (!wantsNewExpenseForm(window.location.search)) return;
+    openModal();
+    window.history.replaceState(
+      null,
+      '',
+      stripNewExpenseParam(window.location.pathname, window.location.search),
+    );
+  }, [openModal]);
+
+  // Cargar categorías dinámicas desde la BD. Memorizadas: el efecto que
+  // completa los valores por defecto del formulario depende de ellas.
+  const { categories: budgetCategories, isLoading: categoriesLoading } =
+    useCategories();
+  const categoryNames = useMemo(
+    () => budgetCategories.map(c => c.name.toUpperCase()),
+    [budgetCategories],
+  );
+  const hasCategories = categoryNames.length > 0;
+  // "Primero crea una categoría" solo cuando la carga terminó y vino vacía,
+  // y nunca al editar un gasto que ya trae su categoría.
+  const submitGuard = expenseSubmitGuard({
+    isEditing,
+    categoriesLoading,
+    hasCategories,
+  });
 
   // Ítems del presupuesto del mes, para asignar cada gasto a un ítem
   const [budgetItems, setBudgetItems] = useState<BudgetItemRef[]>([]);
@@ -270,6 +313,9 @@ export default function GastosPage() {
   const [accountNames, setAccountNames] = useState<string[]>([]);
   // Las tarjetas de crédito habilitan los campos de compra a cuotas
   const [creditAccountNames, setCreditAccountNames] = useState<string[]>([]);
+  // Hasta que las cuentas cargan no se importa Excel: las filas sin columna
+  // de cuenta caerían todas en la cuenta por defecto.
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
   const loadAccounts = useCallback(async () => {
     try {
       const accts = await getUserAccounts();
@@ -277,7 +323,10 @@ export default function GastosPage() {
       setCreditAccountNames(
         accts.filter(a => a.type === 'credit').map(a => a.name),
       );
-    } catch {
+      setAccountsLoaded(true);
+    } catch (err) {
+      console.error('Error cargando cuentas:', err);
+      toast.error('No se pudieron cargar tus cuentas');
       setAccountNames([]);
       setCreditAccountNames([]);
     }
@@ -301,15 +350,33 @@ export default function GastosPage() {
     name: string;
   }>({ isOpen: false, id: '', name: '' });
 
+  // Formulario en blanco, con la primera categoría del usuario y su cuenta
+  // por defecto ("Efectivo" si la tiene, si no la primera).
+  const blankForm = (): FormData =>
+    withFormDefaults(
+      {
+        description: '',
+        amount: 0,
+        transaction_date: todayLocalISO(),
+        category_name: '',
+        account_name: '',
+        place: '',
+        purchase_total: null,
+        installments: null,
+      },
+      { categoryNames, accountNames },
+    );
+
   // Estado del formulario
-  const [form, setForm] = useState<FormData>({
-    description: '',
-    amount: 0,
-    transaction_date: new Date().toISOString().slice(0, 10),
-    category_name: '',
-    account_name: ACCOUNT_TYPES[0],
-    place: '',
-  });
+  const [form, setForm] = useState<FormData>(blankForm);
+
+  // Las categorías y cuentas llegan después del primer render: al cargarse,
+  // completar los valores por defecto sin pisar lo que el usuario ya eligió.
+  // En edición no se toca nada: el gasto trae sus propios valores.
+  useEffect(() => {
+    if (isEditing) return;
+    setForm(prev => withFormDefaults(prev, { categoryNames, accountNames }));
+  }, [categoryNames, accountNames, isEditing]);
 
   // Funciones del formulario
   const handleFormChange = (
@@ -368,6 +435,15 @@ export default function GastosPage() {
       return;
     }
 
+    // Sin categoría no se guarda (el botón ya está deshabilitado; esto cubre
+    // un envío con Enter). Mientras las categorías cargan no se avisa: aún no
+    // se sabe si el usuario tiene.
+    if (!form.category_name) {
+      const aviso = missingCategoryMessage(categoriesLoading);
+      if (aviso) toast.error(aviso);
+      return;
+    }
+
     try {
       if (isEditing && editingTransaction) {
         await updateExpense(editingTransaction.id, form);
@@ -376,16 +452,7 @@ export default function GastosPage() {
       }
 
       // Resetear formulario
-      setForm({
-        description: '',
-        amount: 0,
-        transaction_date: new Date().toISOString().slice(0, 10),
-        category_name: categoryNames[0] || '',
-        account_name: ACCOUNT_TYPES[0],
-        place: '',
-        purchase_total: null,
-        installments: null,
-      });
+      setForm(blankForm());
 
       closeModal();
     } catch (error) {
@@ -399,14 +466,7 @@ export default function GastosPage() {
   };
 
   const handleCloseModal = () => {
-    setForm({
-      description: '',
-      amount: 0,
-      transaction_date: new Date().toISOString().slice(0, 10),
-      category_name: categoryNames[0] || '',
-      account_name: ACCOUNT_TYPES[0],
-      place: '',
-    });
+    setForm(blankForm());
     closeModal();
   };
 
@@ -586,7 +646,7 @@ export default function GastosPage() {
           }
 
           // Parsear fecha
-          let transactionDate = new Date().toISOString().slice(0, 10);
+          let transactionDate = todayLocalISO();
           if (dateCol && row[dateCol]) {
             const rawDate = row[dateCol];
             if (typeof rawDate === 'number') {
@@ -638,7 +698,7 @@ export default function GastosPage() {
           const accountName =
             accountCol && row[accountCol]
               ? String(row[accountCol]).trim()
-              : ACCOUNT_TYPES[0];
+              : pickDefaultAccount(accountNames);
 
           const place =
             placeCol && row[placeCol] ? String(row[placeCol]).trim() : '';
@@ -760,6 +820,7 @@ export default function GastosPage() {
           onAutoRecategorize={handleAutoRecategorize}
           isLoading={loading}
           isImporting={isImporting}
+          importDisabled={!accountsLoaded}
           isRecategorizing={isRecategorizing}
         />
       }
@@ -825,9 +886,9 @@ export default function GastosPage() {
           isEditing={isEditing}
           formData={form}
           expenseCategories={categoryNames}
-          accountTypes={Array.from(
-            new Set([...accountNames, ...ACCOUNT_TYPES]),
-          )}
+          accountTypes={buildAccountOptions(accountNames, form.account_name)}
+          submitDisabled={submitGuard.disabled}
+          submitDisabledLabel={submitGuard.disabledLabel}
           creditAccounts={creditAccountNames}
           onFormChange={handleFormChange}
           onSubmit={handleSubmitExpense}

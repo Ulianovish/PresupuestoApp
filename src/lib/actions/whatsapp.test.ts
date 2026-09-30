@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { revalidatePath } from 'next/cache';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
@@ -9,6 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 import {
   guardarDocumentoDianAction,
   listarDocumentosDianAction,
+  unlinkWhatsAppLinkAction,
 } from './whatsapp';
 
 const mockedCreateClient = createClient as unknown as ReturnType<typeof vi.fn>;
@@ -22,8 +25,9 @@ interface Resultado {
 
 /**
  * Cliente de cookie falso: una sola cadena con los métodos del SELECT
- * (select→eq→order) y del UPDATE (update→eq→eq→select), para mirar qué se
- * llamó.
+ * (select→eq→order), del UPDATE (update→eq→eq→select) y del DELETE
+ * (delete→eq→eq→select), para mirar qué se llamó. `select('id')` cierra
+ * tanto el UPDATE como el DELETE y devuelve `updateResult`.
  */
 function clienteFalso({
   user = { id: 'user-1' } as { id: string } | null,
@@ -32,8 +36,9 @@ function clienteFalso({
 } = {}) {
   const chain = {
     update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
-    // El UPDATE termina en select('id'); el listado sigue con eq→order.
+    // El UPDATE/DELETE terminan en select('id'); el listado sigue con eq→order.
     select: vi.fn((cols: string) =>
       cols === 'id' ? Promise.resolve(updateResult) : chain,
     ),
@@ -196,5 +201,90 @@ describe('listarDocumentosDianAction', () => {
 
     expect(r.ok).toBe(false);
     errorSpy.mockRestore();
+  });
+});
+
+describe('unlinkWhatsAppLinkAction', () => {
+  const PHONE = '+573000000000';
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('borra el link por id solo entre los del usuario autenticado y revalida Ajustes', async () => {
+    const { client, chain } = clienteFalso();
+
+    const r = await unlinkWhatsAppLinkAction(LINK_ID);
+
+    expect(r).toEqual({ ok: true });
+    expect(client.from).toHaveBeenCalledWith('whatsapp_links');
+    expect(chain.delete).toHaveBeenCalled();
+    expect(chain.eq).toHaveBeenCalledWith('id', LINK_ID);
+    expect(chain.eq).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(chain.select).toHaveBeenCalledWith('id');
+    expect(revalidatePath).toHaveBeenCalledWith('/settings');
+  });
+
+  it('id que no es uuid (incluido un teléfono) → error sin tocar la DB', async () => {
+    const { client } = clienteFalso();
+
+    for (const malo of ['', 'no-es-uuid', PHONE]) {
+      const r = await unlinkWhatsAppLinkAction(malo);
+      expect(r).toEqual({ ok: false, error: 'Número inválido.' });
+    }
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it('sin sesión → no autenticado y no borra nada', async () => {
+    const { client } = clienteFalso({ user: null });
+
+    const r = await unlinkWhatsAppLinkAction(LINK_ID);
+
+    expect(r).toEqual({ ok: false, error: 'No autenticado' });
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it('el link no es del usuario (0 filas borradas) → error, no éxito falso', async () => {
+    clienteFalso({ updateResult: { data: [], error: null } });
+
+    const r = await unlinkWhatsAppLinkAction(LINK_ID);
+
+    expect(r).toEqual({
+      ok: false,
+      error: 'No encontramos ese número entre los tuyos.',
+    });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  describe('con error de la DB', () => {
+    beforeEach(() => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('mensaje genérico y no loguea el número', async () => {
+      clienteFalso({
+        updateResult: {
+          data: null,
+          error: {
+            code: '42501',
+            message: 'permission denied',
+            details: `Failing row contains (${PHONE})`,
+          },
+        },
+      });
+
+      const r = await unlinkWhatsAppLinkAction(LINK_ID);
+
+      expect(r).toEqual({
+        ok: false,
+        error: 'No se pudo desvincular el número.',
+      });
+      expect(console.error).toHaveBeenCalledWith(expect.any(String), '42501');
+      expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+        PHONE,
+      );
+      expect(revalidatePath).not.toHaveBeenCalled();
+    });
   });
 });

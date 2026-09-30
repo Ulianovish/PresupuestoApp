@@ -45,15 +45,15 @@ describe('normalizarDescripcion', () => {
   it('quita el prefijo bancario "Banco Davibank S.A. <número> De"', () => {
     expect(
       normalizarDescripcion(
-        'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
       ),
-    ).toBe('luisa fernanda gomez franco');
+    ).toBe('persona ejemplo uno');
   });
 
   it('quita "Nequi <número> De"', () => {
     expect(
-      normalizarDescripcion('Nequi 3115230857 De Carlos Arturo Barrero Vega'),
-    ).toBe('carlos arturo barrero vega');
+      normalizarDescripcion('Nequi 3000000001 De Persona Ejemplo Dos'),
+    ).toBe('persona ejemplo dos');
   });
 
   it('quita llaves y transferencias', () => {
@@ -66,8 +66,8 @@ describe('normalizarDescripcion', () => {
     expect(
       normalizarDescripcion('Llave Bold - Inversiones Crokampollo Sas'),
     ).toBe('inversiones crokampollo sas');
-    expect(normalizarDescripcion('Transferencia a Carlos Gomez')).toBe(
-      'carlos gomez',
+    expect(normalizarDescripcion('Transferencia a Persona Ejemplo Dos')).toBe(
+      'persona ejemplo dos',
     );
     expect(normalizarDescripcion('Transferencia a Academia Chechi')).toBe(
       'academia chechi',
@@ -77,8 +77,10 @@ describe('normalizarDescripcion', () => {
     );
   });
 
-  it('un handle "@susana7309" queda como el nombre', () => {
-    expect(normalizarDescripcion('Transferencia a @susana7309')).toBe('susana');
+  it('un handle "@ejemplo1234" queda como el nombre', () => {
+    expect(normalizarDescripcion('Transferencia a @ejemplo1234')).toBe(
+      'ejemplo',
+    );
   });
 
   it('no confunde "@ 3.250" de una conversión de moneda con un handle', () => {
@@ -149,7 +151,7 @@ describe('construirHistorial / buscarEnHistorial', () => {
     const idx = indexarHistorial(
       construirHistorial([
         fila(
-          'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+          'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
           'VIVIENDA',
           'Arriendo',
         ),
@@ -157,7 +159,7 @@ describe('construirHistorial / buscarEnHistorial', () => {
     );
     expect(
       buscarEnHistorial(
-        'Banco Davibank S.A. 3009998877 De Luisa Fernanda Gómez Franco',
+        'Banco Davibank S.A. 3000000002 De Persona Ejemplo Úno',
         idx,
       ),
     ).toMatchObject({ categoria: 'VIVIENDA', itemNombre: 'Arriendo' });
@@ -302,10 +304,10 @@ describe('itemDesdeHistorial', () => {
   ];
   const idx = indexarHistorial(
     construirHistorial([
-      fila('Carlos Gomez', 'MERCADO', 'Huevos', '2026-09-05'),
+      fila('Persona Ejemplo Dos', 'MERCADO', 'Huevos', '2026-09-05'),
       fila('Verduras', 'MERCADO', 'Verduras y frutas', '2026-09-05'),
       fila(
-        'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
         'VIVIENDA',
         'Arriendo',
         '2026-08-15',
@@ -317,7 +319,7 @@ describe('itemDesdeHistorial', () => {
 
   it('resuelve el ítem del MISMO NOMBRE en el mes destino (otro id)', () => {
     expect(
-      itemDesdeHistorial('Carlos Gomez', 'MERCADO', idx, ITEMS_OCT),
+      itemDesdeHistorial('Persona Ejemplo Dos', 'MERCADO', idx, ITEMS_OCT),
     ).toEqual({
       itemId: 'oct-huevos',
       categoria: 'MERCADO',
@@ -342,7 +344,7 @@ describe('itemDesdeHistorial', () => {
   it('si la categoría del gasto fue ADIVINADA (IA/palabras clave), toma la del historial', () => {
     expect(
       itemDesdeHistorial(
-        'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
         'OTROS',
         idx,
         ITEMS_OCT,
@@ -358,7 +360,7 @@ describe('itemDesdeHistorial', () => {
   it('si el gasto no tiene categoría, toma la del historial', () => {
     expect(
       itemDesdeHistorial(
-        'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
         '',
         idx,
         ITEMS_OCT,
@@ -369,7 +371,7 @@ describe('itemDesdeHistorial', () => {
   it('OTROS elegido por el usuario se respeta: no se le cambia la categoría', () => {
     expect(
       itemDesdeHistorial(
-        'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
         'OTROS',
         idx,
         ITEMS_OCT,
@@ -379,7 +381,7 @@ describe('itemDesdeHistorial', () => {
 
   it('respeta una categoría elegida distinta a la del historial', () => {
     expect(
-      itemDesdeHistorial('Carlos Gomez', 'SALUD', idx, ITEMS_OCT),
+      itemDesdeHistorial('Persona Ejemplo Dos', 'SALUD', idx, ITEMS_OCT),
     ).toBeNull();
   });
 
@@ -431,7 +433,7 @@ describe('cargarHistorialManual', () => {
 
   it('solo manuales del usuario, de los últimos meses', async () => {
     const { client, builder } = fakeClient({
-      data: [fila('Carlos Gomez', 'MERCADO', 'Huevos', '2026-09-05')],
+      data: [fila('Persona Ejemplo Dos', 'MERCADO', 'Huevos', '2026-09-05')],
       error: null,
     });
     const entradas = await cargarHistorialManual(
@@ -582,17 +584,17 @@ describe('ejemplosParaPrompt', () => {
       fila('Arroz', 'MERCADO', 'Lacena', '2026-09-08'),
       fila('Leche', 'MERCADO', 'Lacteos', '2026-09-07'),
       fila('Gaseosa', 'GASTOS HORMIGA', 'Bebidas', '2026-09-06'),
-      fila('Blusa niña', 'ALICE', 'Vestuario Alice', '2026-09-05'),
+      fila('Blusa niña', 'NINOS', 'Vestuario Ninos', '2026-09-05'),
     ]);
     const ej = ejemplosParaPrompt(
       entradas,
-      ['MERCADO', 'Gastos Hormiga', 'ALICE'],
+      ['MERCADO', 'Gastos Hormiga', 'NINOS'],
       4,
     );
     expect(ej).toHaveLength(4);
     // Ronda por categoría: no se llena todo con MERCADO.
     expect(ej.map(e => e.category)).toEqual(
-      expect.arrayContaining(['MERCADO', 'Gastos Hormiga', 'ALICE']),
+      expect.arrayContaining(['MERCADO', 'Gastos Hormiga', 'NINOS']),
     );
     // Sin descripciones repetidas.
     expect(new Set(ej.map(e => e.description.toLowerCase())).size).toBe(4);

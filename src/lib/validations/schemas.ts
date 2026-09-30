@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from './password-rules';
+
 // ============================================
 // CONSTANTES DE VALIDACIÓN
 // ============================================
@@ -225,6 +227,30 @@ export const TransactionSchema = z.object({
 // ESQUEMAS DE AUTENTICACIÓN
 // ============================================
 
+// Regla única de contraseña (NIST 800-63B): solo largo, sin reglas de
+// composición. 72 es el máximo que admite bcrypt, que usa Supabase Auth.
+// La UI dice exactamente "Mínimo 8 caracteres." — si cambias el mínimo,
+// cambia también ese texto. El login NO usa este esquema: hay cuentas
+// creadas con el mínimo anterior (6) que tienen que poder entrar.
+export const passwordSchema = z
+  .string()
+  .min(PASSWORD_MIN_LENGTH, `Usa al menos ${PASSWORD_MIN_LENGTH} caracteres`)
+  .max(
+    PASSWORD_MAX_LENGTH,
+    `Usa como máximo ${PASSWORD_MAX_LENGTH} caracteres`,
+  );
+
+// Formulario de contraseña nueva (resetPasswordAction, S05). Sin mensajes:
+// resetPasswordValidationErrorCode convierte cada issue en un código.
+export const resetPasswordFormSchema = z
+  .object({
+    password: passwordSchema,
+    confirmPassword: z.string().min(1),
+  })
+  .refine(data => data.password === data.confirmPassword, {
+    path: ['confirmPassword'],
+  });
+
 // Esquema para login
 export const loginSchema = z.object({
   email: z
@@ -246,14 +272,8 @@ export const registerSchema = z
       .min(1, 'El email es requerido')
       .email('Debe ser un email válido')
       .max(255, 'Máximo 255 caracteres'),
-    password: z
-      .string()
-      .min(6, 'La contraseña debe tener al menos 6 caracteres')
-      .max(128, 'Máximo 128 caracteres'),
-    confirmPassword: z
-      .string()
-      .min(6, 'Confirma tu contraseña')
-      .max(128, 'Máximo 128 caracteres'),
+    password: passwordSchema,
+    confirmPassword: z.string().min(1, 'Confirma tu contraseña'),
     fullName: z
       .string()
       .min(2, 'El nombre debe tener al menos 2 caracteres')
