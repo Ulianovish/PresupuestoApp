@@ -12,6 +12,10 @@ export const EXPENSE_CATEGORIES = [
   'OTROS',
 ] as const;
 
+// Cuenta por defecto de un gasto. Si el usuario no tiene una cuenta con este
+// nombre, la RPC que guarda el gasto la crea.
+export const DEFAULT_ACCOUNT_NAME = 'Efectivo';
+
 // Tipos de cuenta predefinidos
 export const ACCOUNT_TYPES = [
   'Nequi',

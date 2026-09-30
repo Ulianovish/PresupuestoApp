@@ -486,7 +486,7 @@ EOF
     - `export interface ExpenseFormDefaultsInput { categoryNames: readonly string[]; accountNames: readonly string[] }`
     - `export function withFormDefaults<T extends { category_name: string; account_name: string }>(form: T, input: ExpenseFormDefaultsInput): T` — devuelve **la misma referencia** si no cambia nada (evita re-renders en bucle).
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 Crear `src/lib/expense-form-defaults.test.ts`:
 
@@ -623,12 +623,12 @@ describe('withFormDefaults', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/expense-form-defaults.test.ts`
 Expected: FAIL con `Failed to resolve import "./expense-form-defaults"` (o `Cannot find module`).
 
-- [ ] **Step 3: Agregar `DEFAULT_ACCOUNT_NAME`**
+- [x] **Step 3: Agregar `DEFAULT_ACCOUNT_NAME`**
 
 En `src/lib/constants/expense-categories.ts`, justo después del cierre de `EXPENSE_CATEGORIES` (`] as const;` de la línea 13) y antes de `// Tipos de cuenta predefinidos`, agregar:
 
@@ -641,7 +641,7 @@ export const DEFAULT_ACCOUNT_NAME = 'Efectivo';
 
 (`ACCOUNT_TYPES` todavía no se borra: `/gastos` lo usa hasta la Task 4.)
 
-- [ ] **Step 4: Crear el módulo**
+- [x] **Step 4: Crear el módulo**
 
 Crear `src/lib/expense-form-defaults.ts`:
 
@@ -722,12 +722,12 @@ export function withFormDefaults<
 }
 ```
 
-- [ ] **Step 5: Correr el test y verificar que pasa**
+- [x] **Step 5: Correr el test y verificar que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/expense-form-defaults.test.ts && bun run type-check`
 Expected: PASS (17 tests); `tsc` sin errores.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/constants/expense-categories.ts src/lib/expense-form-defaults.ts src/lib/expense-form-defaults.test.ts && git commit -m "$(cat <<'EOF'
