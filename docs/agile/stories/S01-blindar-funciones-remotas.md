@@ -405,7 +405,7 @@ $function$
 - Consumes: nada.
 - Produces (helpers del test que usan las tareas 2–5, en el mismo archivo): `readMigration(): string`, `codeOnly(sql: string): string`, `functionBlock(sql: string, name: string): string`, `expectSignature(block: string, header: string, returns: string): void`, `expectGuardFirst(block: string): void`, `grantedRoles(code: string, name: string): string[]`, constantes `SEARCH_PATH`, `GUARD_LINES`. En el `.sql`: encabezado + sección 1. Cada tarea siguiente agrega su sección **al final** del `.sql` y su `describe` **al final** del test.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crea `src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts` con este contenido completo:
 
@@ -521,12 +521,12 @@ describe('get_previous_month_overspend', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: FAIL, los 5 tests con `ENOENT: no such file or directory, open '…/supabase/migrations/20260930100000_blindar_funciones_remotas.sql'`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crea `supabase/migrations/20260930100000_blindar_funciones_remotas.sql` con este contenido completo:
 
@@ -645,12 +645,12 @@ REVOKE EXECUTE ON FUNCTION public.get_previous_month_overspend(uuid, character v
 GRANT EXECUTE ON FUNCTION public.get_previous_month_overspend(uuid, character varying) TO service_role;
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
