@@ -122,7 +122,7 @@ describe('loginAction', () => {
     },
   );
 
-  it('credenciales malas → texto traducido y conserva redirectTo', async () => {
+  it('credenciales malas → código (no texto) y conserva redirectTo', async () => {
     clienteFalso({
       signIn: {
         data: { user: null, session: null },
@@ -140,7 +140,7 @@ describe('loginAction', () => {
     );
 
     expect(url.startsWith('/auth/login?')).toBe(true);
-    expect(query(url).get('error')).toBe('Correo o contraseña incorrectos.');
+    expect(query(url).get('error')).toBe('invalid_credentials');
     expect(query(url).get('redirectTo')).toBe('/gastos');
     expect(mockedRevalidate).not.toHaveBeenCalled();
   });
@@ -157,9 +157,7 @@ describe('loginAction', () => {
       loginAction(form({ email: EMAIL, password: PASSWORD })),
     );
 
-    expect(query(url).get('error')).toBe(
-      'Confirma tu correo antes de entrar. Revisa tu bandeja de entrada.',
-    );
+    expect(query(url).get('error')).toBe('email_not_confirmed');
     expect(query(url).get('redirectTo')).toBeNull();
   });
 
@@ -178,12 +176,11 @@ describe('loginAction', () => {
       loginAction(form({ email: EMAIL, password: PASSWORD })),
     );
 
-    expect(query(url).get('error')).toBe(
-      'No pudimos completar la operación. Intenta de nuevo.',
-    );
+    expect(query(url).get('error')).toBe('error_desconocido');
+    expect(url).not.toContain('detalle');
   });
 
-  it('correo inválido → mensaje de validación, sin llamar a Supabase', async () => {
+  it('correo inválido → código de credenciales, sin llamar a Supabase', async () => {
     const { auth } = clienteFalso();
 
     const url = await destino(
@@ -191,7 +188,7 @@ describe('loginAction', () => {
     );
 
     expect(url.startsWith('/auth/login?')).toBe(true);
-    expect(query(url).get('error')).toBe('Debe ser un email válido');
+    expect(query(url).get('error')).toBe('invalid_credentials');
     expect(auth.signInWithPassword).not.toHaveBeenCalled();
   });
 });
@@ -229,9 +226,7 @@ describe('registerAction', () => {
       },
     });
     expect(url.startsWith('/auth/login?')).toBe(true);
-    expect(query(url).get('message')).toBe(
-      'Te enviamos un correo para confirmar tu cuenta. Revisa tu bandeja de entrada.',
-    );
+    expect(query(url).get('message')).toBe('revisa_correo');
   });
 
   it('si Supabase devuelve sesión (confirmación apagada) va a getPostLoginPath', async () => {

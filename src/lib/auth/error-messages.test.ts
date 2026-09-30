@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  authErrorCode,
   GENERIC_AUTH_ERROR,
+  GENERIC_AUTH_ERROR_CODE,
   INVALID_LINK_ERROR_CODE,
   INVALID_LINK_LOGIN_PATH,
   translateAuthError,
@@ -144,6 +146,59 @@ describe('translateAuthError', () => {
   it('el texto genérico es el del contrato', () => {
     expect(GENERIC_AUTH_ERROR).toBe(
       'No pudimos completar la operación. Intenta de nuevo.',
+    );
+  });
+});
+
+describe('authErrorCode', () => {
+  it.each([
+    [{ code: 'invalid_credentials' }, 'invalid_credentials'],
+    [{ code: 'Weak_Password' }, 'weak_password'],
+    [{ message: 'Invalid login credentials' }, 'invalid_credentials'],
+    [{ message: 'User already registered' }, 'user_already_exists'],
+    [{ message: 'Email rate limit exceeded' }, 'over_email_send_rate_limit'],
+    [{ message: 'signup_not_allowed', status: 403 }, 'signup_not_allowed'],
+    [
+      { message: 'Hook requires authorization: signup_not_allowed' },
+      'signup_not_allowed',
+    ],
+    [
+      {
+        code: 'unexpected_failure',
+        message: 'Database error saving new user',
+      },
+      'signup_not_allowed',
+    ],
+  ])('%j → %s', (err, code) => {
+    expect(authErrorCode(err)).toBe(code);
+  });
+
+  it.each([
+    [null],
+    [undefined],
+    [{}],
+    [{ code: 'unexpected_failure', message: 'detalle interno' }],
+    [{ code: 'constructor' }],
+  ])('sin código conocido → código genérico (%j)', err => {
+    expect(authErrorCode(err)).toBe(GENERIC_AUTH_ERROR_CODE);
+  });
+
+  it('el código genérico se traduce al texto genérico', () => {
+    expect(translateAuthError({ code: GENERIC_AUTH_ERROR_CODE })).toBe(
+      GENERIC_AUTH_ERROR,
+    );
+  });
+
+  it.each([
+    [{ code: 'email_not_confirmed', message: 'Email not confirmed' }],
+    [{ message: 'Invalid login credentials' }],
+    [{ message: 'signup_not_allowed' }],
+    [{ code: 'unexpected_failure', message: 'Database error saving new user' }],
+    [{ code: 'unexpected_failure', message: 'detalle interno' }],
+    [null],
+  ])('traducir el código da el mismo texto que traducir el error (%j)', err => {
+    expect(translateAuthError({ code: authErrorCode(err) })).toBe(
+      translateAuthError(err),
     );
   });
 });

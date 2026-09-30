@@ -25,22 +25,21 @@ const YA_EXISTE =
 const LIMITE_CORREOS =
   'Enviamos demasiados correos. Intenta de nuevo en unos minutos.';
 
-// Claves en minúsculas. Map (no objeto) para que 'constructor' o
+/** Código que va en `?error=` cuando el error no es uno conocido. */
+export const GENERIC_AUTH_ERROR_CODE = 'error_desconocido';
+
+// Código (en minúsculas) → texto. Map (no objeto) para que 'constructor' o
 // 'toString' no encuentren nada en el prototipo.
 const MENSAJES = new Map<string, string>([
   ['signup_not_allowed', SIN_INVITACION],
-  ['database error saving new user', SIN_INVITACION],
   ['invalid_credentials', CREDENCIALES],
-  ['invalid login credentials', CREDENCIALES],
   [
     'email_not_confirmed',
     'Confirma tu correo antes de entrar. Revisa tu bandeja de entrada.',
   ],
   ['user_already_exists', YA_EXISTE],
-  ['user already registered', YA_EXISTE],
   ['weak_password', 'La contraseña es muy débil. Usa al menos 8 caracteres.'],
   ['over_email_send_rate_limit', LIMITE_CORREOS],
-  ['email rate limit exceeded', LIMITE_CORREOS],
   [
     'email_address_not_authorized',
     'No pudimos enviar el correo a esta dirección. Escríbele a quien administra la app.',
@@ -54,29 +53,47 @@ const MENSAJES = new Map<string, string>([
   ['same_password', 'La contraseña nueva debe ser distinta de la anterior.'],
 ]);
 
+// `message` de Supabase (en minúsculas) → código.
+const CODIGO_POR_MENSAJE = new Map<string, string>([
+  ['database error saving new user', 'signup_not_allowed'],
+  ['invalid login credentials', 'invalid_credentials'],
+  ['user already registered', 'user_already_exists'],
+  ['email rate limit exceeded', 'over_email_send_rate_limit'],
+]);
+
 function normalizar(valor: string | undefined): string {
   return (valor ?? '').trim().toLowerCase();
+}
+
+/**
+ * Código conocido del error (el que va en `?error=` de las URLs), o
+ * GENERIC_AUTH_ERROR_CODE. `translateAuthError({ code: authErrorCode(e) })`
+ * da el mismo texto que `translateAuthError(e)`.
+ */
+export function authErrorCode(
+  err: { message?: string; code?: string } | null | undefined,
+): string {
+  if (!err) return GENERIC_AUTH_ERROR_CODE;
+
+  // 1) `code` solo si es conocido (p. ej. 'unexpected_failure' no lo es).
+  const code = normalizar(err.code);
+  if (code && MENSAJES.has(code)) return code;
+
+  // 2) Si no, `message`: exacto contra los códigos y los mensajes conocidos.
+  const message = normalizar(err.message);
+  if (!message) return GENERIC_AUTH_ERROR_CODE;
+  if (MENSAJES.has(message)) return message;
+  const porMensaje = CODIGO_POR_MENSAJE.get(message);
+  if (porMensaje) return porMensaje;
+
+  // Solo el literal del hook se busca como subcadena: puede venir envuelto
+  // ("Hook requires authorization: signup_not_allowed"). El resto, exacto.
+  if (message.includes('signup_not_allowed')) return 'signup_not_allowed';
+  return GENERIC_AUTH_ERROR_CODE;
 }
 
 export function translateAuthError(
   err: { message?: string; code?: string } | null | undefined,
 ): string {
-  if (!err) return GENERIC_AUTH_ERROR;
-
-  // 1) `code` solo si es conocido (p. ej. 'unexpected_failure' no lo es).
-  const code = normalizar(err.code);
-  const porCodigo = code ? MENSAJES.get(code) : undefined;
-  if (porCodigo) return porCodigo;
-
-  // 2) Si no, `message`.
-  const message = normalizar(err.message);
-  if (!message) return GENERIC_AUTH_ERROR;
-
-  const exacto = MENSAJES.get(message);
-  if (exacto) return exacto;
-
-  // Solo el literal del hook se busca como subcadena: puede venir envuelto
-  // ("Hook requires authorization: signup_not_allowed"). El resto, exacto.
-  if (message.includes('signup_not_allowed')) return SIN_INVITACION;
-  return GENERIC_AUTH_ERROR;
+  return MENSAJES.get(authErrorCode(err)) ?? GENERIC_AUTH_ERROR;
 }

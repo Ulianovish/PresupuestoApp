@@ -3,22 +3,23 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
-import { translateAuthError } from '@/lib/auth/error-messages';
+import { authErrorCode, translateAuthError } from '@/lib/auth/error-messages';
+import { CHECK_EMAIL_MESSAGE_CODE } from '@/lib/auth/login-feedback';
 import { safeRedirectPath } from '@/lib/auth/safe-redirect';
 import { getPostLoginPath } from '@/lib/onboarding/post-login';
 import { getSiteUrl } from '@/lib/site-url';
 import { createClient } from '@/lib/supabase/server';
 import { loginSchema, registerSchema } from '@/lib/validations/schemas';
 
-const MENSAJE_REVISA_CORREO =
-  'Te enviamos un correo para confirmar tu cuenta. Revisa tu bandeja de entrada.';
-
 function texto(formData: FormData, campo: string): string {
   const valor = formData.get(campo);
   return typeof valor === 'string' ? valor : '';
 }
 
-/** '/auth/login?error=…' (y redirectTo si es una ruta interna segura). */
+/**
+ * '/auth/login?error=…' (y redirectTo si es una ruta interna segura).
+ * Al login va un CÓDIGO (la página lo traduce); al registro, el texto.
+ */
 function urlConError(
   base: '/auth/login' | '/auth/register',
   mensaje: string,
@@ -42,14 +43,9 @@ export async function loginAction(formData: FormData) {
     password: texto(formData, 'password'),
   });
 
+  // Formato inválido: mismo aviso que unas credenciales malas.
   if (!parsed.success) {
-    redirect(
-      urlConError(
-        '/auth/login',
-        parsed.error.issues[0]?.message ?? translateAuthError(null),
-        redirectTo,
-      ),
-    );
+    redirect(urlConError('/auth/login', 'invalid_credentials', redirectTo));
   }
 
   const supabase = await createClient();
@@ -63,7 +59,7 @@ export async function loginAction(formData: FormData) {
       code: error?.code ?? 'sin_usuario',
       status: error?.status,
     });
-    redirect(urlConError('/auth/login', translateAuthError(error), redirectTo));
+    redirect(urlConError('/auth/login', authErrorCode(error), redirectTo));
   }
 
   // Un redirectTo presente pero inseguro cuenta como ausente.
@@ -122,7 +118,7 @@ export async function registerAction(formData: FormData) {
   }
 
   redirect(
-    `/auth/login?${new URLSearchParams({ message: MENSAJE_REVISA_CORREO }).toString()}`,
+    `/auth/login?${new URLSearchParams({ message: CHECK_EMAIL_MESSAGE_CODE }).toString()}`,
   );
 }
 

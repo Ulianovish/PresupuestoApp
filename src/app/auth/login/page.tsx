@@ -13,10 +13,7 @@ import Card, {
 } from '@/components/atoms/Card/Card';
 import Input from '@/components/atoms/Input/Input';
 import { loginAction } from '@/lib/actions/auth';
-import {
-  INVALID_LINK_ERROR_CODE,
-  translateAuthError,
-} from '@/lib/auth/error-messages';
+import { resolveLoginFeedback } from '@/lib/auth/login-feedback';
 
 /**
  * LoginForm - Formulario de inicio de sesión que usa useSearchParams
@@ -29,18 +26,14 @@ function LoginForm() {
   // Lo pone el middleware al mandar aquí desde una ruta protegida.
   const redirectTo = searchParams.get('redirectTo');
 
-  // Obtener errores y mensajes de los query parameters
+  // `?error=` y `?message=` traen códigos: nunca se pinta texto de la URL.
   useEffect(() => {
-    const errorParam = searchParams.get('error');
-    const messageParam = searchParams.get('message');
-
-    // /auth/confirm y /auth/callback mandan un código, no un texto.
-    setError(
-      errorParam === INVALID_LINK_ERROR_CODE
-        ? translateAuthError({ code: errorParam })
-        : errorParam,
-    );
-    setMessage(messageParam);
+    const feedback = resolveLoginFeedback({
+      error: searchParams.get('error'),
+      message: searchParams.get('message'),
+    });
+    setError(feedback.error);
+    setMessage(feedback.message);
   }, [searchParams]);
 
   // Función para manejar el envío del formulario
