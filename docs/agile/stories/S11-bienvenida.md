@@ -353,6 +353,8 @@ Sin commit en esta tarea.
 
 ### Task 3: `loadWizardData` (rubros del mes y categorías)
 
+> **Desviación (implementación):** `budgetedAmount` se entrega redondeado a pesos enteros (`Math.round(Number(f.budgeted_amount) || 0)`, `84b321d`): la RPC devuelve `numeric` (a veces string o con decimales) y el `CurrencyInput` del paso 2 y `saveOnboardingBudgetAction` trabajan con enteros. Para no pisar los decimales de un rubro que no se tocó, el paso 2 solo envía los rubros que cambiaron (deuda cerrada en S12: `montosCambiados` / `saveBudgetStep` con `cargados`).
+
 **Files:**
 - Create: `src/lib/onboarding/wizard-data.ts`
 - Test: `src/lib/onboarding/wizard-data.test.ts`
@@ -797,6 +799,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ### Task 5: `saveOnboardingIncomeAction`
 
+> **Desviación (implementación):** el ingreso es **idempotente por día** (`1d4497f`): antes de insertar busca un `'Ingreso mensual'` del usuario con la fecha de hoy (Bogotá); si existe, lo actualiza (`monto`, `fuente`, filtrado por `id` y `user_id`) en vez de insertar otro. Así volver al paso 1 o recargar `/bienvenida` no duplica el ingreso del mes. Con tests de ambas ramas y del error de la búsqueda.
+
 **Files:**
 - Modify: `src/lib/actions/onboarding.ts`
 - Test: `src/lib/actions/onboarding.test.ts`
@@ -1225,7 +1229,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: columnas `profiles.onboarding_completed_at` y `profiles.onboarding_dismissed_at` (S09, §1.2); política UPDATE `auth.uid() = id`.
 - Produces:
   - `export async function completeOnboardingAction(): Promise<void>` — marca `onboarding_completed_at` y hace `redirect('/dashboard')` (también si el UPDATE falla); sin sesión `redirect('/auth/login')`.
-  - `export async function dismissChecklistAction(): Promise<void>` — marca `onboarding_dismissed_at` y revalida `/dashboard`; sin sesión no hace nada. **S12 la consume; no la vuelve a crear.**
+  - `export async function dismissChecklistAction(): Promise<{ ok: boolean }>` (firma v2, §5.2; el plan original decía `Promise<void>`) — marca `onboarding_dismissed_at` y revalida `/dashboard`; nunca lanza: sin sesión, con el UPDATE fallido o un error inesperado devuelve `{ ok: false }`. **S12 la consume; no la vuelve a crear.**
 
 - [x] **Step 1: Write the failing test**
 
@@ -1421,6 +1425,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 8: `OnboardingWizard` (componente cliente de 3 pasos)
 
 > **Desviación (implementación):** el bloque del código de WhatsApp reusa `WhatsAppLinkInstructions` (exportado por `WhatsAppLinkPanel`, S13) en vez de duplicar el enlace y el texto `VINCULAR <código>`. Se agregó `OnboardingWizard.render.test.tsx` (renderToStaticMarkup, disponible desde S13) con el marcado inicial del paso 1, escrito antes del componente.
+>
+> **Desviación (implementación, `f6d0054`):** la lógica de cada paso vive en `src/lib/onboarding/wizard-steps.ts` (`finishOnboarding`, `saveIncomeStep`, `ingresoSinCambios`, `saveBudgetStep`, `applySuggestion`, `buildFirstExpense`, `saveExpenseAndFinish`) con dependencias inyectadas y sus tests en `wizard-steps.test.ts`; el componente solo conecta estado y toasts. `OnboardingWizard.wiring.test.ts` (test de texto) asegura que el wizard usa esos manejadores y que no se traga el NEXT_REDIRECT de `completeOnboardingAction`. En S12 se agregó `montosCambiados` y el parámetro `cargados` de `saveBudgetStep`.
 
 **Files:**
 - Create: `src/components/organisms/OnboardingWizard/OnboardingWizard.tsx`
