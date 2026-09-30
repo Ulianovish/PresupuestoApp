@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 
 import { z } from 'zod';
 
@@ -169,4 +170,71 @@ export async function saveOnboardingBudgetAction(
 
   revalidatePath('/presupuesto');
   return { ok: true };
+}
+
+/**
+ * Fin de la bienvenida (terminar o saltar el último paso): marca
+ * `onboarding_completed_at` y lleva al dashboard. Si el UPDATE falla igual
+ * redirige: preferimos que vuelva a ver la bienvenida en el próximo ingreso a
+ * dejarlo atrapado aquí.
+ */
+export async function completeOnboardingAction(): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login');
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ onboarding_completed_at: new Date().toISOString() })
+    .eq('id', user.id);
+  if (error) {
+    console.error(
+      'completeOnboardingAction: no se pudo marcar la bienvenida:',
+      error.code,
+    );
+  }
+
+  revalidatePath('/dashboard');
+  redirect('/dashboard');
+}
+
+/**
+ * "Ocultar" la checklist del dashboard (S12): marca `onboarding_dismissed_at`.
+ * Contrato v2 (§5.2): nunca lanza. Sin sesión o con el UPDATE fallido
+ * devuelve `{ ok: false }` y hace console.warn solo con el code; el botón
+ * restaura la tarjeta con un toast.
+ */
+export async function dismissChecklistAction(): Promise<{ ok: boolean }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      console.warn('dismissChecklistAction: sin sesión:', 'no_session');
+      return { ok: false };
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ onboarding_dismissed_at: new Date().toISOString() })
+      .eq('id', user.id);
+    if (error) {
+      // Solo el code: el mensaje de Postgres puede traer datos del usuario.
+      console.warn(
+        'dismissChecklistAction: no se pudo ocultar la checklist:',
+        error.code,
+      );
+      return { ok: false };
+    }
+
+    revalidatePath('/dashboard');
+    return { ok: true };
+  } catch {
+    // Sin el detalle: puede traer datos del usuario.
+    console.warn('dismissChecklistAction: error inesperado');
+    return { ok: false };
+  }
 }

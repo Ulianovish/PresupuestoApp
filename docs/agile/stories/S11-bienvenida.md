@@ -1215,6 +1215,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ### Task 7: `completeOnboardingAction` y `dismissChecklistAction`
 
+> **Desviación (implementación):** `dismissChecklistAction` sigue la enmienda de contratos §5.2 posterior a este plan: devuelve `Promise<{ ok: boolean }>`, nunca lanza, y sin sesión, con el UPDATE fallido o con un error inesperado devuelve `{ ok: false }` con `console.warn` solo del code. Sus tests se ajustaron a eso (4 en vez de 2).
+
 **Files:**
 - Modify: `src/lib/actions/onboarding.ts`
 - Test: `src/lib/actions/onboarding.test.ts`
@@ -1225,7 +1227,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `export async function completeOnboardingAction(): Promise<void>` — marca `onboarding_completed_at` y hace `redirect('/dashboard')` (también si el UPDATE falla); sin sesión `redirect('/auth/login')`.
   - `export async function dismissChecklistAction(): Promise<void>` — marca `onboarding_dismissed_at` y revalida `/dashboard`; sin sesión no hace nada. **S12 la consume; no la vuelve a crear.**
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `src/lib/actions/onboarding.test.ts`:
 - Cambiar la primera línea por `import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';`
@@ -1327,12 +1329,12 @@ describe('dismissChecklistAction', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: FAIL — `completeOnboardingAction is not a function`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/actions/onboarding.ts`, agregar a las importaciones:
 
@@ -1395,17 +1397,17 @@ export async function dismissChecklistAction(): Promise<void> {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (26 + 5 = 31 tests).
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `bun run type-check`
 Expected: sin errores. (`src/types/database.ts` no declara `ingresos` ni las columnas nuevas de `profiles`, pero el cliente ya acepta tablas no declaradas —`accounts.ts` usa `from('accounts')`—. Si el compilador rechaza `onboarding_completed_at`/`onboarding_dismissed_at` en `update`, **no regeneres los tipos** (`bun run db:types` trunca `database.ts`, §5.0) ni edites `src/types/database.ts`: tipa a mano en `onboarding.ts`, casteando solo esas llamadas a un cliente sin esquema (`(supabase as unknown as SupabaseClient).from('profiles')`, con `import type { SupabaseClient } from '@supabase/supabase-js';`, como `expense-classification.ts:171`), y anótalo en `deviations`.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/actions/onboarding.ts src/lib/actions/onboarding.test.ts

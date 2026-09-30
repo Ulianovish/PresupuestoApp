@@ -16,6 +16,8 @@ vi.mock('@/lib/whatsapp/format', () => ({ todayBogota: () => '2026-09-15' }));
 import { createClient } from '@/lib/supabase/server';
 
 import {
+  completeOnboardingAction,
+  dismissChecklistAction,
   ensureStarterKitAction,
   saveOnboardingBudgetAction,
   saveOnboardingIncomeAction,
@@ -361,5 +363,122 @@ describe('saveOnboardingBudgetAction', () => {
     });
     expect(revalidatePath).not.toHaveBeenCalled();
     errorSpy.mockRestore();
+  });
+});
+
+const AHORA = '2026-09-30T15:00:00.000Z';
+
+describe('completeOnboardingAction', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(AHORA));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('marca onboarding_completed_at del propio usuario y lleva al dashboard', async () => {
+    const { llamadas } = clienteFalso();
+
+    await expect(completeOnboardingAction()).rejects.toThrow(
+      'NEXT_REDIRECT:/dashboard',
+    );
+
+    const updates = llamadasDe(llamadas, 'profiles', 'update');
+    expect(updates).toHaveLength(1);
+    expect(updates[0].args[0]).toEqual({ onboarding_completed_at: AHORA });
+    expect(llamadasDe(llamadas, 'profiles', 'eq')[0].args).toEqual([
+      'id',
+      USER_ID,
+    ]);
+    expect(redirect).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('sin sesión → login y no toca profiles', async () => {
+    const { client } = clienteFalso({ user: null });
+
+    await expect(completeOnboardingAction()).rejects.toThrow(
+      'NEXT_REDIRECT:/auth/login',
+    );
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it('si el UPDATE falla igual lleva al dashboard (no deja al usuario atrapado)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    clienteFalso({
+      results: { profiles: { data: null, error: { code: '42703' } } },
+    });
+
+    await expect(completeOnboardingAction()).rejects.toThrow(
+      'NEXT_REDIRECT:/dashboard',
+    );
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+});
+
+describe('dismissChecklistAction (§5.2: devuelve { ok } y nunca lanza)', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(AHORA));
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('marca onboarding_dismissed_at del propio usuario y devuelve ok: true', async () => {
+    const { llamadas } = clienteFalso();
+
+    await expect(dismissChecklistAction()).resolves.toEqual({ ok: true });
+
+    expect(llamadasDe(llamadas, 'profiles', 'update')[0].args[0]).toEqual({
+      onboarding_dismissed_at: AHORA,
+    });
+    expect(llamadasDe(llamadas, 'profiles', 'eq')[0].args).toEqual([
+      'id',
+      USER_ID,
+    ]);
+    expect(revalidatePath).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('sin sesión → ok: false y no toca profiles', async () => {
+    const { client } = clienteFalso({ user: null });
+
+    await expect(dismissChecklistAction()).resolves.toEqual({ ok: false });
+    expect(client.from).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it('si el UPDATE falla → ok: false, console.warn solo con el code y sin revalidar', async () => {
+    clienteFalso({
+      results: {
+        profiles: {
+          data: null,
+          error: { code: '42703', message: 'fallo con usuario@ejemplo.com' },
+        },
+      },
+    });
+
+    await expect(dismissChecklistAction()).resolves.toEqual({ ok: false });
+    expect(warnSpy).toHaveBeenCalledWith(expect.any(String), '42703');
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(
+      'usuario@ejemplo.com',
+    );
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('nunca lanza: si crear el cliente falla → ok: false, sin loguear el detalle', async () => {
+    mockedCreateClient.mockRejectedValueOnce(
+      new Error('fallo con usuario@ejemplo.com'),
+    );
+
+    await expect(dismissChecklistAction()).resolves.toEqual({ ok: false });
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(
+      'usuario@ejemplo.com',
+    );
   });
 });
