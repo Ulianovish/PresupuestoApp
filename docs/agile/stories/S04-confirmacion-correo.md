@@ -1059,7 +1059,7 @@ git commit -m "feat(auth): /auth/confirm verifica el token_hash (o canjea el cod
 
 Un segmento de App Router no puede tener `page.tsx` y `route.ts` a la vez: la página se borra en el mismo paso en que se crea el route handler.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/app/auth/callback/route.test.ts`:
 
@@ -1176,12 +1176,12 @@ describe('GET /auth/callback', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/app/auth/callback/route.test.ts`
 Expected: FAIL con `Failed to resolve import "./route"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Borrar la página vieja:
 
@@ -1236,7 +1236,7 @@ export async function GET(request: Request) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/app/auth/callback/route.test.ts`
 Expected: PASS (7 tests).
@@ -1244,7 +1244,7 @@ Expected: PASS (7 tests).
 Run: `ls src/app/auth/callback`
 Expected: `route.test.ts  route.ts` (sin `page.tsx`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/auth/callback/route.ts src/app/auth/callback/route.test.ts
