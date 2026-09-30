@@ -78,7 +78,7 @@ Todos están en el flujo AUTH (contratos §4). `.env.example` también lo toca S
 - Consumes: nada.
 - Produces: `export function getSiteUrl(env?: Record<string, string | undefined>): string` — `NEXT_PUBLIC_SITE_URL` → `https://${VERCEL_URL}` → `'http://localhost:3001'`, sin barra final, vacío = ausente. Por defecto lee `process.env` en el momento de la llamada (solo servidor).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/site-url.test.ts`:
 
@@ -128,12 +128,12 @@ describe('getSiteUrl', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/site-url.test.ts`
 Expected: FAIL con `Failed to resolve import "./site-url"` (el archivo no existe).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/site-url.ts`:
 
@@ -171,12 +171,12 @@ Agregar **al final** de `.env.example` (después de `TWILIO_CONTENT_SID_CUENTAS=
 NEXT_PUBLIC_SITE_URL=http://localhost:3001
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/site-url.test.ts`
 Expected: PASS (6 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/site-url.ts src/lib/site-url.test.ts .env.example
