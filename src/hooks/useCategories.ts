@@ -35,7 +35,9 @@ export interface UseCategoriesReturn {
 export function useCategories(): UseCategoriesReturn {
   // Estado del hook
   const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  // Arranca en `true`: la carga empieza al montar y, mientras tanto, "sin
+  // categorías" todavía no es un hecho.
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   /**

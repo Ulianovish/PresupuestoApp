@@ -60,16 +60,11 @@ export interface Account {
   is_active: boolean;
 }
 
-// Categorías y tipos de cuenta: definidos en un módulo puro (sin side-effects)
-// y re-exportados aquí para conservar la API pública de este servicio.
-export {
-  EXPENSE_CATEGORIES,
-  ACCOUNT_TYPES,
-} from '@/lib/constants/expense-categories';
-export type {
-  ExpenseCategory,
-  AccountType,
-} from '@/lib/constants/expense-categories';
+// Categorías: definidas en un módulo puro (sin side-effects) y re-exportadas
+// aquí para conservar la API pública de este servicio. Las cuentas salen de
+// la tabla `accounts` del usuario (getUserAccounts), no de una lista fija.
+export { EXPENSE_CATEGORIES } from '@/lib/constants/expense-categories';
+export type { ExpenseCategory } from '@/lib/constants/expense-categories';
 
 // Cliente de Supabase
 const supabase = createClient();

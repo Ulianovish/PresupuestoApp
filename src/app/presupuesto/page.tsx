@@ -21,11 +21,14 @@ import BudgetPageTemplate from '@/components/templates/BudgetPageTemplate/Budget
 import { useMonth } from '@/contexts/MonthContext';
 import { useMonthlyBudget } from '@/hooks/useMonthlyBudget';
 import { deleteCategory, updateCategory } from '@/lib/actions/categories';
+import { ensureStarterKitAction } from '@/lib/actions/onboarding';
 import {
   mapRubroEstado,
   rubrosEnRiesgo,
   type RubroEstado,
 } from '@/lib/budget/alerts';
+import { defaultItemFormNames } from '@/lib/budget/catalog-defaults';
+import { loadStarterKitAndNotify } from '@/lib/onboarding/budget-empty-state';
 import {
   formatCurrency,
   getClassifications,
@@ -77,7 +80,6 @@ export default function PresupuestoPage() {
     addBudgetItem,
     editBudgetItem,
     deleteBudgetItem,
-    initializeMonth,
   } = useMonthlyBudget(selectedMonth);
 
   // Lookups dinámicos desde la BD
@@ -199,22 +201,20 @@ export default function PresupuestoPage() {
     type: 'success',
   });
 
-  // Estado del formulario
-  const defaultClasificacion = classifications[0]?.name || 'Basico';
-  const defaultControl = controls[0]?.name || 'Reducir';
-
+  // Estado del formulario (al montar los catálogos aún no cargan: nombres del contrato)
   const [formData, setFormData] = useState<BudgetFormData>({
     descripcion: '',
     fecha: '',
-    clasificacion: defaultClasificacion,
-    control: defaultControl,
+    ...defaultItemFormNames([], []),
     presupuestado: 0,
     real: 0,
     deuda_id: null,
     alertsEnabled: null,
   });
 
-  const openAddModal = (categoriaId: string) => {
+  // El nombre llega de la tarjeta: así DEUDAS propone Basico/Necesario aunque
+  // la lista de categorías aún no haya cargado.
+  const openAddModal = (categoriaId: string, categoryName: string) => {
     setModalState({
       isOpen: true,
       mode: 'add',
@@ -224,8 +224,7 @@ export default function PresupuestoPage() {
     setFormData({
       descripcion: '',
       fecha: '',
-      clasificacion: classifications[0]?.name || 'Basico',
-      control: controls[0]?.name || 'Reducir',
+      ...defaultItemFormNames(classifications, controls, categoryName),
       presupuestado: 0,
       real: 0,
       deuda_id: null,
@@ -293,6 +292,26 @@ export default function PresupuestoPage() {
     setTimeout(() => {
       setToast(prev => ({ ...prev, show: false }));
     }, 3000);
+  };
+
+  // Estado vacío (S10): cargar el kit inicial de categorías sugeridas.
+  const [isLoadingStarterKit, setIsLoadingStarterKit] = useState(false);
+
+  const handleLoadStarterKit = async () => {
+    setIsLoadingStarterKit(true);
+    try {
+      // Hasta que se aplique la migración de S09 (H8) la RPC no existe y el
+      // aviso es de error; el usuario puede seguir con "Crear categoría".
+      await loadStarterKitAndNotify({
+        ensureStarterKit: ensureStarterKitAction,
+        reload: handleCategoryCreated,
+        notify: showToast,
+        viewedMonth: selectedMonth,
+        currentMonth: todayBogota().slice(0, 7),
+      });
+    } finally {
+      setIsLoadingStarterKit(false);
+    }
   };
 
   const openNextItemForEdit = (
@@ -668,10 +687,11 @@ export default function PresupuestoPage() {
           <BudgetStatusPanels
             isLoading={isLoading}
             error={error}
-            hasData={categories.length > 0}
-            selectedMonth={selectedMonth}
+            categoryCount={categories.length}
             selectedMonthLabel={selectedMonthLabel}
-            onCreateBudget={initializeMonth}
+            onCreateCategory={() => setShowCategoryModal(true)}
+            onLoadStarterKit={handleLoadStarterKit}
+            isLoadingStarterKit={isLoadingStarterKit}
           />
         }
         budgetTable={

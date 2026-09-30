@@ -15,7 +15,7 @@
  * @example
  * <ExpenseTable
  *   expenseData={expenseData}
- *   selectedMonth="2025-07"
+ *   selectedMonth="2026-09"
  *   formatCurrency={formatCurrency}
  *   formatMonthName={formatMonthName}
  *   onEdit={handleEditTransaction}

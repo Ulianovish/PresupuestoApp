@@ -9,6 +9,8 @@
  * @param loading - Shows loading spinner when true
  * @param children - Button content
  * @param className - Additional CSS classes
+ * @param href - Si se pasa, se renderiza un enlace (next/link) con el estilo
+ *   del botón, en vez de un <button> (nunca un <button> dentro de un <a>)
  *
  * @example
  * <Button variant="gradient" size="lg" loading={isSubmitting}>
@@ -18,6 +20,8 @@
 'use client';
 
 import { ReactNode } from 'react';
+
+import Link from 'next/link';
 
 import { Button as ShadcnButton } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -40,6 +44,7 @@ export interface ButtonProps {
   disabled?: boolean;
   type?: 'button' | 'submit' | 'reset';
   title?: string;
+  href?: string;
 }
 
 export default function Button({
@@ -52,6 +57,7 @@ export default function Button({
   onClick,
   type = 'button',
   title,
+  href,
   ...props
 }: ButtonProps) {
   const variants = {
@@ -79,30 +85,23 @@ export default function Button({
     `,
   };
 
-  return (
-    <ShadcnButton
-      className={cn(
-        // Base styles for all variants
-        'relative transition-all duration-200 ease-in-out',
-        // Custom variant styles
-        variant === 'gradient' && variants.gradient,
-        variant === 'glass' && variants.glass,
-        // Loading state
-        loading && 'pointer-events-none opacity-70',
-        // Disabled state
-        disabled && 'opacity-50 cursor-not-allowed hover:scale-100',
-        className,
-      )}
-      variant={
-        variant === 'gradient' || variant === 'glass' ? 'default' : variant
-      }
-      size={size}
-      disabled={disabled || loading}
-      onClick={onClick}
-      type={type}
-      title={title}
-      {...props}
-    >
+  const classes = cn(
+    // Base styles for all variants
+    'relative transition-all duration-200 ease-in-out',
+    // Custom variant styles
+    variant === 'gradient' && variants.gradient,
+    variant === 'glass' && variants.glass,
+    // Loading state
+    loading && 'pointer-events-none opacity-70',
+    // Disabled state
+    disabled && 'opacity-50 cursor-not-allowed hover:scale-100',
+    className,
+  );
+  const shadcnVariant =
+    variant === 'gradient' || variant === 'glass' ? 'default' : variant;
+
+  const content = (
+    <>
       {/* Loading spinner */}
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center">
@@ -119,6 +118,53 @@ export default function Button({
       {variant === 'gradient' && (
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       )}
+    </>
+  );
+
+  if (href) {
+    // Un <a> no tiene `disabled`: se saca del tab, se anuncia deshabilitado,
+    // se le quitan los eventos de puntero y el clic no navega.
+    const inactivo = Boolean(disabled || loading);
+    const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+      if (inactivo) {
+        e.preventDefault();
+        return;
+      }
+      onClick?.(e as unknown as React.MouseEvent<HTMLButtonElement>);
+    };
+    return (
+      <ShadcnButton
+        asChild
+        className={cn(classes, inactivo && 'pointer-events-none')}
+        variant={shadcnVariant}
+        size={size}
+        title={title}
+        {...props}
+      >
+        <Link
+          href={href}
+          onClick={handleLinkClick}
+          aria-disabled={inactivo ? 'true' : undefined}
+          tabIndex={inactivo ? -1 : undefined}
+        >
+          {content}
+        </Link>
+      </ShadcnButton>
+    );
+  }
+
+  return (
+    <ShadcnButton
+      className={classes}
+      variant={shadcnVariant}
+      size={size}
+      disabled={disabled || loading}
+      onClick={onClick}
+      type={type}
+      title={title}
+      {...props}
+    >
+      {content}
     </ShadcnButton>
   );
 }

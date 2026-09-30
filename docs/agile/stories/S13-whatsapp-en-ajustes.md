@@ -51,14 +51,14 @@
 
 ## Criterios de aceptación
 
-- [ ] `buildWhatsAppLinkUrl` con tests: `+573000000000`, `whatsapp:+573000000000` y `" +57 300 000 0000 "` dan `https://wa.me/573000000000?text=VINCULAR%20123456`; `undefined`, `''`, solo espacios o un valor sin dígitos válidos dan `null`.
-- [ ] Con `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` definido, el panel muestra el botón "Abrir WhatsApp" que abre `wa.me` en otra pestaña con `VINCULAR <código>`; sin la variable, el panel se ve como hoy (código y texto `VINCULAR <código>`, sin enlace).
-- [ ] `MSG_LINKED_OK` es exactamente el texto del contrato y el test lo compara con `toBe`.
-- [ ] `MSG_ALREADY_LINKED` ya no promete nada "muy pronto": es `Este número ya está vinculado. Ya puedes mandarme tus gastos.` y el test lo compara con `toBe`.
-- [ ] `unlinkWhatsAppLinkAction(linkId)` borra solo filas del usuario autenticado (`.eq('id', linkId)` + `.eq('user_id', user.id)` + RLS), valida que `linkId` sea uuid antes de tocar la base, responde error si no borró nada, no loguea el número y revalida `/settings`. `unlinkWhatsAppPhoneAction` no existe.
-- [ ] En Ajustes, cada número vinculado tiene "Desvincular"; el botón recibe solo `linkId` y el número enmascarado (el completo no llega al navegador; `key = l.id`); al tocarlo aparece una confirmación con el número enmascarado; al confirmar, el número desaparece de la lista y sale un toast.
-- [ ] `.env.example` termina con `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000`.
-- [ ] `bun run test && bun run type-check` en verde.
+- [x] `buildWhatsAppLinkUrl` con tests: `+573000000000`, `whatsapp:+573000000000` y `" +57 300 000 0000 "` dan `https://wa.me/573000000000?text=VINCULAR%20123456`; `undefined`, `''`, solo espacios o un valor sin dígitos válidos dan `null`.
+- [x] Con `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` definido, el panel muestra el botón "Abrir WhatsApp" que abre `wa.me` en otra pestaña con `VINCULAR <código>`; sin la variable, el panel se ve como hoy (código y texto `VINCULAR <código>`, sin enlace).
+- [x] `MSG_LINKED_OK` es exactamente el texto del contrato y el test lo compara con `toBe`.
+- [x] `MSG_ALREADY_LINKED` ya no promete nada "muy pronto": es `Este número ya está vinculado. Ya puedes mandarme tus gastos.` y el test lo compara con `toBe`.
+- [x] `unlinkWhatsAppLinkAction(linkId)` borra solo filas del usuario autenticado (`.eq('id', linkId)` + `.eq('user_id', user.id)` + RLS), valida que `linkId` sea uuid antes de tocar la base, responde error si no borró nada, no loguea el número y revalida `/settings`. `unlinkWhatsAppPhoneAction` no existe.
+- [x] En Ajustes, cada número vinculado tiene "Desvincular"; el botón recibe solo `linkId` y el número enmascarado (el completo no llega al navegador; `key = l.id`); al tocarlo aparece una confirmación con el número enmascarado; al confirmar, el número desaparece de la lista y sale un toast.
+- [x] `.env.example` termina con `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000`.
+- [x] `bun run test && bun run type-check` en verde.
 
 ---
 
@@ -72,7 +72,7 @@
 - Consumes: nada.
 - Produces: `export function buildWhatsAppLinkUrl(botNumber: string | undefined, code: string): string | null` (la usan la Task 4 y, después en el flujo APP, `OnboardingWizard` de S11, que la importa sin volver a crearla).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/whatsapp/link-url.test.ts`:
 
@@ -115,12 +115,12 @@ describe('buildWhatsAppLinkUrl', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/whatsapp/link-url.test.ts`
 Expected: FAIL — `Failed to resolve import "./link-url"` (el archivo no existe).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/whatsapp/link-url.ts`:
 
@@ -145,12 +145,12 @@ export function buildWhatsAppLinkUrl(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/whatsapp/link-url.test.ts`
 Expected: PASS (5 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/whatsapp/link-url.ts src/lib/whatsapp/link-url.test.ts && git commit -m "$(cat <<'EOF'
@@ -175,7 +175,7 @@ EOF
 
 > S02 (flujo SEG) no está en este worktree, así que `LinkingDeps` todavía tiene solo `redeemLinkCode` y `getLinkByPhone`. Cambia únicamente las dos aserciones indicadas abajo y las dos constantes; al integrar con S02 se conservan sus dependencias nuevas.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `src/lib/whatsapp/handle-linking.test.ts`, dentro de `it('VINCULAR con código válido → confirma y canjea', …)`, reemplazar esta línea:
 
@@ -227,12 +227,12 @@ por:
     );
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/whatsapp/handle-linking.test.ts`
 Expected: FAIL en 2 tests: "VINCULAR con código válido → confirma y canjea" con `expected '✅ ¡Listo! Tu WhatsApp quedó vinculado…' to be '¡Listo! Tu número quedó vinculado…'` y "número ya vinculado y mensaje cualquiera → avisa que ya está vinculado" con `expected 'Tu número ya está vinculado a tu presupuesto. 👍 El registro de gastos por mensaje llegará muy pronto.' to be 'Este número ya está vinculado. Ya puedes mandarme tus gastos.'`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/whatsapp/handle-linking.ts`, reemplazar:
 
@@ -268,12 +268,12 @@ const MSG_ALREADY_LINKED =
 
 No toques ninguna otra constante ni función del archivo.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/whatsapp/handle-linking.test.ts src/app/api/whatsapp/webhook/route.test.ts`
 Expected: PASS (todos; el test del webhook se corre porque consume `handleLinkingMessage`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/whatsapp/handle-linking.ts src/lib/whatsapp/handle-linking.test.ts && git commit -m "$(cat <<'EOF'
@@ -304,7 +304,7 @@ EOF
   ```
   Borra por `id` **y** `user_id` con el cliente de cookie; así el número completo no llega al navegador (el cliente solo conoce el `id` y el número enmascarado). Mensajes de error exactos: `'Número inválido.'` (id que no es uuid, igual que `guardarDocumentoDianAction`), `'No autenticado'`, `'No encontramos ese número entre los tuyos.'`, `'No se pudo desvincular el número.'`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `src/lib/actions/whatsapp.test.ts`:
 
@@ -434,12 +434,12 @@ describe('unlinkWhatsAppLinkAction', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/whatsapp.test.ts`
 Expected: FAIL — los 5 tests de `unlinkWhatsAppLinkAction` fallan con `TypeError: unlinkWhatsAppLinkAction is not a function`; los tests existentes de `guardarDocumentoDianAction` y `listarDocumentosDianAction` siguen en verde.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Agregar al final de `src/lib/actions/whatsapp.ts` (después de `guardarDocumentoDianAction`, así `linkIdSchema` ya está definido):
 
@@ -490,7 +490,7 @@ export async function unlinkWhatsAppLinkAction(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/whatsapp.test.ts && bun run type-check`
 Expected: PASS (15 tests: 7 + 3 existentes + 5 nuevos) y `tsc --noEmit` sin errores.
@@ -498,7 +498,7 @@ Expected: PASS (15 tests: 7 + 3 existentes + 5 nuevos) y `tsc --noEmit` sin erro
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn "unlinkWhatsAppPhoneAction\|UnlinkPhoneResult" src`
 Expected: sin salida (la firma vieja de §2.8 no existe en ningún lado).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/whatsapp.ts src/lib/actions/whatsapp.test.ts && git commit -m "$(cat <<'EOF'
@@ -526,7 +526,7 @@ EOF
 
 > No hay tests de componentes en el repo (vitest corre en `environment: 'node'` sin testing-library). La lógica del enlace está cubierta por la Task 1; esta tarea se verifica con `type-check`, `lint` y una revisión visual opcional.
 
-- [ ] **Step 1: Reemplazar el panel**
+- [x] **Step 1: Reemplazar el panel**
 
 Reemplazar todo `src/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel.tsx` por:
 
@@ -626,7 +626,7 @@ export default function WhatsAppLinkPanel() {
 }
 ```
 
-- [ ] **Step 2: Agregar la variable al final de `.env.example`**
+- [x] **Step 2: Agregar la variable al final de `.env.example`**
 
 Agregar al **final** de `.env.example` (después de la última línea existente; S04 no está en este worktree: al integrar, su `NEXT_PUBLIC_SITE_URL` y esta variable se conservan ambas):
 
@@ -638,7 +638,7 @@ Agregar al **final** de `.env.example` (después de la última línea existente;
 NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000
 ```
 
-- [ ] **Step 3: Verificar tipos y lint**
+- [x] **Step 3: Verificar tipos y lint**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check && bunx eslint src/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel.tsx`
 Expected: `tsc --noEmit` sin errores; eslint sin errores (orden de imports incluido).
@@ -646,11 +646,11 @@ Expected: `tsc --noEmit` sin errores; eslint sin errores (orden de imports inclu
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && tail -n 1 .env.example`
 Expected: `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000`
 
-- [ ] **Step 4 (solo humano, opcional; nunca producción): revisión visual**
+- [x] **Step 4 (solo humano, opcional; nunca producción): revisión visual**
 
 El implementador **no** corre `bun run dev` ni `next build` (`.env.local` apunta a producción, §5.0). El humano, en un entorno con base de desarrollo y `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000`, entra a `/settings`, tocar "Generar código de vinculación" y comprobar que el botón "Abrir WhatsApp" apunta a `https://wa.me/573000000000?text=VINCULAR%20<código>`. Sin la variable, el panel no muestra el botón. No uses datos de producción.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel.tsx .env.example && git commit -m "$(cat <<'EOF'
@@ -682,7 +682,7 @@ EOF
 
 > Por qué por `linkId` (contratos §5.2): el botón cliente recibe solo el `id` del link (uuid) y el número ya enmascarado, y llama directo a la server action `unlinkWhatsAppLinkAction(linkId)`. El número completo se queda en el servidor: ya no hace falta una server action en línea que cierre sobre él. La `key` de la lista también pasa a `l.id`, porque en un server component la `key` viaja en el payload RSC.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts`:
 
@@ -728,12 +728,12 @@ describe('Ajustes: el número completo no llega al navegador', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts`
 Expected: FAIL en 3 tests (`expected '' to contain 'unlinkWhatsAppLinkAction(linkId)'`, `expected '…' to contain 'key={l.id as string}'`, `expected '…maskPhone…' not to contain 'maskPhone'`).
 
-- [ ] **Step 3: Crear el botón con confirmación**
+- [x] **Step 3: Crear el botón con confirmación**
 
 Crear `src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.tsx`:
 
@@ -814,7 +814,7 @@ export default function UnlinkPhoneButton({
 }
 ```
 
-- [ ] **Step 4: Reemplazar la página de Ajustes**
+- [x] **Step 4: Reemplazar la página de Ajustes**
 
 Reemplazar todo `src/app/settings/page.tsx` por:
 
@@ -905,7 +905,7 @@ Notas para el implementador:
 - Se elimina la función local `maskPhone`; la máscara pasa a ser `enmascararTelefono` (la misma que usa `DocumentosDianPanel`), para que el número se vea igual en toda la página.
 - La `key` pasa de `phone_e164` a `id`: en un server component la `key` viaja en el payload RSC.
 
-- [ ] **Step 5: Verificar tests, tipos y lint**
+- [x] **Step 5: Verificar tests, tipos y lint**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts src/lib/actions/whatsapp.test.ts && bun run type-check && bunx eslint src/app/settings/page.tsx src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.tsx src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts`
 Expected: PASS (3 + 15 tests); `tsc --noEmit` sin errores; eslint sin errores.
@@ -914,7 +914,7 @@ Expected: PASS (3 + 15 tests); `tsc --noEmit` sin errores; eslint sin errores.
 
 El implementador **no** corre `bun run dev` ni `next build` (`.env.local` apunta a producción, contratos §5.0). El humano, en un entorno con base de desarrollo (o en S14) y un usuario de prueba con un número vinculado de prueba (`+573000000000`), entra a `/settings`: cada número muestra "Desvincular"; al tocarlo aparece "Desvincular número" con el número enmascarado; "Cancelar" cierra sin cambios; "Desvincular" muestra el toast "Número desvinculado" y el número desaparece de "Números vinculados". En la pestaña Network, la respuesta RSC de `/settings` no contiene `573000000000` en claro.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.tsx src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts src/app/settings/page.tsx && git commit -m "$(cat <<'EOF'
@@ -935,19 +935,29 @@ EOF
 
 **Files:** ninguno.
 
-- [ ] **Step 1: Suite completa y tipos**
+- [x] **Step 1: Suite completa y tipos**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: todos los tests en verde y `tsc --noEmit` sin errores.
 
-- [ ] **Step 2: Sin teléfonos reales en lo nuevo**
+- [x] **Step 2: Sin teléfonos reales en lo nuevo**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git diff main --name-only | xargs grep -nE '\+57[0-9]{10}' | grep -v '573000000000' | grep -v '573001234567'`
 Expected: sin salida (solo aparecen `+573000000000` y el `+573001234567` que ya existía en los tests previos).
 
-- [ ] **Step 3: Revisar criterios de aceptación**
+- [x] **Step 3: Revisar criterios de aceptación**
 
 Marcar cada casilla de "Criterios de aceptación" de este archivo contra el código.
+
+## Desviaciones
+
+- **Reanudación (ADR-005):** la Task 5 estaba hecha pero sin commit. Se verificó que su test falla sin los cambios (3 fallos) y pasa con ellos, se revisaron las condiciones de seguridad del ADR y se agregó un test más: al botón solo llegan `linkId` y `maskedPhone`, y ni el botón ni sus props mencionan `phone_e164`.
+- **Máscara:** `enmascararTelefono` muestra `+57 300 ••• 4567` en vez de `+57300 ***4567`; misma cantidad de dígitos visibles (menos en formatos no colombianos).
+- **Task 6 Step 2:** el grep contra `main` muestra `+573001111111` y `+573002222222`, ficticios y de commits anteriores a S13 (S07/S10, ya en este flujo); los commits de S13 no agregan ningún teléfono.
+- **Ronda de corrección 1:**
+  - Deuda de S10 (ADR-007, lista recuperada y anotada en S10 en `4706c02`): `01b7c37` (refresco tras el kit), `76d927a` (spy de `console.warn`), `db7c496` (`initializeMonth`), `8f5048d` (accesos rápidos sin `<button>` en `<a>`).
+  - "Vinculado el" se formatea con `formatearFechaBogota` (`src/lib/whatsapp/format.ts`, `dd597e4`); si falla la consulta de `whatsapp_links` se registra solo el `code` y se muestra "No pudimos cargar tus números vinculados" en vez del estado vacío (`e326478`).
+  - La lógica de confirmar (toasts y cierre del modal) sale a `confirmar-desvinculo.ts` con tests de `ok`, `ok: false` y excepción; `ConfirmModal` acepta `loadingText` y el botón dice "Desvinculando..." (`e9e49d0`). Los tests de texto verifican que los archivos existan.
 
 ## Tareas humanas (después de integrar)
 

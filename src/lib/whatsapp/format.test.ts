@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   enmascararTelefono,
   formatCOP,
+  formatearFechaBogota,
   hoyBogotaDate,
   todayBogota,
 } from './format';
@@ -39,5 +40,16 @@ describe('enmascararTelefono', () => {
   });
   it('muy corto → lo tapa entero salvo los últimos 2', () => {
     expect(enmascararTelefono('+5712')).toBe('••• 12');
+  });
+});
+
+describe('formatearFechaBogota', () => {
+  it('usa el día de Bogotá aunque en UTC ya sea el siguiente', () => {
+    // 23:30 del 29 de septiembre en Bogotá = 04:30Z del 30.
+    expect(formatearFechaBogota('2026-09-30T04:30:00Z')).toBe('29/9/2026');
+  });
+
+  it('a mediodía coincide con el día UTC', () => {
+    expect(formatearFechaBogota('2026-09-30T17:00:00Z')).toBe('30/9/2026');
   });
 });

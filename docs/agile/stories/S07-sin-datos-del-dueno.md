@@ -19,9 +19,9 @@
 - Textos de UI en español colombiano, tuteo.
 - Ningún dato personal en código, tests ni fixtures: cuentas inventadas (`Cuenta A`, `Tarjeta B`), UUIDs inventados. Nada de nombres de bancos, empresas ni montos reales del dueño.
 - Ningún test toca una base real; el cliente de Supabase se mockea. No se accede a la base de producción.
-- Ejecutar comandos con `builtin cd /Users/migue/Repos/personal/PresupuestoApp && …` (el `cd` del shell está envuelto).
+- Ejecutar comandos en el worktree del flujo APP: `builtin cd /Users/migue/Repos/personal/PresupuestoApp-app && …` (el `cd` del shell está envuelto). Nunca en `/Users/migue/Repos/personal/PresupuestoApp`.
 - Verificación: `bun run test <archivo>` por tarea; al final `bun run test && bun run type-check`.
-- Commits en español, terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Todas las tareas tocan `src/`, así que el pre-commit (lint-staged: eslint --fix + prettier) corre normal; no usar `--no-verify` salvo que el commit sea solo de docs.
+- Commits en español, terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, **siempre** con `git commit --no-verify` (el hook de husky revierte cambios). Antes de cada commit que toque `src/`, correr a mano `bunx eslint <archivos tocados>` y `bunx prettier --check <archivos tocados>` (`--write` si hace falta).
 - Orden y propiedad (contratos §5.3, flujo APP, en serie en el mismo worktree): S07 es la **primera** historia del flujo (S07 → S08 → S10 → S13 → S11 → S12). No depende de ninguna. S10 toca después `Sidebar.tsx` (quita `/test`) y `src/app/gastos/page.tsx` (un `useEffect`); aquí no se toca el ítem `/test`.
 - Prohibido `bun run dev` y `next build` contra `.env.local` (apunta a producción, contratos §5.0). Nunca `bun run db:types`.
 
@@ -83,14 +83,14 @@ src/components/organisms/{Expense,Budget}MigrationPanel/*.tsx
 
 ## Criterios de aceptación
 
-- [ ] `inicializarDatosEjemplo` no existe en `src/` y `useIngresosDeudas` solo carga datos. Test: un usuario sin ingresos ni deudas no dispara ningún `insert` al cargar (`src/hooks/useIngresosDeudas.test.ts`).
-- [ ] El sidebar no importa `useBudgetData`, no muestra montos y `src/hooks/useBudgetData.ts` no existe (`Sidebar.test.ts`).
-- [ ] `ACCOUNT_TYPES` y `AccountType` eliminados; `DEFAULT_ACCOUNT_NAME = 'Efectivo'` exportado (`expense-categories.test.ts`).
-- [ ] `/gastos` ofrece solo las cuentas activas del usuario (más la del gasto en edición si ya no está activa); por defecto `Efectivo` si existe, si no la primera; sin cuentas, `Efectivo` (`expense-form-defaults.test.ts`).
-- [ ] `category_name` inicial = primera categoría del usuario; sin categorías, el botón de guardar está deshabilitado y dice "Primero crea una categoría", con enlace a Ajustes; el submit también lo rechaza.
-- [ ] La importación de Excel sin columna de cuenta usa la cuenta por defecto del usuario, no una lista fija.
-- [ ] (§5.2) No existen `src/scripts/migrate-july-data.ts`, `src/scripts/migrate-july-expenses.ts`, `ExpenseMigrationPanel` ni `BudgetMigrationPanel`; `ExpenseHeader` ya no tiene el botón "Migrar Julio" ligado a `'2025-07'` ni la prop `onShowMigration` (`ExpenseHeader.test.ts`). Un `grep` confirma que nada los importaba antes de borrarlos.
-- [ ] `bun run test && bun run type-check` en verde; `grep -rn "ACCOUNT_TYPES\|inicializarDatosEjemplo\|useBudgetData\|migrate-july\|MigrationPanel\|onShowMigration" src` sin resultados.
+- [x] `inicializarDatosEjemplo` no existe en `src/` y `useIngresosDeudas` solo carga datos. Test: un usuario sin ingresos ni deudas no dispara ningún `insert` al cargar (`src/hooks/useIngresosDeudas.test.ts`).
+- [x] El sidebar no importa `useBudgetData`, no muestra montos y `src/hooks/useBudgetData.ts` no existe (`Sidebar.test.ts`).
+- [x] `ACCOUNT_TYPES` y `AccountType` eliminados; `DEFAULT_ACCOUNT_NAME = 'Efectivo'` exportado (`expense-categories.test.ts`).
+- [x] `/gastos` ofrece solo las cuentas activas del usuario (más la del gasto en edición si ya no está activa); por defecto `Efectivo` si existe, si no la primera; sin cuentas, `Efectivo` (`expense-form-defaults.test.ts`).
+- [x] `category_name` inicial = primera categoría del usuario; sin categorías, el botón de guardar está deshabilitado y dice "Primero crea una categoría", con enlace a Ajustes; el submit también lo rechaza.
+- [x] La importación de Excel sin columna de cuenta usa la cuenta por defecto del usuario, no una lista fija.
+- [x] (§5.2) No existen `src/scripts/migrate-july-data.ts`, `src/scripts/migrate-july-expenses.ts`, `ExpenseMigrationPanel` ni `BudgetMigrationPanel`; `ExpenseHeader` ya no tiene el botón "Migrar Julio" ligado a `'2025-07'` ni la prop `onShowMigration` (`ExpenseHeader.test.ts`). Un `grep` confirma que nada los importaba antes de borrarlos.
+- [x] `bun run test && bun run type-check` en verde; `grep -rn "ACCOUNT_TYPES\|inicializarDatosEjemplo\|useBudgetData\|migrate-july\|MigrationPanel\|onShowMigration" src` sin resultados.
 
 ---
 
@@ -105,7 +105,7 @@ src/components/organisms/{Expense,Budget}MigrationPanel/*.tsx
 - Consumes: `obtenerIngresos(): Promise<Ingreso[]>`, `obtenerDeudas(): Promise<Deuda[]>`, `obtenerResumenFinanciero(): Promise<ResumenFinanciero>` de `@/lib/services/ingresos-deudas` (sin cambios).
 - Produces: `export async function cargarIngresosDeudas(): Promise<{ ingresos: Ingreso[]; deudas: Deuda[]; resumen: ResumenFinanciero }>` en `src/hooks/useIngresosDeudas.ts`. El hook `useIngresosDeudas()` conserva su interfaz pública `UseIngresosDeudasReturn` sin cambios.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 Crear `src/hooks/useIngresosDeudas.test.ts`:
 
@@ -182,12 +182,12 @@ describe('cargarIngresosDeudas', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/hooks/useIngresosDeudas.test.ts`
 Expected: FAIL. El primer test con `TypeError: cargarIngresosDeudas is not a function` (o `(0 , cargarIngresosDeudas) is not a function`); el segundo con `expected [ …, 'inicializarDatosEjemplo', … ] to not include 'inicializarDatosEjemplo'`.
 
-- [ ] **Step 3: Borrar `inicializarDatosEjemplo` del servicio**
+- [x] **Step 3: Borrar `inicializarDatosEjemplo` del servicio**
 
 En `src/lib/services/ingresos-deudas.ts`, borrar completo el bloque que va desde el comentario
 
@@ -208,7 +208,7 @@ hasta su cierre (la línea `}` que sigue a `    // No lanzar error para no bloqu
 
 No se toca nada más del archivo (`crearIngreso` y `crearDeuda` siguen existiendo: los usan los formularios de `/ingresos` y `/deudas`).
 
-- [ ] **Step 4: Dejar el hook solo cargando**
+- [x] **Step 4: Dejar el hook solo cargando**
 
 En `src/hooks/useIngresosDeudas.ts`:
 
@@ -293,17 +293,17 @@ export async function cargarIngresosDeudas(): Promise<{
   }, [cargarDatos]);
 ```
 
-- [ ] **Step 5: Correr el test y verificar que pasa**
+- [x] **Step 5: Correr el test y verificar que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/hooks/useIngresosDeudas.test.ts`
 Expected: PASS (2 tests).
 
-- [ ] **Step 6: Verificar tipos y que no quedan llamadas**
+- [x] **Step 6: Verificar tipos y que no quedan llamadas**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check && grep -rn --exclude='*.test.ts' "inicializarDatosEjemplo\|inicializarDatos\b" src`
 Expected: `tsc --noEmit` sin errores; el `grep` no imprime nada (sale con código 1). Los tests se excluyen porque `useIngresosDeudas.test.ts` nombra la función para afirmar que no existe.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/services/ingresos-deudas.ts src/hooks/useIngresosDeudas.ts src/hooks/useIngresosDeudas.test.ts && git commit -m "$(cat <<'EOF'
@@ -331,7 +331,7 @@ EOF
 - Consumes: nada de la Task 1.
 - Produces: `Sidebar` conserva sus props (`collapsed?`, `onToggle?`). El hook `useBudgetData` y sus tipos `BudgetItem`/`BudgetSummary` de `src/hooks/useBudgetData.ts` dejan de existir (no tienen otros usuarios).
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 Crear `src/components/organisms/Sidebar/Sidebar.test.ts`:
 
@@ -367,12 +367,12 @@ describe('Sidebar sin presupuesto de ejemplo', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/organisms/Sidebar/Sidebar.test.ts`
 Expected: FAIL en los 3 tests (`expected '…useBudgetData…' not to contain 'useBudgetData'`, idem `formatCurrency`, y `expected true to be false`).
 
-- [ ] **Step 3: Quitar el mock del Sidebar**
+- [x] **Step 3: Quitar el mock del Sidebar**
 
 En `src/components/organisms/Sidebar/Sidebar.tsx`:
 
@@ -440,17 +440,17 @@ por un espaciador del ancho del botón de menú, para que el título siga centra
           <span className="w-[38px]" aria-hidden="true" />
 ```
 
-- [ ] **Step 4: Borrar el hook del mock**
+- [x] **Step 4: Borrar el hook del mock**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git rm src/hooks/useBudgetData.ts`
 Expected: `rm 'src/hooks/useBudgetData.ts'`.
 
-- [ ] **Step 5: Correr el test y verificar que pasa**
+- [x] **Step 5: Correr el test y verificar que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/organisms/Sidebar/Sidebar.test.ts && bun run type-check && grep -rn --exclude='*.test.ts' "useBudgetData" src`
 Expected: PASS (3 tests); `tsc` sin errores; el `grep` no imprime nada.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/organisms/Sidebar/Sidebar.tsx src/components/organisms/Sidebar/Sidebar.test.ts && git commit -m "$(cat <<'EOF'
@@ -486,7 +486,7 @@ EOF
     - `export interface ExpenseFormDefaultsInput { categoryNames: readonly string[]; accountNames: readonly string[] }`
     - `export function withFormDefaults<T extends { category_name: string; account_name: string }>(form: T, input: ExpenseFormDefaultsInput): T` — devuelve **la misma referencia** si no cambia nada (evita re-renders en bucle).
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 Crear `src/lib/expense-form-defaults.test.ts`:
 
@@ -623,12 +623,12 @@ describe('withFormDefaults', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/expense-form-defaults.test.ts`
 Expected: FAIL con `Failed to resolve import "./expense-form-defaults"` (o `Cannot find module`).
 
-- [ ] **Step 3: Agregar `DEFAULT_ACCOUNT_NAME`**
+- [x] **Step 3: Agregar `DEFAULT_ACCOUNT_NAME`**
 
 En `src/lib/constants/expense-categories.ts`, justo después del cierre de `EXPENSE_CATEGORIES` (`] as const;` de la línea 13) y antes de `// Tipos de cuenta predefinidos`, agregar:
 
@@ -641,7 +641,7 @@ export const DEFAULT_ACCOUNT_NAME = 'Efectivo';
 
 (`ACCOUNT_TYPES` todavía no se borra: `/gastos` lo usa hasta la Task 4.)
 
-- [ ] **Step 4: Crear el módulo**
+- [x] **Step 4: Crear el módulo**
 
 Crear `src/lib/expense-form-defaults.ts`:
 
@@ -722,12 +722,12 @@ export function withFormDefaults<
 }
 ```
 
-- [ ] **Step 5: Correr el test y verificar que pasa**
+- [x] **Step 5: Correr el test y verificar que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/expense-form-defaults.test.ts && bun run type-check`
 Expected: PASS (17 tests); `tsc` sin errores.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/constants/expense-categories.ts src/lib/expense-form-defaults.ts src/lib/expense-form-defaults.test.ts && git commit -m "$(cat <<'EOF'
@@ -758,7 +758,7 @@ EOF
 - Consumes (Task 3): `DEFAULT_ACCOUNT_NAME`, `NO_CATEGORIES_LABEL`, `pickDefaultAccount`, `buildAccountOptions`, `withFormDefaults` con las firmas de la Task 3.
 - Produces: `ExpenseModal` acepta dos props opcionales nuevas: `submitDisabled?: boolean` y `submitDisabledLabel?: string`. Los demás usuarios de `ExpenseModal` no cambian (las props son opcionales).
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 Crear `src/lib/constants/expense-categories.test.ts`:
 
@@ -778,12 +778,12 @@ describe('constantes de gastos', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/constants/expense-categories.test.ts`
 Expected: FAIL en `no trae una lista fija de cuentas` con `expected { …, ACCOUNT_TYPES: [...] } to not have property "ACCOUNT_TYPES"`; el segundo test pasa.
 
-- [ ] **Step 3: Borrar `ACCOUNT_TYPES` y `AccountType`**
+- [x] **Step 3: Borrar `ACCOUNT_TYPES` y `AccountType`**
 
 En `src/lib/constants/expense-categories.ts`, borrar:
 
@@ -829,7 +829,7 @@ export const DEFAULT_ACCOUNT_NAME = 'Efectivo';
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 ```
 
-- [ ] **Step 4: Quitar el re-export en el servicio de gastos**
+- [x] **Step 4: Quitar el re-export en el servicio de gastos**
 
 En `src/lib/services/expenses.ts`, reemplazar:
 
@@ -856,12 +856,12 @@ export { EXPENSE_CATEGORIES } from '@/lib/constants/expense-categories';
 export type { ExpenseCategory } from '@/lib/constants/expense-categories';
 ```
 
-- [ ] **Step 5: Correr el test de constantes**
+- [x] **Step 5: Correr el test de constantes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/constants/expense-categories.test.ts`
 Expected: PASS (2 tests). (`type-check` todavía falla por `/gastos`; se arregla en los pasos siguientes.)
 
-- [ ] **Step 6: `ExpenseModal` con botón deshabilitable**
+- [x] **Step 6: `ExpenseModal` con botón deshabilitable**
 
 En `src/components/organisms/ExpenseModal/ExpenseModal.tsx`:
 
@@ -964,7 +964,7 @@ por:
             </div>
 ```
 
-- [ ] **Step 7: Comentarios que nombraban `ACCOUNT_TYPES`**
+- [x] **Step 7: Comentarios que nombraban `ACCOUNT_TYPES`**
 
 En `src/components/molecules/ExpenseFormFields/ExpenseFormFields.tsx`, en el `@example` del encabezado, reemplazar:
 
@@ -996,7 +996,7 @@ por:
   // existir para el usuario.
 ```
 
-- [ ] **Step 8: `/gastos` — imports y categorías memorizadas**
+- [x] **Step 8: `/gastos` — imports y categorías memorizadas**
 
 En `src/app/gastos/page.tsx`:
 
@@ -1061,7 +1061,7 @@ por:
   const hasCategories = categoryNames.length > 0;
 ```
 
-- [ ] **Step 9: `/gastos` — estado inicial y valores por defecto**
+- [x] **Step 9: `/gastos` — estado inicial y valores por defecto**
 
 Reemplazar el bloque del estado del formulario (líneas 303-312):
 
@@ -1109,7 +1109,7 @@ por:
   }, [categoryNames, accountNames, isEditing]);
 ```
 
-- [ ] **Step 10: `/gastos` — guardar y cerrar**
+- [x] **Step 10: `/gastos` — guardar y cerrar**
 
 1. En `handleSubmitExpense`, después del bloque
 
@@ -1180,7 +1180,7 @@ por:
   };
 ```
 
-- [ ] **Step 11: `/gastos` — importación de Excel y props del modal**
+- [x] **Step 11: `/gastos` — importación de Excel y props del modal**
 
 1. En `processExcelFile`, reemplazar:
 
@@ -1216,14 +1216,14 @@ por:
           submitDisabledLabel={NO_CATEGORIES_LABEL}
 ```
 
-- [ ] **Step 12: Verificar tipos, tests y que no queda la lista fija**
+- [x] **Step 12: Verificar tipos, tests y que no queda la lista fija**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check && bun run test src/lib/constants/expense-categories.test.ts src/lib/expense-form-defaults.test.ts && grep -rn --exclude='*.test.ts' "ACCOUNT_TYPES\|AccountType\b" src`
 Expected: `tsc` sin errores; PASS (19 tests); el `grep` no imprime nada.
 
 Nota para eslint (`react-hooks/exhaustive-deps`): `blankForm` no va en ningún array de dependencias; solo se llama en manejadores de eventos y como inicializador de `useState`.
 
-- [ ] **Step 13: Commit**
+- [x] **Step 13: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/constants/expense-categories.ts src/lib/constants/expense-categories.test.ts src/lib/services/expenses.ts src/app/gastos/page.tsx src/components/organisms/ExpenseModal/ExpenseModal.tsx src/components/molecules/ExpenseFormFields/ExpenseFormFields.tsx src/components/organisms/PendingInvoicesPanel/PendingInvoicesPanel.tsx && git commit -m "$(cat <<'EOF'
@@ -1257,12 +1257,12 @@ EOF
 - Consumes: nada de tareas anteriores.
 - Produces: `ExpenseHeader` pierde la prop opcional `onShowMigration` (nadie se la pasa: `/gastos` usa `onRefresh`, `onImportExcel`, `onAutoRecategorize`, `isLoading`, `isImporting`, `isRecategorizing`). La prop `migrationPanel` de las plantillas **se queda**: `/gastos` la usa para `PendingInvoicesPanel` y `UnclassifiedExpensesPanel`; solo cambia su comentario. `BudgetStatusPanels.tsx` también menciona `'2025-07'`, pero lo reescribe entero S10; aquí no se toca.
 
-- [ ] **Step 1: Confirmar que nada importa lo que se va a borrar**
+- [x] **Step 1: Confirmar que nada importa lo que se va a borrar**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn --exclude='*.test.ts' "migrate-july\|migrateJulyData\|checkMigrationStatus\|ExpenseMigrationPanel\|BudgetMigrationPanel\|onShowMigration" src .vercelignore`
 Expected: solo coincidencias dentro de los 4 archivos que se borran, en `ExpenseHeader.tsx` (prop `onShowMigration`), en los `@example` de `ExpensePageTemplate.tsx:18` y `BudgetPageTemplate.tsx:16`, y en `.vercelignore:15-16`. **Ningún `import`** de esos módulos fuera de sí mismos. Si aparece un `import` en otro archivo, detente y repórtalo (no borres nada).
 
-- [ ] **Step 2: Escribir el test que falla**
+- [x] **Step 2: Escribir el test que falla**
 
 Crear `src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts`:
 
@@ -1309,17 +1309,17 @@ describe('sin la migración de julio 2025 (contratos §5.2)', () => {
 });
 ```
 
-- [ ] **Step 3: Correr el test y verificar que falla**
+- [x] **Step 3: Correr el test y verificar que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts`
 Expected: FAIL en los 6 tests (4 × `expected true to be false`, `expected '…2025-07…' not to contain '2025-07'` y `expected '…ExpenseMigrationPanel…' not to contain 'ExpenseMigrationPanel'`).
 
-- [ ] **Step 4: Borrar scripts y paneles**
+- [x] **Step 4: Borrar scripts y paneles**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git rm src/scripts/migrate-july-data.ts src/scripts/migrate-july-expenses.ts src/components/organisms/ExpenseMigrationPanel/ExpenseMigrationPanel.tsx src/components/organisms/BudgetMigrationPanel/BudgetMigrationPanel.tsx`
 Expected: cuatro líneas `rm '…'`. Las carpetas `src/scripts/`, `ExpenseMigrationPanel/` y `BudgetMigrationPanel/` quedan vacías y git deja de verlas.
 
-- [ ] **Step 5: `ExpenseHeader` sin el botón de julio**
+- [x] **Step 5: `ExpenseHeader` sin el botón de julio**
 
 En `src/components/organisms/ExpenseHeader/ExpenseHeader.tsx`:
 
@@ -1375,7 +1375,7 @@ import { RefreshCw, Upload, Tags } from 'lucide-react';
 
 (`selectedMonth` sigue en uso: lo muestra el subtítulo con `formatMonthName`.)
 
-- [ ] **Step 6: Comentarios de las plantillas y `.vercelignore`**
+- [x] **Step 6: Comentarios de las plantillas y `.vercelignore`**
 
 En `src/components/templates/ExpensePageTemplate/ExpensePageTemplate.tsx`, reemplazar:
 
@@ -1427,12 +1427,12 @@ En `.vercelignore`, borrar estas tres líneas (y la línea en blanco que las sig
 /src/scripts/migrate-july-expenses.ts
 ```
 
-- [ ] **Step 7: Correr el test y verificar que pasa**
+- [x] **Step 7: Correr el test y verificar que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts && bun run type-check && grep -rn --exclude='*.test.ts' "migrate-july\|migrateJulyData\|checkMigrationStatus\|ExpenseMigrationPanel\|BudgetMigrationPanel\|onShowMigration" src .vercelignore`
 Expected: PASS (6 tests); `tsc` sin errores; el `grep` no imprime nada (sale con código 1).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/organisms/ExpenseHeader/ExpenseHeader.tsx src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts src/components/templates/ExpensePageTemplate/ExpensePageTemplate.tsx src/components/templates/BudgetPageTemplate/BudgetPageTemplate.tsx .vercelignore && git commit -m "$(cat <<'EOF'
@@ -1457,17 +1457,17 @@ EOF
 
 **Interfaces:** ninguna.
 
-- [ ] **Step 1: Suite completa y tipos**
+- [x] **Step 1: Suite completa y tipos**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: todos los tests en verde (incluidos los 5 archivos nuevos) y `tsc` sin errores.
 
-- [ ] **Step 2: Nada del dueño queda en los puntos de la historia**
+- [x] **Step 2: Nada del dueño queda en los puntos de la historia**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn --exclude='*.test.ts' "inicializarDatosEjemplo\|useBudgetData\|ACCOUNT_TYPES\|mockBudgetItems\|mockIncomeData\|migrate-july\|MigrationPanel\|onShowMigration" src`
 Expected: no imprime nada (sale con código 1).
 
-- [ ] **Step 3: Lint de los archivos tocados**
+- [x] **Step 3: Lint de los archivos tocados**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bunx eslint src/app/gastos/page.tsx src/components/organisms/ExpenseModal/ExpenseModal.tsx src/components/organisms/Sidebar/Sidebar.tsx src/components/organisms/ExpenseHeader/ExpenseHeader.tsx src/hooks/useIngresosDeudas.ts src/lib/expense-form-defaults.ts src/lib/constants/expense-categories.ts src/lib/services/expenses.ts src/lib/services/ingresos-deudas.ts`
 Expected: sin errores (advertencias preexistentes del archivo se aceptan si no vienen de líneas nuevas).

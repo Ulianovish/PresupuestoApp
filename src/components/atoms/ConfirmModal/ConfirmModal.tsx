@@ -23,6 +23,8 @@ interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   isLoading?: boolean;
+  /** Texto del botón de confirmar mientras isLoading es true. */
+  loadingText?: string;
 }
 
 export default function ConfirmModal({
@@ -34,6 +36,7 @@ export default function ConfirmModal({
   confirmText = 'Eliminar',
   cancelText = 'Cancelar',
   isLoading = false,
+  loadingText = 'Eliminando...',
 }: ConfirmModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
@@ -62,7 +65,7 @@ export default function ConfirmModal({
             disabled={isLoading}
             className="bg-red-600 hover:bg-red-700 text-white"
           >
-            {isLoading ? 'Eliminando...' : confirmText}
+            {isLoading ? loadingText : confirmText}
           </Button>
         </DialogFooter>
       </DialogContent>

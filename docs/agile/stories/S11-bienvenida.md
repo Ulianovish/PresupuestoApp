@@ -68,7 +68,7 @@ No se modifica ningún otro archivo. `middleware.ts` (proteger `/bienvenida`) es
 - Consumes: nada.
 - Produces: `export type KitItem = { id: string; classificationName: string }` y `export function suggest503020(income: number, items: KitItem[]): { amounts: Record<string, number>; ahorroSinAsignar: number }`. `amounts` trae **todas** las ids de `items` (en 0 si no reciben nada).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/onboarding/budget-503020.test.ts`:
 
@@ -204,12 +204,12 @@ describe('suggest503020', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/onboarding/budget-503020.test.ts`
 Expected: FAIL — `Failed to resolve import "./budget-503020"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/onboarding/budget-503020.ts`:
 
@@ -308,12 +308,12 @@ export function suggest503020(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/onboarding/budget-503020.test.ts`
 Expected: PASS (12 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/onboarding/budget-503020.ts src/lib/onboarding/budget-503020.test.ts
@@ -337,12 +337,12 @@ El flujo APP corre en serie (contratos §5.3): cuando empieza S11, S07, S08, S10
   - `DEFAULT_ACCOUNT_NAME = 'Efectivo'` en `src/lib/constants/expense-categories.ts` (S07, §2.6).
 - Produces: nada.
 
-- [ ] **Step 1: Comprobar que existen**
+- [x] **Step 1: Comprobar que existen**
 
 Run: `grep -n "export function buildWhatsAppLinkUrl" src/lib/whatsapp/link-url.ts && grep -n "export async function ensureStarterKitAction" src/lib/actions/onboarding.ts && grep -n "export const DEFAULT_ACCOUNT_NAME" src/lib/constants/expense-categories.ts && grep -c "export async function" src/lib/actions/onboarding.ts`
 Expected: las tres firmas y, en la última línea, `1` (S10 dejó `onboarding.ts` solo con `ensureStarterKitAction`). Si falta alguna, detente y repórtalo: una historia anterior del flujo no está hecha. **No** las crees aquí.
 
-- [ ] **Step 2: Sus tests pasan**
+- [x] **Step 2: Sus tests pasan**
 
 Run: `bun run test src/lib/whatsapp/link-url.test.ts src/lib/actions/onboarding.test.ts`
 Expected: PASS (5 tests de S13 y 7 de S10).
@@ -352,6 +352,8 @@ Sin commit en esta tarea.
 ---
 
 ### Task 3: `loadWizardData` (rubros del mes y categorías)
+
+> **Desviación (implementación):** `budgetedAmount` se entrega redondeado a pesos enteros (`Math.round(Number(f.budgeted_amount) || 0)`, `84b321d`): la RPC devuelve `numeric` (a veces string o con decimales) y el `CurrencyInput` del paso 2 y `saveOnboardingBudgetAction` trabajan con enteros. Para no pisar los decimales de un rubro que no se tocó, el paso 2 solo envía los rubros que cambiaron (deuda cerrada en S12: `montosCambiados` / `saveBudgetStep` con `cargados`).
 
 **Files:**
 - Create: `src/lib/onboarding/wizard-data.ts`
@@ -367,7 +369,7 @@ Sin commit en esta tarea.
   ```
   Nunca lanza: ante error devuelve listas vacías y loguea solo `error.code`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/onboarding/wizard-data.test.ts`:
 
@@ -534,12 +536,12 @@ describe('loadWizardData', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/onboarding/wizard-data.test.ts`
 Expected: FAIL — `Failed to resolve import "./wizard-data"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/onboarding/wizard-data.ts`:
 
@@ -632,17 +634,17 @@ export async function loadWizardData(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/onboarding/wizard-data.test.ts`
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `bun run type-check`
 Expected: sin errores. (El cliente tipado con `src/types/database.ts` acepta `rpc('get_budget_by_month', …)` igual que `categories.ts` acepta `rpc('upsert_monthly_budget', …)`; si el compilador rechaza el nombre de la RPC, castea solo esa llamada: `(supabase as unknown as SupabaseClient).rpc(...)`, como `expense-classification.ts:171`, y anótalo en `deviations`.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/onboarding/wizard-data.ts src/lib/onboarding/wizard-data.test.ts
@@ -664,7 +666,7 @@ S10 creó `src/lib/actions/onboarding.ts` (solo `ensureStarterKitAction`, firma 
 - Consumes: `ensureStarterKitAction(): Promise<{ seeded: boolean; error?: string }>` (S10, sin cambios).
 - Produces (para las Tasks 5–7, dentro del test): `clienteFalso({ user?, results?, rpcResult? })` → `{ client, llamadas }`, superconjunto del de S10 (misma firma `{ user, rpcResult }` y mismo `client` con `auth` y `rpc`, más `from`); tipos `Resultado` y `Llamada`; constante `USER_ID`.
 
-- [ ] **Step 1: Reemplazar el encabezado del test**
+- [x] **Step 1: Reemplazar el encabezado del test**
 
 En `src/lib/actions/onboarding.test.ts`, reemplazar **todo lo que está antes** de la línea `describe('ensureStarterKitAction', () => {` por:
 
@@ -754,7 +756,7 @@ function clienteFalso({
 
 (Si S10 dejó algún import o constante más en ese encabezado, p. ej. otro nombre para el cliente falso, reemplázalo igual: el `describe` de S10 solo usa `clienteFalso`, `mockedCreateClient` y `ensureStarterKitAction`.)
 
-- [ ] **Step 2: Guarda de render (contratos §5.2)**
+- [x] **Step 2: Guarda de render (contratos §5.2)**
 
 Agregar al final del archivo (después del `describe` de S10, sin tocarlo):
 
@@ -779,12 +781,12 @@ describe('ensureStarterKitAction durante el render (§5.2)', () => {
 });
 ```
 
-- [ ] **Step 3: Los tests siguen en verde**
+- [x] **Step 3: Los tests siguen en verde**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (7 tests de S10 + 1 = 8). Es un cambio de infraestructura del test más una guarda de regresión sobre código que ya cumple el contrato: no hay código nuevo que deba hacer fallar un test primero.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/lib/actions/onboarding.test.ts
@@ -797,6 +799,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ### Task 5: `saveOnboardingIncomeAction`
 
+> **Desviación (implementación):** el ingreso es **idempotente por día** (`1d4497f`): antes de insertar busca un `'Ingreso mensual'` del usuario con la fecha de hoy (Bogotá); si existe, lo actualiza (`monto`, `fuente`, filtrado por `id` y `user_id`) en vez de insertar otro. Así volver al paso 1 o recargar `/bienvenida` no duplica el ingreso del mes. Con tests de ambas ramas y del error de la búsqueda.
+
 **Files:**
 - Modify: `src/lib/actions/onboarding.ts`
 - Test: `src/lib/actions/onboarding.test.ts`
@@ -805,7 +809,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: tabla `ingresos` (`supabase_ingresos_deudas.sql:10-21`: `user_id uuid NOT NULL`, `descripcion varchar(255) NOT NULL`, `fuente varchar(255) NOT NULL`, `monto numeric(12,2)`, `fecha date NOT NULL`, `tipo varchar(50) DEFAULT 'ingreso'`, `es_activo DEFAULT true`); `todayBogota()` de `@/lib/whatsapp/format`.
 - Produces: `export async function saveOnboardingIncomeAction(input: { monto: number; fuente: string }): Promise<{ ok: boolean; error?: string }>`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `src/lib/actions/onboarding.test.ts`, cambiar la importación de `./onboarding` por:
 
@@ -912,12 +916,12 @@ describe('saveOnboardingIncomeAction', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: FAIL — `saveOnboardingIncomeAction is not a function` (o error de import: "does not provide an export named").
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/actions/onboarding.ts`, dejar las importaciones así (fusionar con las que ya haya):
 
@@ -984,12 +988,12 @@ export async function saveOnboardingIncomeAction(input: {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (8 + 9 = 17 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/actions/onboarding.ts src/lib/actions/onboarding.test.ts
@@ -1010,7 +1014,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: tabla `budget_items(id, user_id, budgeted_amount)`; política UPDATE de RLS del dueño.
 - Produces: `export async function saveOnboardingBudgetAction(amounts: Record<string, number>): Promise<{ ok: boolean; error?: string }>`. Claves = ids (uuid) de `budget_items`; valores = pesos enteros ≥ 0. Objeto vacío → `{ ok: true }` sin tocar la base.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `src/lib/actions/onboarding.test.ts` (`revalidatePath` ya está importado desde la Task 4), cambiar la importación de `./onboarding` por:
 
@@ -1118,12 +1122,12 @@ describe('saveOnboardingBudgetAction', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: FAIL — `saveOnboardingBudgetAction is not a function`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/actions/onboarding.ts`, agregar a las importaciones:
 
@@ -1197,12 +1201,12 @@ export async function saveOnboardingBudgetAction(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (17 + 9 = 26 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/actions/onboarding.ts src/lib/actions/onboarding.test.ts
@@ -1215,6 +1219,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ### Task 7: `completeOnboardingAction` y `dismissChecklistAction`
 
+> **Desviación (implementación):** `dismissChecklistAction` sigue la enmienda de contratos §5.2 posterior a este plan: devuelve `Promise<{ ok: boolean }>`, nunca lanza, y sin sesión, con el UPDATE fallido o con un error inesperado devuelve `{ ok: false }` con `console.warn` solo del code. Sus tests se ajustaron a eso (4 en vez de 2).
+
 **Files:**
 - Modify: `src/lib/actions/onboarding.ts`
 - Test: `src/lib/actions/onboarding.test.ts`
@@ -1223,9 +1229,9 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: columnas `profiles.onboarding_completed_at` y `profiles.onboarding_dismissed_at` (S09, §1.2); política UPDATE `auth.uid() = id`.
 - Produces:
   - `export async function completeOnboardingAction(): Promise<void>` — marca `onboarding_completed_at` y hace `redirect('/dashboard')` (también si el UPDATE falla); sin sesión `redirect('/auth/login')`.
-  - `export async function dismissChecklistAction(): Promise<void>` — marca `onboarding_dismissed_at` y revalida `/dashboard`; sin sesión no hace nada. **S12 la consume; no la vuelve a crear.**
+  - `export async function dismissChecklistAction(): Promise<{ ok: boolean }>` (firma v2, §5.2; el plan original decía `Promise<void>`) — marca `onboarding_dismissed_at` y revalida `/dashboard`; nunca lanza: sin sesión, con el UPDATE fallido o un error inesperado devuelve `{ ok: false }`. **S12 la consume; no la vuelve a crear.**
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `src/lib/actions/onboarding.test.ts`:
 - Cambiar la primera línea por `import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';`
@@ -1327,12 +1333,12 @@ describe('dismissChecklistAction', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: FAIL — `completeOnboardingAction is not a function`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/actions/onboarding.ts`, agregar a las importaciones:
 
@@ -1395,17 +1401,17 @@ export async function dismissChecklistAction(): Promise<void> {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (26 + 5 = 31 tests).
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `bun run type-check`
 Expected: sin errores. (`src/types/database.ts` no declara `ingresos` ni las columnas nuevas de `profiles`, pero el cliente ya acepta tablas no declaradas —`accounts.ts` usa `from('accounts')`—. Si el compilador rechaza `onboarding_completed_at`/`onboarding_dismissed_at` en `update`, **no regeneres los tipos** (`bun run db:types` trunca `database.ts`, §5.0) ni edites `src/types/database.ts`: tipa a mano en `onboarding.ts`, casteando solo esas llamadas a un cliente sin esquema (`(supabase as unknown as SupabaseClient).from('profiles')`, con `import type { SupabaseClient } from '@supabase/supabase-js';`, como `expense-classification.ts:171`), y anótalo en `deviations`.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/actions/onboarding.ts src/lib/actions/onboarding.test.ts
@@ -1417,6 +1423,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ---
 
 ### Task 8: `OnboardingWizard` (componente cliente de 3 pasos)
+
+> **Desviación (implementación):** el bloque del código de WhatsApp reusa `WhatsAppLinkInstructions` (exportado por `WhatsAppLinkPanel`, S13) en vez de duplicar el enlace y el texto `VINCULAR <código>`. Se agregó `OnboardingWizard.render.test.tsx` (renderToStaticMarkup, disponible desde S13) con el marcado inicial del paso 1, escrito antes del componente.
+>
+> **Desviación (implementación, `f6d0054`):** la lógica de cada paso vive en `src/lib/onboarding/wizard-steps.ts` (`finishOnboarding`, `saveIncomeStep`, `ingresoSinCambios`, `saveBudgetStep`, `applySuggestion`, `buildFirstExpense`, `saveExpenseAndFinish`) con dependencias inyectadas y sus tests en `wizard-steps.test.ts`; el componente solo conecta estado y toasts. `OnboardingWizard.wiring.test.ts` (test de texto) asegura que el wizard usa esos manejadores y que no se traga el NEXT_REDIRECT de `completeOnboardingAction`. En S12 se agregó `montosCambiados` y el parámetro `cargados` de `saveBudgetStep`.
 
 **Files:**
 - Create: `src/components/organisms/OnboardingWizard/OnboardingWizard.tsx`
@@ -1431,11 +1441,11 @@ Decisiones de diseño (siguen el estilo real de la app: fondo `slate-900`, tarje
 - `CurrencyInput` no acepta `id`, así que su etiqueta lo envuelve (`<label>` implícito).
 - El gasto usa import dinámico de `@/lib/services/expenses`: ese módulo crea un cliente de Supabase de navegador al cargarse y no debe evaluarse en el render del servidor.
 
-- [ ] **Step 1: Cuenta por defecto del gasto**
+- [x] **Step 1: Cuenta por defecto del gasto**
 
 S07 ya creó `DEFAULT_ACCOUNT_NAME` (verificado en la Task 2): el código del Step 2 lo importa directamente. No hay variante sin S07.
 
-- [ ] **Step 2: Crear el componente**
+- [x] **Step 2: Crear el componente**
 
 Crear `src/components/organisms/OnboardingWizard/OnboardingWizard.tsx`:
 
@@ -2051,17 +2061,17 @@ export default function OnboardingWizard({
 }
 ```
 
-- [ ] **Step 3: Type-check y lint**
+- [x] **Step 3: Type-check y lint**
 
 Run: `bun run type-check && bunx eslint src/components/organisms/OnboardingWizard/OnboardingWizard.tsx`
 Expected: sin errores (warnings de `import/order` se corrigen con `bunx eslint --fix` sobre el mismo archivo).
 
-- [ ] **Step 4: Suite completa (nada se rompió)**
+- [x] **Step 4: Suite completa (nada se rompió)**
 
 Run: `bun run test`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/organisms/OnboardingWizard/OnboardingWizard.tsx
@@ -2074,6 +2084,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ### Task 9: Página `/bienvenida`
 
+> **Desviación (implementación):** se agregó `src/app/bienvenida/page.test.tsx`, escrito antes de la página: sin sesión → login; terminada → dashboard; el kit se siembra antes de `loadWizardData`; con error al leer el perfil (S09 sin aplicar) se muestra el wizard.
+
 **Files:**
 - Create: `src/app/bienvenida/page.tsx`
 
@@ -2081,7 +2093,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: `ensureStarterKitAction` (S10; nunca lanza), `loadWizardData` (Task 3), `OnboardingWizard` (Task 8), `createClient` (server), `todayBogota`, variable `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` (§3; puede no existir).
 - Produces: ruta `GET /bienvenida`.
 
-- [ ] **Step 1: Crear la página**
+- [x] **Step 1: Crear la página**
 
 Crear `src/app/bienvenida/page.tsx`:
 
@@ -2148,12 +2160,12 @@ Notas:
 - Si la columna `onboarding_completed_at` todavía no existe (S09 sin aplicar), la consulta devuelve error, `perfil` queda `null` y se muestra el wizard: no rompe.
 - No se prueba con `bun run dev`: `.env.local` apunta a producción (ver Global Constraints). La prueba manual es S14.
 
-- [ ] **Step 2: Type-check y lint**
+- [x] **Step 2: Type-check y lint**
 
 Run: `bun run type-check && bunx eslint src/app/bienvenida/page.tsx`
 Expected: sin errores.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/app/bienvenida/page.tsx
@@ -2168,17 +2180,17 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Files:** ninguno nuevo.
 
-- [ ] **Step 1: Suite completa y typecheck**
+- [x] **Step 1: Suite completa y typecheck**
 
 Run: `bun run test && bun run type-check`
 Expected: todo en verde; los tests nuevos aparecen en `budget-503020.test.ts` (12), `wizard-data.test.ts` (4) y `onboarding.test.ts` (31: los 7 de S10 + 24 de S11).
 
-- [ ] **Step 2: Lint de los archivos de la historia**
+- [x] **Step 2: Lint de los archivos de la historia**
 
 Run: `bunx eslint src/lib/onboarding src/lib/actions/onboarding.ts src/lib/actions/onboarding.test.ts src/components/organisms/OnboardingWizard src/app/bienvenida`
 Expected: sin errores.
 
-- [ ] **Step 3: Revisión contra los criterios de aceptación**
+- [x] **Step 3: Revisión contra los criterios de aceptación**
 
 Recorre los 9 criterios de arriba y confirma en el código:
 1. `page.tsx`: `redirect('/auth/login')`, `redirect('/dashboard')` si `onboarding_completed_at`, `ensureStarterKitAction()` (sin try/catch) antes de `loadWizardData`.
@@ -2191,3 +2203,19 @@ Recorre los 9 criterios de arriba y confirma en el código:
 9. Step 1.
 
 Sin commit en esta tarea (no hay cambios). Si algo falló, corrígelo en la tarea correspondiente con su propio commit.
+
+---
+
+### Task 11: Deuda de S13 — `Button` con `href` deshabilitado (alcance adicional del orquestador)
+
+**Files:** `src/components/atoms/Button/Button.tsx`, test `src/components/atoms/Button/Button.render.test.tsx`.
+
+- [x] **Step 1:** Test (renderToStaticMarkup + árbol sin renderizar): con `href` y `disabled || loading` el `<a>` lleva `aria-disabled="true"`, `tabindex="-1"` y la clase `pointer-events-none`, sin `<button>`; el `onClick` llega al `Link` y, deshabilitado, el clic hace `preventDefault` sin llamar `onClick`. Falla por la razón esperada.
+- [x] **Step 2:** Implementación en `Button.tsx`; test en verde; commit.
+
+### Task 12: Deuda de S13 — secuencia de "Cargar categorías sugeridas" fuera de `/presupuesto` (alcance adicional del orquestador)
+
+**Files:** `src/lib/onboarding/budget-empty-state.ts` (+ test), `src/app/presupuesto/page.tsx`.
+
+- [x] **Step 1:** Test de `loadStarterKitAndNotify` con dependencias inyectadas (acción, toast, recarga, meses): éxito con recarga, error sin recarga, `seeded: false` sin error con recarga, y la rama del `catch` (acción o recarga que lanza → toast de error).
+- [x] **Step 2:** Implementación y `handleLoadStarterKit` de `/presupuesto` la usa; commit.

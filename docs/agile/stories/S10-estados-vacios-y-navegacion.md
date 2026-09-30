@@ -84,7 +84,7 @@
   export const STARTER_KIT_ERROR_MESSAGE: string;
   ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/onboarding/budget-empty-state.test.ts`:
 
@@ -165,12 +165,12 @@ describe('starterKitToast', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/onboarding/budget-empty-state.test.ts`
 Expected: FAIL — `Failed to resolve import "./budget-empty-state"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/onboarding/budget-empty-state.ts`:
 
@@ -246,12 +246,12 @@ export function starterKitToast(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/onboarding/budget-empty-state.test.ts`
 Expected: PASS (12 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/onboarding/budget-empty-state.ts src/lib/onboarding/budget-empty-state.test.ts
@@ -274,12 +274,12 @@ Contratos §5.2: **S10 crea** `src/lib/actions/onboarding.ts` y `src/lib/actions
 - Consumes: `createClient()` de `src/lib/supabase/server.ts`; RPC `public.ensure_starter_kit()` → `boolean` (contratos §1.3/§5.1; la crea S09 en el flujo SEG, **no está en este worktree** y no se aplica hasta H8: los tests mockean el cliente).
 - Produces (contratos §5.2, exacto): `export async function ensureStarterKitAction(): Promise<{ seeded: boolean; error?: string }>`. **Nunca lanza.** No llama `revalidatePath` ni `redirect` (se ejecuta durante el render de `/bienvenida` y del dashboard). Sin sesión → `{ seeded: false, error: 'no_session' }`. Error de la RPC (incluido `23503` sin perfil o la función inexistente antes de H8) → `{ seeded: false, error: <code> }` (`'rpc_error'` si la RPC no trae code) y `console.warn` solo con el code. Cualquier otra excepción → `{ seeded: false, error: 'unexpected' }`. Los llamadores no necesitan try/catch.
 
-- [ ] **Step 0: Verificar que el archivo todavía no existe**
+- [x] **Step 0: Verificar que el archivo todavía no existe**
 
 Run: `test -e src/lib/actions/onboarding.ts || test -e src/lib/actions/onboarding.test.ts && echo "YA EXISTE"`
 Expected: no imprime nada. Si imprime `YA EXISTE`, detente y repórtalo: el orden del flujo APP (§5.3) garantiza que S10 es quien los crea.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/actions/onboarding.test.ts`:
 
@@ -404,12 +404,12 @@ describe('ensureStarterKitAction', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: FAIL — `Failed to resolve import "./onboarding"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/actions/onboarding.ts`:
 
@@ -459,7 +459,7 @@ export async function ensureStarterKitAction(): Promise<{
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (7 tests).
@@ -467,7 +467,7 @@ Expected: PASS (7 tests).
 Run: `bun run type-check`
 Expected: sin errores. Si el compilador rechaza el nombre `'ensure_starter_kit'` (no está en `src/types/database.ts`), **no regeneres tipos** (§5.0): castea solo esa llamada, `(supabase as unknown as SupabaseClient).rpc('ensure_starter_kit')` con `import type { SupabaseClient } from '@supabase/supabase-js';`, como `expense-classification.ts:171`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/actions/onboarding.ts src/lib/actions/onboarding.test.ts
@@ -504,7 +504,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   ```
   Se eliminan `hasData`, `selectedMonth` y `onCreateBudget`. El único consumidor es `src/app/presupuesto/page.tsx` (verificado con grep).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.test.ts`:
 
@@ -563,12 +563,12 @@ describe('/presupuesto cablea el panel vacío (S10)', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.test.ts`
 Expected: FAIL — 5 fallos (p. ej. `expected '…Migrar Datos de Julio…' not to contain 'Migrar Datos de Julio'`, `expected … to contain 'ensureStarterKitAction()'`).
 
-- [ ] **Step 3a: Reescribir el panel**
+- [x] **Step 3a: Reescribir el panel**
 
 Reemplazar todo `src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.tsx` por:
 
@@ -696,7 +696,7 @@ export default function BudgetStatusPanels({
 }
 ```
 
-- [ ] **Step 3b: Imports de la página**
+- [x] **Step 3b: Imports de la página**
 
 En `src/app/presupuesto/page.tsx`, justo después de la línea
 `import { deleteCategory, updateCategory } from '@/lib/actions/categories';`
@@ -722,7 +722,7 @@ import { starterKitToast } from '@/lib/onboarding/budget-empty-state';
 
 (S08 ya agregó `import { defaultItemFormNames } from '@/lib/budget/catalog-defaults';` justo **antes** de ese bloque; no lo toques.)
 
-- [ ] **Step 3c: Quitar `initializeMonth` de la página**
+- [x] **Step 3c: Quitar `initializeMonth` de la página**
 
 En el destructuring de `useMonthlyBudget(selectedMonth)` (líneas 69-81), cambiar:
 
@@ -739,7 +739,7 @@ por:
 
 (`initializeMonth` solo se usaba en `onCreateBudget`; el hook lo sigue exportando.)
 
-- [ ] **Step 3d: Handler del kit**
+- [x] **Step 3d: Handler del kit**
 
 Justo después de la función `showToast` (termina en la línea ~296 con `  };`), agregar:
 
@@ -769,7 +769,7 @@ Justo después de la función `showToast` (termina en la línea ~296 con `  };`)
   };
 ```
 
-- [ ] **Step 3e: JSX del panel**
+- [x] **Step 3e: JSX del panel**
 
 Reemplazar:
 
@@ -800,7 +800,7 @@ por:
         }
 ```
 
-- [ ] **Step 4: Run tests and type-check**
+- [x] **Step 4: Run tests and type-check**
 
 Run: `bun run test src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.test.ts src/lib/onboarding/budget-empty-state.test.ts`
 Expected: PASS (5 + 12 tests).
@@ -808,7 +808,7 @@ Expected: PASS (5 + 12 tests).
 Run: `bun run type-check`
 Expected: sin errores. Si `tsc` reporta `hasData`/`onCreateBudget` en otro archivo, es un consumidor que el grep no vio: ajústalo a las props nuevas y anótalo.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.tsx src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.test.ts src/app/presupuesto/page.tsx
@@ -833,7 +833,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: `logoutAction` de `src/lib/actions/auth.ts` (server action ya existente, se usa como `<form action={logoutAction}>` igual que en `Sidebar.tsx:236`).
 - Produces: nada que usen otras tareas. Props de `MobileSidebar` sin cambios (`isOpen`, `onClose`, `className`), así que `Sidebar.tsx` no cambia su uso.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/components/molecules/MobileSidebar/MobileSidebar.test.ts`:
 
@@ -874,12 +874,12 @@ describe('/test fuera de los menús (S10)', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/components/molecules/MobileSidebar/MobileSidebar.test.ts`
 Expected: FAIL — 4 fallos (`expected … to contain 'href="/settings"'`, `… to contain "import { logoutAction }…"`, y los dos `not to contain "'/test'"`).
 
-- [ ] **Step 3a: Sidebar de escritorio (cambio mínimo; S07 ya lo modificó)**
+- [x] **Step 3a: Sidebar de escritorio (cambio mínimo; S07 ya lo modificó)**
 
 Antes: `grep -n "useBudgetData\|formatCurrency" src/components/organisms/Sidebar/Sidebar.tsx` no debe imprimir nada (S07 ya quitó la tarjeta de montos). Si imprime algo, detente: S07 no está hecha.
 
@@ -890,7 +890,7 @@ En `src/components/organisms/Sidebar/Sidebar.tsx`:
 
 No tocar nada más del archivo. El test de S07 (`Sidebar.test.ts`) debe seguir en verde.
 
-- [ ] **Step 3b: MobileSidebar**
+- [x] **Step 3b: MobileSidebar**
 
 En `src/components/molecules/MobileSidebar/MobileSidebar.tsx`:
 
@@ -971,7 +971,7 @@ import { cn } from '@/lib/utils';
 
 (El `MobileSidebar` solo se monta desde `Sidebar.tsx`, que vive dentro de `AppShell` en páginas con sesión; por eso "Cerrar sesión" se muestra siempre, sin el `user &&` del escritorio.)
 
-- [ ] **Step 4: Run tests and type-check**
+- [x] **Step 4: Run tests and type-check**
 
 Run: `bun run test src/components/molecules/MobileSidebar/MobileSidebar.test.ts`
 Expected: PASS (4 tests).
@@ -979,7 +979,7 @@ Expected: PASS (4 tests).
 Run: `bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/molecules/MobileSidebar/MobileSidebar.tsx src/components/molecules/MobileSidebar/MobileSidebar.test.ts src/components/organisms/Sidebar/Sidebar.tsx
@@ -1011,7 +1011,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   export function stripNewExpenseParam(pathname: string, search: string): string;
   ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Crear `src/lib/onboarding/nuevo-gasto.test.ts`:
 
@@ -1101,12 +1101,12 @@ describe('Agregar Gasto (S10)', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `bun run test src/lib/onboarding/nuevo-gasto.test.ts src/components/organisms/DashboardQuickActions/DashboardQuickActions.test.ts`
 Expected: FAIL — `Failed to resolve import "./nuevo-gasto"` y 2 fallos de texto (`expected … to contain '<Link href={NUEVO_GASTO_HREF}'`, `… to contain 'wantsNewExpenseForm(window.location.search)'`).
 
-- [ ] **Step 3a: Funciones puras**
+- [x] **Step 3a: Funciones puras**
 
 Crear `src/lib/onboarding/nuevo-gasto.ts`:
 
@@ -1134,7 +1134,7 @@ export function stripNewExpenseParam(pathname: string, search: string): string {
 }
 ```
 
-- [ ] **Step 3b: Botón del dashboard**
+- [x] **Step 3b: Botón del dashboard**
 
 En `src/components/organisms/DashboardQuickActions/DashboardQuickActions.tsx`:
 
@@ -1164,7 +1164,7 @@ por (mismo patrón `Link` + `Button` que los otros dos botones del archivo):
       </Link>
 ```
 
-- [ ] **Step 3c: `/gastos` (cambio mínimo; S07 ya lo modificó)**
+- [x] **Step 3c: `/gastos` (cambio mínimo; S07 ya lo modificó)**
 
 En `src/app/gastos/page.tsx`:
 
@@ -1197,7 +1197,7 @@ import {
 
 (`useEffect` ya está importado en el import de `react`. No tocar nada más del archivo.)
 
-- [ ] **Step 4: Run tests and type-check**
+- [x] **Step 4: Run tests and type-check**
 
 Run: `bun run test src/lib/onboarding/nuevo-gasto.test.ts src/components/organisms/DashboardQuickActions/DashboardQuickActions.test.ts`
 Expected: PASS (12 + 2 tests).
@@ -1205,7 +1205,7 @@ Expected: PASS (12 + 2 tests).
 Run: `bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/onboarding/nuevo-gasto.ts src/lib/onboarding/nuevo-gasto.test.ts src/components/organisms/DashboardQuickActions/DashboardQuickActions.tsx src/components/organisms/DashboardQuickActions/DashboardQuickActions.test.ts src/app/gastos/page.tsx
@@ -1220,17 +1220,17 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Files:** ninguno nuevo.
 
-- [ ] **Step 1: Suite completa y tipos**
+- [x] **Step 1: Suite completa y tipos**
 
 Run: `bun run test && bun run type-check`
 Expected: todos los tests en verde (los de antes más los nuevos: 12 + 7 + 5 + 4 + 12 + 2) y `tsc --noEmit` sin salida.
 
-- [ ] **Step 2: Lint de los archivos tocados**
+- [x] **Step 2: Lint de los archivos tocados**
 
 Run: `bunx eslint src/lib/onboarding/budget-empty-state.ts src/lib/onboarding/nuevo-gasto.ts src/lib/actions/onboarding.ts src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.tsx src/components/molecules/MobileSidebar/MobileSidebar.tsx src/components/organisms/Sidebar/Sidebar.tsx src/components/organisms/DashboardQuickActions/DashboardQuickActions.tsx src/app/presupuesto/page.tsx src/app/gastos/page.tsx`
 Expected: sin errores (advertencias previas del archivo no bloquean).
 
-- [ ] **Step 3: Barrido de restos**
+- [x] **Step 3: Barrido de restos**
 
 Run: `grep -rn "Migrar Datos de Julio\|'/test'" src/components/organisms/BudgetStatusPanels src/components/molecules/MobileSidebar src/components/organisms/Sidebar`
 Expected: sin coincidencias.
@@ -1245,6 +1245,20 @@ El implementador **no** corre `bun run dev` ni `next build` (`.env.local` apunta
 No hay commit en esta tarea.
 
 ---
+
+## Desviaciones
+
+- **Reanudación:** las Tasks 1-3 se commitearon en una corrida anterior; la Task 4 estaba hecha pero sin commit (árbol sucio con los cambios exactos del plan). Se verificó que su test falla sin los cambios y pasa con ellos, y se commiteó.
+- **Alcance extra (deuda de S08), pedido por el orquestador:**
+  - Privacidad: nombres de personas en fixtures y comentarios de `src/` reemplazados por inventados (categoría `NINOS`, cuentas `Bruno` y `Coco`, `ALIMENTACIÓN MASCOTAS`). Solo tests y comentarios; los meses `'Abril'` quedan.
+  - `docs/agile/stories/S08-defaults-de-rubros.md` Task 3: el texto de "categoría no encontrada → valores generales" quedó marcado como reemplazado por la desviación.
+  - `openAddModal` de `/presupuesto` recibe el nombre de la categoría desde la tarjeta (`BudgetCategoryRow` → `BudgetTable` → página) en vez de buscarlo en `categories`. Test puro (`defaultItemFormNames([], [], 'DEUDAS')`) y test de texto de la firma.
+- **Deuda de S10 (ADR-007, recuperada en la ronda de corrección 1 de S13):** la lista llegó con las instrucciones del orquestador y se anota literal antes de tocar código:
+  1. `src/app/presupuesto/page.tsx` (`handleLoadStarterKit`): agregar con TDD `shouldReloadAfterStarterKit(result)` en `src/lib/onboarding/budget-empty-state.ts` (`return !result.error`; tests literales del orquestador: "seeded → true, sin error → false, con error". Se implementa `!result.error`: `seeded: false` sin error también recarga, porque el toast dice "Te las mostramos ahora"; solo el error no recarga) y usarla en la página; `await handleCategoryCreated()` va en try/catch con el toast de error "Cargamos las categorías pero no pudimos refrescar; recarga la página".
+  2. `src/lib/actions/onboarding.test.ts`: el spy de `console.warn` se crea en el `beforeEach`, `afterEach(() => vi.restoreAllMocks())` y se borran los `warnSpy.mockRestore()` manuales.
+  3. `src/hooks/useMonthlyBudget.ts`: quitar `initializeMonth` (código muerto) de la interfaz, del `useCallback` y del retorno, tras verificar con grep que nadie lo usa (el `initializeMonth` de `useMonthlyExpenses.ts` es otro y no entra).
+  4. `src/components/organisms/DashboardQuickActions/DashboardQuickActions.tsx`: los tres accesos dejan de ser `<Button>` dentro de `<Link>` (HTML inválido, dos elementos enfocables); test que falle si vuelve a aparecer.
+  Ninguna toca teléfonos, desvincular ni el webhook. Hechas: 1 → `01b7c37`, 2 → `76d927a`, 3 → `db7c496`, 4 → `8f5048d` (el átomo `Button` acepta `href` y renderiza `next/link` vía `asChild`; test de render con `renderToStaticMarkup`).
 
 ## Autorrevisión
 

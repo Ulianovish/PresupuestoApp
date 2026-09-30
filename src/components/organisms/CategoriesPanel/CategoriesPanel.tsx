@@ -3,7 +3,7 @@
 /**
  * CategoriesPanel - Organism Level
  *
- * Administra las categorías del presupuesto (MERCADO, TRANSPORTE, ALICE...):
+ * Administra las categorías del presupuesto (MERCADO, TRANSPORTE, NINOS...):
  * listar, crear, renombrar y eliminar.
  *
  * Renombrar es seguro para el presupuesto: los ítems apuntan a la categoría

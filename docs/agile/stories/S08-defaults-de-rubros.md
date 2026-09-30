@@ -18,8 +18,8 @@
 - Sin migración, sin tocar filas existentes, sin acceso a la base de producción. Los tests mockean el cliente; ningún test toca una base real.
 - Textos de UI y mensajes en español colombiano, tuteo.
 - Verificación del proyecto: `bun run test && bun run type-check`.
-- Commits en español terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-- Ejecutar comandos con `builtin cd /Users/migue/Repos/personal/PresupuestoApp && …`.
+- Commits en español terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, siempre con `git commit --no-verify`; antes, `bunx eslint` y `bunx prettier --check` a mano sobre los archivos de `src/` tocados.
+- Ejecutar comandos con `builtin cd /Users/migue/Repos/personal/PresupuestoApp-app && …` (worktree del flujo APP; las rutas `PresupuestoApp` de los pasos de abajo se ejecutan ahí).
 - Orden (contratos §5.3, flujo APP, en serie en el mismo worktree): S08 va **después de S07** (ya hecho: borró `src/scripts/migrate-july-data.ts`) y **antes de S10**. Ambas tocan `src/app/presupuesto/page.tsx`: S08 solo el estado del formulario (~203-235) y un import; S10 luego cablea el panel vacío sobre el archivo ya modificado por S08.
 - Prohibido `bun run dev` y `next build` contra `.env.local` (apunta a producción, §5.0). Nunca `bun run db:types`.
 
@@ -39,6 +39,15 @@
 | Modificar | `src/lib/actions/deudas-budget.ts` (bloque ~45-79, imports) | `createBudgetItemsForDeuda` usa el resolver con `DEUDA_ITEM_*` |
 | Crear | `src/lib/actions/deudas-budget.test.ts` | Tests de la acción |
 | Modificar | `src/app/presupuesto/page.tsx` (~203-235, imports) | El formulario de rubro nuevo toma los nombres por defecto del contrato en lugar de `classifications[0]` |
+| Modificar | `src/lib/constants/budget-defaults.ts` | + `DEUDAS_CATEGORY_NAME` (lo usan `catalog-defaults.ts` y `deudas-budget.ts`) — ronda de corrección 1 |
+| Crear | `src/lib/constants/budget-defaults.contract.test.ts` | Contrato: los nombres por defecto quedan activos tras las migraciones — ronda 1 |
+| Crear | `src/test-utils/postgrest-chain.ts` | Cadena falsa de PostgREST compartida por los tests de acciones — ronda 1 |
+| Modificar | `src/app/gastos/page.tsx` | Task 7: no se guarda mientras cargan las categorías; ronda 1: usa `expenseSubmitGuard` / `missingCategoryMessage` |
+| Modificar | `src/lib/expense-form-defaults.ts` (+ `.test.ts`) | Ronda 1: guard de guardado puro (`expenseSubmitGuard`, `missingCategoryMessage`) |
+| Modificar | `src/components/organisms/ExpenseModal/ExpenseModal.tsx` (+ `.test.ts`) | Task 7: el aviso "sin categorías" exige `submitDisabledLabel`; ronda 1: test por render |
+| Modificar | `src/__tests__/gastos-page.test.ts` | Task 7 / ronda 1: cableado de /gastos |
+| Modificar | `vitest.config.ts` | Ronda 1: transforma JSX (oxc, runtime automático) para renderizar componentes en tests |
+| Modificar | fixtures de `src/lib/{dian,whatsapp,services}/*.test.ts`, `historial-clasificacion.ts`, `handle-image.ts` | Task 8 / ronda 1: nombres inventados |
 
 **Búsqueda de otros sitios "el primero" (hecha al planear):**
 - `src/app/api/budget/route.ts` y `src/app/api/budget/[id]/route.ts`: buscan clasificación/control **por el nombre que manda el formulario** — no eligen "el primero". Se corrigen indirectamente porque el formulario (`presupuesto/page.tsx`) deja de proponer `classifications[0]`. Sin cambios.
@@ -78,7 +87,7 @@
     - `function pickCatalogId(rows: readonly CatalogRow[], preferredName: string): CatalogPick | null`
     - `function itemDefaultNamesFor(categoryName?: string | null): ItemDefaultNames`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/budget/catalog-defaults.test.ts`:
 
@@ -178,12 +187,12 @@ describe('itemDefaultNamesFor', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/catalog-defaults.test.ts`
 Expected: FAIL — `Failed to resolve import "@/lib/constants/budget-defaults"` (el archivo no existe).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/constants/budget-defaults.ts`:
 
@@ -304,12 +313,12 @@ export function itemDefaultNamesFor(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/catalog-defaults.test.ts`
 Expected: PASS (9 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/constants/budget-defaults.ts src/lib/budget/catalog-defaults.ts src/lib/budget/catalog-defaults.test.ts && git commit -m "$(cat <<'EOF'
@@ -337,7 +346,7 @@ EOF
   - Consultas que hace (las tres en paralelo): `from(<tabla>).select('id, name').eq('is_active', true).order('name')` para `classifications`, `controls` y `budget_statuses`.
   - Aviso de respaldo: `console.warn('[budget-defaults] No existe <etiqueta> "<buscado>"; se usa "<usado>".')` con etiqueta `la clasificación` | `el control` | `el estado`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/budget/item-defaults-supabase.test.ts`:
 
@@ -526,12 +535,12 @@ describe('resolveBudgetItemDefaults', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/item-defaults-supabase.test.ts`
 Expected: FAIL — `Failed to resolve import "./item-defaults-supabase"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/budget/item-defaults-supabase.ts`:
 
@@ -652,12 +661,12 @@ export async function resolveBudgetItemDefaults(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/item-defaults-supabase.test.ts && bun run type-check`
 Expected: PASS (6 tests) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/budget/item-defaults-supabase.ts src/lib/budget/item-defaults-supabase.test.ts && git commit -m "$(cat <<'EOF'
@@ -681,9 +690,9 @@ EOF
 - Produces: firmas públicas sin cambios:
   - `createDefaultBudgetItemForCategory(categoryId: string, categoryName: string, monthYear: string)` → `{ success: boolean; error?: string }`
   - `createBudgetItemInMonth(categoryId: string, name: string, monthYear: string): Promise<{ success: boolean; itemId?: string; error?: string }>`
-  - Nuevo en `createBudgetItemInMonth`: lee el nombre de la categoría con `from('categories').select('name').eq('id', categoryId).eq('user_id', user.id).maybeSingle()`; si no la encuentra usa los valores generales.
+  - Nuevo en `createBudgetItemInMonth`: lee el nombre de la categoría con `from('categories').select('name').eq('id', categoryId).eq('user_id', user.id).maybeSingle()`; ~~si no la encuentra usa los valores generales~~ **(reemplazado, ver Desviaciones: si la consulta falla o la categoría no existe o no es del usuario, devuelve error y no inserta).**
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/actions/categories.test.ts`:
 
@@ -849,6 +858,8 @@ describe('createBudgetItemInMonth', () => {
     expect(mockedResolve).toHaveBeenCalledWith(client, DEUDA);
   });
 
+  // REEMPLAZADO (ver Desviaciones): el test real espera error 'Categoría no
+  // encontrada' y que NO se inserte el rubro. Se deja el texto original abajo.
   it('categoría no encontrada → valores generales, igual crea el rubro', async () => {
     const { client } = clienteFalso({ categoria: null });
 
@@ -873,12 +884,12 @@ describe('createBudgetItemInMonth', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/categories.test.ts`
 Expected: FAIL — `expected "spy" to be called with arguments` en `mockedResolve` (las acciones todavía consultan `classifications`/`controls` con `.limit(1)`; además `cadena` no tiene `limit`, así que puede fallar con `limit is not a function` y la acción devolver `Error interno del servidor`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/actions/categories.ts`, reemplazar el bloque de imports internos:
 
@@ -957,12 +968,12 @@ Verificar que no quedan referencias viejas:
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n "classificationResult\|controlResult\|statusResult\|limit(1)" src/lib/actions/categories.ts`
 Expected: sin salida.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/categories.test.ts && bun run type-check`
 Expected: PASS (7 tests) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/categories.ts src/lib/actions/categories.test.ts && git commit -m "$(cat <<'EOF'
@@ -985,7 +996,7 @@ EOF
 - Consumes (Tasks 1–2): `DEUDA_ITEM_CLASSIFICATION`, `DEUDA_ITEM_CONTROL`, `resolveBudgetItemDefaults(supabase, { classification, control })`.
 - Produces: firma sin cambios `createBudgetItemsForDeuda(deudaId: string, itemName: string)` → `{ success: boolean; error?: string }`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/actions/deudas-budget.test.ts`:
 
@@ -1107,12 +1118,12 @@ describe('createBudgetItemsForDeuda', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/deudas-budget.test.ts`
 Expected: FAIL — `mockedResolve` no fue llamado (la acción todavía consulta `classifications`/`controls` con `.limit(1)`, y `cadena` no tiene `limit`, así que devuelve `Error interno del servidor`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/actions/deudas-budget.ts`, reemplazar:
 
@@ -1156,12 +1167,12 @@ En el `.map(t => ({ … }))` que arma `rows`, cambiar las tres líneas de catál
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n "classificationResult\|controlResult\|statusResult\|limit(1)" src/lib/actions/deudas-budget.ts`
 Expected: sin salida.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/deudas-budget.test.ts && bun run type-check`
 Expected: PASS (2 tests) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/deudas-budget.ts src/lib/actions/deudas-budget.test.ts && git commit -m "$(cat <<'EOF'
@@ -1185,7 +1196,7 @@ EOF
 - Consumes (Task 1): `pickCatalogId`, `itemDefaultNamesFor`, `type CatalogRow`.
 - Produces: `function defaultItemFormNames(classifications: readonly CatalogRow[], controls: readonly CatalogRow[], categoryName?: string | null): { clasificacion: string; control: string }` — nombre del catálogo elegido por `pickCatalogId`; con catálogo vacío (aún no cargó) devuelve el nombre del contrato.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `src/lib/budget/catalog-defaults.test.ts`, cambiar el import:
 
@@ -1244,12 +1255,12 @@ describe('defaultItemFormNames', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/catalog-defaults.test.ts`
 Expected: FAIL — `defaultItemFormNames is not a function` (no está exportada).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Agregar al final de `src/lib/budget/catalog-defaults.ts`:
 
@@ -1327,12 +1338,12 @@ por:
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n "classifications\[0\]\|controls\[0\]\|defaultClasificacion\|defaultControl" src/app/presupuesto/page.tsx`
 Expected: sin salida.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/catalog-defaults.test.ts && bun run type-check`
 Expected: PASS (13 tests) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/budget/catalog-defaults.ts src/lib/budget/catalog-defaults.test.ts src/app/presupuesto/page.tsx && git commit -m "$(cat <<'EOF'
@@ -1349,12 +1360,12 @@ EOF
 
 **Files:** ninguno nuevo.
 
-- [ ] **Step 1: Suite completa y tipos**
+- [x] **Step 1: Suite completa y tipos**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: todos los tests en verde (incluye los 4 archivos nuevos) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 2: No quedan selecciones "el primero" de catálogos al crear rubros**
+- [x] **Step 2: No quedan selecciones "el primero" de catálogos al crear rubros**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rnE "from\('(classifications|controls)'\)" src --include='*.ts' --include='*.tsx' | grep -v "\.test\."`
 Expected: solo `src/lib/budget/item-defaults-supabase.ts`, `src/lib/services/budget.ts` (listados de UI), `src/app/api/budget/route.ts` y `src/app/api/budget/[id]/route.ts` (por nombre enviado). (`src/scripts/migrate-july-data.ts` ya no aparece: lo borró S07.) Ninguno con `.limit(1)`:
@@ -1362,12 +1373,38 @@ Expected: solo `src/lib/budget/item-defaults-supabase.ts`, `src/lib/services/bud
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn "limit(1)" src/lib/actions src/lib/budget`
 Expected: sin salida.
 
-- [ ] **Step 3: Sin migraciones nuevas**
+- [x] **Step 3: Sin migraciones nuevas**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git diff --name-only main...HEAD -- supabase/`
 Expected: sin archivos de S08 (solo los que existieran de otras historias).
 
 Sin commit en esta tarea (no cambia archivos).
+
+---
+
+### Task 7 (adicional, deuda de S07): /gastos no deja guardar mientras cargan las categorías
+
+- [x] Test de texto en `src/__tests__/gastos-page.test.ts`: `submitDisabled={saveBlocked || (!isEditing && categoriesLoading)}`, etiqueta solo si `saveBlocked`, aviso del modal solo con etiqueta, y el guard del submit sin toast mientras carga.
+- [x] `src/app/gastos/page.tsx` y `ExpenseModal.tsx` cableados; test en verde; commit.
+
+### Task 8 (adicional, deuda de S07): fixtures y comentarios sin aspecto de datos reales
+
+- [x] Reemplazar en `src/lib/dian/historial-clasificacion.test.ts` y el comentario de `historial-clasificacion.ts` los valores con aspecto de teléfono o nombre real por inventados; buscar con grep otros casos en `src/`.
+
+### Task 9 (adicional, deuda de S07): Global Constraints de S07
+
+- [x] `docs/agile/stories/S07-sin-datos-del-dueno.md`: commits con `--no-verify` + eslint/prettier a mano; ruta del worktree `PresupuestoApp-app`.
+
+---
+
+## Desviaciones
+
+- **Ruta de ejecución:** todos los pasos se ejecutaron en el worktree `PresupuestoApp-app`, no en `PresupuestoApp`.
+- **Task 7 tocó `ExpenseModal.tsx` y su test**, que no estaban en el plan original: el aviso "sin categorías" del modal ahora sale solo con `submitDisabled && submitDisabledLabel`, para que /gastos pueda deshabilitar el botón sin avisar mientras las categorías cargan.
+- **Estado del rubro nuevo:** antes se buscaba con `.eq('name', 'Activo')` y, si no existía, la acción fallaba. Ahora el resolver lee el catálogo `budget_statuses` **activo** (`is_active = true`, ordenado por nombre) y, si `Activo` no existe o está inactivo, cae al primer estado activo con `console.warn` — el mismo respaldo general de contratos §2.5. Cubierto en `item-defaults-supabase.test.ts`.
+- **`createBudgetItemInMonth` sin categoría (ronda 1):** el plan decía "si no la encuentra usa los valores generales". Se cambió: si la consulta falla devuelve `{ success:false, error:'No se pudo leer la categoría' }` (con `console.error`) y si la categoría no existe o no es del usuario, `{ success:false, error:'Categoría no encontrada' }`, sin insertar. Así un rubro de DEUDAS no nace mal clasificado por un fallo transitorio y no se inserta un `category_id` sin validar. El contrato §2.5 no fija este caso.
+- **Respaldo al primero activo (ronda 1):** se mantiene porque lo exige §2.5, pero `budget-defaults.contract.test.ts` reproduce las migraciones y falla si `Estilo de Vida`, `Basico`, `Reducir` o `Necesario` quedan inactivos o desaparecen. `Activo` (`budget_statuses`) no tiene siembra en `supabase/migrations`, así que no se puede comprobar ahí.
+- **Tests de /gastos y ExpenseModal (ronda 1):** los regex sobre el código fuente se sustituyeron por funciones puras testeadas y un render de `ExpenseModal` con `react-dom/server` (con `Dialog` sustituido, porque el portal de Radix no se renderiza en servidor). No se agregó Testing Library ni jsdom; solo se habilitó la transformación de JSX en `vitest.config.ts`.
 
 ---
 

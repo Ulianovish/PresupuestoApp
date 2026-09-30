@@ -238,7 +238,7 @@ describe('executeTool', () => {
     it('cuenta ambigua ("nequi" con dos Nequi): registra con la por defecto y las dos quedan de candidatas', async () => {
       let recibido: Entrada | null = null;
       const deps = depsFalsas({
-        accounts: ['Efectivo', 'Nequi Migue', 'Nequi Milo'],
+        accounts: ['Efectivo', 'Nequi Bruno', 'Nequi Coco'],
         createExpense: async input => {
           recibido = input;
           return { ok: true, category: 'MERCADO', transactionId: 'tx-1' };
@@ -252,7 +252,7 @@ describe('executeTool', () => {
       expect(r.ok).toBe(true);
       expect(recibido).toMatchObject({
         accountName: 'Efectivo',
-        cuentaPorDefinir: { candidatas: ['Nequi Migue', 'Nequi Milo'] },
+        cuentaPorDefinir: { candidatas: ['Nequi Bruno', 'Nequi Coco'] },
       });
     });
 

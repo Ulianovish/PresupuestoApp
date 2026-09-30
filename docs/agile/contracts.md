@@ -345,6 +345,7 @@ Resuelven los huecos que reportaron los 13 planificadores. Donde choquen con el 
   - Checklist: el ítem `'alertas'` se **reemplaza** por `'presupuesto'` ("Ponle montos a tu presupuesto" → `/presupuesto`), hecho si hay algún `budget_items` del mes actual con `budgeted_amount > 0`. `ChecklistInput.hasExplicitAlerts` → `hasBudgetAmounts`. `deudaCount` cuenta solo deudas activas (verificar el nombre real de la columna de actividad en `supabase_ingresos_deudas.sql`).
   - Extras aceptados: `loadDashboardChecklist` (S12, nunca lanza, `null` = no mostrar), `src/lib/onboarding/wizard-data.ts` (S11), `src/lib/onboarding/budget-empty-state.ts` (S10). El paso 3 de la bienvenida reusa `createExpenseTransaction`.
   - `src/lib/actions/onboarding.ts` y su test los **crea S10** (solo `ensureStarterKitAction`); S11 y S12 los extienden.
+  - **Kit en el dashboard (reemplaza "una vez al cargar" de §2.7):** el dashboard llama `ensureStarterKitAction()` solo si `profiles.onboarding_completed_at IS NULL` (bienvenida pendiente). Si ya terminó la bienvenida no la llama: el kit reactiva categorías inactivas con el mismo nombre (§5.1) y volvería a traer las que el usuario borró a propósito. Si la lectura del perfil falla (p. ej. columna de S09 sin aplicar) o no hay fila, tampoco la llama. La lectura del perfil es una sola (`onboarding_completed_at, onboarding_dismissed_at`) y se pasa a `loadDashboardChecklist(supabase, userId, perfil)` (S12).
   - `dismissChecklistAction(): Promise<{ ok: boolean }>` (reemplaza `Promise<void>`): no lanza; sin sesión o UPDATE fallido → `{ ok: false }` y `console.warn` con el code. El botón "Ocultar" esconde la tarjeta al instante y la restaura con un toast si `ok` es false.
 - **§2.8 WhatsApp**: `unlinkWhatsAppPhoneAction(phoneE164)` se reemplaza por **`unlinkWhatsAppLinkAction(linkId: string): Promise<UnlinkLinkResult>`** con `UnlinkLinkResult = { ok: true } | { ok: false; error: string }`. Borra por `id` y `user_id` con el cliente de cookie; así el número completo no llega al navegador. `key` de la lista = `l.id`. S13 también actualiza `MSG_ALREADY_LINKED` (texto viejo "llegará muy pronto").
 
@@ -366,8 +367,10 @@ Choques al integrar: `handle-linking.ts` (S02 en SEG, S13 en APP: líneas distin
 
 ## Registro de cambios
 
+- v2.4 (2026-09-30): integración de los flujos SEG, AUTH y APP en `feat/multiusuario` (S14). La línea "v2.1" de APP (kit en el dashboard solo con la bienvenida pendiente; S12) se conserva abajo como "v2.1-app".
 - v2.3 (2026-09-30): H10 resuelta; el middleware vive en `src/middleware.ts` (§2.3, §4, §5.3) según [ADR-004](decisions/ADR-004-middleware-en-src.md) y [S15](stories/S15-activar-middleware.md). Las guardias de página redirigen a `/auth/login?redirectTo=<ruta>` para no formar bucle con el middleware.
 - v2.2 (2026-09-30): fila `reauthentication_needed` en §2.2 y regla de sesión de `resetPasswordAction` (cualquier sesión, intencional) en §5.2 (S05).
 - v2.1 (2026-09-30): tarea humana H10 y regla de no declarar protección por middleware hasta resolverla (ADR-004).
+- v2.1-app (2026-09-30): §5.2 — el dashboard llama el kit solo con la bienvenida pendiente; `loadDashboardChecklist` recibe el perfil (S12, decisión del orquestador).
 - v2 (2026-09-30): enmiendas §5 tras la planificación (13 planes, huecos consolidados).
 - v1 (2026-09-30): versión inicial.

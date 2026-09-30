@@ -2,6 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { resolveBudgetItemDefaults } from '@/lib/budget/item-defaults-supabase';
+import {
+  DEUDA_ITEM_CLASSIFICATION,
+  DEUDA_ITEM_CONTROL,
+  DEUDAS_CATEGORY_NAME,
+} from '@/lib/constants/budget-defaults';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -33,7 +39,7 @@ export async function createBudgetItemsForDeuda(
     const { data: category } = await supabase
       .from('categories')
       .select('id')
-      .ilike('name', 'DEUDAS')
+      .ilike('name', DEUDAS_CATEGORY_NAME)
       .eq('user_id', user.id)
       .eq('is_active', true)
       .maybeSingle();
@@ -42,40 +48,13 @@ export async function createBudgetItemsForDeuda(
       return { success: false, error: 'No existe la categoría DEUDAS' };
     }
 
-    // Valores por defecto de clasificación, control y estado
-    const [classificationResult, controlResult, statusResult] =
-      await Promise.all([
-        supabase
-          .from('classifications')
-          .select('id')
-          .eq('is_active', true)
-          .order('name')
-          .limit(1)
-          .single(),
-        supabase
-          .from('controls')
-          .select('id')
-          .eq('is_active', true)
-          .order('name')
-          .limit(1)
-          .single(),
-        supabase
-          .from('budget_statuses')
-          .select('id')
-          .eq('name', 'Activo')
-          .single(),
-      ]);
+    // Clasificación, control y estado por nombre (contratos §2.5)
+    const defaults = await resolveBudgetItemDefaults(supabase, {
+      classification: DEUDA_ITEM_CLASSIFICATION,
+      control: DEUDA_ITEM_CONTROL,
+    });
 
-    if (
-      classificationResult.error ||
-      controlResult.error ||
-      statusResult.error
-    ) {
-      console.error('Error obteniendo valores por defecto:', {
-        classificationResult: classificationResult.error,
-        controlResult: controlResult.error,
-        statusResult: statusResult.error,
-      });
+    if (!defaults.ok) {
       return { success: false, error: 'Faltan valores por defecto' };
     }
 
@@ -105,9 +84,9 @@ export async function createBudgetItemsForDeuda(
         user_id: user.id,
         template_id: t.id,
         category_id: category.id,
-        classification_id: classificationResult.data.id,
-        control_id: controlResult.data.id,
-        status_id: statusResult.data.id,
+        classification_id: defaults.ids.classificationId,
+        control_id: defaults.ids.controlId,
+        status_id: defaults.ids.statusId,
         name: itemName,
         budgeted_amount: 0,
         real_amount: 0,

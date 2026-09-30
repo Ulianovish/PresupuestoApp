@@ -4,9 +4,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Mostrar en el dashboard una lista de 5 pasos pendientes de configuración (calculada desde los datos del usuario), que se puede ocultar para siempre, y reparar el kit inicial cada vez que se carga el dashboard.
+**Goal:** Mostrar en el dashboard una lista de 5 pasos pendientes de configuración (calculada desde los datos del usuario), que se puede ocultar para siempre, y reparar el kit inicial al cargar el dashboard mientras la bienvenida esté pendiente.
 
-**Architecture:** `src/lib/onboarding/checklist.ts` tiene la lógica pura (`computeChecklist`), la carga de datos con conteos `head: true` (`loadChecklistInput`) y la decisión de mostrar (`loadDashboardChecklist`, que lee `profiles.onboarding_dismissed_at`). `src/app/dashboard/page.tsx` (server component) llama `ensureStarterKitAction()` y `loadDashboardChecklist()` y pasa los ítems como prop serializable a `DashboardContent` (client component), que pinta `OnboardingChecklist` encima de las acciones rápidas. "Ocultar" llama `dismissChecklistAction()`.
+**Architecture:** `src/lib/onboarding/checklist.ts` tiene la lógica pura (`computeChecklist`), la carga de datos con conteos `head: true` (`loadChecklistInput`) y la decisión de mostrar (`loadDashboardChecklist`, que recibe el perfil ya leído). `src/app/dashboard/page.tsx` (server component) lee `profiles` una vez, llama `ensureStarterKitAction()` si la bienvenida está pendiente y `loadDashboardChecklist()` y pasa los ítems como prop serializable a `DashboardContent` (client component), que pinta `OnboardingChecklist` encima de las acciones rápidas. "Ocultar" llama `dismissChecklistAction()`.
 
 **Tech Stack:** Next.js 15 App Router (server components + server actions), Supabase (`@supabase/ssr`, `@supabase/supabase-js`), React 19, Tailwind, lucide-react, sonner, vitest (environment `node`), bun.
 
@@ -42,19 +42,19 @@
 
 ## Criterios de aceptación
 
-- [ ] `computeChecklist` devuelve siempre 5 ítems en este orden, con estos textos y enlaces:
+- [x] `computeChecklist` devuelve siempre 5 ítems en este orden, con estos textos y enlaces:
   | id | label | href | done |
   |---|---|---|---|
   | `cuentas` | Agrega tus cuentas | `/settings` | `accountCount > 1` |
   | `deudas` | Registra tarjetas y deudas | `/deudas` | `deudaCount > 0` |
   | `whatsapp` | Vincula WhatsApp | `/settings` | `linkedPhoneCount > 0` |
-  | `documento` | Carga tu cédula para facturas DIAN | `/settings` | `hasDocumento` |
+  | `documento` | Carga tu cédula para facturas DIAN (sin número vinculado: "… (primero vincula WhatsApp)") | `/settings` | `hasDocumento` |
   | `presupuesto` | Ponle montos a tu presupuesto | `/presupuesto` | `hasBudgetAmounts` |
-- [ ] `loadChecklistInput(supabase, userId, monthYear = todayBogota().slice(0, 7))` hace 5 conteos con `{ count: 'exact', head: true }`, todos con `eq('user_id', userId)`: `accounts` (+ `eq('is_active', true)`), `deudas` (+ `eq('es_activo', true)`: solo deudas activas), `whatsapp_links`, `whatsapp_links` (+ `not('documento', 'is', null)`), `budget_items` del mes (`select('id, budget_templates!inner(month_year)', …)` + `eq('budget_templates.month_year', monthYear)` + `gt('budgeted_amount', 0)`). `count` nulo cuenta como 0. Si una consulta falla, lanza un `Error` cuyo mensaje nombra la consulta y el código, sin el `user_id`.
-- [ ] El dashboard muestra `OnboardingChecklist` solo si `profiles.onboarding_dismissed_at` es null **y** hay algún ítem pendiente. Si la lectura del perfil o algún conteo falla, no la muestra (y el dashboard carga igual).
-- [ ] "Ocultar" esconde la tarjeta al instante y guarda `onboarding_dismissed_at = now()` con `dismissChecklistAction()` (de S11); si la llamada lanza (p. ej. error de red), la tarjeta vuelve y sale un toast "No pudimos ocultar la lista. Intenta de nuevo." (Con la versión de S11, un UPDATE fallido no lanza: la tarjeta queda oculta y reaparece en la próxima carga.)
-- [ ] El dashboard llama `ensureStarterKitAction()` en cada carga, antes de contar (el kit crea la cuenta Efectivo), sin try/catch: la acción nunca lanza (§5.2) y un error vuelve en `result.error` sin romper el dashboard.
-- [ ] `bun run test && bun run type-check` en verde.
+- [x] `loadChecklistInput(supabase, userId, monthYear = todayBogota().slice(0, 7))` hace 5 conteos con `{ count: 'exact', head: true }`, todos con `eq('user_id', userId)`: `accounts` (+ `eq('is_active', true)`), `deudas` (+ `eq('es_activo', true)`: solo deudas activas), `whatsapp_links`, `whatsapp_links` (+ `not('documento', 'is', null)` + `neq('documento', '')`), `budget_items` del mes (`select('id, budget_templates!inner(month_year)', …)` + `eq('budget_templates.month_year', monthYear)` + `gt('budgeted_amount', 0)`). `count` nulo cuenta como 0. Si una consulta falla, lanza un `Error` cuyo mensaje nombra la consulta y el código, sin el `user_id`.
+- [x] El dashboard muestra `OnboardingChecklist` solo si `profiles.onboarding_dismissed_at` es null **y** hay algún ítem pendiente. Lee el perfil **una sola vez** (`onboarding_completed_at, onboarding_dismissed_at`) y se lo pasa a `loadDashboardChecklist(supabase, userId, perfil)`. Si la lectura del perfil o algún conteo falla, no la muestra (y el dashboard carga igual).
+- [x] "Ocultar" esconde la tarjeta al instante y guarda `onboarding_dismissed_at = now()` con `dismissChecklistAction()` (de S11, `Promise<{ ok: boolean }>`, §5.2); si devuelve `{ ok: false }` (sin sesión o UPDATE fallido) o la llamada lanza (p. ej. error de red), la tarjeta vuelve y sale un toast "No pudimos ocultar la lista. Intenta de nuevo."
+- [x] El dashboard llama `ensureStarterKitAction()` **solo si la bienvenida está pendiente** (`profiles.onboarding_completed_at IS NULL`), antes de contar (el kit crea la cuenta Efectivo), sin try/catch: la acción nunca lanza (§5.2) y un error vuelve en `result.error` sin romper el dashboard. Si la bienvenida ya terminó, si la lectura del perfil falla (p. ej. columna sin migrar) o si no hay fila, no se llama (así nunca se reactivan categorías borradas a propósito; contratos §5.2).
+- [x] `bun run test && bun run type-check` en verde.
 
 Columnas verificadas en el repo: `deudas.user_id` (`supabase_ingresos_deudas.sql:29`), `deudas.es_activo BOOLEAN DEFAULT true` (`supabase_ingresos_deudas.sql:36`; es la columna de actividad: el borrado de una deuda es `update({ es_activo: false })` en `src/lib/services/ingresos-deudas.ts:196` y los listados filtran `eq('es_activo', true)`; `pagada` es otra cosa y no se usa aquí), `accounts.user_id` / `accounts.is_active` (`src/lib/actions/accounts.ts:35-38`), `whatsapp_links.user_id` (`supabase/migrations/20260611000000_create_whatsapp_links.sql`), `whatsapp_links.documento` (`supabase/migrations/20260928140000_whatsapp_links_documento.sql`), `budget_items.user_id` / `budget_items.budgeted_amount` / `budget_items.template_id` (`src/types/database.ts:226-243`), única FK `budget_items_template_id_fkey` → `budget_templates` (`src/types/supabase.ts`), con `budget_templates.month_year` `'YYYY-MM'`.
 
@@ -69,15 +69,15 @@ El flujo APP corre en serie (contratos §5.3): `src/lib/actions/onboarding.ts` y
 **Interfaces:**
 - Consumes (ya existen):
   - `ensureStarterKitAction(): Promise<{ seeded: boolean; error?: string }>` (S10, §5.2): nunca lanza, no llama `revalidatePath` ni `redirect`; sin sesión `{ seeded: false, error: 'no_session' }`; error de RPC `{ seeded: false, error: <code> }`.
-  - `dismissChecklistAction(): Promise<void>` (S11, Task 7): guarda `profiles.onboarding_dismissed_at = now()` del propio usuario y revalida `/dashboard`; sin sesión no hace nada; si el UPDATE falla registra solo el code y **vuelve sin lanzar**.
+  - `dismissChecklistAction(): Promise<{ ok: boolean }>` (S11, Task 7; §5.2): guarda `profiles.onboarding_dismissed_at = now()` del propio usuario y revalida `/dashboard`; sin sesión o si el UPDATE falla devuelve `{ ok: false }`, registra solo el code y **no lanza**.
 - Produces: nada.
 
-- [ ] **Step 1: Comprobar que existen una sola vez**
+- [x] **Step 1: Comprobar que existen una sola vez**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn "export async function ensureStarterKitAction\|export async function dismissChecklistAction" src`
 Expected: exactamente dos líneas, ambas en `src/lib/actions/onboarding.ts`. Si falta alguna, detente y repórtalo: S10 o S11 no están hechas. **No** las crees aquí.
 
-- [ ] **Step 2: Sus tests pasan**
+- [x] **Step 2: Sus tests pasan**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (31 tests: 7 de S10 + 24 de S11).
@@ -105,7 +105,7 @@ Sin commit en esta tarea.
   export function computeChecklist(input: ChecklistInput): ChecklistItem[]
   ```
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 Crea `src/lib/onboarding/checklist.test.ts`:
 
@@ -206,12 +206,12 @@ describe('computeChecklist', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y ver que falla**
+- [x] **Step 2: Correr el test y ver que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: FAIL con `Failed to resolve import "./checklist"`.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Crea `src/lib/onboarding/checklist.ts`:
 
@@ -285,12 +285,12 @@ export function computeChecklist(input: ChecklistInput): ChecklistItem[] {
 }
 ```
 
-- [ ] **Step 4: Correr el test y ver que pasa**
+- [x] **Step 4: Correr el test y ver que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts && git commit -m "$(cat <<'EOF'
@@ -314,7 +314,7 @@ EOF
 - Consumes también: `todayBogota()` de `@/lib/whatsapp/format` (mes actual por defecto).
 - Produces: `export async function loadChecklistInput(supabase: SupabaseClient, userId: string, monthYear?: string): Promise<ChecklistInput>` — la firma del contrato más un `monthYear` opcional (`'YYYY-MM'`, por defecto `todayBogota().slice(0, 7)`) para no depender de la hora real en los tests. Lanza `Error('loadChecklistInput: <consulta> <código>')` si alguna consulta devuelve `error`.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 En `src/lib/onboarding/checklist.test.ts`:
 
@@ -550,12 +550,12 @@ describe('loadChecklistInput', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y ver que falla**
+- [x] **Step 2: Correr el test y ver que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: FAIL — `loadChecklistInput is not a function` en los 5 tests nuevos (los 4 de `computeChecklist` siguen en verde).
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/onboarding/checklist.ts`, agrega justo después del comentario inicial del archivo (antes de `export type ChecklistInput`):
 
@@ -636,17 +636,17 @@ export async function loadChecklistInput(
 }
 ```
 
-- [ ] **Step 4: Correr el test y ver que pasa**
+- [x] **Step 4: Correr el test y ver que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: PASS (9 tests).
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts && git commit -m "$(cat <<'EOF'
@@ -672,7 +672,7 @@ EOF
 - Consumes: `computeChecklist`, `loadChecklistInput`, `ChecklistItem` (Tasks 2–3); columna `profiles.onboarding_dismissed_at` (S09).
 - Produces: `export async function loadDashboardChecklist(supabase: SupabaseClient, userId: string): Promise<ChecklistItem[] | null>` — `null` = no mostrar. No lanza. (Función adicional a las del contrato; no cambia ninguna firma del contrato.)
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 En `src/lib/onboarding/checklist.test.ts`, agrega `loadDashboardChecklist` al import de `./checklist`:
 
@@ -789,12 +789,12 @@ describe('loadDashboardChecklist', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y ver que falla**
+- [x] **Step 2: Correr el test y ver que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: FAIL — `loadDashboardChecklist is not a function` (los 9 tests anteriores siguen en verde).
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Agrega al final de `src/lib/onboarding/checklist.ts`:
 
@@ -841,17 +841,17 @@ export async function loadDashboardChecklist(
 }
 ```
 
-- [ ] **Step 4: Correr el test y ver que pasa**
+- [x] **Step 4: Correr el test y ver que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: PASS (15 tests).
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts && git commit -m "$(cat <<'EOF'
@@ -880,7 +880,7 @@ EOF
 
 El repo no tiene tests de componentes (vitest corre en `node`, sin DOM ni Testing Library). Esta tarea se verifica con la suite completa, `type-check` y eslint; la lógica que decide qué mostrar ya quedó probada en las Tasks 2–4.
 
-- [ ] **Step 1: Crear el componente**
+- [x] **Step 1: Crear el componente**
 
 Crea `src/components/organisms/OnboardingChecklist/OnboardingChecklist.tsx`:
 
@@ -1000,7 +1000,7 @@ export default function OnboardingChecklist({
 }
 ```
 
-- [ ] **Step 2: Pasar la checklist por `DashboardContent`**
+- [x] **Step 2: Pasar la checklist por `DashboardContent`**
 
 En `src/components/pages/DashboardContent.tsx`:
 
@@ -1060,7 +1060,7 @@ por:
   );
 ```
 
-- [ ] **Step 3: Cargar la checklist en el server component**
+- [x] **Step 3: Cargar la checklist en el server component**
 
 Reemplaza todo `src/app/dashboard/page.tsx` por:
 
@@ -1100,7 +1100,7 @@ export default async function DashboardPage() {
 }
 ```
 
-- [ ] **Step 4: Verificación del proyecto**
+- [x] **Step 4: Verificación del proyecto**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: toda la suite en PASS y `tsc --noEmit` sin errores.
@@ -1114,12 +1114,12 @@ Si `tsc` rechaza pasar `await createClient()` como `SupabaseClient` (no debería
 
 y agrega al final de los imports `import type { SupabaseClient } from '@supabase/supabase-js';`.
 
-- [ ] **Step 5: Lint de los archivos tocados**
+- [x] **Step 5: Lint de los archivos tocados**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bunx eslint src/components/organisms/OnboardingChecklist/OnboardingChecklist.tsx src/components/pages/DashboardContent.tsx src/app/dashboard/page.tsx src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts`
 Expected: sin errores (warnings de orden de imports se arreglan con `--fix`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/organisms/OnboardingChecklist/OnboardingChecklist.tsx src/components/pages/DashboardContent.tsx src/app/dashboard/page.tsx && git commit -m "$(cat <<'EOF'
@@ -1142,6 +1142,27 @@ EOF
 
 - **Cobertura de la épica S12:** `computeChecklist` (con `'presupuesto'`) y `loadChecklistInput` (deudas activas, rubros del mes con monto) con tests → Tasks 2–3. `OnboardingChecklist` en el dashboard y "Ocultar" guarda `onboarding_dismissed_at` → Tasks 4, 5 (acción de S11, verificada en la Task 1). El dashboard llama `ensureStarterKitAction()` al cargar, sin try/catch → Task 5 (Step 3). Mostrar solo si `onboarding_dismissed_at` es null y hay pendientes (contrato §2.7) → Task 4.
 - **Marcadores:** ninguno; todo el código está escrito.
-- **Tipos:** `ChecklistInput` (con `hasBudgetAmounts`), `ChecklistItemId` (con `'presupuesto'`), `ChecklistItem`, `computeChecklist`, `loadChecklistInput(supabase: SupabaseClient, userId: string, monthYear?: string)` (el tercer parámetro es opcional: la firma del contrato sigue valiendo), `ensureStarterKitAction(): Promise<{ seeded: boolean; error?: string }>`, `dismissChecklistAction(): Promise<void>` idénticos al contrato §2.7 + §5.2. `loadDashboardChecklist` es el extra aceptado en §5.2 y solo lo usa `page.tsx`.
+- **Tipos:** `ChecklistInput` (con `hasBudgetAmounts`), `ChecklistItemId` (con `'presupuesto'`), `ChecklistItem`, `computeChecklist`, `loadChecklistInput(supabase: SupabaseClient, userId: string, monthYear?: string)` (el tercer parámetro es opcional: la firma del contrato sigue valiendo), `ensureStarterKitAction(): Promise<{ seeded: boolean; error?: string }>`, `dismissChecklistAction(): Promise<{ ok: boolean }>` idénticos al contrato §2.7 + §5.2. `loadDashboardChecklist` es el extra aceptado en §5.2 y solo lo usa `page.tsx`.
 - **Historias previas (§5.3):** S12 cierra el flujo APP; S10 y S11 ya dejaron las dos acciones y la Task 1 solo las verifica. S09 (flujo SEG) no está en este worktree: sin sus columnas, la checklist no se muestra (probado en la Task 4).
 - **Limitación resuelta en v2:** el ítem `'alertas'` salía hecho desde el primer día (el kit siembra `alerts_enabled = true` en 7 rubros); §5.2 lo reemplaza por `'presupuesto'`, que el kit deja pendiente (rubros en 0).
+
+## Desviaciones (implementación)
+
+- **Rutas:** los comandos del plan usan `/Users/migue/Repos/personal/PresupuestoApp`; se corrieron en el worktree `PresupuestoApp-app`.
+- **Task 1:** `onboarding.test.ts` tiene 36 tests (no 31): S11 agregó más casos. `dismissChecklistAction` ya devuelve `Promise<{ ok: boolean }>` (§5.2), no `Promise<void>`.
+- **Commits:** con `--no-verify` y `bunx eslint` + `bunx prettier --check` manuales antes de cada commit (instrucción del orquestador), no con lint-staged.
+- **Task 5, kit solo con la bienvenida pendiente (orquestador, tras S09):** `page.tsx` lee `profiles.onboarding_completed_at` y llama `ensureStarterKitAction()` solo si es `null`. Si ya terminó la bienvenida no la llama (el kit reactivaría categorías borradas a propósito); si la lectura falla (columna sin migrar) o no hay fila, tampoco. Reemplaza el criterio "en cada carga". Probado en `src/app/dashboard/page.test.tsx` (tres ramas + sin fila + sin sesión + orden kit → checklist).
+- **Task 5, "Ocultar" con `{ ok: false }`:** la lógica va en `hideChecklist` (`checklist.ts`, con `DISMISS_ERROR_MESSAGE`), con dependencias inyectadas y tests: oculta al instante, y restaura con toast si la acción devuelve `{ ok: false }` o lanza. El componente solo la conecta (sin `useTransition`).
+- **Task 5, tests de componente:** S11 habilitó JSX en vitest (oxc), así que `OnboardingChecklist.render.test.tsx` renderiza con `renderToStaticMarkup` y verifica el cableado con `hideChecklist`; `page.test.tsx` además verifica por texto que `DashboardContent` pinta la checklist encima de las acciones rápidas.
+- **Task 5, `createClient`:** la página crea el cliente una vez y lo usa para el perfil y para `loadDashboardChecklist`; compila sin el cast alternativo.
+- **Ronda de revisión 1:**
+  - `loadDashboardChecklist(supabase, userId, perfil)` recibe el perfil ya leído: `page.tsx` hace una sola lectura de `profiles` (`onboarding_completed_at, onboarding_dismissed_at`) en vez de dos en serie. Con error o sin fila le pasa `null` (no se muestra). No se paraleliza con el kit: el kit depende de esa lectura y la checklist cuenta la cuenta Efectivo que crea el kit.
+  - Ítem `documento`: el conteo agrega `neq('documento', '')` (un documento vacío no es cédula). La cédula se carga por número en `DocumentosDianPanel` (Ajustes), que exige un número vinculado; sin número el texto del ítem dice "(primero vincula WhatsApp)". Se mantienen los 5 ítems (el contrato fija los ids).
+  - Tests de componente por comportamiento: `OnboardingChecklist.render.test.tsx` captura el `onClick` de "Ocultar" (Button simulado) y registra los cambios de `oculta` (`useState` envuelto): oculta al instante, restaura con toast si `ok: false` o si lanza. `DashboardContent.render.test.tsx` renderiza el dashboard con datos simulados y verifica la tarjeta en el HTML. Sin Testing Library (§5.0: sin DOM), así que "desaparece" se prueba por el estado pedido, no por un re-render.
+  - `page.test.tsx` restaura los spies en `afterEach`.
+
+## Alcance adicional (deuda de S11, instrucción del orquestador)
+
+- [x] **Extra 1 — el paso 2 del wizard envía solo lo que cambió** (arreglo arrastrado de S11, fuera del alcance de la checklist; va en su propio commit `43d1bbd`): `montosCambiados(cargados, montos)` y `saveBudgetStep({ montos, cargados, save, notify })` en `src/lib/onboarding/wizard-steps.ts` (tests: solo los editados, sin cambios no llama la acción; los tests viejos pasan `cargados: {}`). `OnboardingWizard` guarda `montosGuardados` (inicial = lo cargado; tras guardar = lo enviado) y lo pasa como `cargados` (test de cableado). Así no se pisan montos editados en otra pestaña ni los decimales que llegaron redondeados.
+- [x] **Extra 2 — notas de desviación que faltaban en `S11-bienvenida.md`** (Tasks 3, 5, 7 y 8).
+

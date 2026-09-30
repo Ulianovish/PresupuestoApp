@@ -26,7 +26,11 @@ describe('handleLinkingMessage', () => {
     const reply = await handleLinkingMessage(TEL, 'VINCULAR 482913', d);
     expect(d.reserveLinkAttempt).toHaveBeenCalledWith(TEL);
     expect(d.redeemLinkCode).toHaveBeenCalledWith('482913', TEL);
-    expect(reply).toContain('vinculado');
+    expect(reply).toBe(
+      '¡Listo! Tu número quedó vinculado. Ya puedes mandarme una foto de la ' +
+        'factura, el código CUFE o escribir algo como «40 mil almuerzo». ' +
+        'También puedes preguntarme «¿cuánto llevo en mercado?».',
+    );
     expect(d.getLinkByPhone).not.toHaveBeenCalled();
     expect(d.releaseLinkAttempt).toHaveBeenCalledWith(7);
   });
@@ -185,7 +189,9 @@ describe('handleLinkingMessage', () => {
       getLinkByPhone: vi.fn().mockResolvedValue({ userId: 'u1' }),
     });
     const reply = await handleLinkingMessage(TEL, 'hola', d);
-    expect(reply.toLowerCase()).toContain('vinculado');
+    expect(reply).toBe(
+      'Este número ya está vinculado. Ya puedes mandarme tus gastos.',
+    );
   });
 
   it('número NO vinculado y mensaje cualquiera → instrucciones de vinculación', async () => {

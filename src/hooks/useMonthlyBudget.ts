@@ -38,7 +38,6 @@ export interface UseMonthlyBudgetReturn {
     updates: Partial<Omit<BudgetItem, 'id'>>,
   ) => Promise<boolean>;
   deleteBudgetItem: (itemId: string) => Promise<boolean>;
-  initializeMonth: (monthYear: string) => Promise<boolean>;
 }
 
 /**
@@ -82,35 +81,6 @@ export function useMonthlyBudget(monthYear: string): UseMonthlyBudgetReturn {
       setIsLoading(false);
     }
   }, []);
-
-  /**
-   * Inicializa un nuevo mes de presupuesto
-   */
-  const initializeMonth = useCallback(
-    async (month: string): Promise<boolean> => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const templateId = await createMonthlyBudget(month);
-
-        if (templateId) {
-          await loadBudgetData(month);
-          return true;
-        } else {
-          setError('Error al crear el presupuesto mensual');
-          return false;
-        }
-      } catch (err) {
-        console.error('Error inicializando mes:', err);
-        setError('Error al inicializar el presupuesto mensual');
-        return false;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [loadBudgetData],
-  );
 
   /**
    * Refresca los datos del presupuesto usando el mes actual del parámetro
@@ -385,6 +355,5 @@ export function useMonthlyBudget(monthYear: string): UseMonthlyBudgetReturn {
     addBudgetItem,
     editBudgetItem,
     deleteBudgetItem: deleteBudgetItemHandler,
-    initializeMonth,
   };
 }

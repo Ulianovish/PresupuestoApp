@@ -1,107 +1,121 @@
 /**
  * BudgetStatusPanels - Organism Level
  *
- * Organism que maneja todos los paneles de estado para la página de presupuesto:
- * - Panel de error
- * - Panel de carga
- * - Panel de estado vacío
+ * Paneles de estado de /presupuesto: error, carga y "sin categorías".
+ * Qué panel se pinta lo decide getBudgetPanelState
+ * (src/lib/onboarding/budget-empty-state.ts).
  *
- * @param isLoading - Estado de carga
- * @param error - Mensaje de error (si existe)
- * @param hasData - Si hay datos para mostrar
- * @param selectedMonth - Mes seleccionado
- * @param selectedMonthLabel - Etiqueta del mes seleccionado
- * @param onCreateBudget - Función para crear presupuesto nuevo
+ * Sin categorías activas no hay presupuesto posible, así que el panel vacío
+ * ofrece las dos salidas: cargar las categorías sugeridas
+ * (ensureStarterKitAction) o crear una a mano (el CategoryModal de la página,
+ * que también crea el rubro por defecto del mes).
  *
  * @example
  * <BudgetStatusPanels
  *   isLoading={false}
- *   error="Error al cargar datos"
- *   hasData={false}
- *   selectedMonth="2025-07"
- *   selectedMonthLabel="Julio 2025"
- *   onCreateBudget={handleCreateBudget}
+ *   error={null}
+ *   categoryCount={0}
+ *   selectedMonthLabel="Septiembre 2026"
+ *   onCreateCategory={() => setShowCategoryModal(true)}
+ *   onLoadStarterKit={handleLoadStarterKit}
+ *   isLoadingStarterKit={false}
  * />
  */
 
 import React from 'react';
 
-import { AlertCircle, Database, RefreshCw } from 'lucide-react';
+import { AlertCircle, FolderPlus, RefreshCw, Sparkles } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
 import Card from '@/components/atoms/Card/Card';
+import { getBudgetPanelState } from '@/lib/onboarding/budget-empty-state';
 
 interface BudgetStatusPanelsProps {
   isLoading: boolean;
   error: string | null;
-  hasData: boolean;
-  selectedMonth: string;
+  /** Categorías activas del usuario (las que devuelve useMonthlyBudget). */
+  categoryCount: number;
   selectedMonthLabel: string;
-  onCreateBudget: (month: string) => void;
+  /** Abre el CategoryModal de la página. */
+  onCreateCategory: () => void;
+  /** Llama ensureStarterKitAction y recarga el presupuesto. */
+  onLoadStarterKit: () => void;
+  isLoadingStarterKit: boolean;
 }
 
 export default function BudgetStatusPanels({
   isLoading,
   error,
-  hasData,
-  selectedMonth,
+  categoryCount,
   selectedMonthLabel,
-  onCreateBudget,
+  onCreateCategory,
+  onLoadStarterKit,
+  isLoadingStarterKit,
 }: BudgetStatusPanelsProps) {
-  return (
-    <>
-      {/* Panel de error */}
-      {error && (
-        <Card variant="glass" className="p-6 border-red-500/20">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-400 mt-1" />
-            <div>
-              <h3 className="text-lg font-semibold text-red-400 mb-1">Error</h3>
-              <p className="text-gray-300">{error}</p>
-            </div>
-          </div>
-        </Card>
-      )}
+  const state = getBudgetPanelState({ isLoading, error, categoryCount });
 
-      {/* Panel de carga */}
-      {isLoading && (
-        <Card variant="glass" className="p-8">
-          <div className="flex items-center justify-center gap-3">
-            <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
-            <span className="text-gray-300 text-lg">
-              Cargando presupuesto...
-            </span>
+  if (state === 'error') {
+    return (
+      <Card variant="glass" className="p-6 border-red-500/20">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-400 mt-1" />
+          <div>
+            <h3 className="text-lg font-semibold text-red-400 mb-1">Error</h3>
+            <p className="text-gray-300">{error}</p>
           </div>
-        </Card>
-      )}
+        </div>
+      </Card>
+    );
+  }
 
-      {/* Panel de estado vacío */}
-      {!isLoading && !hasData && !error && (
-        <Card variant="glass" className="p-8 text-center">
-          <div className="text-gray-400 mb-4">
-            <Database className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <h3 className="text-lg font-semibold mb-2">
-              No hay datos para este mes
-            </h3>
-            <p className="text-sm">
-              {selectedMonth === '2025-07'
-                ? 'Usa el botón "Migrar Datos de Julio" para empezar con datos de ejemplo.'
-                : `No hay presupuesto creado para ${selectedMonthLabel}. Puedes crear uno nuevo.`}
-            </p>
-          </div>
+  if (state === 'loading') {
+    return (
+      <Card variant="glass" className="p-8">
+        <div className="flex items-center justify-center gap-3">
+          <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
+          <span className="text-gray-300 text-lg">Cargando presupuesto...</span>
+        </div>
+      </Card>
+    );
+  }
 
-          {/* Botón para crear presupuesto nuevo (solo si no es julio) */}
-          {selectedMonth !== '2025-07' && (
-            <Button
-              variant="gradient"
-              onClick={() => onCreateBudget(selectedMonth)}
-              className="mt-4"
-            >
-              Crear Presupuesto para {selectedMonthLabel}
-            </Button>
-          )}
-        </Card>
-      )}
-    </>
-  );
+  if (state === 'sin-categorias') {
+    return (
+      <Card variant="glass" className="p-8 text-center">
+        <div className="text-gray-400 mb-4">
+          <FolderPlus className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <h3 className="text-lg font-semibold mb-2">
+            Aún no tienes categorías
+          </h3>
+          <p className="text-sm">
+            Para armar el presupuesto de {selectedMonthLabel} necesitas al menos
+            una categoría. Carga las sugeridas (vivienda, mercado, transporte,
+            salud, deudas y otros) o crea la tuya.
+          </p>
+        </div>
+
+        <div className="mt-4 flex flex-col sm:flex-row gap-3 justify-center">
+          <Button
+            variant="gradient"
+            onClick={onLoadStarterKit}
+            loading={isLoadingStarterKit}
+            disabled={isLoadingStarterKit}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Cargar categorías sugeridas
+          </Button>
+          <Button
+            variant="glass"
+            onClick={onCreateCategory}
+            disabled={isLoadingStarterKit}
+          >
+            <FolderPlus className="w-4 h-4 mr-2" />
+            Crear categoría
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  return null;
 }

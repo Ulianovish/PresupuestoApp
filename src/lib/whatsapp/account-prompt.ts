@@ -381,7 +381,7 @@ export async function manejarEleccionCuenta(
 }
 
 /**
- * El usuario escribió el nombre en vez de tocar la lista ("Nequi Milo"). Solo
+ * El usuario escribió el nombre en vez de tocar la lista ("Nequi Coco"). Solo
  * se toma como respuesta si hay una pregunta abierta y el mensaje es un
  * nombre de cuenta corto, sin monto: "40k huevos" sigue yendo al agente.
  * Devuelve true si lo manejó (el llamador no tiene que pasarlo al agente).

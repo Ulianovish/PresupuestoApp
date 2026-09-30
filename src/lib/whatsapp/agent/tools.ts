@@ -87,7 +87,7 @@ export function resolverCuenta(
 /**
  * Cuentas cuyo nombre tiene alguna palabra distintiva (4+ letras) que aparece
  * en el texto libre: "con la Davivienda" → Davivienda y TC Davivienda. Varias
- * candidatas = ambigua (p. ej. "nequi" → Nequi Migue y Nequi Milo); la lista
+ * candidatas = ambigua (p. ej. "nequi" → Nequi Bruno y Nequi Coco); la lista
  * de cuentas del bot las pone primero para que el usuario elija.
  *
  * Vive acá (y no en `handle-image.ts`, que la usa) para que el agente también
@@ -277,7 +277,7 @@ export interface ToolDeps {
      * Presente cuando el usuario no dijo la cuenta (o nombró una ambigua): el
      * gasto se registra con la por defecto y el turno manda después la lista
      * de WhatsApp para elegir la real. `candidatas` = lo que matcheó lo que
-     * nombró (nequi → Nequi Migue, Nequi Milo), para ponerlas primero.
+     * nombró (nequi → Nequi Bruno, Nequi Coco), para ponerlas primero.
      */
     cuentaPorDefinir?: { candidatas: string[] };
   }) => Promise<{
@@ -367,7 +367,7 @@ export async function executeTool(
 ): Promise<ToolOutcome> {
   try {
     if (name === 'registrar_gasto') {
-      // Una cuenta que nombra a varias ("nequi" con Nequi Migue y Nequi Milo)
+      // Una cuenta que nombra a varias ("nequi" con Nequi Bruno y Nequi Coco)
       // no frena el gasto: se registra con la por defecto y la lista de
       // WhatsApp le pregunta al usuario con esas candidatas primero. Una
       // palabra que apunta a UNA sola cuenta ("la davivienda") se usa. Una
