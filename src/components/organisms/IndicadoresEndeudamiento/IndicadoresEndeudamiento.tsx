@@ -6,7 +6,7 @@
  *
  *   - % del ingreso destinado a deudas de consumo (tarjetas de crédito)
  *   - % del ingreso destinado a deudas de activos
- *   - % del ingreso destinado a todas las deudas
+ *   - Índice de flujo de deuda: % del ingreso que se va en cuotas de crédito
  *
  * Debajo de cada porcentaje se deja a la vista la división que lo produce,
  * para que el número sea auditable de un vistazo.
@@ -23,8 +23,19 @@ import Card, {
 } from '@/components/atoms/Card/Card';
 import {
   alertasEndeudamiento,
+  mensajeFlujoDeuda,
+  nivelFlujoDeuda,
+  FLUJO_DEUDA_SANO,
   type IndicadoresEndeudamiento as Indicadores,
 } from '@/lib/indicadores-endeudamiento';
+
+/** Colores del índice de flujo de deuda según su nivel. */
+const COLOR_NIVEL = {
+  sano: { texto: 'text-emerald-400', borde: 'border-emerald-500/40' },
+  atencion: { texto: 'text-amber-400', borde: 'border-amber-500/40' },
+  riesgo: { texto: 'text-red-400', borde: 'border-red-500/50' },
+  'sin-dato': { texto: 'text-white', borde: 'border-white/10' },
+} as const;
 
 interface IndicadoresEndeudamientoProps {
   indicadores: Indicadores;
@@ -106,14 +117,38 @@ export default function IndicadoresEndeudamiento({
             ingresoNeto={ingresoNeto}
             formatCurrency={formatCurrency}
           />
-          <Indicador
-            titulo="Del ingreso a todas las deudas"
-            porcentaje={indicadores.porcentajeTotal}
-            numerador={pagosTotales}
-            ingresoNeto={ingresoNeto}
-            formatCurrency={formatCurrency}
-          />
         </div>
+
+        {/* Índice de flujo de deuda: la misma división (cuotas / ingreso) que
+            miran los bancos para decidir si hay capacidad de pago. */}
+        {(() => {
+          const nivel = nivelFlujoDeuda(indicadores.porcentajeTotal);
+          const color = COLOR_NIVEL[nivel];
+          return (
+            <div
+              className={`mt-4 rounded-lg border ${color.borde} bg-white/5 p-4`}
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm text-gray-300">
+                  Índice de Flujo de Deuda
+                </p>
+                <p className={`text-3xl font-bold ${color.texto}`}>
+                  {indicadores.porcentajeTotal === null
+                    ? '—'
+                    : `${indicadores.porcentajeTotal.toFixed(1)} %`}
+                </p>
+              </div>
+              <p className="mt-1 text-xs text-gray-400">
+                {formatCurrency(pagosTotales)} en cuotas /{' '}
+                {ingresoNeto > 0 ? formatCurrency(ingresoNeto) : 'sin ingreso'}{' '}
+                de ingreso · máximo recomendado {FLUJO_DEUDA_SANO} %
+              </p>
+              <p className={`mt-2 text-xs ${color.texto}`}>
+                {mensajeFlujoDeuda(nivel)}
+              </p>
+            </div>
+          );
+        })()}
 
         {ingresoNeto <= 0 && (
           <p className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">

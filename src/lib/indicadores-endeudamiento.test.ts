@@ -3,6 +3,8 @@ import { describe, it, expect } from 'vitest';
 import {
   alertasEndeudamiento,
   calcularIndicadores,
+  mensajeFlujoDeuda,
+  nivelFlujoDeuda,
   esDeudaDeConsumo,
   ingresoNetoDelMes,
   type DeudaParaIndicador,
@@ -164,5 +166,45 @@ describe('alertasEndeudamiento', () => {
   it('con los datos de agosto 2026 aparece la alerta', () => {
     const r = calcularIndicadores(DEUDAS, 17750000);
     expect(alertasEndeudamiento(r).map(a => a.id)).toEqual(['consumo-alto']);
+  });
+});
+
+describe('nivelFlujoDeuda', () => {
+  it('hasta 30 % es sano', () => {
+    expect(nivelFlujoDeuda(0)).toBe('sano');
+    expect(nivelFlujoDeuda(29.9)).toBe('sano');
+    expect(nivelFlujoDeuda(30)).toBe('sano');
+  });
+
+  it('entre 30 y 40 pide atención', () => {
+    expect(nivelFlujoDeuda(30.1)).toBe('atencion');
+    expect(nivelFlujoDeuda(39.9)).toBe('atencion');
+  });
+
+  it('desde 40 es alto riesgo', () => {
+    expect(nivelFlujoDeuda(40)).toBe('riesgo');
+    expect(nivelFlujoDeuda(61.8)).toBe('riesgo');
+  });
+
+  it('sin ingreso del mes no hay nivel', () => {
+    expect(nivelFlujoDeuda(null)).toBe('sin-dato');
+  });
+
+  it('el ejemplo de la banca: 2 millones sobre 5 da 40 %', () => {
+    const r = calcularIndicadores(
+      [{ tipo: 'deuda', valor_cuota: 2000000, es_activo: true, pagada: false }],
+      5000000,
+    );
+    expect(r.porcentajeTotal).toBe(40);
+    expect(nivelFlujoDeuda(r.porcentajeTotal)).toBe('riesgo');
+  });
+});
+
+describe('mensajeFlujoDeuda', () => {
+  it('explica cada nivel', () => {
+    expect(mensajeFlujoDeuda('riesgo')).toContain('alto riesgo');
+    expect(mensajeFlujoDeuda('atencion')).toContain('30');
+    expect(mensajeFlujoDeuda('sano')).toContain('manejable');
+    expect(mensajeFlujoDeuda('sin-dato')).toContain('Falta el ingreso');
   });
 });
