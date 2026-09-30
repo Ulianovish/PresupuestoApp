@@ -36,4 +36,4 @@ Alineado con contratos v2 (§5). Escrito por el orquestador (sin planificador): 
 - [x] **T2 — Aviso de CONTACT_EMAIL.** Cambia el test de `legal.test.ts` que espera que lance en producción: ahora espera `console.warn` (con `vi.spyOn(console, 'warn')`) y que no lance. Rojo → cambia `assertContactEmailReady` → verde. Commit.
 - [x] **T3 — Deuda S05** (CA5–CA8), un commit por criterio o uno solo si son pequeños.
 - [x] **T4 — ADR-004 y limpieza** (CA9). Commit de docs.
-- [ ] **T5 — Verificación.** `bun run test && bun run type-check` en verde; árbol limpio.
+- [x] **T5 — Verificación.** `bun run test && bun run type-check` en verde; árbol limpio.
