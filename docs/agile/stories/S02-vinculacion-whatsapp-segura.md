@@ -23,7 +23,7 @@
 - Tests: el cliente Supabase siempre mockeado (`vi.mock('@/lib/supabase/server', …)`), ninguno toca una base real. Datos de prueba: teléfono `+573000000000`, ids `user-1`/`otro`. Nunca loguear el número ni el código: solo `error.code`.
 - Textos para el usuario en español colombiano con tuteo.
 - Verificación: `bun run test <archivo>` por tarea; al final `bun run test && bun run type-check`.
-- Commits en español terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Todos los commits de esta historia tocan `src/`, así que van **sin** `--no-verify`.
+- Commits en español terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Todos los commits van **con** `--no-verify` (regla del orquestador: husky/lint-staged puede descartar cambios); antes de cada commit que toca `src/` se corren `bunx eslint` y `bunx prettier --check` sobre los archivos tocados.
 - No se toca `src/lib/actions/whatsapp.ts` (es de S13): `createLinkCode(user.id)` sigue funcionando con la firma nueva porque el segundo parámetro es opcional.
 
 ## Archivos
@@ -55,7 +55,7 @@
 
 - **Por qué la revinculación se decide con `whatsapp_conversations.user_id`.** En el webhook, un número ya vinculado nunca entra al flujo de vinculación (sus mensajes van al agente). Un número solo cambia de dueño después de desvincularse (S13 agrega el botón), y en ese momento la fila de `whatsapp_links` del dueño anterior ya no existe. Por eso el borrado es `DELETE FROM whatsapp_conversations WHERE phone_e164 = <n> AND user_id <> <nuevo>`: cubre ese caso y el de un upsert directo, y conserva la conversación si el dueño es el mismo.
 - **Por qué el límite deja pasar si la base falla.** El código puede llegar a producción antes de que se aplique la migración (H8). Si `whatsapp_link_attempts` no existe, bloquear dejaría a todos sin poder vincular. Por eso `reserveLinkAttempt` deja pasar ante un error y `releaseLinkAttempt` nunca lanza; ambos loguean solo `error.code`.
-- **Ronda de corrección 1 (revisión).** El límite pasó de «contar y luego registrar el fallo» (dos pasos: una ráfaga en paralelo de `VINCULAR` desde el mismo número pasaba el conteo N veces) a **reservar antes de canjear**: `reserveLinkAttempt` purga las filas del número anteriores a la ventana (la tabla no crece sin límite), inserta el intento y cuenta la ventana con él incluido; con más de 5 borra su reserva y responde `MSG_TOO_MANY_ATTEMPTS`. Si el canje sale bien o falla por la base (`link_failed`), `handleLinkingMessage` libera la reserva con `releaseLinkAttempt`; con `invalid_or_expired` la fila queda como el fallo. Además, si `redeemLinkCode` falla después de consumir el código (conversación o upsert), lo devuelve a pendiente (best-effort) para que el mismo `VINCULAR` se pueda reintentar. Las secciones de tareas de abajo conservan el diseño original como historia.
+- **Ronda de corrección 1 (revisión).** El límite pasó de «contar y luego registrar el fallo» (dos pasos: una ráfaga en paralelo de `VINCULAR` desde el mismo número pasaba el conteo N veces) a **reservar antes de canjear**: `reserveLinkAttempt` purga las filas anteriores a la ventana (en S03 pasó a borrar las de **todos** los números, no solo las del que escribe, para que la tabla no crezca con números que no vuelven), inserta el intento y cuenta la ventana con él incluido; con más de 5 borra su reserva y responde `MSG_TOO_MANY_ATTEMPTS`. Si el canje sale bien o falla por la base (`link_failed`), `handleLinkingMessage` libera la reserva con `releaseLinkAttempt`; con `invalid_or_expired` la fila queda como el fallo. Además, si `redeemLinkCode` falla después de consumir el código (conversación o upsert), lo devuelve a pendiente (best-effort) para que el mismo `VINCULAR` se pueda reintentar. Las secciones de tareas de abajo conservan el diseño original como historia.
 - **Por qué `link_failed`.** Antes cualquier error del canje devolvía `invalid_or_expired`. Ahora ese resultado suma un intento fallido al número, así que un error de base (que no es culpa de quien escribe) se separa en `link_failed`. El mensaje al usuario sigue siendo `MSG_CODE_INVALID` en ambos casos.
 - **Los intentos bloqueados no se registran.** Así, quien espera 15 minutos vuelve a poder intentar, como dice el mensaje.
 
@@ -913,6 +913,8 @@ EOF
 
 ### Task 4: Límite de intentos fallidos por número en el servicio
 
+> **Reemplazada en la ronda de corrección 1.** `isLinkAttemptLimitReached` y `recordFailedLinkAttempt` ya no existen: se reemplazaron por `reserveLinkAttempt` (reserva el intento antes de canjear, cuenta la ventana con él incluido y rechaza con más de 5) y `releaseLinkAttempt` (borra la reserva si el canje salió bien o falló por la base). El texto de abajo conserva el diseño original como historia; ver «Notas de diseño → Ronda de corrección 1».
+
 **Files:**
 - Modify: `src/lib/services/whatsapp-links.ts` (comentario de cabecera y funciones nuevas al final)
 - Test: `src/lib/services/whatsapp-links.test.ts`
@@ -1581,6 +1583,15 @@ Si algún paso falla, corregir en la tarea correspondiente y hacer un commit nue
 - [x] **Step 1:** Test: el guard de `20260930100000` usa `auth.uid() IS DISTINCT FROM p_user_id` (un `p_user_id` NULL es "no autorizado") y la verificación manual trae el caso 7b y la huella `md5(prosrc)`. Verificado que falla.
 - [x] **Step 2:** Migración `20260930100000` (sin aplicar): guard con `IS DISTINCT FROM` en las 3 funciones; paso 0 `SELECT proname, md5(prosrc) …`; caso 7b (plantilla real de otro usuario como fuente y como destino, `BEGIN/ROLLBACK`, esperado 42501). Contratos §0 actualizados. Test en verde.
 - [x] **Step 3:** Commit.
+
+### Deuda cerrada en S03 (alcance adicional del orquestador)
+
+- [x] La purga best-effort de `whatsapp_link_attempts` borra todas las filas anteriores a la ventana (`delete().lt('created_at', desde)`, sin filtro por número).
+- [x] Si el canje da `invalid_or_expired` pero el número ya está vinculado (`getLinkByPhone`; reintento de Twilio tras un timeout), `handleLinkingMessage` libera la reserva y responde `MSG_LINKED_OK`. Si esa consulta falla, responde `MSG_CODE_INVALID` y el intento cuenta.
+
+## Riesgos aceptados
+
+- **Sin límite global multi-número.** El límite de 5 intentos en 15 minutos es por número. Alguien con muchos números (o que falsifique el remitente, cosa que la firma de Twilio impide) podría probar más códigos en total. Con códigos de 6 dígitos que vencen en 10 minutos el riesgo es bajo; queda en el backlog.
 
 ---
 
