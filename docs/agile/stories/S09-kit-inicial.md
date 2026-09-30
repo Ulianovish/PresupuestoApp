@@ -956,3 +956,15 @@ EOF
 - **Marcadores:** ninguno; todo el SQL y el TS están completos.
 - **Consistencia:** los nombres coinciden con contratos §1.2/§1.3/§5.1 y con lo que consumirán S10–S12 (`rpc('ensure_starter_kit')` devuelve `boolean` → `{ seeded: boolean; error?: string }` de §5.2; `onboarding_completed_at`/`onboarding_dismissed_at`). Los textos que el test busca son exactamente los del SQL tras colapsar espacios (`squash`); el SQL no tiene `--` dentro de cadenas (los `->>` de jsonb no lo contienen), así que quitar comentarios no altera código.
 - **Dependencias:** en el flujo SEG va después de S03 (§5.3); no depende de sus archivos. No toca `src/lib/onboarding/`. La verificación manual 5 menciona S03 solo por si su trigger de allowlist ya está aplicado.
+
+---
+
+## Deuda cerrada en S09b
+
+Recarga del kit robusta (la migración `20260930130000` aún no está aplicada, así que se edita en sitio). Test de texto en `src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`, TDD y un commit por punto.
+
+- [x] **1. Plantilla del mes:** `ON CONFLICT (user_id, month_year) DO UPDATE SET is_active = true` (antes `DO NOTHING`); el id se sigue leyendo con el `SELECT` posterior.
+- [ ] **2. Rubros inactivos:** los rubros del kit que ya existen inactivos en la plantilla (misma categoría + `lower(name)`) se reactivan con un `UPDATE` antes del `INSERT … NOT EXISTS`.
+- [ ] **3. Categorías por `upper(btrim(name))`:** antes del `INSERT` se reactivan las categorías del usuario que coinciden con una del kit; solo se insertan las que no existen con ese criterio (no se duplica `Vivienda` vs `VIVIENDA`). Los rubros usan esas categorías por id.
+- [ ] **4. Verificación manual:** caso con plantilla y un rubro del kit inactivos + categoría `Vivienda` en minúsculas → recargar → todo reactivado, sin duplicados.
+- [ ] **5. Global Constraints:** commits siempre con `git commit --no-verify`; antes de cada commit que toque `src/`, `bunx eslint` y `bunx prettier --check`.

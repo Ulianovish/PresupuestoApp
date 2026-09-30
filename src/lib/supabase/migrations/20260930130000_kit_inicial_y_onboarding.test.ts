@@ -227,11 +227,12 @@ describe('migración 20260930130000: _seed_starter_kit', () => {
     );
   });
 
-  it('crea la plantilla del mes con ON CONFLICT y toma su id', () => {
+  it('crea la plantilla del mes (o la reactiva si estaba inactiva) y toma su id', () => {
     const body = seed();
     expect(body).toContain(
-      "INSERT INTO public.budget_templates (user_id, name, month_year, is_active) VALUES (p_user_id, 'Presupuesto ' || p_month_year, p_month_year, true) ON CONFLICT (user_id, month_year) DO NOTHING;",
+      "INSERT INTO public.budget_templates (user_id, name, month_year, is_active) VALUES (p_user_id, 'Presupuesto ' || p_month_year, p_month_year, true) ON CONFLICT (user_id, month_year) DO UPDATE SET is_active = true;",
     );
+    expect(body).not.toContain('ON CONFLICT (user_id, month_year) DO NOTHING');
     expect(body).toContain(
       'SELECT id INTO v_template_id FROM public.budget_templates WHERE user_id = p_user_id AND month_year = p_month_year;',
     );

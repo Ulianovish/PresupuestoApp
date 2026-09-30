@@ -154,10 +154,11 @@ BEGIN
           AND lower(btrim(a.name)) = 'efectivo'
     );
 
-    -- Plantilla del mes (único: idx_budget_templates_user_month)
+    -- Plantilla del mes (único: idx_budget_templates_user_month). Si ya existía
+    -- inactiva, se reactiva: recargar el kit no deja rubros en una plantilla apagada.
     INSERT INTO public.budget_templates (user_id, name, month_year, is_active)
     VALUES (p_user_id, 'Presupuesto ' || p_month_year, p_month_year, true)
-    ON CONFLICT (user_id, month_year) DO NOTHING;
+    ON CONFLICT (user_id, month_year) DO UPDATE SET is_active = true;
 
     SELECT id INTO v_template_id
     FROM public.budget_templates
