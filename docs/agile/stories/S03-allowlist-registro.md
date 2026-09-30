@@ -18,7 +18,7 @@
 - Migración idempotente (`IF NOT EXISTS`, `CREATE OR REPLACE`, `DROP … IF EXISTS`), con bloque comentado de verificación manual al final.
 - **Ninguna migración se aplica a producción durante la implementación** (tarea humana H8). Ningún agente escribe en la base remota.
 - Datos personales: ningún correo real en SQL, tests ni docs. Solo `usuario@ejemplo.com`, `otro@ejemplo.com`, `no-invitado@ejemplo.com`.
-- Verificación del proyecto: `bun run test && bun run type-check`. Commits de solo docs/SQL: `git commit --no-verify` (husky/lint-staged puede descartar cambios en commits sin archivos de `src/`).
+- Verificación del proyecto: `bun run test && bun run type-check`. Todos los commits van con `git commit --no-verify` (regla del orquestador: husky/lint-staged puede descartar cambios); antes de cada commit que toca `src/` se corren `bunx eslint` y `bunx prettier --check` sobre los archivos tocados.
 - Commits en español, terminados con `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Ejecutar comandos con `builtin cd /Users/migue/Repos/personal/PresupuestoApp && …` (o la ruta del worktree asignado).
 - Dependencia: S01 (`20260930100000`) va antes en la serie de migraciones; S03 no toca sus archivos.
@@ -250,10 +250,10 @@ Expected: PASS (8 tests).
 
 - [x] **Step 5: Commit**
 
-El commit incluye un archivo de `src/`, así que va sin `--no-verify` (lint-staged formatea el test).
+Va con `--no-verify` (regla del orquestador); antes se corren `bunx eslint` y `bunx prettier --check` sobre el test.
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit --no-verify -m "$(cat <<'EOF'
 feat(auth): tabla signup_allowlist, is_signup_allowed y backfill de usuarios
 
 Primera parte de S03: la allowlist vive en una tabla con RLS y sin acceso
@@ -372,7 +372,7 @@ Expected: PASS (13 tests).
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit --no-verify -m "$(cat <<'EOF'
 feat(auth): hook Before User Created que rechaza correos sin invitación
 
 hook_before_user_created devuelve '{}' si el correo está en la allowlist y
@@ -483,8 +483,11 @@ Agregar al final de `supabase/migrations/20260930120000_signup_allowlist.sql`:
 
 -- 5) Trigger de respaldo. Protege antes de activar el hook (H5) y cubre
 --    auth.admin.createUser / "Add user" del dashboard, que no llaman al hook.
---    El cliente ve 'Database error saving new user' (translateAuthError lo
---    traduce). Con el hook activo, un correo no invitado nunca llega aquí.
+--    El cliente ve 'Database error saving new user'; lo traducirá
+--    translateAuthError, que llega con S04 (§2.2): hasta entonces se ve el
+--    mensaje crudo en inglés. Con el hook activo, un correo no invitado nunca
+--    llega aquí. También rechaza toda alta sin email (teléfono, anónimo),
+--    incluso desde auth.admin: es intencional (riesgo aceptado en S03).
 CREATE OR REPLACE FUNCTION public.enforce_signup_allowlist()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -550,7 +553,7 @@ Expected: PASS (22 tests).
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit --no-verify -m "$(cat <<'EOF'
 feat(auth): trigger de respaldo de la allowlist en auth.users
 
 enforce_signup_allowlist (BEFORE INSERT) rechaza con 'signup_not_allowed'
@@ -700,6 +703,21 @@ Requisito: la migración `20260930120000_signup_allowlist.sql` ya está aplicada
    Esperado con el hook activo: `HTTP 403` y `signup_not_allowed` en el cuerpo.
    Si sale `HTTP 500` con `Database error saving new user`, el hook no está activo y rechazó el trigger de respaldo: revisar los pasos 2–6.
 8. Opcional: Authentication → Logs, filtrar por `before-user-created` para ver la llamada.
+
+---
+
+## Riesgos aceptados y pendientes (ronda de corrección 1)
+
+- **El trigger bloquea toda alta sin email.** `enforce_signup_allowlist` rechaza cualquier INSERT en `auth.users` con `email` NULL o vacío (registro por teléfono, anónimo), incluso desde `auth.admin.createUser`. Es intencional: la app solo usa correo y ningún usuario actual es anónimo. Si algún día se quiere teléfono o anónimos, hay que cambiar el trigger y el hook.
+- **Mensaje crudo hasta S04.** El rechazo del trigger llega como `Database error saving new user` (`unexpected_failure`); lo traduce `translateAuthError` (contratos §2.2), que llega con S04. Hasta entonces, quien no está invitado y entra por un camino que no pasa por el hook ve ese texto en inglés.
+- **El test de la migración es de humo.** Compara texto (con los roles de cada `REVOKE` en cualquier orden y cualquier alias en el backfill); no ejecuta el SQL. El comportamiento real queda en los 6 bloques de verificación manual del final del `.sql`.
+- **Pendiente de H8 — resultado de la verificación manual** (anotar aquí al aplicar la migración):
+  - [ ] 1) RLS activo y sin políticas.
+  - [ ] 2) Privilegios de tabla, funciones y esquema.
+  - [ ] 3) Backfill: ningún usuario existente fuera.
+  - [ ] 4) Hook: `{}` para el invitado, 403 `signup_not_allowed` para el que no.
+  - [ ] 5) Triggers de `auth.users`: `enforce_signup_allowlist` y `on_auth_user_created`.
+  - [ ] 6) Advisors: solo `rls_enabled_no_policy` (INFO) para `signup_allowlist`.
 
 ---
 

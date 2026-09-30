@@ -1586,8 +1586,8 @@ Si algún paso falla, corregir en la tarea correspondiente y hacer un commit nue
 
 ### Deuda cerrada en S03 (alcance adicional del orquestador)
 
-- [x] La purga best-effort de `whatsapp_link_attempts` borra todas las filas anteriores a la ventana (`delete().lt('created_at', desde)`, sin filtro por número).
-- [x] Si el canje da `invalid_or_expired` pero el número ya está vinculado (`getLinkByPhone`; reintento de Twilio tras un timeout), `handleLinkingMessage` libera la reserva y responde `MSG_LINKED_OK`. Si esa consulta falla, responde `MSG_CODE_INVALID` y el intento cuenta.
+- [x] La purga best-effort de `whatsapp_link_attempts` borra todas las filas anteriores a la ventana (`delete().lt('created_at', desde)`, sin filtro por número). Para que no recorra la tabla entera, la migración `20260930110000` (sin aplicar, H8) agrega el índice `whatsapp_link_attempts_created_idx (created_at)`.
+- [x] Reintento de Twilio tras un timeout: si el código ya no está pendiente, `redeemLinkCode` busca si ESE código lo canjeó en los últimos 2 minutos (`LINK_RETRY_WINDOW_MINUTES`) el mismo usuario al que está vinculado el número; si es así devuelve `already_redeemed_same_link` y `handleLinkingMessage` libera la reserva (una vez) y responde `MSG_LINKED_OK`. En cualquier otro caso (número sin vínculo, código ajeno o inexistente, error al consultar) es `invalid_or_expired`: el intento cuenta y la respuesta es `MSG_CODE_INVALID`. (La primera versión, ronda 1 de S03, aceptaba cualquier código inválido si el número ya estaba vinculado: dejaba probar códigos sin límite y se corrigió.)
 
 ## Riesgos aceptados
 
