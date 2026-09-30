@@ -690,7 +690,7 @@ EOF
 - Produces: firmas públicas sin cambios:
   - `createDefaultBudgetItemForCategory(categoryId: string, categoryName: string, monthYear: string)` → `{ success: boolean; error?: string }`
   - `createBudgetItemInMonth(categoryId: string, name: string, monthYear: string): Promise<{ success: boolean; itemId?: string; error?: string }>`
-  - Nuevo en `createBudgetItemInMonth`: lee el nombre de la categoría con `from('categories').select('name').eq('id', categoryId).eq('user_id', user.id).maybeSingle()`; si no la encuentra usa los valores generales.
+  - Nuevo en `createBudgetItemInMonth`: lee el nombre de la categoría con `from('categories').select('name').eq('id', categoryId).eq('user_id', user.id).maybeSingle()`; ~~si no la encuentra usa los valores generales~~ **(reemplazado, ver Desviaciones: si la consulta falla o la categoría no existe o no es del usuario, devuelve error y no inserta).**
 
 - [x] **Step 1: Write the failing test**
 
@@ -858,6 +858,8 @@ describe('createBudgetItemInMonth', () => {
     expect(mockedResolve).toHaveBeenCalledWith(client, DEUDA);
   });
 
+  // REEMPLAZADO (ver Desviaciones): el test real espera error 'Categoría no
+  // encontrada' y que NO se inserte el rubro. Se deja el texto original abajo.
   it('categoría no encontrada → valores generales, igual crea el rubro', async () => {
     const { client } = clienteFalso({ categoria: null });
 
