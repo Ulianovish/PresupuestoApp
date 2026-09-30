@@ -1253,7 +1253,12 @@ No hay commit en esta tarea.
   - Privacidad: nombres de personas en fixtures y comentarios de `src/` reemplazados por inventados (categoría `NINOS`, cuentas `Bruno` y `Coco`, `ALIMENTACIÓN MASCOTAS`). Solo tests y comentarios; los meses `'Abril'` quedan.
   - `docs/agile/stories/S08-defaults-de-rubros.md` Task 3: el texto de "categoría no encontrada → valores generales" quedó marcado como reemplazado por la desviación.
   - `openAddModal` de `/presupuesto` recibe el nombre de la categoría desde la tarjeta (`BudgetCategoryRow` → `BudgetTable` → página) en vez de buscarlo en `categories`. Test puro (`defaultItemFormNames([], [], 'DEUDAS')`) y test de texto de la firma.
-- **Deuda de S10 sin especificar, pendiente de recuperar (ADR-007):** el orquestador mencionó 4 tareas de deuda de S10, pero la lista (archivo, hallazgo y criterio) no está escrita en el repositorio ni llegó al relanzar. No se implementó nada ni se da por cerrada. Cuando aparezca, se anota aquí literal antes de tocar código; si alguna toca teléfonos, desvincular o el webhook del bot, va primero y con tests sin números reales.
+- **Deuda de S10 (ADR-007, recuperada en la ronda de corrección 1 de S13):** la lista llegó con las instrucciones del orquestador y se anota literal antes de tocar código:
+  1. `src/app/presupuesto/page.tsx` (`handleLoadStarterKit`): agregar con TDD `shouldReloadAfterStarterKit(result)` en `src/lib/onboarding/budget-empty-state.ts` (`return !result.error`; tests literales del orquestador: "seeded → true, sin error → false, con error". Se implementa `!result.error`: `seeded: false` sin error también recarga, porque el toast dice "Te las mostramos ahora"; solo el error no recarga) y usarla en la página; `await handleCategoryCreated()` va en try/catch con el toast de error "Cargamos las categorías pero no pudimos refrescar; recarga la página".
+  2. `src/lib/actions/onboarding.test.ts`: el spy de `console.warn` se crea en el `beforeEach`, `afterEach(() => vi.restoreAllMocks())` y se borran los `warnSpy.mockRestore()` manuales.
+  3. `src/hooks/useMonthlyBudget.ts`: quitar `initializeMonth` (código muerto) de la interfaz, del `useCallback` y del retorno, tras verificar con grep que nadie lo usa (el `initializeMonth` de `useMonthlyExpenses.ts` es otro y no entra).
+  4. `src/components/organisms/DashboardQuickActions/DashboardQuickActions.tsx`: los tres accesos dejan de ser `<Button>` dentro de `<Link>` (HTML inválido, dos elementos enfocables); test que falle si vuelve a aparecer.
+  Ninguna toca teléfonos, desvincular ni el webhook. Los commits quedan registrados en las Desviaciones de S13.
 
 ## Autorrevisión
 
