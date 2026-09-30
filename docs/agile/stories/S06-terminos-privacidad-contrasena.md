@@ -733,7 +733,7 @@ EOF
 - Consumes (de Task 3): `CONTACT_EMAIL`, `LEGAL_UPDATED_AT`, `type LegalSection` de `@/lib/constants/legal`.
 - Produces: `src/app/terms/content.ts` → `export const TERMS_SECTIONS: LegalSection[]`; `src/app/terms/page.tsx` → `export const metadata: Metadata`, `export default function TermsPage()`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/app/terms/terms.test.ts`:
 
@@ -814,12 +814,12 @@ describe('página /terms', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/terms/terms.test.ts`
 Expected: FAIL con `Failed to resolve import "./content"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/app/terms/content.ts`:
 
@@ -963,12 +963,12 @@ export default function TermsPage() {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/terms/terms.test.ts && bun run type-check`
 Expected: PASS (7 tests) y `tsc` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/app/terms/content.ts src/app/terms/page.tsx src/app/terms/terms.test.ts && git commit -m "$(cat <<'EOF'
