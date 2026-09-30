@@ -24,6 +24,11 @@ El árbitro eligió la 1 y, si el middleware no corría, abrir la historia que l
 - `git mv middleware.ts src/middleware.ts` sin cambiar sus reglas de acceso (S15).
 - `src/middleware-location.test.ts` fija que el archivo está en `src/`, que no hay otro en la raíz y que el matcher no toca `/api` (webhook de WhatsApp y crons), `/_next/*`, `favicon.ico` ni archivos estáticos.
 - Las redirecciones del middleware copian las cookies que Supabase escribió al refrescar la sesión (patrón oficial de `@supabase/ssr`). Sin esto, una redirección tras rotar el refresh token dejaría al navegador con el token viejo y la sesión se perdería al activarse el middleware por primera vez.
+- Ronda de corrección 1 de S15:
+  - Si `createServerClient` o `getUser()` lanzan (variables de entorno ausentes en un preview, red, SDK), el middleware no responde 500: registra solo el nombre del error y sigue sin usuario. Las rutas públicas y de auth sirven igual y las protegidas van al login. Un `error` con `code` de `getUser()` (p. ej. `refresh_token_not_found`) se registra solo con su `code`; la falta de sesión (`AuthSessionMissingError`, sin `code`) no se registra.
+  - Bucle con las guardias de las páginas: `dashboard`, `settings`, `deudas`, `ingresos` e `ingresos-deudas` hacen su propio `getUser()`. Si el del middleware ve sesión y el de la página no (error transitorio, 429, red), antes se formaba `/dashboard → /auth/login → /dashboard`. Ahora esas guardias redirigen a `/auth/login?redirectTo=<ruta>` y el middleware no manda `/auth/login` al dashboard cuando trae `redirectTo` o `error`. `/auth/register` sigue mandando al dashboard con sesión.
+  - Peticiones que no son GET/HEAD o que traen la cabecera `next-action` (Server Actions) reciben 303 en lugar de 307: con 307 el navegador repetiría el POST contra el login con un id de acción que allí no existe.
+  - El matcher excluye `api/` y `api` exactos (`(?!api/|api$|…)`), no cualquier ruta que empiece por "api" (p. ej. `/apiario` sí pasa por el middleware). Verificado también con el `path-to-regexp` que trae Next.js.
 
 ## Riesgo
 Activarlo cambia el comportamiento de producción por primera vez: redirecciones al login, `/auth/login` y `/auth/register` mandan al dashboard con sesión, y el refresco de cookies pasa a hacerse en cada petición. Un error aquí podría dejar al usuario real fuera de la app o en un bucle de redirección.
@@ -32,7 +37,10 @@ Reglas relevantes (ver `src/lib/auth/route-access.ts`):
 - Públicas (exactas): `/`, `/test`, `/terms`, `/privacy`.
 - Auth (siempre accesibles; login y registro redirigen con sesión): `/auth/*`.
 - Protegidas: `/dashboard`, `/bienvenida`, `/presupuesto`, `/gastos`, `/ingresos` (incluye `/ingresos-deudas`), `/deudas`, `/profile`, `/settings`.
-- Sesión vencida: `getUser()` devuelve usuario nulo → las protegidas van a `/auth/login?redirectTo=…`, que es ruta de auth y pasa sin sesión: no hay bucle.
+- Sesión vencida: `getUser()` devuelve usuario nulo (Supabase borra las cookies `sb-*` con `maxAge 0`) → las protegidas van a `/auth/login?redirectTo=…` con las cookies de borrado, y el login pasa sin sesión: no hay bucle (test).
+
+## Deuda registrada
+- `/test` sigue siendo pública: es una página cliente de prueba de componentes y de Supabase (cliente anon). S15 no cambia reglas de acceso, así que queda para una historia aparte: sacarla de `PUBLIC_ROUTES`, protegerla o no servirla en producción (`notFound()` si `VERCEL_ENV === 'production'`).
 
 ## Prueba en preview (antes de fusionar a `main`, integración S14, con OK de la persona)
 En un preview de Vercel:
@@ -42,6 +50,7 @@ En un preview de Vercel:
 4. Cerrar sesión y volver a entrar.
 5. `/auth/confirm` desde un correo real de prueba funciona.
 6. `/api/whatsapp/webhook` y los crons no se ven afectados (el matcher excluye `/api`).
+7. Comportamiento conocido: una Server Action enviada con la sesión vencida recibe un 303 al login (no un error genérico).
 
 ## Consecuencias
 - Ya no aplica la regla de v2.1 de no declarar protección por middleware en los criterios de aceptación, una vez que S15 esté en `main` y pase la prueba en preview.

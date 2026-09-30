@@ -37,3 +37,13 @@ Alineado con contratos v2 (§5). Escrito por el orquestador (sin planificador): 
 - [x] **T3 — Deuda S05** (CA5–CA8), un commit por criterio o uno solo si son pequeños.
 - [x] **T4 — ADR-004 y limpieza** (CA9). Commit de docs.
 - [x] **T5 — Verificación.** `bun run test && bun run type-check` en verde; árbol limpio.
+
+## Ronda de corrección 1 (revisión)
+
+- El middleware ya no responde 500 si `createServerClient` o `getUser()` fallan: sigue sin usuario (públicas y auth pasan, protegidas al login) y registra solo el nombre o el `code` del error.
+- Tests de sesión vencida fieles a Supabase (`refresh_token_not_found` + cookies de borrado): la protegida va al login con el borrado y el login pasa sin bucle.
+- Bucle página ↔ middleware: las guardias de `dashboard`, `settings`, `deudas`, `ingresos` e `ingresos-deudas` redirigen a `/auth/login?redirectTo=<ruta>`, y el middleware no rebota ese login al dashboard (ADR-004).
+- Server Actions y peticiones no GET/HEAD reciben 303 en vez de 307.
+- Matcher: `(?!api/|api$|…)`; `/apiario` sí pasa por el middleware.
+- `/test` pública queda como deuda en ADR-004 (S15 no cambia reglas de acceso).
+- H9 (CA4): la guarda de `CONTACT_EMAIL` pasó de romper el build a un `console.warn` por decisión de la persona. El aviso no basta como única defensa: **antes de abrir el registro, comprobar a mano que `CONTACT_EMAIL` en `src/lib/constants/legal.ts` es un buzón real** (check previo de la integración S14; tarea H9 en contratos §5.4). Pendiente: crear la tarea en Plane.
