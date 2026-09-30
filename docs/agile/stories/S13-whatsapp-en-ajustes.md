@@ -51,14 +51,14 @@
 
 ## Criterios de aceptación
 
-- [ ] `buildWhatsAppLinkUrl` con tests: `+573000000000`, `whatsapp:+573000000000` y `" +57 300 000 0000 "` dan `https://wa.me/573000000000?text=VINCULAR%20123456`; `undefined`, `''`, solo espacios o un valor sin dígitos válidos dan `null`.
-- [ ] Con `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` definido, el panel muestra el botón "Abrir WhatsApp" que abre `wa.me` en otra pestaña con `VINCULAR <código>`; sin la variable, el panel se ve como hoy (código y texto `VINCULAR <código>`, sin enlace).
-- [ ] `MSG_LINKED_OK` es exactamente el texto del contrato y el test lo compara con `toBe`.
-- [ ] `MSG_ALREADY_LINKED` ya no promete nada "muy pronto": es `Este número ya está vinculado. Ya puedes mandarme tus gastos.` y el test lo compara con `toBe`.
-- [ ] `unlinkWhatsAppLinkAction(linkId)` borra solo filas del usuario autenticado (`.eq('id', linkId)` + `.eq('user_id', user.id)` + RLS), valida que `linkId` sea uuid antes de tocar la base, responde error si no borró nada, no loguea el número y revalida `/settings`. `unlinkWhatsAppPhoneAction` no existe.
-- [ ] En Ajustes, cada número vinculado tiene "Desvincular"; el botón recibe solo `linkId` y el número enmascarado (el completo no llega al navegador; `key = l.id`); al tocarlo aparece una confirmación con el número enmascarado; al confirmar, el número desaparece de la lista y sale un toast.
-- [ ] `.env.example` termina con `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000`.
-- [ ] `bun run test && bun run type-check` en verde.
+- [x] `buildWhatsAppLinkUrl` con tests: `+573000000000`, `whatsapp:+573000000000` y `" +57 300 000 0000 "` dan `https://wa.me/573000000000?text=VINCULAR%20123456`; `undefined`, `''`, solo espacios o un valor sin dígitos válidos dan `null`.
+- [x] Con `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` definido, el panel muestra el botón "Abrir WhatsApp" que abre `wa.me` en otra pestaña con `VINCULAR <código>`; sin la variable, el panel se ve como hoy (código y texto `VINCULAR <código>`, sin enlace).
+- [x] `MSG_LINKED_OK` es exactamente el texto del contrato y el test lo compara con `toBe`.
+- [x] `MSG_ALREADY_LINKED` ya no promete nada "muy pronto": es `Este número ya está vinculado. Ya puedes mandarme tus gastos.` y el test lo compara con `toBe`.
+- [x] `unlinkWhatsAppLinkAction(linkId)` borra solo filas del usuario autenticado (`.eq('id', linkId)` + `.eq('user_id', user.id)` + RLS), valida que `linkId` sea uuid antes de tocar la base, responde error si no borró nada, no loguea el número y revalida `/settings`. `unlinkWhatsAppPhoneAction` no existe.
+- [x] En Ajustes, cada número vinculado tiene "Desvincular"; el botón recibe solo `linkId` y el número enmascarado (el completo no llega al navegador; `key = l.id`); al tocarlo aparece una confirmación con el número enmascarado; al confirmar, el número desaparece de la lista y sale un toast.
+- [x] `.env.example` termina con `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000`.
+- [x] `bun run test && bun run type-check` en verde.
 
 ---
 
@@ -935,19 +935,25 @@ EOF
 
 **Files:** ninguno.
 
-- [ ] **Step 1: Suite completa y tipos**
+- [x] **Step 1: Suite completa y tipos**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: todos los tests en verde y `tsc --noEmit` sin errores.
 
-- [ ] **Step 2: Sin teléfonos reales en lo nuevo**
+- [x] **Step 2: Sin teléfonos reales en lo nuevo**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git diff main --name-only | xargs grep -nE '\+57[0-9]{10}' | grep -v '573000000000' | grep -v '573001234567'`
 Expected: sin salida (solo aparecen `+573000000000` y el `+573001234567` que ya existía en los tests previos).
 
-- [ ] **Step 3: Revisar criterios de aceptación**
+- [x] **Step 3: Revisar criterios de aceptación**
 
 Marcar cada casilla de "Criterios de aceptación" de este archivo contra el código.
+
+## Desviaciones
+
+- **Reanudación (ADR-005):** la Task 5 estaba hecha pero sin commit. Se verificó que su test falla sin los cambios (3 fallos) y pasa con ellos, se revisaron las condiciones de seguridad del ADR y se agregó un test más: al botón solo llegan `linkId` y `maskedPhone`, y ni el botón ni sus props mencionan `phone_e164`.
+- **Máscara:** `enmascararTelefono` muestra `+57 300 ••• 4567` en vez de `+57300 ***4567`; misma cantidad de dígitos visibles (menos en formatos no colombianos).
+- **Task 6 Step 2:** el grep contra `main` muestra `+573001111111` y `+573002222222`, ficticios y de commits anteriores a S13 (S07/S10, ya en este flujo); los commits de S13 no agregan ningún teléfono.
 
 ## Tareas humanas (después de integrar)
 
