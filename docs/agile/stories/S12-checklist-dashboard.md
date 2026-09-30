@@ -72,12 +72,12 @@ El flujo APP corre en serie (contratos §5.3): `src/lib/actions/onboarding.ts` y
   - `dismissChecklistAction(): Promise<void>` (S11, Task 7): guarda `profiles.onboarding_dismissed_at = now()` del propio usuario y revalida `/dashboard`; sin sesión no hace nada; si el UPDATE falla registra solo el code y **vuelve sin lanzar**.
 - Produces: nada.
 
-- [ ] **Step 1: Comprobar que existen una sola vez**
+- [x] **Step 1: Comprobar que existen una sola vez**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn "export async function ensureStarterKitAction\|export async function dismissChecklistAction" src`
 Expected: exactamente dos líneas, ambas en `src/lib/actions/onboarding.ts`. Si falta alguna, detente y repórtalo: S10 o S11 no están hechas. **No** las crees aquí.
 
-- [ ] **Step 2: Sus tests pasan**
+- [x] **Step 2: Sus tests pasan**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (31 tests: 7 de S10 + 24 de S11).
@@ -105,7 +105,7 @@ Sin commit en esta tarea.
   export function computeChecklist(input: ChecklistInput): ChecklistItem[]
   ```
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 Crea `src/lib/onboarding/checklist.test.ts`:
 
@@ -206,12 +206,12 @@ describe('computeChecklist', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y ver que falla**
+- [x] **Step 2: Correr el test y ver que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: FAIL con `Failed to resolve import "./checklist"`.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Crea `src/lib/onboarding/checklist.ts`:
 
@@ -285,12 +285,12 @@ export function computeChecklist(input: ChecklistInput): ChecklistItem[] {
 }
 ```
 
-- [ ] **Step 4: Correr el test y ver que pasa**
+- [x] **Step 4: Correr el test y ver que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts && git commit -m "$(cat <<'EOF'
