@@ -7,6 +7,9 @@
  * como gasto básico que había que eliminar.
  */
 
+/** Nombre de la categoría cuyos rubros usan los valores de deuda. */
+export const DEUDAS_CATEGORY_NAME = 'DEUDAS';
+
 /** Clasificación de un rubro nuevo cualquiera. */
 export const DEFAULT_ITEM_CLASSIFICATION = 'Estilo de Vida';
 

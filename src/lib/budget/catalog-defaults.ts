@@ -9,6 +9,7 @@ import {
   DEFAULT_ITEM_CONTROL,
   DEUDA_ITEM_CLASSIFICATION,
   DEUDA_ITEM_CONTROL,
+  DEUDAS_CATEGORY_NAME,
 } from '@/lib/constants/budget-defaults';
 
 export interface CatalogRow {
@@ -27,9 +28,6 @@ export interface ItemDefaultNames {
   classification: string;
   control: string;
 }
-
-/** Nombre de la categoría cuyos rubros usan los valores de deuda. */
-const DEUDAS_CATEGORY_NAME = 'DEUDAS';
 
 function normalizeName(name: string): string {
   return name

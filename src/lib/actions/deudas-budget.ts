@@ -6,6 +6,7 @@ import { resolveBudgetItemDefaults } from '@/lib/budget/item-defaults-supabase';
 import {
   DEUDA_ITEM_CLASSIFICATION,
   DEUDA_ITEM_CONTROL,
+  DEUDAS_CATEGORY_NAME,
 } from '@/lib/constants/budget-defaults';
 import { createClient } from '@/lib/supabase/server';
 
@@ -38,7 +39,7 @@ export async function createBudgetItemsForDeuda(
     const { data: category } = await supabase
       .from('categories')
       .select('id')
-      .ilike('name', 'DEUDAS')
+      .ilike('name', DEUDAS_CATEGORY_NAME)
       .eq('user_id', user.id)
       .eq('is_active', true)
       .maybeSingle();

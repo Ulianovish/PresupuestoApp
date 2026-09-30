@@ -159,6 +159,33 @@ describe('resolveBudgetItemDefaults', () => {
     );
   });
 
+  it('si no existe el estado "Activo" cae al primer estado activo y avisa', async () => {
+    const { client } = clienteFalso({
+      budget_statuses: {
+        data: [
+          { id: 'st-inactivo', name: 'Inactivo' },
+          { id: 'st-pausado', name: 'Pausado' },
+        ],
+        error: null,
+      },
+    });
+
+    const r = await resolveBudgetItemDefaults(client, GENERAL);
+
+    expect(r).toEqual({
+      ok: true,
+      ids: {
+        classificationId: 'cls-estilo',
+        controlId: 'ctl-reducir',
+        statusId: 'st-inactivo',
+      },
+    });
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    expect(console.warn).toHaveBeenCalledWith(
+      '[budget-defaults] No existe el estado "Activo"; se usa "Inactivo".',
+    );
+  });
+
   it('si falla una consulta → ok:false y console.error', async () => {
     const { client } = clienteFalso({
       controls: { data: null, error: { message: 'fallo' } },
