@@ -1253,6 +1253,7 @@ No hay commit en esta tarea.
   - Privacidad: nombres de personas en fixtures y comentarios de `src/` reemplazados por inventados (categoría `NINOS`, cuentas `Bruno` y `Coco`, `ALIMENTACIÓN MASCOTAS`). Solo tests y comentarios; los meses `'Abril'` quedan.
   - `docs/agile/stories/S08-defaults-de-rubros.md` Task 3: el texto de "categoría no encontrada → valores generales" quedó marcado como reemplazado por la desviación.
   - `openAddModal` de `/presupuesto` recibe el nombre de la categoría desde la tarjeta (`BudgetCategoryRow` → `BudgetTable` → página) en vez de buscarlo en `categories`. Test puro (`defaultItemFormNames([], [], 'DEUDAS')`) y test de texto de la firma.
+- **Deuda de S10 sin especificar, pendiente de recuperar (ADR-007):** el orquestador mencionó 4 tareas de deuda de S10, pero la lista (archivo, hallazgo y criterio) no está escrita en el repositorio ni llegó al relanzar. No se implementó nada ni se da por cerrada. Cuando aparezca, se anota aquí literal antes de tocar código; si alguna toca teléfonos, desvincular o el webhook del bot, va primero y con tests sin números reales.
 
 ## Autorrevisión
 
