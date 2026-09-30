@@ -70,7 +70,7 @@
 - Consumes: tablas existentes `public.whatsapp_link_codes` (columnas `id uuid PK`, `code`, `user_id`, `expires_at`, `used_at`, `created_at`; migraciones `20260611000000` y `20260611000001`).
 - Produces: índice `whatsapp_link_codes_code_pending_uq`; tabla `public.whatsapp_link_attempts(id bigserial PK, phone_e164 text NOT NULL, created_at timestamptz NOT NULL DEFAULT now())` que usan las tareas 4 y 5.
 
-- [ ] **Step 1: Escribir el test de texto que falla**
+- [x] **Step 1: Escribir el test de texto que falla**
 
 Crear `src/lib/supabase/migrations/20260930110000_whatsapp_vinculacion_segura.test.ts`:
 
@@ -161,12 +161,12 @@ describe(`migración ${ARCHIVO}`, () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `bun run test src/lib/supabase/migrations/20260930110000_whatsapp_vinculacion_segura.test.ts`
 Expected: FAIL con `ENOENT: no such file or directory, open '…/supabase/migrations/20260930110000_whatsapp_vinculacion_segura.sql'`.
 
-- [ ] **Step 3: Escribir la migración**
+- [x] **Step 3: Escribir la migración**
 
 Crear `supabase/migrations/20260930110000_whatsapp_vinculacion_segura.sql`:
 
@@ -252,12 +252,12 @@ GRANT USAGE, SELECT ON SEQUENCE public.whatsapp_link_attempts_id_seq TO service_
 --  WHERE used_at IS NULL GROUP BY code HAVING count(*) > 1;
 ```
 
-- [ ] **Step 4: Correr el test y verificar que pasa**
+- [x] **Step 4: Correr el test y verificar que pasa**
 
 Run: `bun run test src/lib/supabase/migrations/20260930110000_whatsapp_vinculacion_segura.test.ts`
 Expected: PASS (7 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add supabase/migrations/20260930110000_whatsapp_vinculacion_segura.sql src/lib/supabase/migrations/20260930110000_whatsapp_vinculacion_segura.test.ts
