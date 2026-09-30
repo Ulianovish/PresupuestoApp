@@ -66,7 +66,8 @@ export async function loadWizardData(
         name: f.item_name ?? '',
         categoryName: f.category_name ?? '',
         classificationName: f.classification_name ?? '',
-        budgetedAmount: Number(f.budgeted_amount) || 0,
+        // NUMERIC puede traer decimales; la acción del paso 2 exige enteros.
+        budgetedAmount: Math.round(Number(f.budgeted_amount) || 0),
       }));
   }
 

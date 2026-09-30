@@ -79,6 +79,25 @@ const FILAS = [
 describe('loadWizardData', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('redondea a pesos enteros los montos NUMERIC con decimales', async () => {
+    const { supabase } = clienteFalso({
+      rpcResult: {
+        data: [
+          { ...FILAS[0], budgeted_amount: '150000.5' },
+          { ...FILAS[1], budgeted_amount: 99999.4 },
+        ],
+        error: null,
+      },
+    });
+
+    const r = await loadWizardData(supabase, USER_ID, '2026-09');
+
+    expect(r.items.map(i => i.budgetedAmount)).toEqual([150001, 99999]);
+    expect(r.items.every(i => Number.isSafeInteger(i.budgetedAmount))).toBe(
+      true,
+    );
+  });
+
   it('pide el presupuesto del mes del propio usuario y mapea los rubros', async () => {
     const { client, supabase } = clienteFalso({
       rpcResult: { data: FILAS, error: null },
