@@ -236,7 +236,7 @@ EOF
 - Consumes: helpers del test de la Task 1 (`code`, `squash`, `functionBlock`).
 - Produces: `public._seed_starter_kit(p_user_id uuid, p_month_year text) RETURNS boolean` — `true` si sembró (o recargó el kit a quien no tenía categorías activas), `false` si el usuario ya tenía alguna categoría activa; lanza excepción si el mes es inválido o falta un catálogo (antes de insertar nada). Solo la pueden ejecutar el dueño y otras funciones SECURITY DEFINER del dueño (`ensure_starter_kit`, `handle_new_user`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Agregar al final de `src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`:
 
@@ -420,12 +420,12 @@ describe('migración 20260930130000: _seed_starter_kit', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: FAIL — los 14 tests nuevos fallan con `Error: No está la función _seed_starter_kit` (o, en el de REVOKE, con el `toContain` sin match); los 3 de la Task 1 siguen en PASS.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Agregar al final de `supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql`:
 
@@ -563,12 +563,12 @@ $function$;
 REVOKE EXECUTE ON FUNCTION public._seed_starter_kit(uuid, text) FROM PUBLIC, anon, authenticated, service_role;
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: PASS — 17 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts && git commit -m "$(cat <<'EOF'
