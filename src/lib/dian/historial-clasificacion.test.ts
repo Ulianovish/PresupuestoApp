@@ -66,8 +66,8 @@ describe('normalizarDescripcion', () => {
     expect(
       normalizarDescripcion('Llave Bold - Inversiones Crokampollo Sas'),
     ).toBe('inversiones crokampollo sas');
-    expect(normalizarDescripcion('Transferencia a Carlos Gomez')).toBe(
-      'carlos gomez',
+    expect(normalizarDescripcion('Transferencia a Persona Ejemplo Dos')).toBe(
+      'persona ejemplo dos',
     );
     expect(normalizarDescripcion('Transferencia a Academia Chechi')).toBe(
       'academia chechi',
@@ -77,8 +77,10 @@ describe('normalizarDescripcion', () => {
     );
   });
 
-  it('un handle "@susana7309" queda como el nombre', () => {
-    expect(normalizarDescripcion('Transferencia a @susana7309')).toBe('susana');
+  it('un handle "@ejemplo1234" queda como el nombre', () => {
+    expect(normalizarDescripcion('Transferencia a @ejemplo1234')).toBe(
+      'ejemplo',
+    );
   });
 
   it('no confunde "@ 3.250" de una conversión de moneda con un handle', () => {
@@ -302,7 +304,7 @@ describe('itemDesdeHistorial', () => {
   ];
   const idx = indexarHistorial(
     construirHistorial([
-      fila('Carlos Gomez', 'MERCADO', 'Huevos', '2026-09-05'),
+      fila('Persona Ejemplo Dos', 'MERCADO', 'Huevos', '2026-09-05'),
       fila('Verduras', 'MERCADO', 'Verduras y frutas', '2026-09-05'),
       fila(
         'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
@@ -317,7 +319,7 @@ describe('itemDesdeHistorial', () => {
 
   it('resuelve el ítem del MISMO NOMBRE en el mes destino (otro id)', () => {
     expect(
-      itemDesdeHistorial('Carlos Gomez', 'MERCADO', idx, ITEMS_OCT),
+      itemDesdeHistorial('Persona Ejemplo Dos', 'MERCADO', idx, ITEMS_OCT),
     ).toEqual({
       itemId: 'oct-huevos',
       categoria: 'MERCADO',
@@ -379,7 +381,7 @@ describe('itemDesdeHistorial', () => {
 
   it('respeta una categoría elegida distinta a la del historial', () => {
     expect(
-      itemDesdeHistorial('Carlos Gomez', 'SALUD', idx, ITEMS_OCT),
+      itemDesdeHistorial('Persona Ejemplo Dos', 'SALUD', idx, ITEMS_OCT),
     ).toBeNull();
   });
 
@@ -431,7 +433,7 @@ describe('cargarHistorialManual', () => {
 
   it('solo manuales del usuario, de los últimos meses', async () => {
     const { client, builder } = fakeClient({
-      data: [fila('Carlos Gomez', 'MERCADO', 'Huevos', '2026-09-05')],
+      data: [fila('Persona Ejemplo Dos', 'MERCADO', 'Huevos', '2026-09-05')],
       error: null,
     });
     const entradas = await cargarHistorialManual(

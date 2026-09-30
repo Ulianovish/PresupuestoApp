@@ -77,7 +77,7 @@ describe('describirTransferencia', () => {
     expect(
       describirTransferencia(
         'Huevos con nequi',
-        { concept: 'Pago', recipient: 'Carlos Gomez' },
+        { concept: 'Pago', recipient: 'Persona Ejemplo Dos' },
         CUENTAS,
       ),
     ).toBe('Huevos');
@@ -87,7 +87,7 @@ describe('describirTransferencia', () => {
     expect(
       describirTransferencia(
         '',
-        { concept: 'Cena afuera con nequi', recipient: 'Susana Ospina' },
+        { concept: 'Cena afuera con nequi', recipient: 'Persona Ejemplo Tres' },
         CUENTAS,
       ),
     ).toBe('Cena afuera');
@@ -97,27 +97,27 @@ describe('describirTransferencia', () => {
     expect(
       describirTransferencia(
         '',
-        { concept: null, recipient: 'Carlos Gomez' },
+        { concept: null, recipient: 'Persona Ejemplo Dos' },
         CUENTAS,
       ),
-    ).toBe('Carlos Gomez');
+    ).toBe('Persona Ejemplo Dos');
   });
 
   it('un pie de foto que es una instrucción cae al concepto de la visión', () => {
     expect(
       describirTransferencia(
         'Subela a gastos',
-        { concept: 'Arriendo septiembre', recipient: 'Luisa Gomez' },
+        { concept: 'Arriendo septiembre', recipient: 'Persona Ejemplo Uno' },
         CUENTAS,
       ),
     ).toBe('Arriendo septiembre');
     expect(
       describirTransferencia(
         'anota esto',
-        { concept: null, recipient: 'Luisa Gomez' },
+        { concept: null, recipient: 'Persona Ejemplo Uno' },
         CUENTAS,
       ),
-    ).toBe('Luisa Gomez');
+    ).toBe('Persona Ejemplo Uno');
   });
 
   it('sin nada → "Transferencia"', () => {

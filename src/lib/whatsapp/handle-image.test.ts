@@ -591,7 +591,7 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
       date: '2026-06-11',
       account: null,
       concept: 'Pago',
-      recipient: 'Carlos Gomez',
+      recipient: 'Persona Ejemplo Dos',
       confidence: 0.9,
       ...extra,
     }));
@@ -628,7 +628,7 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
       description: 'Huevos',
       accountName: 'Nequi',
       date: '2026-06-11',
-      place: 'Carlos Gomez',
+      place: 'Persona Ejemplo Dos',
     });
     expect(mensajes(deps)[0]).toMatch(
       /^✅ Registré \$\s?9\.000 · Huevos en MERCADO \(Nequi\)\./,
@@ -653,7 +653,7 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
       '+57300',
       expect.objectContaining({
         accountName: 'Efectivo',
-        place: 'Carlos Gomez',
+        place: 'Persona Ejemplo Dos',
       }),
     );
     expect(deps.askAccount).toHaveBeenCalledTimes(1);
@@ -712,7 +712,7 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
     expect(deps.createDirectExpense).toHaveBeenCalledWith(
       'u1',
       '+57300',
-      expect.objectContaining({ description: 'Carlos Gomez' }),
+      expect.objectContaining({ description: 'Persona Ejemplo Dos' }),
     );
   });
 

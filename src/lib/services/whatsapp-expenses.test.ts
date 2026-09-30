@@ -118,13 +118,13 @@ describe('createDirectExpense', () => {
       description: 'Huevos',
       accountName: 'Efectivo',
       date: '2026-06-11',
-      place: 'Carlos Gomez',
+      place: 'Persona Ejemplo Dos',
     });
 
     expect(res.ok).toBe(true);
     expect(rpc).toHaveBeenCalledWith(
       'upsert_monthly_expense',
-      expect.objectContaining({ p_place: 'Carlos Gomez' }),
+      expect.objectContaining({ p_place: 'Persona Ejemplo Dos' }),
     );
     expect(txUpdate).toHaveBeenCalledWith({
       registered_phone: '+573001234567',
@@ -281,10 +281,10 @@ describe('createDirectExpense', () => {
   });
 
   it('reutiliza el historial manual: categoría e ítem del mismo nombre, sin IA', async () => {
-    // El usuario ya asignó a mano "Carlos Gomez" → MERCADO/Huevos en agosto.
+    // El usuario ya asignó a mano "Persona Ejemplo Dos" → MERCADO/Huevos en agosto.
     const historial = [
       {
-        description: 'Carlos Gomez',
+        description: 'Persona Ejemplo Dos',
         category_name: 'MERCADO',
         transaction_date: '2026-08-20',
         budget_items: { name: 'Huevos', categories: { name: 'MERCADO' } },
@@ -337,7 +337,7 @@ describe('createDirectExpense', () => {
 
     const res = await createDirectExpense('user-1', '+573001234567', {
       amount: 15000,
-      description: 'carlos gómez',
+      description: 'persona ejemplo dós',
       accountName: 'Nequi',
       date: '2026-09-10',
     });

@@ -184,7 +184,7 @@ const PALABRAS_GENERICAS = new Set([
 /**
  * Normaliza una descripción para buscarla en el historial: minúsculas, sin
  * tildes ni puntuación, espacios colapsados, sin prefijos bancarios ni
- * "cuota N de M". Un handle "@susana7309" queda como "susana". Si no queda
+ * "cuota N de M". Un handle "@ejemplo1234" queda como "ejemplo". Si no queda
  * nada útil (solo el prefijo, menos de 4 letras o solo palabras genéricas),
  * devuelve '' y no se matchea.
  */
@@ -193,7 +193,7 @@ export function normalizarDescripcion(desc: string | null | undefined): string {
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
-    // "@susana7309" → "susana" (un "@ 3.250" de conversión no es un handle)
+    // "@ejemplo1234" → "ejemplo" (un "@ 3.250" de conversión no es un handle)
     .replace(/@([a-z]+)\d*/g, '$1')
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
