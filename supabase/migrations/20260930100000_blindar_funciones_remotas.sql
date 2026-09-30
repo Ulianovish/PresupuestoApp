@@ -110,3 +110,92 @@ $function$;
 
 REVOKE EXECUTE ON FUNCTION public.get_previous_month_overspend(uuid, character varying) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_previous_month_overspend(uuid, character varying) TO service_role;
+
+
+-- ============================================================================
+-- 2. copy_budget_items_from_template: guard + ambas plantillas del usuario.
+--    El resto del cuerpo es el de producción.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.copy_budget_items_from_template(p_user_id uuid, p_source_template_id uuid, p_target_template_id uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path = public, pg_temp
+AS $function$
+DECLARE
+    items_copied INTEGER := 0;
+BEGIN
+    IF auth.role() IS DISTINCT FROM 'service_role'
+       AND (auth.uid() IS NULL OR auth.uid() <> p_user_id) THEN
+        RAISE EXCEPTION 'no autorizado' USING ERRCODE = '42501';
+    END IF;
+
+    -- S01: la plantilla fuente y la destino deben ser de p_user_id
+    -- (antes se copiaban rubros de cualquier plantilla).
+    IF NOT EXISTS (
+        SELECT 1 FROM budget_templates bt
+        WHERE bt.id = p_source_template_id
+        AND bt.user_id = p_user_id
+    ) OR NOT EXISTS (
+        SELECT 1 FROM budget_templates bt
+        WHERE bt.id = p_target_template_id
+        AND bt.user_id = p_user_id
+    ) THEN
+        RAISE EXCEPTION 'no autorizado' USING ERRCODE = '42501';
+    END IF;
+
+    -- Verificar que el template destino no tenga items ya
+    IF EXISTS (
+        SELECT 1 FROM budget_items
+        WHERE template_id = p_target_template_id
+        AND is_active = true
+    ) THEN
+        RAISE NOTICE 'Template destino ya tiene items, saltando copia';
+        RETURN 0;
+    END IF;
+
+    -- Copiar items del template fuente al destino
+    INSERT INTO budget_items (
+        user_id,
+        template_id,
+        category_id,
+        classification_id,
+        control_id,
+        status_id,
+        name,
+        description,
+        budgeted_amount,
+        spent_amount,
+        real_amount,
+        due_date,
+        is_active
+    )
+    SELECT
+        p_user_id,
+        p_target_template_id,
+        category_id,
+        classification_id,
+        control_id,
+        status_id,
+        name,
+        description,
+        budgeted_amount,
+        0.00 as spent_amount,  -- Resetear gastos
+        0.00 as real_amount,   -- Resetear montos reales
+        due_date,
+        true as is_active
+    FROM budget_items
+    WHERE template_id = p_source_template_id
+    AND is_active = true;
+
+    -- Obtener cantidad de items copiados
+    GET DIAGNOSTICS items_copied = ROW_COUNT;
+
+    RAISE NOTICE 'Copiados % items del template % al template %', items_copied, p_source_template_id, p_target_template_id;
+
+    RETURN items_copied;
+END;
+$function$;
+
+REVOKE EXECUTE ON FUNCTION public.copy_budget_items_from_template(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.copy_budget_items_from_template(uuid, uuid, uuid) TO service_role;

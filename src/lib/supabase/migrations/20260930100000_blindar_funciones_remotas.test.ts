@@ -107,3 +107,61 @@ describe('get_previous_month_overspend', () => {
     expect(grantedRoles(code, NAME)).toEqual(['service_role']);
   });
 });
+
+describe('copy_budget_items_from_template', () => {
+  const NAME = 'copy_budget_items_from_template';
+
+  it('conserva la firma de producción (no crea overload)', () => {
+    expectSignature(
+      functionBlock(readMigration(), NAME),
+      'CREATE OR REPLACE FUNCTION public.copy_budget_items_from_template(p_user_id uuid, p_source_template_id uuid, p_target_template_id uuid)',
+      ' RETURNS integer',
+    );
+  });
+
+  it('es SECURITY DEFINER con search_path fijo', () => {
+    const block = functionBlock(readMigration(), NAME);
+    expect(block).toContain('\n SECURITY DEFINER\n');
+    expect(block).toContain(SEARCH_PATH);
+  });
+
+  it('valida al usuario antes de todo', () => {
+    expectGuardFirst(functionBlock(readMigration(), NAME));
+  });
+
+  it('exige que la plantilla fuente y la destino sean del usuario antes de copiar', () => {
+    const block = functionBlock(readMigration(), NAME);
+    const source = block.search(
+      /bt\.id = p_source_template_id\s+AND bt\.user_id = p_user_id/,
+    );
+    const target = block.search(
+      /bt\.id = p_target_template_id\s+AND bt\.user_id = p_user_id/,
+    );
+    const insert = block.indexOf('INSERT INTO budget_items');
+    expect(source).toBeGreaterThan(-1);
+    expect(target).toBeGreaterThan(-1);
+    expect(insert).toBeGreaterThan(-1);
+    expect(source).toBeLessThan(insert);
+    expect(target).toBeLessThan(insert);
+  });
+
+  it('conserva el resto del cuerpo de producción', () => {
+    const block = functionBlock(readMigration(), NAME);
+    expect(block).toContain('RETURN 0;');
+    expect(block).toContain('0.00 as spent_amount,');
+    expect(block).toContain('0.00 as real_amount,');
+    expect(block).toMatch(
+      /FROM budget_items\s+WHERE template_id = p_source_template_id\s+AND is_active = true;/,
+    );
+    expect(block).toContain('GET DIAGNOSTICS items_copied = ROW_COUNT;');
+    expect(block).toContain('RETURN items_copied;');
+  });
+
+  it('solo service_role la ejecuta', () => {
+    const code = codeOnly(readMigration());
+    expect(code).toContain(
+      'REVOKE EXECUTE ON FUNCTION public.copy_budget_items_from_template(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;',
+    );
+    expect(grantedRoles(code, NAME)).toEqual(['service_role']);
+  });
+});

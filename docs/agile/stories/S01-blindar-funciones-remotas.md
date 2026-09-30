@@ -676,7 +676,7 @@ EOF
 - Consumes: helpers de la Task 1 (`readMigration`, `codeOnly`, `functionBlock`, `expectSignature`, `expectGuardFirst`, `grantedRoles`, `SEARCH_PATH`).
 - Produces: sección 2 del `.sql`. Firma sin cambios: `copy_budget_items_from_template(p_user_id uuid, p_source_template_id uuid, p_target_template_id uuid) RETURNS integer`, que sigue llamando `upsert_monthly_budget` y `fix_templates_without_items`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Agrega al final del archivo de test:
 
@@ -740,12 +740,12 @@ describe('copy_budget_items_from_template', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: FAIL en los 6 tests nuevos (5 con `Falta CREATE OR REPLACE de copy_budget_items_from_template`, el de grants con `expected [] to deeply equal [ 'service_role' ]` o con el `toContain` del REVOKE); los 5 de la Task 1 siguen en PASS.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Agrega al final de `supabase/migrations/20260930100000_blindar_funciones_remotas.sql`:
 
@@ -843,12 +843,12 @@ GRANT EXECUTE ON FUNCTION public.copy_budget_items_from_template(uuid, uuid, uui
 
 Nota: las líneas `0.00 as spent_amount,  -- Resetear gastos` tienen un comentario al final pero **no empiezan** con `--`, así que `codeOnly` las conserva y el test las encuentra.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: PASS, 11 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
