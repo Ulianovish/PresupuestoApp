@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { createServerClient } from '@supabase/ssr';
 
+import { LOGIN_PATH, loginUrl } from '@/lib/auth/login-url';
 import { getRouteAccess, redirectsSignedInUser } from '@/lib/auth/route-access';
 import { esFaltaDeSesion, resumenErrorAuth } from '@/lib/auth/session-error';
 
@@ -94,7 +95,7 @@ export async function middleware(request: NextRequest) {
   // falló) mandó aquí a propósito: rebotar al dashboard formaría un bucle.
   if (access === 'auth') {
     const loginConMarcador =
-      pathname === '/auth/login' &&
+      pathname === LOGIN_PATH &&
       (request.nextUrl.searchParams.has('redirectTo') ||
         request.nextUrl.searchParams.has('error'));
     if (user && redirectsSignedInUser(pathname) && !loginConMarcador) {
@@ -104,9 +105,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (access === 'protected' && !user) {
-    const redirectUrl = new URL('/auth/login', request.url);
-    redirectUrl.searchParams.set('redirectTo', `${pathname}${search}`);
-    return redirigir(redirectUrl);
+    return redirigir(new URL(loginUrl(pathname, search), request.url));
   }
 
   return supabaseResponse;
