@@ -100,6 +100,18 @@ describe('translateAuthError', () => {
     ).toBe(SIN_INVITACION);
   });
 
+  it.each([
+    'Something went wrong: invalid login credentials for this project',
+    'weak_password_policy_disabled',
+    'otp_expired_or_whatever',
+    'no user_already_exists here',
+  ])(
+    'solo signup_not_allowed se busca como subcadena (%s → genérico)',
+    message => {
+      expect(translateAuthError({ message })).toBe(GENERIC_AUTH_ERROR);
+    },
+  );
+
   it('enlace_invalido tiene texto propio y constantes exportadas', () => {
     expect(INVALID_LINK_ERROR_CODE).toBe('enlace_invalido');
     expect(translateAuthError({ code: INVALID_LINK_ERROR_CODE })).toBe(

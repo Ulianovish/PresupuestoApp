@@ -3,7 +3,8 @@
  * (contratos §2.2 + §5.2).
  *
  * Compara `code` solo si es uno conocido; si no hay `code` o no está en la
- * tabla, compara `message`. Sin distinguir mayúsculas. El rechazo del hook de
+ * tabla, compara `message` (exacto; solo 'signup_not_allowed' también como
+ * subcadena). Sin distinguir mayúsculas. El rechazo del hook de
  * la allowlist llega sin `code` (message 'signup_not_allowed', 403) y el del
  * trigger con `code: 'unexpected_failure'` y message 'Database error saving
  * new user': ambos terminan en el texto de "sin invitación".
@@ -74,9 +75,8 @@ export function translateAuthError(
   const exacto = MENSAJES.get(message);
   if (exacto) return exacto;
 
-  // El hook de registro puede venir envuelto ("... signup_not_allowed ...").
-  for (const [clave, texto] of MENSAJES) {
-    if (message.includes(clave)) return texto;
-  }
+  // Solo el literal del hook se busca como subcadena: puede venir envuelto
+  // ("Hook requires authorization: signup_not_allowed"). El resto, exacto.
+  if (message.includes('signup_not_allowed')) return SIN_INVITACION;
   return GENERIC_AUTH_ERROR;
 }
