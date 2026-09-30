@@ -4,9 +4,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Que un usuario que olvidó su contraseña pida un enlace por correo en `/auth/forgot-password` (con la misma respuesta exista o no el correo) y, al abrirlo, cree una contraseña nueva en `/auth/reset-password` y quede en `/dashboard`.
+**Goal:** Que un usuario que olvidó su contraseña pida un enlace por correo en `/auth/forgot-password` (con la misma respuesta exista o no el correo) y, al abrirlo, cree una contraseña nueva en `/auth/reset-password` y siga a `/bienvenida` o `/dashboard` según su onboarding (`getPostLoginPath`, contratos §5.2).
 
-**Architecture:** Dos server actions nuevas en `src/lib/actions/auth.ts`. `forgotPasswordAction` llama `supabase.auth.resetPasswordForEmail` con `redirectTo` hacia `/auth/confirm` (S04), se traga todo error (incluido el límite de envíos, que revelaría que el correo existe; contratos §5.2), registra solo el `code` y siempre redirige al mismo mensaje. El correo (plantilla "Reset Password", tarea humana H4) apunta a `/auth/confirm?token_hash=…&type=recovery&next=/auth/reset-password`; ese route handler (S04) llama `verifyOtp`, deja la sesión en cookies y redirige a `/auth/reset-password`. `resetPasswordAction` exige esa sesión (`auth.getUser()`), valida con `passwordSchema` (S06) y llama `updateUser({ password })`; sus errores (incluido `same_password`) pasan por `translateAuthError` (S04). Las páginas imitan el estilo de `login/page.tsx` y `register/page.tsx` (Card `glass`, fondo `slate-900`, mensajes por query `error`/`message`).
+**Architecture:** Dos server actions nuevas en `src/lib/actions/auth.ts`. `forgotPasswordAction` llama `supabase.auth.resetPasswordForEmail` con `redirectTo` hacia `/auth/confirm` (S04), se traga todo error (incluido el límite de envíos, que revelaría que el correo existe; contratos §5.2), registra solo el `code` y siempre redirige al mismo mensaje. El correo (plantilla "Reset Password", tarea humana H4) apunta a `/auth/confirm?token_hash=…&type=recovery&next=/auth/reset-password`; ese route handler (S04) llama `verifyOtp`, deja la sesión en cookies y redirige a `/auth/reset-password`. `resetPasswordAction` exige esa sesión (`auth.getUser()`), valida con `resetPasswordFormSchema` (usa `passwordSchema` de S06) y llama `updateUser({ password })`; tras el éxito redirige con `getPostLoginPath(supabase, user.id)`. En `?error=`/`?message=` solo viajan **códigos**, nunca texto; las páginas los traducen con `resolveForgotPasswordFeedback` y `resolveResetPasswordError` (`src/lib/auth/password-reset-feedback.ts`, listas cerradas; lo que no está en la lista pasa por `translateAuthError`, incluido `same_password`). Las páginas imitan el estilo de `login/page.tsx` y `register/page.tsx` (Card `glass`, fondo `slate-900`). **Ver la sección «Desviaciones» al final: prevalece sobre el código de las Tasks 2–5.**
 
 **Tech Stack:** Next.js 15 App Router (server actions, server components), `@supabase/ssr` (cliente de cookie), Zod 4, vitest 4, bun.
 
@@ -45,6 +45,11 @@ S05 depende de **S04** (crea `getSiteUrl`, `safeRedirectPath`, `translateAuthErr
 | Crear | `src/app/auth/forgot-password/page.tsx` | Formulario de correo (componente cliente, estilo login) |
 | Crear | `src/app/auth/reset-password/page.tsx` | Server component: exige sesión; sin sesión → `/auth/forgot-password` con "El enlace venció. Pide uno nuevo." |
 | Crear | `src/app/auth/reset-password/ResetPasswordForm.tsx` | Formulario cliente de contraseña nueva (estilo register) |
+| Crear | `src/lib/auth/password-reset-feedback.ts` (+ test) | Códigos de las dos páginas y su traducción desde listas cerradas (ver Desviaciones) |
+| Crear | `src/app/auth/forgot-password/forgot-password-page.test.ts`, `src/app/auth/reset-password/reset-password-page.test.ts` | Invariantes de seguridad sobre el código fuente de las páginas (sin render, §5.0) |
+| Crear | `src/app/auth/AuthLoadingFallback.tsx` | Fallback de Suspense compartido por login, registro y las dos páginas de contraseña |
+| Modificar | `src/lib/validations/schemas.ts` | `resetPasswordFormSchema` (exportado para que el test use el esquema real) |
+| Modificar | `src/lib/auth/error-messages.ts` | Fila `reauthentication_needed` (contratos §5.2) |
 
 `src/lib/validations/schemas.ts` **no se toca**: `passwordSchema` lo crea S06. `middleware.ts` y `src/lib/auth/route-access.ts` **no se tocan**: S04 deja `/auth/forgot-password` y `/auth/reset-password` en `AUTH_ROUTES` de `route-access.ts` (siempre accesibles; solo `/auth/login` y `/auth/register` redirigen a usuarios con sesión). S04 es dueña de esos archivos.
 
@@ -53,12 +58,12 @@ La plantilla "Invite user" de S04 también lleva a `/auth/reset-password` (contr
 ## Criterios de aceptación
 
 1. `/auth/forgot-password` muestra un formulario de correo. Al enviarlo con un correo válido se llama `resetPasswordForEmail(correo, { redirectTo: `${getSiteUrl()}/auth/confirm?type=recovery&next=/auth/reset-password` })` y se muestra **exactamente** "Si el correo está registrado, te enviamos un enlace.", tanto si Supabase responde bien como si devuelve cualquier error (incluido el límite de envíos) o lanza: la URL final es idéntica en todos los casos y el log lleva solo el `code` (contratos §5.2).
-2. Correo vacío o con formato inválido → "Escribe un correo válido." sin llamar a Supabase.
-3. `/auth/reset-password` sin sesión redirige a `/auth/forgot-password` con "El enlace venció. Pide uno nuevo." (texto de `translateAuthError({ code: 'otp_expired' })`). `resetPasswordAction` aplica la misma regla (no confía en la página).
-4. `resetPasswordAction` valida con `passwordSchema` (8–72) y que ambas contraseñas coincidan ("Las contraseñas no coinciden"); si falla, vuelve a `/auth/reset-password?error=…` sin llamar `updateUser`.
-5. Con sesión y contraseña válida: `updateUser({ password })`, `revalidatePath('/', 'layout')` y redirección a `/dashboard`.
-6. Error de `updateUser` → `/auth/reset-password?error=<translateAuthError(error)>`; nunca el mensaje crudo. `same_password` muestra "La contraseña nueva debe ser distinta de la anterior." (fila de §5.2).
-7. La UI de reset dice "Mínimo 8 caracteres." como único texto de ayuda.
+2. Correo vacío o con formato inválido → `/auth/forgot-password?error=correo_invalido` sin llamar a Supabase; la página muestra "Escribe un correo válido.". (En el éxito la URL es `?message=enlace_enviado` y la página muestra el texto del criterio 1.)
+3. `/auth/reset-password` sin sesión redirige a `/auth/forgot-password?error=otp_expired`, que la página traduce a "El enlace venció. Pide uno nuevo." (`translateAuthError({ code: 'otp_expired' })`). `resetPasswordAction` aplica la misma regla (no confía en la página).
+4. `resetPasswordAction` valida con `resetPasswordFormSchema` (`passwordSchema` 8–72, confirmación no vacía y que ambas coincidan); si falla, vuelve a `/auth/reset-password?error=<código>` (`password_corta`, `password_larga`, `confirmar_password`, `no_coinciden` o `datos_invalidos`) sin llamar `updateUser`, y la página muestra el texto de la lista cerrada ("Las contraseñas no coinciden.", etc.).
+5. Con sesión y contraseña válida: `updateUser({ password })`, `revalidatePath('/', 'layout')` y redirección a `getPostLoginPath(supabase, user.id)` (`/bienvenida` o `/dashboard`; contratos §5.2), no a `/dashboard` fijo.
+6. Error de `updateUser` → `/auth/reset-password?error=<authErrorCode(error)>`; la página lo traduce con `resolveResetPasswordError`, nunca muestra el mensaje crudo y un texto libre en `?error=` cae en el genérico. `same_password` muestra "La contraseña nueva debe ser distinta de la anterior." y `reauthentication_needed` "Por seguridad, pide un enlace nuevo para cambiar la contraseña." (filas de §5.2).
+7. La UI de reset usa `PASSWORD_HINT` ("Mínimo 8 caracteres.") como único texto de ayuda y `PASSWORD_MIN_LENGTH`/`PASSWORD_MAX_LENGTH` de `password-rules.ts` en los campos.
 8. Los logs de error no contienen el correo; el de `forgotPasswordAction` es exactamente `{ code }`.
 9. Texto de la plantilla "Reset Password" para H4 incluido en esta historia (sección final).
 10. `bun run test && bun run type-check` en verde.
@@ -1197,7 +1202,7 @@ Comprobación después de pegarla (la hace la persona, con su propio correo, cua
 - C2 (correo inválido) → Task 2, tests 5 y 6.
 - C3 (sin sesión) → Task 3 test 1 (acción) + Task 5 Step 2 (página, mismo destino).
 - C4 (passwordSchema 8–72 + coincidencia) → Task 1 (verifica el de S06) + Task 3 tests 2–4.
-- C5 (éxito → `updateUser`, `revalidatePath`, `/dashboard`) → Task 3 test 5.
+- C5 (éxito → `updateUser`, `revalidatePath`, `getPostLoginPath`) → Task 3 test 5 (ver Desviaciones).
 - C6 (errores traducidos, nunca crudos; `same_password` con texto propio) → Task 3 tests 6, 7 y 8.
 - C7 ("Mínimo 8 caracteres.") → Task 5 Step 1.
 - C8 (logs sin correo; `forgotPasswordAction` solo `{ code }`) → Task 2 tests 3 y 4; los `console.error` de la Task 3 solo llevan `code`/`status`.
@@ -1209,3 +1214,22 @@ Comprobación después de pegarla (la hace la persona, con su propio correo, cua
 **Enmiendas v2 (§5):** orden S04 → S06 → S05, así que `passwordSchema` ya no se crea aquí (Task 1 solo verifica); `forgotPasswordAction` se traga todo error y registra solo el `code` (§5.2); `same_password` pasa por `translateAuthError` (§5.2); sin `bun run dev` (§5.0); sin tocar `vitest.config.ts`, `schemas.ts`, `middleware.ts` ni `route-access.ts`.
 
 **Consistencia con S04/S06 (van antes en el flujo AUTH):** se usan exactamente `getSiteUrl()` (`@/lib/site-url`), `translateAuthError(err)` (`@/lib/auth/error-messages`), `passwordSchema` (`@/lib/validations/schemas`) y `/auth/confirm` con `type`/`next`, como en el contrato §2.1–§2.4 y §5.2. `safeRedirectPath` no se usa directamente: `/auth/confirm` (S04) lo aplica sobre `next=/auth/reset-password`, que el contrato permite explícitamente. El helper privado `withQueryParam` y el test `auth-password.test.ts` tienen nombres propios para no chocar con lo que agregue S04 en `auth.ts` y `auth.test.ts`.
+
+---
+
+## Desviaciones (implementación real; prevalece sobre el código de las Tasks 2–5)
+
+El plan se escribió antes de que S04 y S06 fijaran el patrón de códigos en la URL. La implementación sigue ese patrón y contratos §5.2; el código de las Tasks 2–5 queda como referencia histórica.
+
+1. **Códigos, no texto, en la URL.** En vez del helper `withQueryParam(path, key, texto)` (con 'Escribe un correo válido.', 'Si el correo está registrado…', `translateAuthError(error)` o el primer mensaje de Zod en la URL), `auth.ts` usa `urlConCodigo(path, params)` (el mismo helper que usan login y registro vía `urlConError`) y solo manda códigos:
+   - `/auth/forgot-password`: `?error=correo_invalido`, `?message=enlace_enviado`, `?error=otp_expired` (sin sesión).
+   - `/auth/reset-password`: `?error=` con `password_corta`, `password_larga`, `no_coinciden`, `confirmar_password`, `datos_invalidos` (validación, `resetPasswordValidationErrorCode`) o el código de `authErrorCode(error)` (errores de `updateUser`).
+2. **La traducción la hacen las páginas** con `resolveForgotPasswordFeedback` y `resolveResetPasswordError` (`src/lib/auth/password-reset-feedback.ts`), desde listas cerradas (`Map`); un código fuera de la lista pasa por `translateAuthError` (desconocido → texto genérico) y un `?message=` desconocido no se muestra. Así nadie puede armar una URL con un texto engañoso.
+3. **Éxito con `getPostLoginPath(supabase, user.id)`**, no `redirect('/dashboard')` fijo (contratos §5.2): el invitado que fija su contraseña ve `/bienvenida`.
+4. **Regla de contraseña compartida.** La UI usa `PASSWORD_HINT`, `PASSWORD_MIN_LENGTH` y `PASSWORD_MAX_LENGTH` de `src/lib/validations/password-rules.ts` (S06) en vez del texto "Mínimo 8 caracteres." y los números escritos a mano. El esquema del formulario es `resetPasswordFormSchema`, exportado desde `src/lib/validations/schemas.ts` (no desde `auth.ts`, que es `'use server'`), para que el test de `resetPasswordValidationErrorCode` use el esquema real. Por eso sí se toca `schemas.ts` (solo se agrega ese esquema; `passwordSchema` no cambia).
+5. **Archivos nuevos** no previstos: `src/lib/auth/password-reset-feedback.ts` y su test; `forgot-password-page.test.ts` y `reset-password-page.test.ts` (solo invariantes de seguridad sobre el código fuente: nada de `setError(searchParams.get…)`, `setMessage` solo con lo resuelto o `null`, uso de la regla compartida); `src/app/auth/AuthLoadingFallback.tsx` (fallback de Suspense que antes estaba copiado en login, registro y las dos páginas nuevas).
+6. **Deuda de S06 resuelta aquí** (tres tareas):
+   - `confirmar_password`: el registro (y el reset) con la confirmación vacía pide confirmarla en vez de decir que no coinciden.
+   - `datos_login_invalidos`: el login con el formulario inválido manda su propio código (`LOGIN_VALIDATION_ERROR_CODE`), no el de credenciales.
+   - Contratos §5.2: `registerAction` manda en `?error=` un código por campo que traduce `resolveRegisterError`.
+7. **Sesión aceptada.** `resetPasswordAction` y `/auth/reset-password` aceptan cualquier sesión, no solo una de recuperación (lo usan la recuperación y la invitación). Queda documentado en contratos §5.2; si en Supabase se activa "Secure password change", `updateUser` devuelve `reauthentication_needed`, que ahora tiene fila propia en `error-messages.ts`: "Por seguridad, pide un enlace nuevo para cambiar la contraseña."
