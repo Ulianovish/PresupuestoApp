@@ -132,6 +132,10 @@ describe('resolveResetPasswordError', () => {
     ['datos_invalidos', 'Revisa la contraseña.'],
     ['same_password', 'La contraseña nueva debe ser distinta de la anterior.'],
     ['weak_password', 'La contraseña es muy débil. Usa al menos 8 caracteres.'],
+    [
+      'reauthentication_needed',
+      'Por seguridad, pide un enlace nuevo para cambiar la contraseña.',
+    ],
   ])('traduce %s', (codigo, texto) => {
     expect(resolveResetPasswordError(codigo)).toBe(texto);
   });

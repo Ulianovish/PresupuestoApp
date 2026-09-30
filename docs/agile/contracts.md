@@ -325,6 +325,7 @@ Resuelven los huecos que reportaron los 13 planificadores. Donde choquen con el 
   |---|---|
   | `enlace_invalido` | El enlace no es válido o ya venció. Si ya confirmaste tu correo, inicia sesión. |
   | `same_password` | La contraseña nueva debe ser distinta de la anterior. |
+  | `reauthentication_needed` | Por seguridad, pide un enlace nuevo para cambiar la contraseña. |
 
   Exporta `INVALID_LINK_ERROR_CODE`, `INVALID_LINK_LOGIN_PATH`, `GENERIC_AUTH_ERROR`. Implementación con `Map` (sin lookups en el prototipo).
 - **§2.3 auth**:
@@ -334,6 +335,7 @@ Resuelven los huecos que reportaron los 13 planificadores. Donde choquen con el 
   - `registerAction` manda en `?error=` un código por campo y la página lo traduce con `resolveRegisterError` desde una lista cerrada.
   - La plantilla "Invite user" lleva `next=/auth/reset-password` (excepción a "sin next"): no invitar antes de desplegar S05, y el correo debe estar en la allowlist.
   - `resetPasswordAction`, tras `updateUser` exitoso, redirige con `getPostLoginPath` (no fijo a `/dashboard`): así el invitado que fija su contraseña ve `/bienvenida`.
+  - `resetPasswordAction` y `/auth/reset-password` aceptan **cualquier** sesión, no solo una de recuperación: es intencional, porque las usan tanto el enlace de recuperación como la invitación, y no se distingue el tipo de sesión. Un usuario con sesión normal puede cambiar su contraseña sin dar la actual; si en Supabase se activa "Secure password change", `updateUser` devuelve `reauthentication_needed` y la página muestra el texto de esa fila (pedir un enlace nuevo).
   - Lógica de rutas del middleware en `src/lib/auth/route-access.ts` (S04).
 - **§2.6 limpieza (S07)**: además borra `src/scripts/migrate-july-data.ts`, `src/scripts/migrate-july-expenses.ts`, los paneles sin uso `ExpenseMigrationPanel` y `BudgetMigrationPanel`, y el botón ligado a `'2025-07'` de `ExpenseHeader.tsx` (verificar con grep que nada los importe). "Primero crea una categoría" es la etiqueta del botón deshabilitado, más un aviso con enlace a `/settings`.
 - **§2.7 onboarding**:
@@ -362,6 +364,7 @@ Choques al integrar: `handle-linking.ts` (S02 en SEG, S13 en APP: líneas distin
 
 ## Registro de cambios
 
+- v2.2 (2026-09-30): fila `reauthentication_needed` en §2.2 y regla de sesión de `resetPasswordAction` (cualquier sesión, intencional) en §5.2 (S05).
 - v2.1 (2026-09-30): tarea humana H10 y regla de no declarar protección por middleware hasta resolverla (ADR-004).
 - v2 (2026-09-30): enmiendas §5 tras la planificación (13 planes, huecos consolidados).
 - v1 (2026-09-30): versión inicial.

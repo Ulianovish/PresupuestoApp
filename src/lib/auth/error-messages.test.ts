@@ -131,6 +131,18 @@ describe('translateAuthError', () => {
     ).toBe('La contraseña nueva debe ser distinta de la anterior.');
   });
 
+  it('reauthentication_needed (updateUser con "Secure password change") pide un enlace nuevo', () => {
+    expect(
+      translateAuthError({
+        code: 'reauthentication_needed',
+        message: 'Password update requires reauthentication.',
+      }),
+    ).toBe('Por seguridad, pide un enlace nuevo para cambiar la contraseña.');
+    expect(authErrorCode({ code: 'reauthentication_needed' })).toBe(
+      'reauthentication_needed',
+    );
+  });
+
   it.each([
     [null],
     [undefined],

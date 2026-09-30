@@ -51,6 +51,12 @@ const MENSAJES = new Map<string, string>([
     'El enlace no es válido o ya venció. Si ya confirmaste tu correo, inicia sesión.',
   ],
   ['same_password', 'La contraseña nueva debe ser distinta de la anterior.'],
+  // updateUser con "Secure password change" activo y una sesión que no es de
+  // recuperación (contratos §5.2): la salida es pedir un enlace nuevo.
+  [
+    'reauthentication_needed',
+    'Por seguridad, pide un enlace nuevo para cambiar la contraseña.',
+  ],
 ]);
 
 // `message` de Supabase (en minúsculas) → código.
