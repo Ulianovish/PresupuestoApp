@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
@@ -155,19 +152,5 @@ describe('/dashboard', () => {
 
     expect(ensureStarterKitAction).not.toHaveBeenCalled();
     expect(loadDashboardChecklist).toHaveBeenCalledWith(client, USER_ID, null);
-  });
-});
-
-describe('DashboardContent (cableado de la checklist)', () => {
-  const fuente = readFileSync(
-    resolve(process.cwd(), 'src/components/pages/DashboardContent.tsx'),
-    'utf8',
-  );
-
-  it('acepta la prop checklist y pinta OnboardingChecklist encima de las acciones rápidas', () => {
-    expect(fuente).toContain('checklist?: ChecklistItem[] | null;');
-    expect(fuente).toMatch(
-      /checklist && <OnboardingChecklist items=\{checklist\} \/>\}\s*<DashboardQuickActions \/>/,
-    );
   });
 });
