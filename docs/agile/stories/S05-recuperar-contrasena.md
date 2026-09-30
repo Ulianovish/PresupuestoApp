@@ -679,7 +679,7 @@ EOF
 
 No hay tests de componentes en el proyecto (vitest corre en `node`, contratos §5.0); la verificación es `type-check`.
 
-- [ ] **Step 1: Crear la página**
+- [x] **Step 1: Crear la página**
 
 Crea `src/app/auth/forgot-password/page.tsx`:
 
@@ -855,14 +855,14 @@ export default function ForgotPasswordPage() {
 }
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
 Expected: sin errores.
 
 Sin revisión manual con `bun run dev`: contratos §5.0 lo prohíben (`.env.local` apunta a producción y el formulario mandaría correos reales). La revisión visual la hace la persona después de desplegar.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/app/auth/forgot-password/page.tsx && git commit -m "$(cat <<'EOF'
