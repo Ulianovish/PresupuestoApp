@@ -56,7 +56,12 @@ export function computeChecklist(input: ChecklistInput): ChecklistItem[] {
     },
     {
       id: 'documento',
-      label: 'Carga tu cédula para facturas DIAN',
+      // La cédula se guarda por número vinculado (whatsapp_links.documento):
+      // sin número, Ajustes no tiene dónde cargarla.
+      label:
+        input.linkedPhoneCount > 0
+          ? 'Carga tu cédula para facturas DIAN'
+          : 'Carga tu cédula para facturas DIAN (primero vincula WhatsApp)',
       href: '/settings',
       done: input.hasDocumento,
     },
@@ -106,7 +111,9 @@ export async function loadChecklistInput(
         .from('whatsapp_links')
         .select('id', CONTEO)
         .eq('user_id', userId)
-        .not('documento', 'is', null),
+        .not('documento', 'is', null)
+        // Un documento vacío no es una cédula cargada.
+        .neq('documento', ''),
       // Rubros del mes con monto: el join !inner con budget_templates (FK
       // budget_items_template_id_fkey) deja filtrar por month_year.
       supabase
@@ -140,30 +147,23 @@ export async function loadChecklistInput(
   };
 }
 
+/** Lo que la checklist necesita del perfil (lo lee el dashboard una vez). */
+export type PerfilChecklist = { onboarding_dismissed_at: string | null };
+
 /**
  * Lo que el dashboard necesita: los ítems si hay que mostrar la checklist, o
  * null si no (la ocultó, ya hizo todo, o algo falló). Nunca lanza: la
  * checklist es opcional y no debe tumbar el dashboard.
  *
- * Una fila sin la columna (migración S09 sin aplicar) da undefined y se trata
- * como ocultada.
+ * `perfil` es la fila de profiles que el dashboard ya leyó; null = no hay
+ * fila o la lectura falló. Una fila sin la columna (migración S09 sin
+ * aplicar) da undefined y se trata como ocultada.
  */
 export async function loadDashboardChecklist(
   supabase: SupabaseClient,
   userId: string,
+  perfil: PerfilChecklist | null,
 ): Promise<ChecklistItem[] | null> {
-  const { data: perfil, error } = await supabase
-    .from('profiles')
-    .select('onboarding_dismissed_at')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error) {
-    console.error(
-      'loadDashboardChecklist: error leyendo el perfil:',
-      error.code,
-    );
-    return null;
-  }
   if (!perfil || perfil.onboarding_dismissed_at !== null) {
     return null;
   }

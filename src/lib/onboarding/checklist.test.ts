@@ -44,7 +44,7 @@ describe('computeChecklist', () => {
       },
       {
         id: 'documento',
-        label: 'Carga tu cédula para facturas DIAN',
+        label: 'Carga tu cédula para facturas DIAN (primero vincula WhatsApp)',
         href: '/settings',
         done: false,
       },
@@ -85,6 +85,18 @@ describe('computeChecklist', () => {
     }
   });
 
+  it('la cédula se carga por número vinculado: sin WhatsApp, el ítem lo dice', () => {
+    const documento = (linkedPhoneCount: number) =>
+      computeChecklist({ ...RECIEN_LLEGADO, linkedPhoneCount }).find(
+        i => i.id === 'documento',
+      )?.label;
+
+    expect(documento(0)).toBe(
+      'Carga tu cédula para facturas DIAN (primero vincula WhatsApp)',
+    );
+    expect(documento(1)).toBe('Carga tu cédula para facturas DIAN');
+  });
+
   it('con todo configurado, los 5 quedan hechos', () => {
     const items = computeChecklist({
       accountCount: 2,
@@ -120,7 +132,7 @@ function clienteFalso(responder: (c: Consulta) => Respuesta) {
     const consulta: Consulta = { tabla, llamadas: [] };
     consultas.push(consulta);
     const builder: Record<string, unknown> = {};
-    for (const metodo of ['select', 'eq', 'not', 'gt', 'maybeSingle']) {
+    for (const metodo of ['select', 'eq', 'not', 'neq', 'gt', 'maybeSingle']) {
       builder[metodo] = (...args: unknown[]) => {
         consulta.llamadas.push({ metodo, args });
         return builder;
@@ -238,7 +250,10 @@ describe('loadChecklistInput', () => {
     expect(llamo(deudas, 'eq', 'es_activo', true)).toBe(true);
 
     const links = consultas.filter(c => c.tabla === 'whatsapp_links');
-    expect(links.filter(c => filtraNoNulo(c, 'documento'))).toHaveLength(1);
+    const conDocumento = links.filter(c => filtraNoNulo(c, 'documento'));
+    expect(conDocumento).toHaveLength(1);
+    // Un documento vacío ('') no cuenta como cédula cargada.
+    expect(llamo(conDocumento[0], 'neq', 'documento', '')).toBe(true);
 
     // Rubros del mes con monto (§5.2).
     const rubros = consultas.find(c => c.tabla === 'budget_items')!;
@@ -315,91 +330,79 @@ describe('loadDashboardChecklist', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  function responderDashboard(
-    perfil: Respuesta,
-    conteos: Conteos = CEROS,
-    fallas: Partial<Record<string, string>> = {},
-  ) {
-    const conteo = responderConteos(conteos, fallas);
-    return (c: Consulta): Respuesta =>
-      c.tabla === 'profiles' ? perfil : conteo(c);
-  }
+  const NO_OCULTA = { onboarding_dismissed_at: null };
+
+  it('recibe el perfil ya leído: no vuelve a leer profiles', async () => {
+    const { client, consultas } = clienteFalso(responderConteos(CEROS));
+
+    await loadDashboardChecklist(client, USER_ID, NO_OCULTA);
+
+    expect(consultas.map(c => c.tabla)).not.toContain('profiles');
+  });
 
   it('si ya la ocultó, devuelve null sin hacer los conteos', async () => {
-    const { client, from, consultas } = clienteFalso(
-      responderDashboard({
-        data: { onboarding_dismissed_at: '2026-09-01T00:00:00.000Z' },
-        error: null,
-      }),
-    );
+    const { client, from } = clienteFalso(responderConteos(CEROS));
 
-    await expect(loadDashboardChecklist(client, USER_ID)).resolves.toBeNull();
-    expect(from).toHaveBeenCalledTimes(1);
-    const perfil = consultas[0];
-    expect(perfil.tabla).toBe('profiles');
-    expect(llamo(perfil, 'select', 'onboarding_dismissed_at')).toBe(true);
-    expect(llamo(perfil, 'eq', 'id', USER_ID)).toBe(true);
-    expect(llamo(perfil, 'maybeSingle')).toBe(true);
+    await expect(
+      loadDashboardChecklist(client, USER_ID, {
+        onboarding_dismissed_at: '2026-09-01T00:00:00.000Z',
+      }),
+    ).resolves.toBeNull();
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('sin perfil (sin fila o la lectura falló), devuelve null sin hacer los conteos', async () => {
+    const { client, from } = clienteFalso(responderConteos(CEROS));
+
+    await expect(
+      loadDashboardChecklist(client, USER_ID, null),
+    ).resolves.toBeNull();
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('una fila sin la columna (undefined) cuenta como ocultada', async () => {
+    const { client, from } = clienteFalso(responderConteos(CEROS));
+
+    await expect(
+      loadDashboardChecklist(client, USER_ID, {} as typeof NO_OCULTA),
+    ).resolves.toBeNull();
+    expect(from).not.toHaveBeenCalled();
   });
 
   it('si no la ocultó y hay pendientes, devuelve los 5 ítems', async () => {
     const { client } = clienteFalso(
-      responderDashboard(
-        { data: { onboarding_dismissed_at: null }, error: null },
-        { ...CEROS, accounts: 1, deudas: 2 },
-      ),
+      responderConteos({ ...CEROS, accounts: 1, deudas: 2 }),
     );
 
-    const items = await loadDashboardChecklist(client, USER_ID);
+    const items = await loadDashboardChecklist(client, USER_ID, NO_OCULTA);
     expect(items).toHaveLength(5);
     expect(items!.filter(i => i.done).map(i => i.id)).toEqual(['deudas']);
   });
 
   it('si todo está hecho, devuelve null', async () => {
     const { client } = clienteFalso(
-      responderDashboard(
-        { data: { onboarding_dismissed_at: null }, error: null },
-        {
-          accounts: 2,
-          deudas: 1,
-          links: 1,
-          linksConDocumento: 1,
-          presupuesto: 1,
-        },
-      ),
+      responderConteos({
+        accounts: 2,
+        deudas: 1,
+        links: 1,
+        linksConDocumento: 1,
+        presupuesto: 1,
+      }),
     );
 
-    await expect(loadDashboardChecklist(client, USER_ID)).resolves.toBeNull();
-  });
-
-  it('si la lectura del perfil falla (p. ej. columna sin migrar), devuelve null y registra solo el código', async () => {
-    const { client, from } = clienteFalso(
-      responderDashboard({ data: null, error: { code: '42703' } }),
-    );
-
-    await expect(loadDashboardChecklist(client, USER_ID)).resolves.toBeNull();
-    expect(from).toHaveBeenCalledTimes(1);
-    expect(console.error).toHaveBeenCalledWith(expect.any(String), '42703');
-  });
-
-  it('sin fila de perfil, devuelve null', async () => {
-    const { client } = clienteFalso(
-      responderDashboard({ data: null, error: null }),
-    );
-
-    await expect(loadDashboardChecklist(client, USER_ID)).resolves.toBeNull();
+    await expect(
+      loadDashboardChecklist(client, USER_ID, NO_OCULTA),
+    ).resolves.toBeNull();
   });
 
   it('si un conteo falla, devuelve null sin lanzar y sin loguear el user_id', async () => {
     const { client } = clienteFalso(
-      responderDashboard(
-        { data: { onboarding_dismissed_at: null }, error: null },
-        CEROS,
-        { budget_items: '42501' },
-      ),
+      responderConteos(CEROS, { budget_items: '42501' }),
     );
 
-    await expect(loadDashboardChecklist(client, USER_ID)).resolves.toBeNull();
+    await expect(
+      loadDashboardChecklist(client, USER_ID, NO_OCULTA),
+    ).resolves.toBeNull();
     const logueado = JSON.stringify(
       (console.error as unknown as ReturnType<typeof vi.fn>).mock.calls,
     );

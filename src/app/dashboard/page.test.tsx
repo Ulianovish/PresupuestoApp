@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
   redirect: vi.fn((url: string) => {
@@ -63,6 +63,8 @@ describe('/dashboard', () => {
     mocked(ensureStarterKitAction).mockResolvedValue({ seeded: false });
     mocked(loadDashboardChecklist).mockResolvedValue(ITEMS);
   });
+  // Restaura los spies (console.error) aunque una aserción falle.
+  afterEach(() => vi.restoreAllMocks());
 
   it('sin sesión → login, sin sembrar el kit', async () => {
     mocked(getCurrentUser).mockResolvedValue(null);
@@ -82,21 +84,31 @@ describe('/dashboard', () => {
       orden.push('checklist');
       return ITEMS;
     });
-    const { client, chain } = clienteFalso({
-      data: { onboarding_completed_at: null },
-      error: null,
-    });
+    const perfil = {
+      onboarding_completed_at: null,
+      onboarding_dismissed_at: null,
+    };
+    const { client, chain } = clienteFalso({ data: perfil, error: null });
 
     const arbol = (await DashboardPage()) as {
       type: unknown;
       props: Record<string, unknown>;
     };
 
+    // Una sola lectura de profiles con las dos columnas; la checklist recibe
+    // el perfil ya leído.
+    expect(client.from).toHaveBeenCalledTimes(1);
     expect(client.from).toHaveBeenCalledWith('profiles');
-    expect(chain.select).toHaveBeenCalledWith('onboarding_completed_at');
+    expect(chain.select).toHaveBeenCalledWith(
+      'onboarding_completed_at, onboarding_dismissed_at',
+    );
     expect(chain.eq).toHaveBeenCalledWith('id', USER_ID);
     expect(orden).toEqual(['kit', 'checklist']);
-    expect(loadDashboardChecklist).toHaveBeenCalledWith(client, USER_ID);
+    expect(loadDashboardChecklist).toHaveBeenCalledWith(
+      client,
+      USER_ID,
+      perfil,
+    );
     expect(arbol.type).toBe(DashboardContent);
     expect(arbol.props).toMatchObject({
       user: { id: USER_ID },
@@ -105,36 +117,44 @@ describe('/dashboard', () => {
   });
 
   it('bienvenida terminada: NO llama el kit (no reactiva categorías borradas)', async () => {
-    clienteFalso({
-      data: { onboarding_completed_at: '2026-09-01T00:00:00.000Z' },
-      error: null,
-    });
+    const perfil = {
+      onboarding_completed_at: '2026-09-01T00:00:00.000Z',
+      onboarding_dismissed_at: null,
+    };
+    const { client } = clienteFalso({ data: perfil, error: null });
 
     const arbol = (await DashboardPage()) as { props: Record<string, unknown> };
 
     expect(ensureStarterKitAction).not.toHaveBeenCalled();
-    expect(loadDashboardChecklist).toHaveBeenCalled();
+    expect(loadDashboardChecklist).toHaveBeenCalledWith(
+      client,
+      USER_ID,
+      perfil,
+    );
     expect(arbol.props.checklist).toEqual(ITEMS);
   });
 
   it('si la lectura del perfil falla (columna sin migrar): NO llama el kit y carga igual', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    clienteFalso({ data: null, error: { code: '42703' } });
+    const { client } = clienteFalso({ data: null, error: { code: '42703' } });
     mocked(loadDashboardChecklist).mockResolvedValue(null);
 
     const arbol = (await DashboardPage()) as { props: Record<string, unknown> };
 
     expect(ensureStarterKitAction).not.toHaveBeenCalled();
+    // Sin perfil válido la checklist recibe null (no muestra nada).
+    expect(loadDashboardChecklist).toHaveBeenCalledWith(client, USER_ID, null);
+    expect(console.error).toHaveBeenCalledWith(expect.any(String), '42703');
     expect(arbol.props.checklist).toBeNull();
-    vi.restoreAllMocks();
   });
 
   it('sin fila de perfil: NO llama el kit', async () => {
-    clienteFalso({ data: null, error: null });
+    const { client } = clienteFalso({ data: null, error: null });
 
     await DashboardPage();
 
     expect(ensureStarterKitAction).not.toHaveBeenCalled();
+    expect(loadDashboardChecklist).toHaveBeenCalledWith(client, USER_ID, null);
   });
 });
 
