@@ -334,7 +334,7 @@ git commit -m "feat(auth): safeRedirectPath solo deja redirigir a rutas internas
   - `export const INVALID_LINK_ERROR_CODE = 'enlace_invalido'`
   - `export const INVALID_LINK_LOGIN_PATH = '/auth/login?error=enlace_invalido'` (lo usan Task 5, Task 6 y la página de login en Task 7).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/auth/error-messages.test.ts`:
 
@@ -473,12 +473,12 @@ describe('translateAuthError', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/auth/error-messages.test.ts`
 Expected: FAIL con `Failed to resolve import "./error-messages"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/auth/error-messages.ts`:
 
@@ -567,12 +567,12 @@ export function translateAuthError(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/auth/error-messages.test.ts`
 Expected: PASS (todos los casos, incluidos hook, trigger, `enlace_invalido` y `same_password`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/auth/error-messages.ts src/lib/auth/error-messages.test.ts
