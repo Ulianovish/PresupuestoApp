@@ -183,3 +183,29 @@ export async function loadDashboardChecklist(
   const items = computeChecklist(input);
   return items.some(i => !i.done) ? items : null;
 }
+
+export const DISMISS_ERROR_MESSAGE =
+  'No pudimos ocultar la lista. Intenta de nuevo.';
+
+/**
+ * "Ocultar" la checklist: la esconde al instante y guarda con `dismiss`
+ * (dismissChecklistAction, contratos §5.2). Si devuelve `{ ok: false }` o la
+ * llamada lanza (p. ej. error de red), la tarjeta vuelve y sale un aviso.
+ */
+export async function hideChecklist(deps: {
+  dismiss: () => Promise<{ ok: boolean }>;
+  setOculta: (oculta: boolean) => void;
+  notify: (message: string) => void;
+}): Promise<void> {
+  deps.setOculta(true);
+  let ok = false;
+  try {
+    ok = (await deps.dismiss()).ok;
+  } catch {
+    ok = false;
+  }
+  if (!ok) {
+    deps.setOculta(false);
+    deps.notify(DISMISS_ERROR_MESSAGE);
+  }
+}

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   computeChecklist,
+  DISMISS_ERROR_MESSAGE,
+  hideChecklist,
   loadChecklistInput,
   loadDashboardChecklist,
   type ChecklistInput,
@@ -403,5 +405,66 @@ describe('loadDashboardChecklist', () => {
     );
     expect(logueado).toContain('42501');
     expect(logueado).not.toContain(USER_ID);
+  });
+});
+
+describe('hideChecklist', () => {
+  function deps(dismiss: () => Promise<{ ok: boolean }>) {
+    const estados: boolean[] = [];
+    const avisos: string[] = [];
+    return {
+      estados,
+      avisos,
+      deps: {
+        dismiss,
+        setOculta: (v: boolean) => estados.push(v),
+        notify: (m: string) => avisos.push(m),
+      },
+    };
+  }
+
+  it('oculta al instante y la deja oculta si se guardó', async () => {
+    let resolver: (r: { ok: boolean }) => void = () => {};
+    const {
+      estados,
+      avisos,
+      deps: d,
+    } = deps(() => new Promise(r => (resolver = r)));
+
+    const promesa = hideChecklist(d);
+    // Antes de que responda el servidor ya está oculta.
+    expect(estados).toEqual([true]);
+    resolver({ ok: true });
+    await promesa;
+
+    expect(estados).toEqual([true]);
+    expect(avisos).toEqual([]);
+  });
+
+  it('si la acción devuelve ok:false, la restaura y avisa', async () => {
+    const { estados, avisos, deps: d } = deps(async () => ({ ok: false }));
+
+    await hideChecklist(d);
+
+    expect(estados).toEqual([true, false]);
+    expect(avisos).toEqual([DISMISS_ERROR_MESSAGE]);
+    expect(DISMISS_ERROR_MESSAGE).toBe(
+      'No pudimos ocultar la lista. Intenta de nuevo.',
+    );
+  });
+
+  it('si la llamada lanza (p. ej. red), la restaura y avisa', async () => {
+    const {
+      estados,
+      avisos,
+      deps: d,
+    } = deps(async () => {
+      throw new Error('red');
+    });
+
+    await hideChecklist(d);
+
+    expect(estados).toEqual([true, false]);
+    expect(avisos).toEqual([DISMISS_ERROR_MESSAGE]);
   });
 });

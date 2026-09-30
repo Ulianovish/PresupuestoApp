@@ -880,7 +880,7 @@ EOF
 
 El repo no tiene tests de componentes (vitest corre en `node`, sin DOM ni Testing Library). Esta tarea se verifica con la suite completa, `type-check` y eslint; la lógica que decide qué mostrar ya quedó probada en las Tasks 2–4.
 
-- [ ] **Step 1: Crear el componente**
+- [x] **Step 1: Crear el componente**
 
 Crea `src/components/organisms/OnboardingChecklist/OnboardingChecklist.tsx`:
 
@@ -1000,7 +1000,7 @@ export default function OnboardingChecklist({
 }
 ```
 
-- [ ] **Step 2: Pasar la checklist por `DashboardContent`**
+- [x] **Step 2: Pasar la checklist por `DashboardContent`**
 
 En `src/components/pages/DashboardContent.tsx`:
 
@@ -1060,7 +1060,7 @@ por:
   );
 ```
 
-- [ ] **Step 3: Cargar la checklist en el server component**
+- [x] **Step 3: Cargar la checklist en el server component**
 
 Reemplaza todo `src/app/dashboard/page.tsx` por:
 
@@ -1100,7 +1100,7 @@ export default async function DashboardPage() {
 }
 ```
 
-- [ ] **Step 4: Verificación del proyecto**
+- [x] **Step 4: Verificación del proyecto**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: toda la suite en PASS y `tsc --noEmit` sin errores.
@@ -1114,12 +1114,12 @@ Si `tsc` rechaza pasar `await createClient()` como `SupabaseClient` (no debería
 
 y agrega al final de los imports `import type { SupabaseClient } from '@supabase/supabase-js';`.
 
-- [ ] **Step 5: Lint de los archivos tocados**
+- [x] **Step 5: Lint de los archivos tocados**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bunx eslint src/components/organisms/OnboardingChecklist/OnboardingChecklist.tsx src/components/pages/DashboardContent.tsx src/app/dashboard/page.tsx src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts`
 Expected: sin errores (warnings de orden de imports se arreglan con `--fix`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/organisms/OnboardingChecklist/OnboardingChecklist.tsx src/components/pages/DashboardContent.tsx src/app/dashboard/page.tsx && git commit -m "$(cat <<'EOF'
@@ -1145,3 +1145,14 @@ EOF
 - **Tipos:** `ChecklistInput` (con `hasBudgetAmounts`), `ChecklistItemId` (con `'presupuesto'`), `ChecklistItem`, `computeChecklist`, `loadChecklistInput(supabase: SupabaseClient, userId: string, monthYear?: string)` (el tercer parámetro es opcional: la firma del contrato sigue valiendo), `ensureStarterKitAction(): Promise<{ seeded: boolean; error?: string }>`, `dismissChecklistAction(): Promise<void>` idénticos al contrato §2.7 + §5.2. `loadDashboardChecklist` es el extra aceptado en §5.2 y solo lo usa `page.tsx`.
 - **Historias previas (§5.3):** S12 cierra el flujo APP; S10 y S11 ya dejaron las dos acciones y la Task 1 solo las verifica. S09 (flujo SEG) no está en este worktree: sin sus columnas, la checklist no se muestra (probado en la Task 4).
 - **Limitación resuelta en v2:** el ítem `'alertas'` salía hecho desde el primer día (el kit siembra `alerts_enabled = true` en 7 rubros); §5.2 lo reemplaza por `'presupuesto'`, que el kit deja pendiente (rubros en 0).
+
+## Desviaciones (implementación)
+
+- **Rutas:** los comandos del plan usan `/Users/migue/Repos/personal/PresupuestoApp`; se corrieron en el worktree `PresupuestoApp-app`.
+- **Task 1:** `onboarding.test.ts` tiene 36 tests (no 31): S11 agregó más casos. `dismissChecklistAction` ya devuelve `Promise<{ ok: boolean }>` (§5.2), no `Promise<void>`.
+- **Commits:** con `--no-verify` y `bunx eslint` + `bunx prettier --check` manuales antes de cada commit (instrucción del orquestador), no con lint-staged.
+- **Task 5, kit solo con la bienvenida pendiente (orquestador, tras S09):** `page.tsx` lee `profiles.onboarding_completed_at` y llama `ensureStarterKitAction()` solo si es `null`. Si ya terminó la bienvenida no la llama (el kit reactivaría categorías borradas a propósito); si la lectura falla (columna sin migrar) o no hay fila, tampoco. Reemplaza el criterio "en cada carga". Probado en `src/app/dashboard/page.test.tsx` (tres ramas + sin fila + sin sesión + orden kit → checklist).
+- **Task 5, "Ocultar" con `{ ok: false }`:** la lógica va en `hideChecklist` (`checklist.ts`, con `DISMISS_ERROR_MESSAGE`), con dependencias inyectadas y tests: oculta al instante, y restaura con toast si la acción devuelve `{ ok: false }` o lanza. El componente solo la conecta (sin `useTransition`).
+- **Task 5, tests de componente:** S11 habilitó JSX en vitest (oxc), así que `OnboardingChecklist.render.test.tsx` renderiza con `renderToStaticMarkup` y verifica el cableado con `hideChecklist`; `page.test.tsx` además verifica por texto que `DashboardContent` pinta la checklist encima de las acciones rápidas.
+- **Task 5, `createClient`:** la página crea el cliente una vez y lo usa para el perfil y para `loadDashboardChecklist`; compila sin el cast alternativo.
+
