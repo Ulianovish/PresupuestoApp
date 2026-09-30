@@ -34,15 +34,20 @@ describe('loginUrl', () => {
   });
 });
 
+// Comprobación estática: cada guardia debe llamar a loginUrl con su propia
+// ruta. La regex tolera espacios, saltos de línea y cualquier tipo de comillas.
 describe('guardias de página', () => {
   it.each(['dashboard', 'deudas', 'ingresos', 'ingresos-deudas', 'settings'])(
     'src/app/%s/page.tsx usa loginUrl en vez de un literal',
     ruta => {
       const codigo = fs.readFileSync(
-        path.join(process.cwd(), 'src/app', ruta, 'page.tsx'),
+        path.resolve(__dirname, '../../app', ruta, 'page.tsx'),
         'utf8',
       );
-      expect(codigo).toContain(`redirect(loginUrl('/${ruta}'))`);
+      const llamada = new RegExp(
+        `redirect\\(\\s*loginUrl\\(\\s*(['"\`])/${ruta}\\1\\s*\\)`,
+      );
+      expect(codigo).toMatch(llamada);
       expect(codigo).not.toContain('redirectTo=');
     },
   );

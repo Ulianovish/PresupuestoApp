@@ -65,8 +65,11 @@ describe('config.matcher (RegExp nativo)', () => {
   });
 });
 
-// Next.js compila el matcher con su copia de path-to-regexp: se prueba con esa
-// misma función para no depender de que ambos intérpretes coincidan.
+// Aproximación con la misma librería: Next.js compila el matcher con su copia
+// de path-to-regexp, pero además lo envuelve con el prefijo de _next/data y el
+// sufijo (.json)? y le pasa sus propias opciones (strict, delimiter). Aquí se
+// usan las opciones por defecto, así que no cubre barras finales ni rutas
+// _next/data; sí detecta diferencias de sintaxis frente al RegExp nativo.
 describe('config.matcher (path-to-regexp de Next.js)', () => {
   const patron = pathToRegexp(middlewareModule.config.matcher[0]);
 
