@@ -1,26 +1,24 @@
 /**
  * ExpenseHeader - Organism Level
  *
- * Header principal de la página de gastos con título, selector de mes y botón de actualizar.
- * Incluye botón para mostrar migración de datos de julio.
+ * Header principal de la página de gastos con título, mes seleccionado y
+ * botones de importar Excel, auto-categorizar y actualizar.
  *
  * @param selectedMonth - Mes seleccionado actualmente
  * @param onRefresh - Función para actualizar los datos
- * @param onShowMigration - Función para mostrar panel de migración
  * @param isLoading - Estado de carga
  *
  * @example
  * <ExpenseHeader
- *   selectedMonth="2025-07"
+ *   selectedMonth="2026-09"
  *   onRefresh={refreshExpenses}
- *   onShowMigration={handleShowMigrationPanel}
  *   isLoading={loading}
  * />
  */
 
 import React from 'react';
 
-import { RefreshCw, Database, Upload, Tags } from 'lucide-react';
+import { RefreshCw, Upload, Tags } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
 import { formatMonthName } from '@/lib/services/expenses';
@@ -30,7 +28,6 @@ interface ExpenseHeaderProps {
   onRefresh: () => void;
   onImportExcel?: () => void;
   onAutoRecategorize?: () => void;
-  onShowMigration?: () => void;
   isLoading: boolean;
   isImporting?: boolean;
   isRecategorizing?: boolean;
@@ -41,7 +38,6 @@ export default function ExpenseHeader({
   onRefresh,
   onImportExcel,
   onAutoRecategorize,
-  onShowMigration,
   isLoading,
   isImporting,
   isRecategorizing,
@@ -89,20 +85,6 @@ export default function ExpenseHeader({
               className={`w-4 h-4 ${isRecategorizing ? 'animate-pulse' : ''}`}
             />
             {isRecategorizing ? 'Categorizando...' : 'Auto-categorizar'}
-          </Button>
-        )}
-
-        {/* Botón de migración julio */}
-        {selectedMonth === '2025-07' && onShowMigration && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onShowMigration}
-            disabled={isLoading}
-            className="flex items-center gap-2 border-amber-500/50 text-amber-300 hover:bg-amber-500/10"
-          >
-            <Database className="w-4 h-4" />
-            Migrar Julio
           </Button>
         )}
 

@@ -11,10 +11,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Scripts de migración (no necesarios en producción)
-/src/scripts/migrate-july-data.ts
-/src/scripts/migrate-july-expenses.ts
-
 # Documentación de desarrollo
 DEPLOYMENT_GUIDE.md
 DEPLOYMENT_CHECKLIST.md

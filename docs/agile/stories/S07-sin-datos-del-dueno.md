@@ -89,7 +89,7 @@ src/components/organisms/{Expense,Budget}MigrationPanel/*.tsx
 - [x] `/gastos` ofrece solo las cuentas activas del usuario (más la del gasto en edición si ya no está activa); por defecto `Efectivo` si existe, si no la primera; sin cuentas, `Efectivo` (`expense-form-defaults.test.ts`).
 - [x] `category_name` inicial = primera categoría del usuario; sin categorías, el botón de guardar está deshabilitado y dice "Primero crea una categoría", con enlace a Ajustes; el submit también lo rechaza.
 - [x] La importación de Excel sin columna de cuenta usa la cuenta por defecto del usuario, no una lista fija.
-- [ ] (§5.2) No existen `src/scripts/migrate-july-data.ts`, `src/scripts/migrate-july-expenses.ts`, `ExpenseMigrationPanel` ni `BudgetMigrationPanel`; `ExpenseHeader` ya no tiene el botón "Migrar Julio" ligado a `'2025-07'` ni la prop `onShowMigration` (`ExpenseHeader.test.ts`). Un `grep` confirma que nada los importaba antes de borrarlos.
+- [x] (§5.2) No existen `src/scripts/migrate-july-data.ts`, `src/scripts/migrate-july-expenses.ts`, `ExpenseMigrationPanel` ni `BudgetMigrationPanel`; `ExpenseHeader` ya no tiene el botón "Migrar Julio" ligado a `'2025-07'` ni la prop `onShowMigration` (`ExpenseHeader.test.ts`). Un `grep` confirma que nada los importaba antes de borrarlos.
 - [ ] `bun run test && bun run type-check` en verde; `grep -rn "ACCOUNT_TYPES\|inicializarDatosEjemplo\|useBudgetData\|migrate-july\|MigrationPanel\|onShowMigration" src` sin resultados.
 
 ---
@@ -1257,12 +1257,12 @@ EOF
 - Consumes: nada de tareas anteriores.
 - Produces: `ExpenseHeader` pierde la prop opcional `onShowMigration` (nadie se la pasa: `/gastos` usa `onRefresh`, `onImportExcel`, `onAutoRecategorize`, `isLoading`, `isImporting`, `isRecategorizing`). La prop `migrationPanel` de las plantillas **se queda**: `/gastos` la usa para `PendingInvoicesPanel` y `UnclassifiedExpensesPanel`; solo cambia su comentario. `BudgetStatusPanels.tsx` también menciona `'2025-07'`, pero lo reescribe entero S10; aquí no se toca.
 
-- [ ] **Step 1: Confirmar que nada importa lo que se va a borrar**
+- [x] **Step 1: Confirmar que nada importa lo que se va a borrar**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn --exclude='*.test.ts' "migrate-july\|migrateJulyData\|checkMigrationStatus\|ExpenseMigrationPanel\|BudgetMigrationPanel\|onShowMigration" src .vercelignore`
 Expected: solo coincidencias dentro de los 4 archivos que se borran, en `ExpenseHeader.tsx` (prop `onShowMigration`), en los `@example` de `ExpensePageTemplate.tsx:18` y `BudgetPageTemplate.tsx:16`, y en `.vercelignore:15-16`. **Ningún `import`** de esos módulos fuera de sí mismos. Si aparece un `import` en otro archivo, detente y repórtalo (no borres nada).
 
-- [ ] **Step 2: Escribir el test que falla**
+- [x] **Step 2: Escribir el test que falla**
 
 Crear `src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts`:
 
@@ -1309,17 +1309,17 @@ describe('sin la migración de julio 2025 (contratos §5.2)', () => {
 });
 ```
 
-- [ ] **Step 3: Correr el test y verificar que falla**
+- [x] **Step 3: Correr el test y verificar que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts`
 Expected: FAIL en los 6 tests (4 × `expected true to be false`, `expected '…2025-07…' not to contain '2025-07'` y `expected '…ExpenseMigrationPanel…' not to contain 'ExpenseMigrationPanel'`).
 
-- [ ] **Step 4: Borrar scripts y paneles**
+- [x] **Step 4: Borrar scripts y paneles**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git rm src/scripts/migrate-july-data.ts src/scripts/migrate-july-expenses.ts src/components/organisms/ExpenseMigrationPanel/ExpenseMigrationPanel.tsx src/components/organisms/BudgetMigrationPanel/BudgetMigrationPanel.tsx`
 Expected: cuatro líneas `rm '…'`. Las carpetas `src/scripts/`, `ExpenseMigrationPanel/` y `BudgetMigrationPanel/` quedan vacías y git deja de verlas.
 
-- [ ] **Step 5: `ExpenseHeader` sin el botón de julio**
+- [x] **Step 5: `ExpenseHeader` sin el botón de julio**
 
 En `src/components/organisms/ExpenseHeader/ExpenseHeader.tsx`:
 
@@ -1375,7 +1375,7 @@ import { RefreshCw, Upload, Tags } from 'lucide-react';
 
 (`selectedMonth` sigue en uso: lo muestra el subtítulo con `formatMonthName`.)
 
-- [ ] **Step 6: Comentarios de las plantillas y `.vercelignore`**
+- [x] **Step 6: Comentarios de las plantillas y `.vercelignore`**
 
 En `src/components/templates/ExpensePageTemplate/ExpensePageTemplate.tsx`, reemplazar:
 
@@ -1427,12 +1427,12 @@ En `.vercelignore`, borrar estas tres líneas (y la línea en blanco que las sig
 /src/scripts/migrate-july-expenses.ts
 ```
 
-- [ ] **Step 7: Correr el test y verificar que pasa**
+- [x] **Step 7: Correr el test y verificar que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts && bun run type-check && grep -rn --exclude='*.test.ts' "migrate-july\|migrateJulyData\|checkMigrationStatus\|ExpenseMigrationPanel\|BudgetMigrationPanel\|onShowMigration" src .vercelignore`
 Expected: PASS (6 tests); `tsc` sin errores; el `grep` no imprime nada (sale con código 1).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/organisms/ExpenseHeader/ExpenseHeader.tsx src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts src/components/templates/ExpensePageTemplate/ExpensePageTemplate.tsx src/components/templates/BudgetPageTemplate/BudgetPageTemplate.tsx .vercelignore && git commit -m "$(cat <<'EOF'

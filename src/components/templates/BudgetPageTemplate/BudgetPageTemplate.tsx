@@ -5,7 +5,7 @@
  * Sigue el patrón Atomic Design para composición de componentes.
  *
  * @param header - Componente del header con selector de mes
- * @param migrationPanel - Panel de migración de datos (opcional)
+ * @param migrationPanel - Panel extra sobre la tabla (opcional)
  * @param statusPanels - Paneles de estado (error, loading, vacío)
  * @param budgetTable - Tabla principal del presupuesto
  * @param modal - Modal para agregar/editar items
@@ -13,7 +13,6 @@
  * @example
  * <BudgetPageTemplate
  *   header={<BudgetHeader />}
- *   migrationPanel={<BudgetMigrationPanel />}
  *   statusPanels={<BudgetStatusPanels />}
  *   budgetTable={<BudgetTable />}
  *   modal={<BudgetItemModal />}
