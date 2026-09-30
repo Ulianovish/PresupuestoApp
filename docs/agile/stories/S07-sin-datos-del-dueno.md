@@ -83,7 +83,7 @@ src/components/organisms/{Expense,Budget}MigrationPanel/*.tsx
 
 ## Criterios de aceptación
 
-- [ ] `inicializarDatosEjemplo` no existe en `src/` y `useIngresosDeudas` solo carga datos. Test: un usuario sin ingresos ni deudas no dispara ningún `insert` al cargar (`src/hooks/useIngresosDeudas.test.ts`).
+- [x] `inicializarDatosEjemplo` no existe en `src/` y `useIngresosDeudas` solo carga datos. Test: un usuario sin ingresos ni deudas no dispara ningún `insert` al cargar (`src/hooks/useIngresosDeudas.test.ts`).
 - [ ] El sidebar no importa `useBudgetData`, no muestra montos y `src/hooks/useBudgetData.ts` no existe (`Sidebar.test.ts`).
 - [ ] `ACCOUNT_TYPES` y `AccountType` eliminados; `DEFAULT_ACCOUNT_NAME = 'Efectivo'` exportado (`expense-categories.test.ts`).
 - [ ] `/gastos` ofrece solo las cuentas activas del usuario (más la del gasto en edición si ya no está activa); por defecto `Efectivo` si existe, si no la primera; sin cuentas, `Efectivo` (`expense-form-defaults.test.ts`).
@@ -105,7 +105,7 @@ src/components/organisms/{Expense,Budget}MigrationPanel/*.tsx
 - Consumes: `obtenerIngresos(): Promise<Ingreso[]>`, `obtenerDeudas(): Promise<Deuda[]>`, `obtenerResumenFinanciero(): Promise<ResumenFinanciero>` de `@/lib/services/ingresos-deudas` (sin cambios).
 - Produces: `export async function cargarIngresosDeudas(): Promise<{ ingresos: Ingreso[]; deudas: Deuda[]; resumen: ResumenFinanciero }>` en `src/hooks/useIngresosDeudas.ts`. El hook `useIngresosDeudas()` conserva su interfaz pública `UseIngresosDeudasReturn` sin cambios.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 Crear `src/hooks/useIngresosDeudas.test.ts`:
 
@@ -182,12 +182,12 @@ describe('cargarIngresosDeudas', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/hooks/useIngresosDeudas.test.ts`
 Expected: FAIL. El primer test con `TypeError: cargarIngresosDeudas is not a function` (o `(0 , cargarIngresosDeudas) is not a function`); el segundo con `expected [ …, 'inicializarDatosEjemplo', … ] to not include 'inicializarDatosEjemplo'`.
 
-- [ ] **Step 3: Borrar `inicializarDatosEjemplo` del servicio**
+- [x] **Step 3: Borrar `inicializarDatosEjemplo` del servicio**
 
 En `src/lib/services/ingresos-deudas.ts`, borrar completo el bloque que va desde el comentario
 
@@ -208,7 +208,7 @@ hasta su cierre (la línea `}` que sigue a `    // No lanzar error para no bloqu
 
 No se toca nada más del archivo (`crearIngreso` y `crearDeuda` siguen existiendo: los usan los formularios de `/ingresos` y `/deudas`).
 
-- [ ] **Step 4: Dejar el hook solo cargando**
+- [x] **Step 4: Dejar el hook solo cargando**
 
 En `src/hooks/useIngresosDeudas.ts`:
 
@@ -293,17 +293,17 @@ export async function cargarIngresosDeudas(): Promise<{
   }, [cargarDatos]);
 ```
 
-- [ ] **Step 5: Correr el test y verificar que pasa**
+- [x] **Step 5: Correr el test y verificar que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/hooks/useIngresosDeudas.test.ts`
 Expected: PASS (2 tests).
 
-- [ ] **Step 6: Verificar tipos y que no quedan llamadas**
+- [x] **Step 6: Verificar tipos y que no quedan llamadas**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check && grep -rn --exclude='*.test.ts' "inicializarDatosEjemplo\|inicializarDatos\b" src`
 Expected: `tsc --noEmit` sin errores; el `grep` no imprime nada (sale con código 1). Los tests se excluyen porque `useIngresosDeudas.test.ts` nombra la función para afirmar que no existe.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/services/ingresos-deudas.ts src/hooks/useIngresosDeudas.ts src/hooks/useIngresosDeudas.test.ts && git commit -m "$(cat <<'EOF'

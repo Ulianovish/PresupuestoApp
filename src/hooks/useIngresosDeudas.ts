@@ -15,7 +15,6 @@ import {
   actualizarDeuda,
   eliminarDeuda,
   obtenerResumenFinanciero,
-  inicializarDatosEjemplo,
   formatearMoneda,
   type Ingreso,
   type Deuda,
@@ -23,6 +22,27 @@ import {
   type NuevaDeuda,
   type ResumenFinanciero,
 } from '@/lib/services/ingresos-deudas';
+
+// ============================================
+// CARGA (sin efectos secundarios)
+// ============================================
+
+/**
+ * Lee ingresos, deudas y el resumen del usuario autenticado. Solo lee:
+ * un usuario sin datos se queda sin datos (nunca se le siembra nada).
+ */
+export async function cargarIngresosDeudas(): Promise<{
+  ingresos: Ingreso[];
+  deudas: Deuda[];
+  resumen: ResumenFinanciero;
+}> {
+  const [ingresos, deudas, resumen] = await Promise.all([
+    obtenerIngresos(),
+    obtenerDeudas(),
+    obtenerResumenFinanciero(),
+  ]);
+  return { ingresos, deudas, resumen };
+}
 
 // ============================================
 // INTERFACE DEL HOOK
@@ -84,23 +104,15 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
       setLoading(true);
       setError(null);
 
-      // Cargar datos en paralelo para mejor rendimiento
-      const [ingresosData, deudasData, resumenData] = await Promise.all([
-        obtenerIngresos(),
-        obtenerDeudas(),
-        obtenerResumenFinanciero(),
-      ]);
+      const {
+        ingresos: ingresosData,
+        deudas: deudasData,
+        resumen: resumenData,
+      } = await cargarIngresosDeudas();
 
       setIngresos(ingresosData);
       setDeudas(deudasData);
       setResumen(resumenData);
-
-      // console.log('Datos cargados exitosamente:', {
-      //   totalIngresos,
-      //   totalDeudas,
-      //   ingresosCount: ingresos.length,
-      //   deudasCount: deudas.length,
-      // });
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Error desconocido';
@@ -112,38 +124,13 @@ export function useIngresosDeudas(): UseIngresosDeudasReturn {
   }, []);
 
   // ============================================
-  // FUNCIÓN PARA INICIALIZAR DATOS
-  // ============================================
-
-  const inicializarDatos = useCallback(async () => {
-    try {
-      // Primero intentar cargar datos existentes
-      await cargarDatos();
-
-      // Si no hay datos, inicializar con ejemplos
-      if (ingresos.length === 0 && deudas.length === 0) {
-        // console.log(
-        //   'No se encontraron datos, inicializando datos de ejemplo...'
-        // );
-        await inicializarDatosEjemplo();
-        // Recargar después de inicializar
-        await cargarDatos();
-      }
-    } catch (err) {
-      console.error('Error al inicializar datos:', err);
-      // En caso de error, solo cargar datos sin ejemplos
-      await cargarDatos();
-    }
-  }, [cargarDatos, ingresos.length, deudas.length]);
-
-  // ============================================
   // EFECTOS
   // ============================================
 
   // Cargar datos al montar el componente
   useEffect(() => {
-    inicializarDatos();
-  }, [inicializarDatos]); // Incluir dependencia correcta
+    cargarDatos();
+  }, [cargarDatos]);
 
   // ============================================
   // FUNCIONES PARA MANEJAR INGRESOS
