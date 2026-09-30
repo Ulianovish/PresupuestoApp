@@ -48,7 +48,14 @@ const METODOS = [
   'order',
   'single',
   'maybeSingle',
+  'limit',
 ] as const;
+
+/**
+ * Resultado de una tabla: fijo, o calculado al hacer `await` a partir de los
+ * métodos que se llamaron en esa cadena (p. ej. 'select' vs 'insert').
+ */
+type ResultadoTabla = Resultado | ((metodos: string[]) => Resultado);
 
 /**
  * Cliente de cookie falso. Cada `from(tabla)` devuelve una cadena "thenable"
@@ -58,20 +65,25 @@ const METODOS = [
  */
 function clienteFalso({
   user = { id: USER_ID } as { id: string } | null,
-  results = {} as Record<string, Resultado>,
+  results = {} as Record<string, ResultadoTabla>,
   rpcResult = { data: true, error: null } as Resultado,
 } = {}) {
   const llamadas: Llamada[] = [];
   const from = vi.fn((table: string) => {
-    const result = results[table] ?? { data: null, error: null };
+    const metodosDeLaCadena: string[] = [];
     const chain: Record<string, unknown> = {
       then: (
         resolve: (r: Resultado) => unknown,
         reject?: (e: unknown) => unknown,
-      ) => Promise.resolve(result).then(resolve, reject),
+      ) => {
+        const r = results[table] ?? { data: null, error: null };
+        const result = typeof r === 'function' ? r(metodosDeLaCadena) : r;
+        return Promise.resolve(result).then(resolve, reject);
+      },
     };
     for (const metodo of METODOS) {
       chain[metodo] = vi.fn((...args: unknown[]) => {
+        metodosDeLaCadena.push(metodo);
         llamadas.push({ table, method: metodo, args });
         return chain;
       });
@@ -221,6 +233,64 @@ describe('saveOnboardingIncomeAction', () => {
     });
   });
 
+  it('busca el ingreso de hoy del propio usuario antes de insertar', async () => {
+    const { llamadas } = clienteFalso();
+
+    await saveOnboardingIncomeAction({ monto: 3_500_000, fuente: 'Salario' });
+
+    const filtros = llamadasDe(llamadas, 'ingresos', 'eq').map(l => l.args);
+    expect(filtros).toContainEqual(['user_id', USER_ID]);
+    expect(filtros).toContainEqual(['descripcion', 'Ingreso mensual']);
+    expect(filtros).toContainEqual(['fecha', '2026-09-15']);
+  });
+
+  it('si ya hay un "Ingreso mensual" de hoy, lo actualiza en vez de insertar otro', async () => {
+    const { llamadas } = clienteFalso({
+      results: {
+        ingresos: metodos =>
+          metodos.includes('select')
+            ? { data: [{ id: 'ing-1' }], error: null }
+            : { data: null, error: null },
+      },
+    });
+
+    const r = await saveOnboardingIncomeAction({
+      monto: 4_000_000,
+      fuente: 'Negocio',
+    });
+
+    expect(r).toEqual({ ok: true });
+    expect(llamadasDe(llamadas, 'ingresos', 'insert')).toHaveLength(0);
+    const updates = llamadasDe(llamadas, 'ingresos', 'update');
+    expect(updates).toHaveLength(1);
+    expect(updates[0].args[0]).toEqual({ fuente: 'Negocio', monto: 4_000_000 });
+    const filtros = llamadasDe(llamadas, 'ingresos', 'eq').map(l => l.args);
+    expect(filtros).toContainEqual(['id', 'ing-1']);
+    expect(
+      filtros.filter(f => f[0] === 'user_id').length,
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it('llamar dos veces el mismo día inserta una sola fila', async () => {
+    const filas: Array<{ id: string }> = [];
+    const { llamadas } = clienteFalso({
+      results: {
+        ingresos: metodos => {
+          if (metodos.includes('select'))
+            return { data: [...filas], error: null };
+          if (metodos.includes('insert')) filas.push({ id: 'ing-1' });
+          return { data: null, error: null };
+        },
+      },
+    });
+
+    await saveOnboardingIncomeAction({ monto: 3_500_000, fuente: 'Salario' });
+    await saveOnboardingIncomeAction({ monto: 3_500_000, fuente: 'Salario' });
+
+    expect(llamadasDe(llamadas, 'ingresos', 'insert')).toHaveLength(1);
+    expect(llamadasDe(llamadas, 'ingresos', 'update')).toHaveLength(1);
+  });
+
   it.each([0, -100_000, 1500.5, Number.NaN, Number.POSITIVE_INFINITY])(
     'monto inválido (%s) → error sin tocar la DB',
     async monto => {
@@ -351,7 +421,10 @@ describe('saveOnboardingBudgetAction', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     clienteFalso({
       results: {
-        budget_items: { data: null, error: { code: '42501', message: 'x' } },
+        budget_items: {
+          data: null,
+          error: { code: '42501', message: 'Failing row contains (1000)' },
+        },
       },
     });
 
@@ -362,6 +435,8 @@ describe('saveOnboardingBudgetAction', () => {
       error: 'No pudimos guardar tu presupuesto. Intenta de nuevo.',
     });
     expect(revalidatePath).not.toHaveBeenCalled();
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('Failing row');
+    expect(errorSpy).toHaveBeenCalledWith(expect.any(String), '42501');
     errorSpy.mockRestore();
   });
 });

@@ -56,6 +56,11 @@ const MAX_FUENTE = 255;
 /**
  * Paso 1 de la bienvenida: guarda el ingreso mensual en `ingresos` con la
  * fecha de hoy (Bogotá). `monto` en pesos enteros > 0.
+ *
+ * Idempotente por día: si el usuario ya tiene un 'Ingreso mensual' con la
+ * fecha de hoy (volvió al paso 1 o recargó /bienvenida), actualiza esa fila
+ * con el monto y la fuente nuevos en vez de insertar otra; así el ingreso del
+ * mes no queda duplicado.
  */
 export async function saveOnboardingIncomeAction(input: {
   monto: number;
@@ -79,25 +84,44 @@ export async function saveOnboardingIncomeAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'No autenticado' };
 
-  const { error } = await supabase.from('ingresos').insert({
-    user_id: user.id,
-    descripcion: DESCRIPCION_INGRESO,
-    fuente,
-    monto,
-    fecha: todayBogota(),
-    tipo: 'ingreso',
-  });
-  if (error) {
+  const fecha = todayBogota();
+  const fallo = (code: string | undefined): OnboardingResult => {
     // Solo el código: el detalle de un CHECK fallido trae la fila (el monto).
     console.error(
       'saveOnboardingIncomeAction: error guardando el ingreso:',
-      error.code,
+      code,
     );
     return {
       ok: false,
       error: 'No pudimos guardar tu ingreso. Intenta de nuevo.',
     };
-  }
+  };
+
+  const existente = await supabase
+    .from('ingresos')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('descripcion', DESCRIPCION_INGRESO)
+    .eq('fecha', fecha)
+    .limit(1);
+  if (existente.error) return fallo(existente.error.code);
+
+  const fila = ((existente.data ?? []) as Array<{ id: string }>)[0];
+  const { error } = fila
+    ? await supabase
+        .from('ingresos')
+        .update({ fuente, monto })
+        .eq('id', fila.id)
+        .eq('user_id', user.id)
+    : await supabase.from('ingresos').insert({
+        user_id: user.id,
+        descripcion: DESCRIPCION_INGRESO,
+        fuente,
+        monto,
+        fecha,
+        tipo: 'ingreso',
+      });
+  if (error) return fallo(error.code);
 
   revalidatePath('/ingresos');
   return { ok: true };
@@ -110,6 +134,11 @@ const MAX_RUBROS = 200;
  * Paso 2 de la bienvenida: guarda el monto presupuestado de cada rubro.
  * Solo toca `budgeted_amount` y solo de rubros del usuario (filtro explícito
  * por `user_id` además de RLS). Montos en pesos enteros >= 0.
+ *
+ * Los UPDATE van en paralelo y sin transacción: si uno falla, los demás ya
+ * quedaron aplicados y el presupuesto puede quedar guardado a medias. Es
+ * aceptable porque reintentar es idempotente (vuelve a escribir los mismos
+ * montos). Un id que no es del usuario afecta 0 filas y no se reporta.
  */
 export async function saveOnboardingBudgetAction(
   amounts: Record<string, number>,
