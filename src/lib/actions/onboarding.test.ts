@@ -1,6 +1,17 @@
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+vi.mock('next/navigation', () => ({
+  // Como en Next: redirect() corta la ejecución lanzando.
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT:${url}`);
+  }),
+}));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
+vi.mock('@/lib/whatsapp/format', () => ({ todayBogota: () => '2026-09-15' }));
 
 import { createClient } from '@/lib/supabase/server';
 
@@ -15,21 +26,57 @@ interface Resultado {
   error: { code?: string; message?: string } | null;
 }
 
+interface Llamada {
+  table: string;
+  method: string;
+  args: unknown[];
+}
+
+const METODOS = [
+  'insert',
+  'update',
+  'select',
+  'eq',
+  'order',
+  'single',
+  'maybeSingle',
+] as const;
+
 /**
- * Cliente de cookie falso: auth.getUser y rpc. S11 lo reemplaza por uno más
- * completo (con from) que conserva esta firma: `clienteFalso({ user,
- * rpcResult })` y devuelve `{ client }`.
+ * Cliente de cookie falso. Cada `from(tabla)` devuelve una cadena "thenable"
+ * que registra cada método llamado y, al hacer `await`, resuelve con
+ * `results[tabla]` (por defecto sin error). Conserva la firma del de S10
+ * (`{ user, rpcResult }` → `{ client }`), así sus tests siguen igual.
  */
 function clienteFalso({
   user = { id: USER_ID } as { id: string } | null,
+  results = {} as Record<string, Resultado>,
   rpcResult = { data: true, error: null } as Resultado,
 } = {}) {
+  const llamadas: Llamada[] = [];
+  const from = vi.fn((table: string) => {
+    const result = results[table] ?? { data: null, error: null };
+    const chain: Record<string, unknown> = {
+      then: (
+        resolve: (r: Resultado) => unknown,
+        reject?: (e: unknown) => unknown,
+      ) => Promise.resolve(result).then(resolve, reject),
+    };
+    for (const metodo of METODOS) {
+      chain[metodo] = vi.fn((...args: unknown[]) => {
+        llamadas.push({ table, method: metodo, args });
+        return chain;
+      });
+    }
+    return chain;
+  });
   const client = {
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }) },
+    from,
     rpc: vi.fn().mockResolvedValue(rpcResult),
   };
   mockedCreateClient.mockResolvedValue(client);
-  return { client };
+  return { client, llamadas };
 }
 
 describe('ensureStarterKitAction', () => {
@@ -116,5 +163,24 @@ describe('ensureStarterKitAction', () => {
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(
       'usuario@ejemplo.com',
     );
+  });
+});
+
+describe('ensureStarterKitAction durante el render (§5.2)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('no revalida ni redirige, ni con éxito, ni sin sesión, ni con error', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    clienteFalso();
+    await ensureStarterKitAction();
+    clienteFalso({ user: null });
+    await ensureStarterKitAction();
+    clienteFalso({ rpcResult: { data: null, error: { code: 'PGRST202' } } });
+    await ensureStarterKitAction();
+
+    expect(revalidatePath).not.toHaveBeenCalled();
+    expect(redirect).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

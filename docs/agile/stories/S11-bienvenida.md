@@ -664,7 +664,7 @@ S10 creó `src/lib/actions/onboarding.ts` (solo `ensureStarterKitAction`, firma 
 - Consumes: `ensureStarterKitAction(): Promise<{ seeded: boolean; error?: string }>` (S10, sin cambios).
 - Produces (para las Tasks 5–7, dentro del test): `clienteFalso({ user?, results?, rpcResult? })` → `{ client, llamadas }`, superconjunto del de S10 (misma firma `{ user, rpcResult }` y mismo `client` con `auth` y `rpc`, más `from`); tipos `Resultado` y `Llamada`; constante `USER_ID`.
 
-- [ ] **Step 1: Reemplazar el encabezado del test**
+- [x] **Step 1: Reemplazar el encabezado del test**
 
 En `src/lib/actions/onboarding.test.ts`, reemplazar **todo lo que está antes** de la línea `describe('ensureStarterKitAction', () => {` por:
 
@@ -754,7 +754,7 @@ function clienteFalso({
 
 (Si S10 dejó algún import o constante más en ese encabezado, p. ej. otro nombre para el cliente falso, reemplázalo igual: el `describe` de S10 solo usa `clienteFalso`, `mockedCreateClient` y `ensureStarterKitAction`.)
 
-- [ ] **Step 2: Guarda de render (contratos §5.2)**
+- [x] **Step 2: Guarda de render (contratos §5.2)**
 
 Agregar al final del archivo (después del `describe` de S10, sin tocarlo):
 
@@ -779,12 +779,12 @@ describe('ensureStarterKitAction durante el render (§5.2)', () => {
 });
 ```
 
-- [ ] **Step 3: Los tests siguen en verde**
+- [x] **Step 3: Los tests siguen en verde**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (7 tests de S10 + 1 = 8). Es un cambio de infraestructura del test más una guarda de regresión sobre código que ya cumple el contrato: no hay código nuevo que deba hacer fallar un test primero.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/lib/actions/onboarding.test.ts
