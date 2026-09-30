@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server';
 
+import { createServerClient } from '@supabase/ssr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@supabase/ssr', () => ({ createServerClient: vi.fn() }));
-
-import { createServerClient } from '@supabase/ssr';
-
 import { middleware } from '../middleware';
+
+// vi.mock se eleva por encima de los imports.
+vi.mock('@supabase/ssr', () => ({ createServerClient: vi.fn() }));
 
 const mockedCreateServerClient = vi.mocked(createServerClient);
 const ORIGEN = 'http://localhost:3001';
