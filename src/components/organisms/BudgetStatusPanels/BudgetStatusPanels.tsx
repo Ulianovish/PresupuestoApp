@@ -83,6 +83,10 @@ export default function BudgetStatusPanels({
             <h3 className="text-lg font-semibold mb-2">
               No hay datos para este mes
             </h3>
+            {/* TODO(S10): quitar las ramas de '2025-07' (el botón "Migrar Datos
+                de Julio" ya no existe desde S07). S10 reescribe este panel
+                vacío en el mismo flujo APP; ver
+                docs/agile/stories/S10-estados-vacios-y-navegacion.md. */}
             <p className="text-sm">
               {selectedMonth === '2025-07'
                 ? 'Usa el botón "Migrar Datos de Julio" para empezar con datos de ejemplo.'

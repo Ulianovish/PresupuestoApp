@@ -13,7 +13,7 @@
  *
  * @example
  * <BudgetHeader
- *   selectedMonth="2025-07"
+ *   selectedMonth="2026-09"
  *   onRefresh={refreshBudget}
  *   isLoading={false}
  *   monthOptions={monthOptions}

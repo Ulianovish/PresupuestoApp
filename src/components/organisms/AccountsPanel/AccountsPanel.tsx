@@ -3,7 +3,7 @@
 /**
  * AccountsPanel - Organism Level
  *
- * Administra las cuentas donde se registran los gastos (Nequi, TC Falabella,
+ * Administra las cuentas donde se registran los gastos (Cuenta A, Tarjeta B,
  * Efectivo...): listar, crear, renombrar, cambiar el tipo y desactivar.
  *
  * Renombrar es seguro: los gastos apuntan a la cuenta por id, así que
