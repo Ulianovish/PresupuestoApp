@@ -1,18 +1,14 @@
 import { redirect } from 'next/navigation';
 
+import UnlinkPhoneButton from '@/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton';
 import AccountsPanel from '@/components/organisms/AccountsPanel/AccountsPanel';
 import CategoriesPanel from '@/components/organisms/CategoriesPanel/CategoriesPanel';
 import DocumentosDianPanel from '@/components/organisms/DocumentosDianPanel/DocumentosDianPanel';
 import WhatsAppLinkPanel from '@/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel';
 import { createClient } from '@/lib/supabase/server';
+import { enmascararTelefono } from '@/lib/whatsapp/format';
 
 export const dynamic = 'force-dynamic';
-
-function maskPhone(phone: string): string {
-  // +573001234567 -> +57300 ***4567
-  if (phone.length < 7) return phone;
-  return `${phone.slice(0, 6)} ***${phone.slice(-4)}`;
-}
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -25,7 +21,7 @@ export default async function SettingsPage() {
 
   const { data: links } = await supabase
     .from('whatsapp_links')
-    .select('phone_e164, linked_at')
+    .select('id, phone_e164, linked_at')
     .eq('user_id', user.id)
     .order('linked_at', { ascending: false });
 
@@ -45,19 +41,31 @@ export default async function SettingsPage() {
         </h3>
         {links && links.length > 0 ? (
           <ul className="space-y-2">
-            {links.map(l => (
-              <li
-                key={l.phone_e164 as string}
-                className="flex items-center justify-between rounded bg-slate-800 px-3 py-2 text-sm"
-              >
-                <span className="font-mono text-slate-200">
-                  {maskPhone(l.phone_e164 as string)}
-                </span>
-                <span className="text-xs text-slate-500">
-                  {new Date(l.linked_at as string).toLocaleDateString('es-CO')}
-                </span>
-              </li>
-            ))}
+            {links.map(l => {
+              // El número completo se queda en el servidor: al cliente solo
+              // llegan el id del link y el número enmascarado (§5.2).
+              const masked = enmascararTelefono(l.phone_e164 as string);
+              return (
+                <li
+                  key={l.id as string}
+                  className="flex items-center justify-between gap-3 rounded bg-slate-800 px-3 py-2 text-sm"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-mono text-slate-200">{masked}</span>
+                    <span className="text-xs text-slate-500">
+                      Vinculado el{' '}
+                      {new Date(l.linked_at as string).toLocaleDateString(
+                        'es-CO',
+                      )}
+                    </span>
+                  </div>
+                  <UnlinkPhoneButton
+                    linkId={l.id as string}
+                    maskedPhone={masked}
+                  />
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <p className="text-sm text-slate-400">

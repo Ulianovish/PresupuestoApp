@@ -682,7 +682,7 @@ EOF
 
 > Por qué por `linkId` (contratos §5.2): el botón cliente recibe solo el `id` del link (uuid) y el número ya enmascarado, y llama directo a la server action `unlinkWhatsAppLinkAction(linkId)`. El número completo se queda en el servidor: ya no hace falta una server action en línea que cierre sobre él. La `key` de la lista también pasa a `l.id`, porque en un server component la `key` viaja en el payload RSC.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts`:
 
@@ -728,12 +728,12 @@ describe('Ajustes: el número completo no llega al navegador', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts`
 Expected: FAIL en 3 tests (`expected '' to contain 'unlinkWhatsAppLinkAction(linkId)'`, `expected '…' to contain 'key={l.id as string}'`, `expected '…maskPhone…' not to contain 'maskPhone'`).
 
-- [ ] **Step 3: Crear el botón con confirmación**
+- [x] **Step 3: Crear el botón con confirmación**
 
 Crear `src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.tsx`:
 
@@ -814,7 +814,7 @@ export default function UnlinkPhoneButton({
 }
 ```
 
-- [ ] **Step 4: Reemplazar la página de Ajustes**
+- [x] **Step 4: Reemplazar la página de Ajustes**
 
 Reemplazar todo `src/app/settings/page.tsx` por:
 
@@ -905,7 +905,7 @@ Notas para el implementador:
 - Se elimina la función local `maskPhone`; la máscara pasa a ser `enmascararTelefono` (la misma que usa `DocumentosDianPanel`), para que el número se vea igual en toda la página.
 - La `key` pasa de `phone_e164` a `id`: en un server component la `key` viaja en el payload RSC.
 
-- [ ] **Step 5: Verificar tests, tipos y lint**
+- [x] **Step 5: Verificar tests, tipos y lint**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts src/lib/actions/whatsapp.test.ts && bun run type-check && bunx eslint src/app/settings/page.tsx src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.tsx src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts`
 Expected: PASS (3 + 15 tests); `tsc --noEmit` sin errores; eslint sin errores.
@@ -914,7 +914,7 @@ Expected: PASS (3 + 15 tests); `tsc --noEmit` sin errores; eslint sin errores.
 
 El implementador **no** corre `bun run dev` ni `next build` (`.env.local` apunta a producción, contratos §5.0). El humano, en un entorno con base de desarrollo (o en S14) y un usuario de prueba con un número vinculado de prueba (`+573000000000`), entra a `/settings`: cada número muestra "Desvincular"; al tocarlo aparece "Desvincular número" con el número enmascarado; "Cancelar" cierra sin cambios; "Desvincular" muestra el toast "Número desvinculado" y el número desaparece de "Números vinculados". En la pestaña Network, la respuesta RSC de `/settings` no contiene `573000000000` en claro.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.tsx src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts src/app/settings/page.tsx && git commit -m "$(cat <<'EOF'
