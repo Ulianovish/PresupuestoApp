@@ -22,8 +22,8 @@ import { getSiteUrl } from '@/lib/site-url';
 import { createClient } from '@/lib/supabase/server';
 import {
   loginSchema,
-  passwordSchema,
   registerSchema,
+  resetPasswordFormSchema,
 } from '@/lib/validations/schemas';
 
 function texto(formData: FormData, campo: string): string {
@@ -275,15 +275,6 @@ export async function forgotPasswordAction(formData: FormData): Promise<void> {
     conCodigo('/auth/forgot-password', 'message', FORGOT_PASSWORD_SENT_CODE),
   );
 }
-
-const resetPasswordFormSchema = z
-  .object({
-    password: passwordSchema,
-    confirmPassword: z.string().min(1),
-  })
-  .refine(data => data.password === data.confirmPassword, {
-    path: ['confirmPassword'],
-  });
 
 /**
  * Server Action: guarda la contraseña nueva.

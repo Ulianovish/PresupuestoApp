@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
 
-import { passwordSchema } from '@/lib/validations/schemas';
+import { resetPasswordFormSchema } from '@/lib/validations/schemas';
 
 import { GENERIC_AUTH_ERROR } from './error-messages';
 import {
@@ -72,18 +71,8 @@ describe('resolveForgotPasswordFeedback', () => {
   });
 });
 
-// Misma forma que el esquema de resetPasswordAction.
-const esquemaReset = z
-  .object({
-    password: passwordSchema,
-    confirmPassword: z.string().min(1),
-  })
-  .refine(d => d.password === d.confirmPassword, {
-    path: ['confirmPassword'],
-  });
-
 function codigoReset(password: string, confirmPassword: string): string {
-  const r = esquemaReset.safeParse({ password, confirmPassword });
+  const r = resetPasswordFormSchema.safeParse({ password, confirmPassword });
   if (r.success) throw new Error('se esperaba un error de Zod');
   return resetPasswordValidationErrorCode(r.error.issues);
 }

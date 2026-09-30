@@ -240,6 +240,17 @@ export const passwordSchema = z
     `Usa como máximo ${PASSWORD_MAX_LENGTH} caracteres`,
   );
 
+// Formulario de contraseña nueva (resetPasswordAction, S05). Sin mensajes:
+// resetPasswordValidationErrorCode convierte cada issue en un código.
+export const resetPasswordFormSchema = z
+  .object({
+    password: passwordSchema,
+    confirmPassword: z.string().min(1),
+  })
+  .refine(data => data.password === data.confirmPassword, {
+    path: ['confirmPassword'],
+  });
+
 // Esquema para login
 export const loginSchema = z.object({
   email: z
