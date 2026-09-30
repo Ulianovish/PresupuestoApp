@@ -27,7 +27,7 @@ Alineado con contratos v2 (§5). Escrito por el orquestador (sin planificador): 
 - [x] CA5 (deuda S05): constante `RESET_LINK_EXPIRED_PATH` en `password-reset-feedback.ts` usada por la página y por `resetPasswordAction`; el test comprueba el uso de la constante.
 - [x] CA6 (deuda S05): el texto de `LOGIN_VALIDATION_ERROR_CODE` pasa a "Revisa tu correo y tu contraseña.".
 - [x] CA7 (deuda S05): tests de `resetPasswordAction` cuando `auth.getUser()` devuelve `{ user: null, error }` y cuando lanza: registra solo el `code` (o el nombre del error) y redirige a `RESET_LINK_EXPIRED_PATH`.
-- [x] CA8 (deuda S05): en `auth-password.test.ts` la aserción débil `not.toContain(encodeURIComponent(crudo))` se reemplaza por `expect(url.searchParams.get('error')).not.toBe(crudo)`.
+- [x] CA8 (deuda S05): en `auth-password.test.ts` la aserción débil `not.toContain(encodeURIComponent(crudo))` se reemplazó por tres más fuertes: `url.searchParams.get('error')` es exactamente el código esperado, la URL solo lleva el parámetro `error` y `decodeURIComponent(url.href)` no contiene el mensaje crudo.
 - [x] CA9: quitar el comentario de `src/middleware.test.ts` que remite a H10/ADR-004 (ya resuelto) y documentar en `docs/agile/decisions/ADR-004-middleware-en-src.md` (contexto, verificación del 2026-09-30, decisión, riesgo y prueba en preview).
 
 ## Tareas (TDD, un commit por tarea, siempre `git commit --no-verify` tras `bunx eslint` y `bunx prettier --check` de los archivos tocados)
@@ -54,4 +54,11 @@ Alineado con contratos v2 (§5). Escrito por el orquestador (sin planificador): 
 - [x] T2: helper `esFaltaDeSesion(error)` en `src/lib/auth/`, usado por el middleware y `resetPasswordAction`.
 - [x] T3: el matcher excluye también `json|txt|xml|map|webmanifest`.
 - [x] T4: helper `loginUrl(pathname, search?)` en `src/lib/auth/`, usado por las guardias de las páginas.
-- [ ] T5: CA8 ajustado a lo implementado y deuda cerrada documentada.
+- [x] T5: CA8 ajustado a lo implementado y deuda cerrada documentada.
+
+### Deuda cerrada en S15b
+
+- Observabilidad: un error de `getUser()` sin `code` (p. ej. `AuthRetryableFetchError` cuando Supabase no responde) ya deja rastro en el log del middleware como `{ code: error.name, status }`; nunca se registra el mensaje.
+- `AuthSessionMissingError` (visitante sin sesión) no se registra como fallo ni en el middleware ni en `resetPasswordAction`: ambos usan `esFaltaDeSesion` (`src/lib/auth/session-error.ts`).
+- Matcher: `robots.txt`, `sitemap.xml`, `manifest.json`, `*.webmanifest` y los `.map` ya no pasan por el middleware. Se prueba con `RegExp` nativo y con `pathToRegexp` de `next/dist/compiled/path-to-regexp` (la misma copia que usa Next.js).
+- Guardias de `dashboard`, `deudas`, `ingresos`, `ingresos-deudas` y `settings` construyen la URL de login con `loginUrl` (`src/lib/auth/login-url.ts`, con `URLSearchParams` y la query de origen conservada) en vez de literales.
