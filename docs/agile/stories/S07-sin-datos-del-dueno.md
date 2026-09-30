@@ -90,7 +90,7 @@ src/components/organisms/{Expense,Budget}MigrationPanel/*.tsx
 - [x] `category_name` inicial = primera categoría del usuario; sin categorías, el botón de guardar está deshabilitado y dice "Primero crea una categoría", con enlace a Ajustes; el submit también lo rechaza.
 - [x] La importación de Excel sin columna de cuenta usa la cuenta por defecto del usuario, no una lista fija.
 - [x] (§5.2) No existen `src/scripts/migrate-july-data.ts`, `src/scripts/migrate-july-expenses.ts`, `ExpenseMigrationPanel` ni `BudgetMigrationPanel`; `ExpenseHeader` ya no tiene el botón "Migrar Julio" ligado a `'2025-07'` ni la prop `onShowMigration` (`ExpenseHeader.test.ts`). Un `grep` confirma que nada los importaba antes de borrarlos.
-- [ ] `bun run test && bun run type-check` en verde; `grep -rn "ACCOUNT_TYPES\|inicializarDatosEjemplo\|useBudgetData\|migrate-july\|MigrationPanel\|onShowMigration" src` sin resultados.
+- [x] `bun run test && bun run type-check` en verde; `grep -rn "ACCOUNT_TYPES\|inicializarDatosEjemplo\|useBudgetData\|migrate-july\|MigrationPanel\|onShowMigration" src` sin resultados.
 
 ---
 
@@ -1457,17 +1457,17 @@ EOF
 
 **Interfaces:** ninguna.
 
-- [ ] **Step 1: Suite completa y tipos**
+- [x] **Step 1: Suite completa y tipos**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: todos los tests en verde (incluidos los 5 archivos nuevos) y `tsc` sin errores.
 
-- [ ] **Step 2: Nada del dueño queda en los puntos de la historia**
+- [x] **Step 2: Nada del dueño queda en los puntos de la historia**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn --exclude='*.test.ts' "inicializarDatosEjemplo\|useBudgetData\|ACCOUNT_TYPES\|mockBudgetItems\|mockIncomeData\|migrate-july\|MigrationPanel\|onShowMigration" src`
 Expected: no imprime nada (sale con código 1).
 
-- [ ] **Step 3: Lint de los archivos tocados**
+- [x] **Step 3: Lint de los archivos tocados**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bunx eslint src/app/gastos/page.tsx src/components/organisms/ExpenseModal/ExpenseModal.tsx src/components/organisms/Sidebar/Sidebar.tsx src/components/organisms/ExpenseHeader/ExpenseHeader.tsx src/hooks/useIngresosDeudas.ts src/lib/expense-form-defaults.ts src/lib/constants/expense-categories.ts src/lib/services/expenses.ts src/lib/services/ingresos-deudas.ts`
 Expected: sin errores (advertencias preexistentes del archivo se aceptan si no vienen de líneas nuevas).
