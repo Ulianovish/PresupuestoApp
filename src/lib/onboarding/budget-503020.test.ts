@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { suggest503020, type KitItem } from './budget-503020';
+import { inRule503020, suggest503020, type KitItem } from './budget-503020';
 
 const item = (id: string, classificationName: string): KitItem => ({
   id,
@@ -125,5 +125,18 @@ describe('suggest503020', () => {
     expect(r.amounts.otros).toBe(750_000);
     expect(r.amounts.internet).toBe(750_000);
     expect(r.ahorroSinAsignar).toBe(1_000_000);
+  });
+});
+
+describe('inRule503020', () => {
+  it('necesidades y deseos entran; Impuestos y desconocidas no', () => {
+    expect(inRule503020('Basico')).toBe(true);
+    expect(inRule503020('Básico')).toBe(true);
+    expect(inRule503020('Estilo de Vida')).toBe(true);
+    expect(inRule503020('Caprichos')).toBe(true);
+    expect(inRule503020('calidad de vida')).toBe(true);
+    expect(inRule503020('Impuestos')).toBe(false);
+    expect(inRule503020('Otra cosa')).toBe(false);
+    expect(inRule503020('')).toBe(false);
   });
 });

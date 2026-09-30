@@ -43,6 +43,15 @@ function normalizar(nombre: string): string {
 }
 
 /**
+ * true si la clasificación entra en la regla (necesidades o deseos). Los
+ * rubros de 'Impuestos' o de clasificaciones desconocidas no reciben monto de
+ * la sugerencia: quien la aplica debe conservar lo que ya tenían.
+ */
+export function inRule503020(classificationName: string): boolean {
+  return normalizar(classificationName ?? '') in GRUPO_POR_CLASIFICACION;
+}
+
+/**
  * Reparte `income` entre los rubros según su clasificación: 50 % necesidades
  * ('Basico') y 30 % deseos ('Estilo de Vida' | 'Caprichos' | 'Calidad de
  * Vida'). El 20 % de ahorro va siempre a `ahorroSinAsignar`, junto con el
