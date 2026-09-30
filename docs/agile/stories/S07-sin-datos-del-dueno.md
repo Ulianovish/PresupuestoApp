@@ -19,9 +19,9 @@
 - Textos de UI en español colombiano, tuteo.
 - Ningún dato personal en código, tests ni fixtures: cuentas inventadas (`Cuenta A`, `Tarjeta B`), UUIDs inventados. Nada de nombres de bancos, empresas ni montos reales del dueño.
 - Ningún test toca una base real; el cliente de Supabase se mockea. No se accede a la base de producción.
-- Ejecutar comandos con `builtin cd /Users/migue/Repos/personal/PresupuestoApp && …` (el `cd` del shell está envuelto).
+- Ejecutar comandos en el worktree del flujo APP: `builtin cd /Users/migue/Repos/personal/PresupuestoApp-app && …` (el `cd` del shell está envuelto). Nunca en `/Users/migue/Repos/personal/PresupuestoApp`.
 - Verificación: `bun run test <archivo>` por tarea; al final `bun run test && bun run type-check`.
-- Commits en español, terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Todas las tareas tocan `src/`, así que el pre-commit (lint-staged: eslint --fix + prettier) corre normal; no usar `--no-verify` salvo que el commit sea solo de docs.
+- Commits en español, terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, **siempre** con `git commit --no-verify` (el hook de husky revierte cambios). Antes de cada commit que toque `src/`, correr a mano `bunx eslint <archivos tocados>` y `bunx prettier --check <archivos tocados>` (`--write` si hace falta).
 - Orden y propiedad (contratos §5.3, flujo APP, en serie en el mismo worktree): S07 es la **primera** historia del flujo (S07 → S08 → S10 → S13 → S11 → S12). No depende de ninguna. S10 toca después `Sidebar.tsx` (quita `/test`) y `src/app/gastos/page.tsx` (un `useEffect`); aquí no se toca el ítem `/test`.
 - Prohibido `bun run dev` y `next build` contra `.env.local` (apunta a producción, contratos §5.0). Nunca `bun run db:types`.
 

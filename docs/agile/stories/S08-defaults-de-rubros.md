@@ -18,8 +18,8 @@
 - Sin migración, sin tocar filas existentes, sin acceso a la base de producción. Los tests mockean el cliente; ningún test toca una base real.
 - Textos de UI y mensajes en español colombiano, tuteo.
 - Verificación del proyecto: `bun run test && bun run type-check`.
-- Commits en español terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-- Ejecutar comandos con `builtin cd /Users/migue/Repos/personal/PresupuestoApp && …`.
+- Commits en español terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, siempre con `git commit --no-verify`; antes, `bunx eslint` y `bunx prettier --check` a mano sobre los archivos de `src/` tocados.
+- Ejecutar comandos con `builtin cd /Users/migue/Repos/personal/PresupuestoApp-app && …` (worktree del flujo APP; las rutas `PresupuestoApp` de los pasos de abajo se ejecutan ahí).
 - Orden (contratos §5.3, flujo APP, en serie en el mismo worktree): S08 va **después de S07** (ya hecho: borró `src/scripts/migrate-july-data.ts`) y **antes de S10**. Ambas tocan `src/app/presupuesto/page.tsx`: S08 solo el estado del formulario (~203-235) y un import; S10 luego cablea el panel vacío sobre el archivo ya modificado por S08.
 - Prohibido `bun run dev` y `next build` contra `.env.local` (apunta a producción, §5.0). Nunca `bun run db:types`.
 
@@ -1382,7 +1382,7 @@ Sin commit en esta tarea (no cambia archivos).
 
 ### Task 9 (adicional, deuda de S07): Global Constraints de S07
 
-- [ ] `docs/agile/stories/S07-sin-datos-del-dueno.md`: commits con `--no-verify` + eslint/prettier a mano; ruta del worktree `PresupuestoApp-app`.
+- [x] `docs/agile/stories/S07-sin-datos-del-dueno.md`: commits con `--no-verify` + eslint/prettier a mano; ruta del worktree `PresupuestoApp-app`.
 
 ---
 
