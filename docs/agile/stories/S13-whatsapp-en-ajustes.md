@@ -175,7 +175,7 @@ EOF
 
 > S02 (flujo SEG) no está en este worktree, así que `LinkingDeps` todavía tiene solo `redeemLinkCode` y `getLinkByPhone`. Cambia únicamente las dos aserciones indicadas abajo y las dos constantes; al integrar con S02 se conservan sus dependencias nuevas.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `src/lib/whatsapp/handle-linking.test.ts`, dentro de `it('VINCULAR con código válido → confirma y canjea', …)`, reemplazar esta línea:
 
@@ -227,12 +227,12 @@ por:
     );
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/whatsapp/handle-linking.test.ts`
 Expected: FAIL en 2 tests: "VINCULAR con código válido → confirma y canjea" con `expected '✅ ¡Listo! Tu WhatsApp quedó vinculado…' to be '¡Listo! Tu número quedó vinculado…'` y "número ya vinculado y mensaje cualquiera → avisa que ya está vinculado" con `expected 'Tu número ya está vinculado a tu presupuesto. 👍 El registro de gastos por mensaje llegará muy pronto.' to be 'Este número ya está vinculado. Ya puedes mandarme tus gastos.'`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/whatsapp/handle-linking.ts`, reemplazar:
 
@@ -268,12 +268,12 @@ const MSG_ALREADY_LINKED =
 
 No toques ninguna otra constante ni función del archivo.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/whatsapp/handle-linking.test.ts src/app/api/whatsapp/webhook/route.test.ts`
 Expected: PASS (todos; el test del webhook se corre porque consume `handleLinkingMessage`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/whatsapp/handle-linking.ts src/lib/whatsapp/handle-linking.test.ts && git commit -m "$(cat <<'EOF'

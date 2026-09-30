@@ -10,14 +10,14 @@ export interface LinkingDeps {
 }
 
 const MSG_LINKED_OK =
-  '✅ ¡Listo! Tu WhatsApp quedó vinculado a tu presupuesto. Pronto podrás ' +
-  'enviarme tus facturas (CUFE o foto) y transferencias para registrar gastos.';
+  '¡Listo! Tu número quedó vinculado. Ya puedes mandarme una foto de la ' +
+  'factura, el código CUFE o escribir algo como «40 mil almuerzo». ' +
+  'También puedes preguntarme «¿cuánto llevo en mercado?».';
 const MSG_CODE_INVALID =
   '❌ Ese código no es válido o ya expiró. Genera uno nuevo en la app ' +
   '(Ajustes → Conectar WhatsApp) y envíame: VINCULAR 123456';
 const MSG_ALREADY_LINKED =
-  'Tu número ya está vinculado a tu presupuesto. 👍 El registro de gastos por ' +
-  'mensaje llegará muy pronto.';
+  'Este número ya está vinculado. Ya puedes mandarme tus gastos.';
 const MSG_NEEDS_LINK =
   'Hola 👋 Para conectar tu WhatsApp con tu presupuesto, entra a la app → ' +
   'Ajustes → Conectar WhatsApp, genera tu código de 6 dígitos y envíame: ' +
