@@ -35,7 +35,7 @@ Contratos: `docs/agile/contracts.md`. Diseño: `docs/superpowers/specs/2026-09-3
 
 ### S05 — Recuperar contraseña
 - [ ] `/auth/forgot-password` con respuesta idéntica exista o no el correo.
-- [ ] `/auth/reset-password` con `passwordSchema`, requiere sesión, redirige a `/dashboard`.
+- [ ] `/auth/reset-password` con `passwordSchema`, requiere sesión, redirige a `/dashboard`. *(Enmienda §5.2: redirige con `getPostLoginPath`, así el invitado ve `/bienvenida`.)*
 - [ ] Texto de la plantilla "Reset password" para H4.
 
 ### S06 — Términos, privacidad y regla de contraseña
@@ -78,12 +78,15 @@ Contratos: `docs/agile/contracts.md`. Diseño: `docs/superpowers/specs/2026-09-3
 ### S12 — Checklist del dashboard
 - [ ] `computeChecklist` y `loadChecklistInput` con tests.
 - [ ] `OnboardingChecklist` en el dashboard; "Ocultar" guarda `onboarding_dismissed_at`.
-- [ ] El dashboard llama `ensureStarterKitAction()` al cargar.
+- [ ] El dashboard llama `ensureStarterKitAction()` al cargar. *(Enmienda §5.2: solo si `onboarding_completed_at IS NULL`.)*
 
 ### S13 — WhatsApp en Ajustes
 - [ ] `buildWhatsAppLinkUrl` con tests; enlace `wa.me` en el panel.
-- [ ] `MSG_LINKED_OK` nuevo; botón desvincular con `unlinkWhatsAppPhoneAction`.
+- [ ] `MSG_LINKED_OK` nuevo; botón desvincular con `unlinkWhatsAppPhoneAction`. *(Enmienda §5.2: `unlinkWhatsAppLinkAction(linkId)`.)*
 - [ ] `.env.example` con `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER`.
+
+### S15 — Activar el middleware (ADR-004)
+- [x] El middleware vive en `src/middleware.ts`; el build lista "ƒ Middleware" (verificado en la integración, 2026-09-30).
 
 ## E5 — Integración
 

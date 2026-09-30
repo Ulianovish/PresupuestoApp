@@ -17,3 +17,7 @@ La siembra no usa `upsert_monthly_budget`: su guard exige `auth.uid() = p_user_i
 
 ## Consecuencias
 El kit vive en un solo lugar (SQL). Cambiarlo es una migración nueva. El usuario existente no se toca (ya tiene categorías).
+
+## Actualización (contratos v2, §5.1 y §5.2)
+- Idempotencia: `_seed_starter_kit` no hace nada si el usuario tiene alguna categoría **activa** (no "alguna categoría"): quien las desactivó todas puede recargar el kit.
+- El dashboard llama `ensure_starter_kit()` **solo** si `profiles.onboarding_completed_at IS NULL`; después de la bienvenida no, porque reactivaría categorías que el usuario apagó a propósito. `/bienvenida` y el botón del estado vacío de `/presupuesto` (S10) sí la llaman.
