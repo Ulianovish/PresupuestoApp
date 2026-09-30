@@ -2069,19 +2069,19 @@ git commit -m "feat(auth): middleware deja pasar /auth/confirm, protege /bienven
 
 **Files:** ninguno nuevo.
 
-- [ ] **Step 1: Suite completa y tipos**
+- [x] **Step 1: Suite completa y tipos**
 
 Run: `bun run test && bun run type-check`
 Expected: todos los archivos de test en verde (los 7 nuevos de esta historia más los existentes) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 2: Build con variables de ejemplo (solo sin `.env.local`)**
+- [x] **Step 2: Build con variables de ejemplo (solo sin `.env.local`)**
 
 Valida que `/auth/callback` ya no tiene `page.tsx` y `route.ts` a la vez y que los route handlers compilan. Contratos §5.0 prohíben `next build` contra `.env.local` (apunta a producción) y Next lo carga solo aunque se pasen variables: este paso **solo** corre en un worktree sin `.env.local`.
 
 Run: `test -e .env.local && echo "hay .env.local: se salta el build" || NEXT_PUBLIC_SUPABASE_URL=https://ejemplo.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=clave-de-ejemplo SUPABASE_SERVICE_ROLE_KEY=clave-de-ejemplo bun run build`
 Expected: o el aviso de que se salta, o build exitoso con `ƒ /auth/callback` y `ƒ /auth/confirm` en la tabla de rutas. Si falla por una variable de otro módulo que no es de auth, anotarlo en el reporte sin tocar ese módulo. Si se salta, el Step 1 (`tsc`) sigue siendo la verificación obligatoria.
 
-- [ ] **Step 3: Revisión de datos personales**
+- [x] **Step 3: Revisión de datos personales**
 
 Run: `git diff main --stat && git diff main -- src middleware.ts | grep -nE "@(gmail|hotmail|outlook|yahoo)\.|\+57[0-9]{10}" || echo "sin datos personales"`
 Expected: `sin datos personales` (los tests solo usan `usuario@ejemplo.com`).
