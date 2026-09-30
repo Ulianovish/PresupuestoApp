@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // `ingresos-deudas.ts` importa la instancia `supabase` creada a nivel de
@@ -66,5 +69,32 @@ describe('cargarIngresosDeudas', () => {
 
   it('el servicio ya no exporta una siembra de datos de ejemplo', () => {
     expect(Object.keys(servicio)).not.toContain('inicializarDatosEjemplo');
+  });
+});
+
+// Sin DOM en vitest (entorno `node`) no se puede montar el hook: se revisa
+// su código fuente para que el efecto de montaje solo lea (antes la siembra
+// vivía ahí, en `inicializarDatos`).
+describe('useIngresosDeudas: efecto de montaje', () => {
+  const hook = readFileSync(
+    resolve(process.cwd(), 'src/hooks/useIngresosDeudas.ts'),
+    'utf8',
+  );
+
+  it('el único efecto al montar llama solo a cargarDatos', () => {
+    const efectos = [
+      ...hook.matchAll(/useEffect\(\(\) => \{([\s\S]*?)\}, \[/g),
+    ];
+    expect(efectos).toHaveLength(1);
+    expect(efectos[0][1].trim()).toBe('cargarDatos();');
+  });
+
+  it('cargarDatos solo lee a través de cargarIngresosDeudas', () => {
+    const cuerpo = hook.slice(
+      hook.indexOf('const cargarDatos = useCallback'),
+      hook.indexOf('// Cargar datos al montar'),
+    );
+    expect(cuerpo).toContain('await cargarIngresosDeudas()');
+    expect(cuerpo).not.toMatch(/crearIngreso|crearDeuda|inicializar/);
   });
 });
