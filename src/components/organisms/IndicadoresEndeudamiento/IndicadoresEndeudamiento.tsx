@@ -29,12 +29,12 @@ import {
   type IndicadoresEndeudamiento as Indicadores,
 } from '@/lib/indicadores-endeudamiento';
 
-/** Colores del índice de flujo de deuda según su nivel. */
+/** Color del índice de flujo de deuda según su nivel. */
 const COLOR_NIVEL = {
-  sano: { texto: 'text-emerald-400', borde: 'border-emerald-500/40' },
-  atencion: { texto: 'text-amber-400', borde: 'border-amber-500/40' },
-  riesgo: { texto: 'text-red-400', borde: 'border-red-500/50' },
-  'sin-dato': { texto: 'text-white', borde: 'border-white/10' },
+  sano: 'text-emerald-400',
+  atencion: 'text-amber-400',
+  riesgo: 'text-red-400',
+  'sin-dato': 'text-white',
 } as const;
 
 interface IndicadoresEndeudamientoProps {
@@ -44,30 +44,46 @@ interface IndicadoresEndeudamientoProps {
   formatCurrency: (amount: number) => string;
 }
 
-/** Un indicador: porcentaje grande y la fracción que lo compone debajo. */
+/**
+ * Un indicador: porcentaje grande y la fracción que lo compone debajo.
+ *
+ * `colorPorcentaje` y `nota` solo los usa el índice de flujo de deuda, que
+ * además del número lleva su nivel de riesgo. Los tres se ven igual.
+ */
 function Indicador({
   titulo,
   porcentaje,
   numerador,
   formatCurrency,
   ingresoNeto,
+  colorPorcentaje = 'text-white',
+  nota,
+  notaTitle,
 }: {
   titulo: string;
   porcentaje: number | null;
   numerador: number;
   formatCurrency: (amount: number) => string;
   ingresoNeto: number;
+  colorPorcentaje?: string;
+  nota?: string;
+  notaTitle?: string;
 }) {
   return (
-    <div className="rounded-lg bg-white/5 p-4">
+    <div className="flex flex-col rounded-lg bg-white/5 p-4">
       <p className="text-sm text-gray-300">{titulo}</p>
-      <p className="mt-1 text-3xl font-bold text-white">
+      <p className={`mt-1 text-3xl font-bold ${colorPorcentaje}`}>
         {porcentaje === null ? '—' : `${porcentaje.toFixed(1)} %`}
       </p>
       <p className="mt-2 text-xs text-gray-400">
         {formatCurrency(numerador)} /{' '}
         {ingresoNeto > 0 ? formatCurrency(ingresoNeto) : 'sin ingreso'}
       </p>
+      {nota && (
+        <p className={`mt-1 text-xs ${colorPorcentaje}`} title={notaTitle}>
+          {nota}
+        </p>
+      )}
     </div>
   );
 }
@@ -117,38 +133,28 @@ export default function IndicadoresEndeudamiento({
             ingresoNeto={ingresoNeto}
             formatCurrency={formatCurrency}
           />
+          {(() => {
+            const nivel = nivelFlujoDeuda(indicadores.porcentajeTotal);
+            const etiqueta = {
+              sano: 'Manejable',
+              atencion: 'Atención',
+              riesgo: 'Alto riesgo',
+              'sin-dato': 'Sin dato',
+            }[nivel];
+            return (
+              <Indicador
+                titulo="Índice de Flujo de Deuda"
+                porcentaje={indicadores.porcentajeTotal}
+                numerador={pagosTotales}
+                ingresoNeto={ingresoNeto}
+                formatCurrency={formatCurrency}
+                colorPorcentaje={COLOR_NIVEL[nivel]}
+                nota={`${etiqueta} · máx. recomendado ${FLUJO_DEUDA_SANO} %`}
+                notaTitle={mensajeFlujoDeuda(nivel)}
+              />
+            );
+          })()}
         </div>
-
-        {/* Índice de flujo de deuda: la misma división (cuotas / ingreso) que
-            miran los bancos para decidir si hay capacidad de pago. */}
-        {(() => {
-          const nivel = nivelFlujoDeuda(indicadores.porcentajeTotal);
-          const color = COLOR_NIVEL[nivel];
-          return (
-            <div
-              className={`mt-4 rounded-lg border ${color.borde} bg-white/5 p-4`}
-            >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-sm text-gray-300">
-                  Índice de Flujo de Deuda
-                </p>
-                <p className={`text-3xl font-bold ${color.texto}`}>
-                  {indicadores.porcentajeTotal === null
-                    ? '—'
-                    : `${indicadores.porcentajeTotal.toFixed(1)} %`}
-                </p>
-              </div>
-              <p className="mt-1 text-xs text-gray-400">
-                {formatCurrency(pagosTotales)} en cuotas /{' '}
-                {ingresoNeto > 0 ? formatCurrency(ingresoNeto) : 'sin ingreso'}{' '}
-                de ingreso · máximo recomendado {FLUJO_DEUDA_SANO} %
-              </p>
-              <p className={`mt-2 text-xs ${color.texto}`}>
-                {mensajeFlujoDeuda(nivel)}
-              </p>
-            </div>
-          );
-        })()}
 
         {ingresoNeto <= 0 && (
           <p className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
