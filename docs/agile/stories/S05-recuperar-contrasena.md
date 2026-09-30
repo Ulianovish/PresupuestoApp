@@ -885,7 +885,7 @@ EOF
 - Consumes: `resetPasswordAction(formData: FormData): Promise<void>` (Task 3); `createClient()` de `@/lib/supabase/server`; `translateAuthError` (S04); átomos `Button`, `Card`, `Input`.
 - Produces: ruta `/auth/reset-password`. Sin sesión redirige (en el servidor) a `/auth/forgot-password?error=<"El enlace venció. Pide uno nuevo.">`, el mismo destino que usa la acción. Con sesión muestra el formulario con campos `password` y `confirmPassword`.
 
-- [ ] **Step 1: Crear el formulario cliente**
+- [x] **Step 1: Crear el formulario cliente**
 
 Crea `src/app/auth/reset-password/ResetPasswordForm.tsx`:
 
@@ -1063,7 +1063,7 @@ export default function ResetPasswordForm() {
 }
 ```
 
-- [ ] **Step 2: Crear la página (server component)**
+- [x] **Step 2: Crear la página (server component)**
 
 Crea `src/app/auth/reset-password/page.tsx`:
 
@@ -1100,14 +1100,14 @@ export default async function ResetPasswordPage() {
 }
 ```
 
-- [ ] **Step 3: Type-check**
+- [x] **Step 3: Type-check**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
 Expected: sin errores.
 
 Sin revisión manual con `bun run dev` (contratos §5.0). La redirección sin sesión de la página usa el mismo destino que la acción, que sí está cubierta por el test "sin sesión" de la Task 3.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/app/auth/reset-password/page.tsx src/app/auth/reset-password/ResetPasswordForm.tsx && git commit -m "$(cat <<'EOF'
