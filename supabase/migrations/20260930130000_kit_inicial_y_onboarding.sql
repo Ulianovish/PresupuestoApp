@@ -185,3 +185,29 @@ $function$;
 -- llaman como SECURITY DEFINER, así que el chequeo de EXECUTE es contra el dueño.
 -- service_role también se revoca: los default privileges de Supabase se lo dan.
 REVOKE EXECUTE ON FUNCTION public._seed_starter_kit(uuid, text) FROM PUBLIC, anon, authenticated, service_role;
+
+
+-- ============================================================================
+-- 3. ensure_starter_kit: reparación para el usuario de la sesión
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.ensure_starter_kit()
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path = public, pg_temp
+AS $function$
+DECLARE
+    v_uid uuid := auth.uid();
+BEGIN
+    IF v_uid IS NULL THEN
+        RAISE EXCEPTION 'no autorizado' USING ERRCODE = '42501';
+    END IF;
+
+    RETURN public._seed_starter_kit(v_uid, to_char(now() AT TIME ZONE 'America/Bogota', 'YYYY-MM'));
+END;
+$function$;
+
+-- Solo authenticated (cliente de cookie). service_role no tiene auth.uid():
+-- se revoca también porque los default privileges de Supabase se lo dan.
+REVOKE EXECUTE ON FUNCTION public.ensure_starter_kit() FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.ensure_starter_kit() TO authenticated;

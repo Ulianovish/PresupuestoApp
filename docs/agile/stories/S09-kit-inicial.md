@@ -596,7 +596,7 @@ EOF
 - Consumes: `public._seed_starter_kit(uuid, text) RETURNS boolean` (Task 2).
 - Produces: `public.ensure_starter_kit() RETURNS boolean` — RPC `supabase.rpc('ensure_starter_kit')` con el cliente de cookie (lo usará `ensureStarterKitAction()`, que crea S10 y extienden S11/S12, contratos §2.7 y §5.2; no se crea en esta historia). Sin sesión → error `42501 'no autorizado'`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Agregar al final de `src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`:
 
@@ -644,12 +644,12 @@ describe('migración 20260930130000: ensure_starter_kit', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: FAIL — los 5 tests nuevos fallan (`Error: No está la función ensure_starter_kit`, y el de grants con `expected [] to deeply equal [ 'authenticated' ]` o el `toContain` del REVOKE sin match); los 17 anteriores en PASS.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Agregar al final de `supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql`:
 
@@ -682,12 +682,12 @@ REVOKE EXECUTE ON FUNCTION public.ensure_starter_kit() FROM PUBLIC, anon, servic
 GRANT EXECUTE ON FUNCTION public.ensure_starter_kit() TO authenticated;
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: PASS — 22 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts && git commit -m "$(cat <<'EOF'

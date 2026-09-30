@@ -237,3 +237,45 @@ describe('migración 20260930130000: _seed_starter_kit', () => {
     );
   });
 });
+
+describe('migración 20260930130000: ensure_starter_kit', () => {
+  const ensure = () => squash(functionBlock('ensure_starter_kit'));
+
+  it('no recibe parámetros (no se puede apuntar a otro usuario) y devuelve boolean', () => {
+    expect(ensure()).toMatch(
+      /^CREATE OR REPLACE FUNCTION public\.ensure_starter_kit\(\) RETURNS boolean/,
+    );
+  });
+
+  it('es SECURITY DEFINER con search_path fijo', () => {
+    expect(ensure()).toMatch(/\bSECURITY DEFINER\b/);
+    expect(ensure()).toContain('SET search_path = public, pg_temp');
+  });
+
+  it('exige sesión: auth.uid() NULL lanza 42501', () => {
+    const body = ensure();
+    expect(body).toContain('v_uid uuid := auth.uid();');
+    expect(body).toContain(
+      "IF v_uid IS NULL THEN RAISE EXCEPTION 'no autorizado' USING ERRCODE = '42501'; END IF;",
+    );
+  });
+
+  it('siembra al usuario de la sesión con el mes actual de Bogotá', () => {
+    expect(ensure()).toContain(
+      "RETURN public._seed_starter_kit(v_uid, to_char(now() AT TIME ZONE 'America/Bogota', 'YYYY-MM'));",
+    );
+  });
+
+  it('EXECUTE solo para authenticated', () => {
+    const flat = squash(code);
+    expect(flat).toContain(
+      'REVOKE EXECUTE ON FUNCTION public.ensure_starter_kit() FROM PUBLIC, anon, service_role;',
+    );
+    const grants = [
+      ...flat.matchAll(
+        /GRANT EXECUTE ON FUNCTION public\.ensure_starter_kit\(\) TO ([^;]+);/g,
+      ),
+    ].map(m => m[1].trim());
+    expect(grants).toEqual(['authenticated']);
+  });
+});
