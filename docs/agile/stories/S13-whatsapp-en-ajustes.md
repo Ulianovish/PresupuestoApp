@@ -304,7 +304,7 @@ EOF
   ```
   Borra por `id` **y** `user_id` con el cliente de cookie; así el número completo no llega al navegador (el cliente solo conoce el `id` y el número enmascarado). Mensajes de error exactos: `'Número inválido.'` (id que no es uuid, igual que `guardarDocumentoDianAction`), `'No autenticado'`, `'No encontramos ese número entre los tuyos.'`, `'No se pudo desvincular el número.'`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `src/lib/actions/whatsapp.test.ts`:
 
@@ -434,12 +434,12 @@ describe('unlinkWhatsAppLinkAction', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/whatsapp.test.ts`
 Expected: FAIL — los 5 tests de `unlinkWhatsAppLinkAction` fallan con `TypeError: unlinkWhatsAppLinkAction is not a function`; los tests existentes de `guardarDocumentoDianAction` y `listarDocumentosDianAction` siguen en verde.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Agregar al final de `src/lib/actions/whatsapp.ts` (después de `guardarDocumentoDianAction`, así `linkIdSchema` ya está definido):
 
@@ -490,7 +490,7 @@ export async function unlinkWhatsAppLinkAction(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/whatsapp.test.ts && bun run type-check`
 Expected: PASS (15 tests: 7 + 3 existentes + 5 nuevos) y `tsc --noEmit` sin errores.
@@ -498,7 +498,7 @@ Expected: PASS (15 tests: 7 + 3 existentes + 5 nuevos) y `tsc --noEmit` sin erro
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn "unlinkWhatsAppPhoneAction\|UnlinkPhoneResult" src`
 Expected: sin salida (la firma vieja de §2.8 no existe en ningún lado).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/whatsapp.ts src/lib/actions/whatsapp.test.ts && git commit -m "$(cat <<'EOF'
