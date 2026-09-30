@@ -42,15 +42,15 @@ Se usan **los dos**: hook como barrera principal y trigger como respaldo. Fuente
 
 ## Criterios de aceptación
 
-- [ ] Tabla `public.signup_allowlist(email text PK CHECK (email = lower(btrim(email))), note text, created_at timestamptz NOT NULL DEFAULT now())`, RLS habilitado, sin políticas, `REVOKE ALL` para `PUBLIC, anon, authenticated`.
-- [ ] `is_signup_allowed(p_email text) RETURNS boolean`: SECURITY DEFINER, `search_path` fijo, compara `lower(btrim(p_email))`; EXECUTE solo para `supabase_auth_admin` (y el dueño).
-- [ ] `hook_before_user_created(event jsonb) RETURNS jsonb`: `'{}'::jsonb` si `is_signup_allowed(event->'user'->>'email')`; si no, `{"error":{"http_code":403,"message":"signup_not_allowed"}}`. `GRANT EXECUTE … TO supabase_auth_admin`; `REVOKE … FROM authenticated, anon, public` (y `service_role`).
-- [ ] Trigger de respaldo `enforce_signup_allowlist` `BEFORE INSERT ON auth.users` con `RAISE EXCEPTION 'signup_not_allowed'`.
-- [ ] Backfill idempotente de los correos existentes de `auth.users` (`ON CONFLICT DO NOTHING`).
-- [ ] Test de texto de la migración en verde (RLS, revokes, grants a `supabase_auth_admin`, literal `signup_not_allowed`, backfill idempotente, sin correos reales).
-- [ ] ADR-002 completa con la verificación del hook (plan, formato, grants, flujos cubiertos) y la decisión.
-- [ ] Instrucciones exactas de H5 y H6 en esta historia (sección final).
-- [ ] `bun run test && bun run type-check` en verde.
+- [x] Tabla `public.signup_allowlist(email text PK CHECK (email = lower(btrim(email))), note text, created_at timestamptz NOT NULL DEFAULT now())`, RLS habilitado, sin políticas, `REVOKE ALL` para `PUBLIC, anon, authenticated`.
+- [x] `is_signup_allowed(p_email text) RETURNS boolean`: SECURITY DEFINER, `search_path` fijo, compara `lower(btrim(p_email))`; EXECUTE solo para `supabase_auth_admin` (y el dueño).
+- [x] `hook_before_user_created(event jsonb) RETURNS jsonb`: `'{}'::jsonb` si `is_signup_allowed(event->'user'->>'email')`; si no, `{"error":{"http_code":403,"message":"signup_not_allowed"}}`. `GRANT EXECUTE … TO supabase_auth_admin`; `REVOKE … FROM authenticated, anon, public` (y `service_role`).
+- [x] Trigger de respaldo `enforce_signup_allowlist` `BEFORE INSERT ON auth.users` con `RAISE EXCEPTION 'signup_not_allowed'`.
+- [x] Backfill idempotente de los correos existentes de `auth.users` (`ON CONFLICT DO NOTHING`).
+- [x] Test de texto de la migración en verde (RLS, revokes, grants a `supabase_auth_admin`, literal `signup_not_allowed`, backfill idempotente, sin correos reales).
+- [x] ADR-002 completa con la verificación del hook (plan, formato, grants, flujos cubiertos) y la decisión.
+- [x] Instrucciones exactas de H5 y H6 en esta historia (sección final).
+- [x] `bun run test && bun run type-check` en verde.
 
 ---
 
@@ -542,12 +542,12 @@ CREATE TRIGGER enforce_signup_allowlist
 --    signup_allowlist (INFO). Es intencional: nadie salvo el dueño la toca.
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
 Expected: PASS (22 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit -m "$(cat <<'EOF'
@@ -573,7 +573,7 @@ EOF
 - Consumes: la migración de las Tareas 1–3 (nombres de funciones y trigger).
 - Produces: ADR-002 cerrada; S04 la lee para `translateAuthError`.
 
-- [ ] **Step 1: Reemplazar el contenido de ADR-002**
+- [x] **Step 1: Reemplazar el contenido de ADR-002**
 
 Sobrescribir `docs/agile/decisions/ADR-002-allowlist-registro.md` con:
 
@@ -619,17 +619,17 @@ No repite el rechazo: con el hook activo, un registro rechazado nunca llega al `
 - `translateAuthError` debe mirar `message` aunque `code` venga con un valor que no está en su tabla (`unexpected_failure`) o no venga.
 ```
 
-- [ ] **Step 2: Verificación completa del proyecto**
+- [x] **Step 2: Verificación completa del proyecto**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: todos los tests en verde (incluidos los 22 de `src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 3: Revisar que no quedaron correos reales**
+- [x] **Step 3: Revisar que no quedaron correos reales**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -EnoI "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}" supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts docs/agile/decisions/ADR-002-allowlist-registro.md`
 Expected: solo direcciones `@ejemplo.com` (o ninguna en la ADR).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Solo docs: va con `--no-verify`.
 
