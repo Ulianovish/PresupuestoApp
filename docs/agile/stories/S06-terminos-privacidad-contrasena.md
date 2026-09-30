@@ -1018,7 +1018,7 @@ Tareas TDD aparte, una por commit, pedidas por el orquestador en la misma zona (
 - [x] **A3:** `translateAuthError`: subcadena solo para `signup_not_allowed`; lo demás, coincidencia exacta.
 - [x] **A4:** `/auth/callback` redirige a `/auth/confirm` con los mismos parámetros (`code`, `type`; `redirectTo` → `next`).
 - [x] **A5:** `getSiteUrl`: en `VERCEL_ENV=production` sin `NEXT_PUBLIC_SITE_URL`, usa `VERCEL_PROJECT_PRODUCTION_URL` antes que `VERCEL_URL`.
-- [ ] **A6:** `middleware.test.ts` con `createServerClient` simulado.
+- [x] **A6:** `middleware.test.ts` con `createServerClient` simulado.
 
 ---
 
