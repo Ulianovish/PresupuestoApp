@@ -591,7 +591,7 @@ git commit -m "feat(auth): translateAuthError con los textos en español del con
 - Consumes: `SupabaseClient` de `@supabase/supabase-js` (se le pasa el cliente de cookie de `createClient()`; el tipo `SupabaseClient<Database>` es asignable, verificado con `tsc`).
 - Produces: `export async function getPostLoginPath(supabase: SupabaseClient, userId: string): Promise<'/bienvenida' | '/dashboard'>`. Consulta `from('profiles').select('onboarding_completed_at').eq('id', userId).maybeSingle()`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/onboarding/post-login.test.ts`:
 
@@ -664,12 +664,12 @@ describe('getPostLoginPath', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/onboarding/post-login.test.ts`
 Expected: FAIL con `Failed to resolve import "./post-login"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/onboarding/post-login.ts`:
 
@@ -701,12 +701,12 @@ export async function getPostLoginPath(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/onboarding/post-login.test.ts`
 Expected: PASS (5 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/onboarding/post-login.ts src/lib/onboarding/post-login.test.ts
