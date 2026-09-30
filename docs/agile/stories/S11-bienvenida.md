@@ -805,7 +805,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: tabla `ingresos` (`supabase_ingresos_deudas.sql:10-21`: `user_id uuid NOT NULL`, `descripcion varchar(255) NOT NULL`, `fuente varchar(255) NOT NULL`, `monto numeric(12,2)`, `fecha date NOT NULL`, `tipo varchar(50) DEFAULT 'ingreso'`, `es_activo DEFAULT true`); `todayBogota()` de `@/lib/whatsapp/format`.
 - Produces: `export async function saveOnboardingIncomeAction(input: { monto: number; fuente: string }): Promise<{ ok: boolean; error?: string }>`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `src/lib/actions/onboarding.test.ts`, cambiar la importación de `./onboarding` por:
 
@@ -912,12 +912,12 @@ describe('saveOnboardingIncomeAction', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: FAIL — `saveOnboardingIncomeAction is not a function` (o error de import: "does not provide an export named").
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/actions/onboarding.ts`, dejar las importaciones así (fusionar con las que ya haya):
 
@@ -984,12 +984,12 @@ export async function saveOnboardingIncomeAction(input: {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (8 + 9 = 17 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/actions/onboarding.ts src/lib/actions/onboarding.test.ts

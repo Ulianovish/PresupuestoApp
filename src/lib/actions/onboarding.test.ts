@@ -15,7 +15,10 @@ vi.mock('@/lib/whatsapp/format', () => ({ todayBogota: () => '2026-09-15' }));
 
 import { createClient } from '@/lib/supabase/server';
 
-import { ensureStarterKitAction } from './onboarding';
+import {
+  ensureStarterKitAction,
+  saveOnboardingIncomeAction,
+} from './onboarding';
 
 const mockedCreateClient = createClient as unknown as ReturnType<typeof vi.fn>;
 
@@ -77,6 +80,10 @@ function clienteFalso({
   };
   mockedCreateClient.mockResolvedValue(client);
   return { client, llamadas };
+}
+
+function llamadasDe(llamadas: Llamada[], table: string, method: string) {
+  return llamadas.filter(l => l.table === table && l.method === method);
 }
 
 describe('ensureStarterKitAction', () => {
@@ -182,5 +189,89 @@ describe('ensureStarterKitAction durante el render (§5.2)', () => {
     expect(revalidatePath).not.toHaveBeenCalled();
     expect(redirect).not.toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+});
+
+describe('saveOnboardingIncomeAction', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('guarda el ingreso del usuario con la fecha de hoy en Bogotá', async () => {
+    const { llamadas } = clienteFalso();
+
+    const r = await saveOnboardingIncomeAction({
+      monto: 3_500_000,
+      fuente: '  Salario ',
+    });
+
+    expect(r).toEqual({ ok: true });
+    const inserts = llamadasDe(llamadas, 'ingresos', 'insert');
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0].args[0]).toEqual({
+      user_id: USER_ID,
+      descripcion: 'Ingreso mensual',
+      fuente: 'Salario',
+      monto: 3_500_000,
+      fecha: '2026-09-15',
+      tipo: 'ingreso',
+    });
+  });
+
+  it.each([0, -100_000, 1500.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'monto inválido (%s) → error sin tocar la DB',
+    async monto => {
+      const { client } = clienteFalso();
+
+      const r = await saveOnboardingIncomeAction({ monto, fuente: 'Salario' });
+
+      expect(r.ok).toBe(false);
+      expect(r.error).toMatch(/ingreso/i);
+      expect(client.from).not.toHaveBeenCalled();
+    },
+  );
+
+  it('fuente vacía → error sin tocar la DB', async () => {
+    const { client } = clienteFalso();
+
+    const r = await saveOnboardingIncomeAction({
+      monto: 1_000_000,
+      fuente: '   ',
+    });
+
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/de dónde/i);
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it('sin sesión → No autenticado', async () => {
+    const { client } = clienteFalso({ user: null });
+
+    expect(
+      await saveOnboardingIncomeAction({ monto: 1_000_000, fuente: 'Salario' }),
+    ).toEqual({ ok: false, error: 'No autenticado' });
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it('error de la DB → mensaje genérico y no loguea el monto', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    clienteFalso({
+      results: {
+        ingresos: {
+          data: null,
+          error: { code: '23514', message: 'Failing row contains (3500000)' },
+        },
+      },
+    });
+
+    const r = await saveOnboardingIncomeAction({
+      monto: 3_500_000,
+      fuente: 'Salario',
+    });
+
+    expect(r).toEqual({
+      ok: false,
+      error: 'No pudimos guardar tu ingreso. Intenta de nuevo.',
+    });
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('3500000');
+    errorSpy.mockRestore();
   });
 });

@@ -1,6 +1,9 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
+
 import { createClient } from '@/lib/supabase/server';
+import { todayBogota } from '@/lib/whatsapp/format';
 
 /**
  * Siembra el kit inicial (contratos §1.3 y §5.1) para el usuario de la sesión.
@@ -40,4 +43,59 @@ export async function ensureStarterKitAction(): Promise<{
     console.warn('ensureStarterKitAction: error inesperado');
     return { seeded: false, error: 'unexpected' };
   }
+}
+
+type OnboardingResult = { ok: boolean; error?: string };
+
+const DESCRIPCION_INGRESO = 'Ingreso mensual';
+const MAX_FUENTE = 255;
+
+/**
+ * Paso 1 de la bienvenida: guarda el ingreso mensual en `ingresos` con la
+ * fecha de hoy (Bogotá). `monto` en pesos enteros > 0.
+ */
+export async function saveOnboardingIncomeAction(input: {
+  monto: number;
+  fuente: string;
+}): Promise<OnboardingResult> {
+  const monto = input?.monto;
+  if (typeof monto !== 'number' || !Number.isSafeInteger(monto) || monto <= 0) {
+    return { ok: false, error: 'Escribe tu ingreso en pesos, mayor a cero.' };
+  }
+  const fuente = typeof input.fuente === 'string' ? input.fuente.trim() : '';
+  if (!fuente) {
+    return { ok: false, error: 'Cuéntanos de dónde viene el ingreso.' };
+  }
+  if (fuente.length > MAX_FUENTE) {
+    return { ok: false, error: 'La fuente del ingreso es demasiado larga.' };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'No autenticado' };
+
+  const { error } = await supabase.from('ingresos').insert({
+    user_id: user.id,
+    descripcion: DESCRIPCION_INGRESO,
+    fuente,
+    monto,
+    fecha: todayBogota(),
+    tipo: 'ingreso',
+  });
+  if (error) {
+    // Solo el código: el detalle de un CHECK fallido trae la fila (el monto).
+    console.error(
+      'saveOnboardingIncomeAction: error guardando el ingreso:',
+      error.code,
+    );
+    return {
+      ok: false,
+      error: 'No pudimos guardar tu ingreso. Intenta de nuevo.',
+    };
+  }
+
+  revalidatePath('/ingresos');
+  return { ok: true };
 }
