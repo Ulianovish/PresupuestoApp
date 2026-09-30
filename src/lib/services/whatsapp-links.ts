@@ -290,8 +290,9 @@ function logIntentos(funcion: string, err: unknown) {
 /**
  * Reserva un intento de VINCULAR del número ANTES de canjear el código.
  *
- * 1. Borra (best-effort) las filas del número anteriores a la ventana: solo se
- *    usan los últimos 15 minutos y así la tabla no crece sin límite.
+ * 1. Borra (best-effort) TODAS las filas anteriores a la ventana, de cualquier
+ *    número: solo se usan los últimos 15 minutos y así la tabla no crece sin
+ *    límite, ni con números que no vuelven a escribir.
  * 2. Inserta la fila del intento.
  * 3. Cuenta las filas del número en la ventana, esta incluida. Si pasan de 5,
  *    borra la propia y rechaza (los intentos bloqueados no se registran).
@@ -319,7 +320,6 @@ export async function reserveLinkAttempt(
     const { error: purgaError } = await supabase
       .from('whatsapp_link_attempts')
       .delete()
-      .eq('phone_e164', phoneE164)
       .lt('created_at', desde);
     if (purgaError) logIntentos('reserveLinkAttempt', purgaError);
 

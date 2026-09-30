@@ -552,7 +552,7 @@ function clienteIntentos(...consultas: Array<ReturnType<typeof consulta>>) {
 describe('reserveLinkAttempt', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('purga lo viejo del número, registra el intento ANTES de contar y cuenta la ventana con él incluido', async () => {
+  it('purga todo lo anterior a la ventana, registra el intento ANTES de contar y cuenta la ventana con él incluido', async () => {
     const purga = consulta({ error: null });
     const insert = consulta({ data: { id: 42 }, error: null });
     const conteo = consulta({ count: 5, error: null });
@@ -562,9 +562,10 @@ describe('reserveLinkAttempt', () => {
 
     expect(res).toEqual({ allowed: true, attemptId: 42 });
     expect(from).toHaveBeenCalledWith('whatsapp_link_attempts');
-    // Purga: solo las filas del número anteriores a la ventana.
+    // Purga: TODAS las filas anteriores a la ventana, de cualquier número
+    // (así también desaparecen las de números que no vuelven a escribir).
     expect(purga.delete).toHaveBeenCalled();
-    expect(purga.eq).toHaveBeenCalledWith('phone_e164', TEL);
+    expect(purga.eq).not.toHaveBeenCalled();
     expect(purga.lt).toHaveBeenCalledWith(
       'created_at',
       '2026-09-30T11:45:00.000Z',
