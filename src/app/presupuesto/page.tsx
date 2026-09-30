@@ -28,10 +28,7 @@ import {
   type RubroEstado,
 } from '@/lib/budget/alerts';
 import { defaultItemFormNames } from '@/lib/budget/catalog-defaults';
-import {
-  shouldReloadAfterStarterKit,
-  starterKitToast,
-} from '@/lib/onboarding/budget-empty-state';
+import { loadStarterKitAndNotify } from '@/lib/onboarding/budget-empty-state';
 import {
   formatCurrency,
   getClassifications,
@@ -303,26 +300,15 @@ export default function PresupuestoPage() {
   const handleLoadStarterKit = async () => {
     setIsLoadingStarterKit(true);
     try {
-      // Nunca lanza (contratos §5.2): los fallos llegan en result.error. Hasta
-      // que se aplique la migración de S09 (H8) la RPC no existe y el aviso es
-      // de error; el usuario puede seguir con "Crear categoría".
-      const result = await ensureStarterKitAction();
-      const aviso = starterKitToast(
-        result,
-        selectedMonth,
-        todayBogota().slice(0, 7),
-      );
-      showToast(aviso.message, aviso.type);
-      if (shouldReloadAfterStarterKit(result)) {
-        try {
-          await handleCategoryCreated();
-        } catch {
-          showToast(
-            'Cargamos las categorías pero no pudimos refrescar; recarga la página',
-            'error',
-          );
-        }
-      }
+      // Hasta que se aplique la migración de S09 (H8) la RPC no existe y el
+      // aviso es de error; el usuario puede seguir con "Crear categoría".
+      await loadStarterKitAndNotify({
+        ensureStarterKit: ensureStarterKitAction,
+        reload: handleCategoryCreated,
+        notify: showToast,
+        viewedMonth: selectedMonth,
+        currentMonth: todayBogota().slice(0, 7),
+      });
     } finally {
       setIsLoadingStarterKit(false);
     }

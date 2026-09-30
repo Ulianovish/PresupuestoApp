@@ -2211,5 +2211,5 @@ Sin commit en esta tarea (no hay cambios). Si algo falló, corrígelo en la tare
 
 **Files:** `src/lib/onboarding/budget-empty-state.ts` (+ test), `src/app/presupuesto/page.tsx`.
 
-- [ ] **Step 1:** Test de `loadStarterKitAndNotify` con dependencias inyectadas (acción, toast, recarga, meses): éxito con recarga, error sin recarga, `seeded: false` sin error con recarga, y la rama del `catch` (acción o recarga que lanza → toast de error).
-- [ ] **Step 2:** Implementación y `handleLoadStarterKit` de `/presupuesto` la usa; commit.
+- [x] **Step 1:** Test de `loadStarterKitAndNotify` con dependencias inyectadas (acción, toast, recarga, meses): éxito con recarga, error sin recarga, `seeded: false` sin error con recarga, y la rama del `catch` (acción o recarga que lanza → toast de error).
+- [x] **Step 2:** Implementación y `handleLoadStarterKit` de `/presupuesto` la usa; commit.

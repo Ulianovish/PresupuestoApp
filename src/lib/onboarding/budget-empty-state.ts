@@ -76,3 +76,39 @@ export function starterKitToast(
 export function shouldReloadAfterStarterKit(result: StarterKitResult): boolean {
   return !result.error;
 }
+
+export const STARTER_KIT_RELOAD_ERROR_MESSAGE =
+  'Cargamos las categorías pero no pudimos refrescar; recarga la página';
+
+/**
+ * Secuencia del botón "Cargar categorías sugeridas" de /presupuesto, con las
+ * dependencias inyectadas para poder probar cada rama: llama la acción, avisa
+ * con `starterKitToast` y recarga si `shouldReloadAfterStarterKit`. Nunca
+ * lanza: si la acción lanza (p. ej. la red) avisa con el error del kit, y si
+ * la recarga lanza pide recargar la página.
+ */
+export async function loadStarterKitAndNotify(deps: {
+  ensureStarterKit: () => Promise<StarterKitResult>;
+  reload: () => Promise<void>;
+  notify: (message: string, type: StarterKitToast['type']) => void;
+  viewedMonth: string;
+  currentMonth: string;
+}): Promise<void> {
+  let result: StarterKitResult;
+  try {
+    result = await deps.ensureStarterKit();
+  } catch {
+    deps.notify(STARTER_KIT_ERROR_MESSAGE, 'error');
+    return;
+  }
+
+  const aviso = starterKitToast(result, deps.viewedMonth, deps.currentMonth);
+  deps.notify(aviso.message, aviso.type);
+
+  if (!shouldReloadAfterStarterKit(result)) return;
+  try {
+    await deps.reload();
+  } catch {
+    deps.notify(STARTER_KIT_RELOAD_ERROR_MESSAGE, 'error');
+  }
+}

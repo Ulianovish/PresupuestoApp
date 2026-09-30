@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   STARTER_KIT_ERROR_MESSAGE,
+  STARTER_KIT_RELOAD_ERROR_MESSAGE,
   getBudgetPanelState,
+  loadStarterKitAndNotify,
   shouldReloadAfterStarterKit,
   starterKitToast,
 } from './budget-empty-state';
@@ -91,5 +93,91 @@ describe('shouldReloadAfterStarterKit', () => {
     expect(
       shouldReloadAfterStarterKit({ seeded: false, error: 'no_session' }),
     ).toBe(false);
+  });
+});
+
+describe('loadStarterKitAndNotify', () => {
+  function deps(
+    ensureStarterKit: () => Promise<{ seeded: boolean; error?: string }>,
+  ) {
+    return {
+      ensureStarterKit: vi.fn(ensureStarterKit),
+      reload: vi.fn(async () => {}),
+      notify: vi.fn(),
+      viewedMonth: '2026-09',
+      currentMonth: '2026-09',
+    };
+  }
+
+  it('sembró: avisa con éxito y recarga', async () => {
+    const d = deps(async () => ({ seeded: true }));
+
+    await loadStarterKitAndNotify(d);
+
+    expect(d.notify).toHaveBeenCalledTimes(1);
+    expect(d.notify).toHaveBeenCalledWith(
+      expect.stringContaining('cargamos las categorías sugeridas'),
+      'success',
+    );
+    expect(d.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('ya tenía categorías (seeded: false sin error): avisa y recarga para mostrárselas', async () => {
+    const d = deps(async () => ({ seeded: false }));
+
+    await loadStarterKitAndNotify(d);
+
+    expect(d.notify).toHaveBeenCalledWith(
+      expect.stringContaining('Ya tienes categorías'),
+      'success',
+    );
+    expect(d.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('la acción devuelve error: aviso de error y no recarga', async () => {
+    const d = deps(async () => ({ seeded: false, error: 'PGRST202' }));
+
+    await loadStarterKitAndNotify(d);
+
+    expect(d.notify).toHaveBeenCalledWith(STARTER_KIT_ERROR_MESSAGE, 'error');
+    expect(d.reload).not.toHaveBeenCalled();
+  });
+
+  it('catch: si la acción lanza, aviso de error, no recarga y no propaga', async () => {
+    const d = deps(async () => {
+      throw new Error('red caída');
+    });
+
+    await expect(loadStarterKitAndNotify(d)).resolves.toBeUndefined();
+
+    expect(d.notify).toHaveBeenCalledTimes(1);
+    expect(d.notify).toHaveBeenCalledWith(STARTER_KIT_ERROR_MESSAGE, 'error');
+    expect(d.reload).not.toHaveBeenCalled();
+  });
+
+  it('catch: si la recarga lanza, avisa que recargue la página y no propaga', async () => {
+    const d = deps(async () => ({ seeded: true }));
+    d.reload.mockRejectedValueOnce(new Error('fallo al refrescar'));
+
+    await expect(loadStarterKitAndNotify(d)).resolves.toBeUndefined();
+
+    expect(d.notify).toHaveBeenLastCalledWith(
+      STARTER_KIT_RELOAD_ERROR_MESSAGE,
+      'error',
+    );
+  });
+
+  it('usa los meses que recibe para el aviso', async () => {
+    const d = {
+      ...deps(async () => ({ seeded: true })),
+      viewedMonth: '2026-08',
+    };
+
+    await loadStarterKitAndNotify(d);
+
+    expect(d.notify).toHaveBeenCalledWith(
+      expect.stringContaining('presupuesto del mes actual'),
+      'success',
+    );
   });
 });
