@@ -17,19 +17,19 @@ export function isPlaceholderContactEmail(correo: string): boolean {
 }
 
 /**
- * Rompe si en producción el correo sigue siendo un marcador: /terms y
+ * Avisa si en producción el correo sigue siendo un marcador: /terms y
  * /privacy prometerían copia, corrección y borrado de datos a través de un
- * buzón que no existe. Se evalúa al cargar este módulo, así que el build de
- * producción de Vercel (VERCEL_ENV === 'production') falla hasta que se
- * resuelva H9. Preview y local lo toleran.
+ * buzón que no existe. Se evalúa al cargar este módulo. No rompe el build
+ * (decisión de la persona, 2026-09-30): es un aviso hasta resolver H9
+ * (contratos §5.4). El texto no incluye el correo.
  */
 export function assertContactEmailReady(
   correo: string,
   vercelEnv: string | undefined,
 ): void {
   if (vercelEnv === 'production' && isPlaceholderContactEmail(correo)) {
-    throw new Error(
-      `CONTACT_EMAIL sigue siendo el marcador "${correo}". Cámbialo en src/lib/constants/legal.ts por un buzón real (tarea humana H9, contratos §5.4) antes de publicar en producción.`,
+    console.warn(
+      'CONTACT_EMAIL sigue siendo el de ejemplo: resuelve H9 antes de abrir el registro',
     );
   }
 }

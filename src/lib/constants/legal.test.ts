@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   CONTACT_EMAIL,
@@ -20,10 +20,17 @@ describe('isPlaceholderContactEmail', () => {
 });
 
 describe('assertContactEmailReady', () => {
-  it('en producción con el marcador rompe (build de Vercel)', () => {
+  it('en producción con el marcador avisa sin romper ni exponer el correo', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
     expect(() =>
       assertContactEmailReady('contacto@ejemplo.com', 'production'),
-    ).toThrow(/H9/);
+    ).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(
+      'CONTACT_EMAIL sigue siendo el de ejemplo: resuelve H9 antes de abrir el registro',
+    );
+
+    warn.mockRestore();
   });
 
   it('en producción con un buzón real no rompe', () => {
