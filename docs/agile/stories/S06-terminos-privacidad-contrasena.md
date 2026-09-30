@@ -49,7 +49,7 @@
 - [x] `passwordSchema` exportado desde `src/lib/validations/schemas.ts`: rechaza 7 caracteres con "Usa al menos 8 caracteres", acepta 8 y 72, rechaza 73 con "Usa como máximo 72 caracteres", y no exige mayúsculas, números ni símbolos.
 - [x] `registerSchema.password` usa `passwordSchema`; `confirmPassword` solo exige no estar vacío ("Confirma tu contraseña") y debe coincidir ("Las contraseñas no coinciden").
 - [x] El registro muestra "Mínimo 8 caracteres." como único texto de ayuda de la contraseña; ya no menciona mayúsculas, minúsculas ni números. Los inputs tienen `minLength={8}` y `maxLength={72}`.
-- [x] `/privacy` existe, es pública (ya lo es por middleware) y dice, de forma breve: quién la administra (sin nombre), qué se guarda (cuenta, presupuesto, gastos, facturas con CUFE, números de WhatsApp, cédula/NIT, últimos mensajes con el bot), qué no se guarda (fotos, números de tarjeta, cookies de publicidad), para qué se usa, con quién se comparte (Supabase, Vercel, Twilio y Meta, Vercel AI Gateway y MiniMax, Resend, DIAN vía servicio propio), cuánto tiempo y cómo pedir copia, corrección o borrado escribiendo a `CONTACT_EMAIL`.
+- [x] `/privacy` existe, es una página pública sin sesión (está en `PUBLIC_ROUTES`; no se afirma protección por middleware, ver Riesgos y ADR-004) y dice, de forma breve: quién la administra (sin nombre), qué se guarda (cuenta, presupuesto, gastos, facturas con CUFE, números de WhatsApp, cédula/NIT, últimos mensajes con el bot), qué no se guarda (fotos, números de tarjeta, cookies de publicidad), para qué se usa, con quién se comparte (Supabase, Vercel, Twilio y Meta, Vercel AI Gateway y MiniMax, Resend, DIAN vía servicio propio), cuánto tiempo y cómo pedir copia, corrección o borrado escribiendo a `CONTACT_EMAIL`.
 - [x] `/terms` existe y dice: acceso por invitación, responsabilidades de la cuenta, que los números vinculados ven y registran en el presupuesto, que la IA se equivoca, que la app solo maneja COP, que no es asesoría financiera, uso aceptable, cómo cerrar la cuenta, enlace a privacidad.
 - [x] Ningún texto legal contiene correos distintos de `CONTACT_EMAIL`, números de teléfono ni secuencias de 7+ dígitos, ni voseo.
 - [x] `middleware.ts`, `src/lib/auth/route-access.ts` y `vitest.config.ts` sin cambios de esta historia.
@@ -1022,9 +1022,14 @@ Tareas TDD aparte, una por commit, pedidas por el orquestador en la misma zona (
 
 ---
 
+## Riesgos
+
+- **Middleware posiblemente inactivo (depende de S04, no bloquea S06; ADR-004).** El proyecto usa `src/app/` y el único middleware es `middleware.ts` en la raíz; Next.js lo busca en `src/`, así que muy probablemente no corre. Esta historia no declara ninguna protección por middleware: `/terms` y `/privacy` son páginas públicas que funcionan igual con o sin él. `src/middleware.test.ts` (A6) prueba la función aislada y no demuestra que Next.js la cargue. Se resuelve con la tarea humana H10 y, si hace falta, con la historia de bug de S04 que mueve el archivo.
+
 ## Tareas humanas
 
 - **H9** (contratos §5.4): antes de abrir el registro (junto con H1/H6), cambiar `CONTACT_EMAIL` en `src/lib/constants/legal.ts` por un buzón real que alguien lea. Ningún agente la hace: el valor de ejemplo `contacto@ejemplo.com` se queda en el código hasta entonces.
+- **H10** (contratos §5.4, ADR-004): verificar en un preview de Vercel si `/gastos` y `/bienvenida` redirigen al login sin sesión y si el build muestra "ƒ Middleware". No la hace ningún agente.
 - Si el proveedor de correo final no es Resend (decisión D2), actualizar el ítem "Resend" en `src/app/privacy/content.ts`, su test y `LEGAL_UPDATED_AT`.
 
 ## Autorrevisión

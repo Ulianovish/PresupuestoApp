@@ -358,8 +358,10 @@ Choques al integrar: `handle-linking.ts` (S02 en SEG, S13 en APP: líneas distin
 
 ### 5.4 Tareas humanas nuevas
 - **H9**: cambiar `CONTACT_EMAIL` (`src/lib/constants/legal.ts`) por un buzón real antes de abrir el registro.
+- **H10** (ADR-004): en un preview de Vercel, abrir `/gastos` y `/bienvenida` en ventana privada sin sesión y revisar si el build muestra "ƒ Middleware". Si no redirigen al login, abrir la historia de bug de S04 que mueve `middleware.ts` a `src/middleware.ts`; si redirigen, anotarlo en ADR-004. Hasta entonces ninguna historia declara protección por middleware en sus criterios.
 
 ## Registro de cambios
 
+- v2.1 (2026-09-30): tarea humana H10 y regla de no declarar protección por middleware hasta resolverla (ADR-004).
 - v2 (2026-09-30): enmiendas §5 tras la planificación (13 planes, huecos consolidados).
 - v1 (2026-09-30): versión inicial.
