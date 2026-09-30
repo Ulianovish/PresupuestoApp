@@ -683,7 +683,7 @@ EOF
   - `createBudgetItemInMonth(categoryId: string, name: string, monthYear: string): Promise<{ success: boolean; itemId?: string; error?: string }>`
   - Nuevo en `createBudgetItemInMonth`: lee el nombre de la categoría con `from('categories').select('name').eq('id', categoryId).eq('user_id', user.id).maybeSingle()`; si no la encuentra usa los valores generales.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/actions/categories.test.ts`:
 
@@ -873,12 +873,12 @@ describe('createBudgetItemInMonth', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/categories.test.ts`
 Expected: FAIL — `expected "spy" to be called with arguments` en `mockedResolve` (las acciones todavía consultan `classifications`/`controls` con `.limit(1)`; además `cadena` no tiene `limit`, así que puede fallar con `limit is not a function` y la acción devolver `Error interno del servidor`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/actions/categories.ts`, reemplazar el bloque de imports internos:
 
@@ -957,12 +957,12 @@ Verificar que no quedan referencias viejas:
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n "classificationResult\|controlResult\|statusResult\|limit(1)" src/lib/actions/categories.ts`
 Expected: sin salida.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/categories.test.ts && bun run type-check`
 Expected: PASS (7 tests) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/categories.ts src/lib/actions/categories.test.ts && git commit -m "$(cat <<'EOF'
