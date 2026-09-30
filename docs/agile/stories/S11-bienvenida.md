@@ -1420,6 +1420,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ### Task 8: `OnboardingWizard` (componente cliente de 3 pasos)
 
+> **Desviación (implementación):** el bloque del código de WhatsApp reusa `WhatsAppLinkInstructions` (exportado por `WhatsAppLinkPanel`, S13) en vez de duplicar el enlace y el texto `VINCULAR <código>`. Se agregó `OnboardingWizard.render.test.tsx` (renderToStaticMarkup, disponible desde S13) con el marcado inicial del paso 1, escrito antes del componente.
+
 **Files:**
 - Create: `src/components/organisms/OnboardingWizard/OnboardingWizard.tsx`
 
@@ -1433,11 +1435,11 @@ Decisiones de diseño (siguen el estilo real de la app: fondo `slate-900`, tarje
 - `CurrencyInput` no acepta `id`, así que su etiqueta lo envuelve (`<label>` implícito).
 - El gasto usa import dinámico de `@/lib/services/expenses`: ese módulo crea un cliente de Supabase de navegador al cargarse y no debe evaluarse en el render del servidor.
 
-- [ ] **Step 1: Cuenta por defecto del gasto**
+- [x] **Step 1: Cuenta por defecto del gasto**
 
 S07 ya creó `DEFAULT_ACCOUNT_NAME` (verificado en la Task 2): el código del Step 2 lo importa directamente. No hay variante sin S07.
 
-- [ ] **Step 2: Crear el componente**
+- [x] **Step 2: Crear el componente**
 
 Crear `src/components/organisms/OnboardingWizard/OnboardingWizard.tsx`:
 
@@ -2053,17 +2055,17 @@ export default function OnboardingWizard({
 }
 ```
 
-- [ ] **Step 3: Type-check y lint**
+- [x] **Step 3: Type-check y lint**
 
 Run: `bun run type-check && bunx eslint src/components/organisms/OnboardingWizard/OnboardingWizard.tsx`
 Expected: sin errores (warnings de `import/order` se corrigen con `bunx eslint --fix` sobre el mismo archivo).
 
-- [ ] **Step 4: Suite completa (nada se rompió)**
+- [x] **Step 4: Suite completa (nada se rompió)**
 
 Run: `bun run test`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/organisms/OnboardingWizard/OnboardingWizard.tsx
