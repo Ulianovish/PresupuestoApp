@@ -1220,17 +1220,17 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Files:** ninguno nuevo.
 
-- [ ] **Step 1: Suite completa y tipos**
+- [x] **Step 1: Suite completa y tipos**
 
 Run: `bun run test && bun run type-check`
 Expected: todos los tests en verde (los de antes más los nuevos: 12 + 7 + 5 + 4 + 12 + 2) y `tsc --noEmit` sin salida.
 
-- [ ] **Step 2: Lint de los archivos tocados**
+- [x] **Step 2: Lint de los archivos tocados**
 
 Run: `bunx eslint src/lib/onboarding/budget-empty-state.ts src/lib/onboarding/nuevo-gasto.ts src/lib/actions/onboarding.ts src/components/organisms/BudgetStatusPanels/BudgetStatusPanels.tsx src/components/molecules/MobileSidebar/MobileSidebar.tsx src/components/organisms/Sidebar/Sidebar.tsx src/components/organisms/DashboardQuickActions/DashboardQuickActions.tsx src/app/presupuesto/page.tsx src/app/gastos/page.tsx`
 Expected: sin errores (advertencias previas del archivo no bloquean).
 
-- [ ] **Step 3: Barrido de restos**
+- [x] **Step 3: Barrido de restos**
 
 Run: `grep -rn "Migrar Datos de Julio\|'/test'" src/components/organisms/BudgetStatusPanels src/components/molecules/MobileSidebar src/components/organisms/Sidebar`
 Expected: sin coincidencias.
@@ -1245,6 +1245,14 @@ El implementador **no** corre `bun run dev` ni `next build` (`.env.local` apunta
 No hay commit en esta tarea.
 
 ---
+
+## Desviaciones
+
+- **Reanudación:** las Tasks 1-3 se commitearon en una corrida anterior; la Task 4 estaba hecha pero sin commit (árbol sucio con los cambios exactos del plan). Se verificó que su test falla sin los cambios y pasa con ellos, y se commiteó.
+- **Alcance extra (deuda de S08), pedido por el orquestador:**
+  - Privacidad: nombres de personas en fixtures y comentarios de `src/` reemplazados por inventados (categoría `NINOS`, cuentas `Bruno` y `Coco`, `ALIMENTACIÓN MASCOTAS`). Solo tests y comentarios; los meses `'Abril'` quedan.
+  - `docs/agile/stories/S08-defaults-de-rubros.md` Task 3: el texto de "categoría no encontrada → valores generales" quedó marcado como reemplazado por la desviación.
+  - `openAddModal` de `/presupuesto` recibe el nombre de la categoría desde la tarjeta (`BudgetCategoryRow` → `BudgetTable` → página) en vez de buscarlo en `categories`. Test puro (`defaultItemFormNames([], [], 'DEUDAS')`) y test de texto de la firma.
 
 ## Autorrevisión
 
