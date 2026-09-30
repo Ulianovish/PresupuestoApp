@@ -2078,6 +2078,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ### Task 9: Página `/bienvenida`
 
+> **Desviación (implementación):** se agregó `src/app/bienvenida/page.test.tsx`, escrito antes de la página: sin sesión → login; terminada → dashboard; el kit se siembra antes de `loadWizardData`; con error al leer el perfil (S09 sin aplicar) se muestra el wizard.
+
 **Files:**
 - Create: `src/app/bienvenida/page.tsx`
 
@@ -2085,7 +2087,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: `ensureStarterKitAction` (S10; nunca lanza), `loadWizardData` (Task 3), `OnboardingWizard` (Task 8), `createClient` (server), `todayBogota`, variable `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` (§3; puede no existir).
 - Produces: ruta `GET /bienvenida`.
 
-- [ ] **Step 1: Crear la página**
+- [x] **Step 1: Crear la página**
 
 Crear `src/app/bienvenida/page.tsx`:
 
@@ -2152,12 +2154,12 @@ Notas:
 - Si la columna `onboarding_completed_at` todavía no existe (S09 sin aplicar), la consulta devuelve error, `perfil` queda `null` y se muestra el wizard: no rompe.
 - No se prueba con `bun run dev`: `.env.local` apunta a producción (ver Global Constraints). La prueba manual es S14.
 
-- [ ] **Step 2: Type-check y lint**
+- [x] **Step 2: Type-check y lint**
 
 Run: `bun run type-check && bunx eslint src/app/bienvenida/page.tsx`
 Expected: sin errores.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/app/bienvenida/page.tsx
