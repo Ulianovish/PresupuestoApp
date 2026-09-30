@@ -414,7 +414,7 @@ EOF
   - error de `updateUser` → `/auth/reset-password?error=<translateAuthError(error)>`
   - éxito → `/dashboard`
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 En `src/lib/actions/auth-password.test.ts`:
 
@@ -557,12 +557,12 @@ describe('resetPasswordAction', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/auth-password.test.ts`
 Expected: los 6 tests de `forgotPasswordAction` PASS; los 8 de `resetPasswordAction` FAIL con `resetPasswordAction is not a function`.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/actions/auth.ts`:
 
@@ -642,17 +642,17 @@ export async function resetPasswordAction(formData: FormData): Promise<void> {
 
 Nota: la sesión se revisa **antes** de validar, para que un enlace vencido lleve a pedir otro en vez de mostrar errores de formulario.
 
-- [ ] **Step 4: Correr el test y verificar que pasa**
+- [x] **Step 4: Correr el test y verificar que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/auth-password.test.ts`
 Expected: PASS (14 tests).
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/auth.ts src/lib/actions/auth-password.test.ts && git commit -m "$(cat <<'EOF'

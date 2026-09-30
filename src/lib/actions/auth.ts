@@ -10,13 +10,18 @@ import { CHECK_EMAIL_MESSAGE_CODE } from '@/lib/auth/login-feedback';
 import {
   FORGOT_PASSWORD_INVALID_EMAIL_CODE,
   FORGOT_PASSWORD_SENT_CODE,
+  resetPasswordValidationErrorCode,
 } from '@/lib/auth/password-reset-feedback';
 import { registerValidationErrorCode } from '@/lib/auth/register-feedback';
 import { safeRedirectPath } from '@/lib/auth/safe-redirect';
 import { getPostLoginPath } from '@/lib/onboarding/post-login';
 import { getSiteUrl } from '@/lib/site-url';
 import { createClient } from '@/lib/supabase/server';
-import { loginSchema, registerSchema } from '@/lib/validations/schemas';
+import {
+  loginSchema,
+  passwordSchema,
+  registerSchema,
+} from '@/lib/validations/schemas';
 
 function texto(formData: FormData, campo: string): string {
   const valor = formData.get(campo);
@@ -264,4 +269,61 @@ export async function forgotPasswordAction(formData: FormData): Promise<void> {
   redirect(
     conCodigo('/auth/forgot-password', 'message', FORGOT_PASSWORD_SENT_CODE),
   );
+}
+
+const resetPasswordFormSchema = z
+  .object({
+    password: passwordSchema,
+    confirmPassword: z.string().min(1),
+  })
+  .refine(data => data.password === data.confirmPassword, {
+    path: ['confirmPassword'],
+  });
+
+/**
+ * Server Action: guarda la contraseña nueva.
+ * Requiere la sesión que deja /auth/confirm al abrir el enlace del correo (o
+ * la invitación). Tras guardar va a /bienvenida o /dashboard según el
+ * onboarding (contratos §5.2), para que el invitado vea la bienvenida.
+ */
+export async function resetPasswordAction(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // La sesión se revisa antes de validar: un enlace vencido lleva a pedir otro.
+  if (!user) {
+    redirect(conCodigo('/auth/forgot-password', 'error', 'otp_expired'));
+  }
+
+  const parsed = resetPasswordFormSchema.safeParse({
+    password: texto(formData, 'password'),
+    confirmPassword: texto(formData, 'confirmPassword'),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      conCodigo(
+        '/auth/reset-password',
+        'error',
+        resetPasswordValidationErrorCode(parsed.error.issues),
+      ),
+    );
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: parsed.data.password,
+  });
+
+  if (error) {
+    console.error('resetPasswordAction: updateUser falló', {
+      code: error.code,
+      status: error.status,
+    });
+    redirect(conCodigo('/auth/reset-password', 'error', authErrorCode(error)));
+  }
+
+  revalidatePath('/', 'layout');
+  redirect(await getPostLoginPath(supabase, user.id));
 }

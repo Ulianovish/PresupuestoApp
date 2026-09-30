@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+
+import { passwordSchema } from '@/lib/validations/schemas';
 
 import { GENERIC_AUTH_ERROR } from './error-messages';
 import {
   FORGOT_PASSWORD_INVALID_EMAIL_CODE,
   FORGOT_PASSWORD_SENT_CODE,
+  RESET_PASSWORD_VALIDATION_ERROR_CODES,
+  resetPasswordValidationErrorCode,
   resolveForgotPasswordFeedback,
+  resolveResetPasswordError,
 } from './password-reset-feedback';
 
 describe('resolveForgotPasswordFeedback', () => {
@@ -63,5 +69,78 @@ describe('resolveForgotPasswordFeedback', () => {
     expect(
       resolveForgotPasswordFeedback({ error: null, message }).message,
     ).toBeNull();
+  });
+});
+
+// Misma forma que el esquema de resetPasswordAction.
+const esquemaReset = z
+  .object({
+    password: passwordSchema,
+    confirmPassword: z.string().min(1),
+  })
+  .refine(d => d.password === d.confirmPassword, {
+    path: ['confirmPassword'],
+  });
+
+function codigoReset(password: string, confirmPassword: string): string {
+  const r = esquemaReset.safeParse({ password, confirmPassword });
+  if (r.success) throw new Error('se esperaba un error de Zod');
+  return resetPasswordValidationErrorCode(r.error.issues);
+}
+
+describe('resetPasswordValidationErrorCode', () => {
+  it.each([
+    ['corta', 'corta', 'password_corta'],
+    ['a'.repeat(73), 'a'.repeat(73), 'password_larga'],
+    ['claveNueva123', 'otraClave456', 'no_coinciden'],
+    ['claveNueva123', '', 'confirmar_password'],
+  ])('%s / %s → %s', (password, confirmPassword, codigo) => {
+    expect(codigoReset(password, confirmPassword)).toBe(codigo);
+  });
+
+  it('sin issues reconocibles → datos_invalidos', () => {
+    expect(resetPasswordValidationErrorCode([])).toBe('datos_invalidos');
+    expect(
+      resetPasswordValidationErrorCode([{ path: ['otro'], code: 'custom' }]),
+    ).toBe('datos_invalidos');
+  });
+
+  it('todo código que produce está en la lista cerrada', () => {
+    for (const codigo of [
+      codigoReset('x', 'x'),
+      codigoReset('a'.repeat(73), 'a'.repeat(73)),
+      codigoReset('claveNueva123', 'otra'),
+      codigoReset('claveNueva123', ''),
+      resetPasswordValidationErrorCode([]),
+    ]) {
+      expect(RESET_PASSWORD_VALIDATION_ERROR_CODES.has(codigo)).toBe(true);
+    }
+  });
+});
+
+describe('resolveResetPasswordError', () => {
+  it('sin error no muestra nada', () => {
+    expect(resolveResetPasswordError(null)).toBeNull();
+    expect(resolveResetPasswordError('')).toBeNull();
+  });
+
+  it.each([
+    ['password_corta', 'La contraseña debe tener al menos 8 caracteres.'],
+    ['password_larga', 'La contraseña puede tener como máximo 72 caracteres.'],
+    ['no_coinciden', 'Las contraseñas no coinciden.'],
+    ['confirmar_password', 'Confirma tu contraseña.'],
+    ['datos_invalidos', 'Revisa la contraseña.'],
+    ['same_password', 'La contraseña nueva debe ser distinta de la anterior.'],
+    ['weak_password', 'La contraseña es muy débil. Usa al menos 8 caracteres.'],
+  ])('traduce %s', (codigo, texto) => {
+    expect(resolveResetPasswordError(codigo)).toBe(texto);
+  });
+
+  it.each([
+    'New password should be different from the old password.',
+    'Las contraseñas no coinciden',
+    'constructor',
+  ])('texto libre en ?error= cae en el genérico (%s)', texto => {
+    expect(resolveResetPasswordError(texto)).toBe(GENERIC_AUTH_ERROR);
   });
 });

@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,12 +16,14 @@ vi.mock('@/lib/site-url', () => ({
   getSiteUrl: vi.fn(() => 'https://app.ejemplo.com'),
 }));
 
+import { getPostLoginPath } from '@/lib/onboarding/post-login';
 import { createClient } from '@/lib/supabase/server';
 
-import { forgotPasswordAction } from './auth';
+import { forgotPasswordAction, resetPasswordAction } from './auth';
 
 const mockedCreateClient = vi.mocked(createClient);
 const mockedRedirect = vi.mocked(redirect);
+const mockedPostLogin = vi.mocked(getPostLoginPath);
 
 const CORREO = 'usuario@ejemplo.com';
 const REDIRECT_TO =
@@ -168,4 +171,96 @@ describe('forgotPasswordAction', () => {
     expect(url.searchParams.get('error')).toBe('correo_invalido');
     expect(client.auth.resetPasswordForEmail).not.toHaveBeenCalled();
   });
+});
+
+describe('resetPasswordAction', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockedPostLogin.mockResolvedValue('/dashboard');
+  });
+
+  const VALIDA = 'claveNueva123';
+  const USER_ID = '11111111-1111-4111-8111-111111111111';
+
+  function enviar(password: string, confirmPassword: string) {
+    return destino(
+      resetPasswordAction(formulario({ password, confirmPassword })),
+    );
+  }
+
+  it('sin sesión → vuelve a pedir el enlace (otp_expired) y no cambia nada', async () => {
+    const client = clienteFalso({ user: null });
+
+    const url = await enviar(VALIDA, VALIDA);
+
+    expect(url.pathname).toBe('/auth/forgot-password');
+    expect(url.searchParams.get('error')).toBe('otp_expired');
+    expect(client.auth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['corta', 'corta', 'password_corta'],
+    ['a'.repeat(73), 'a'.repeat(73), 'password_larga'],
+    [VALIDA, 'otraClave456', 'no_coinciden'],
+    [VALIDA, '', 'confirmar_password'],
+  ])(
+    'validación (%s / %s) → código %s y no llama updateUser',
+    async (password, confirmPassword, codigo) => {
+      const client = clienteFalso();
+
+      const url = await enviar(password, confirmPassword);
+
+      expect(url.pathname).toBe('/auth/reset-password');
+      expect(url.searchParams.get('error')).toBe(codigo);
+      expect(client.auth.updateUser).not.toHaveBeenCalled();
+    },
+  );
+
+  it('con sesión y contraseña válida → updateUser, revalida y va a getPostLoginPath', async () => {
+    const client = clienteFalso();
+    mockedPostLogin.mockResolvedValue('/bienvenida');
+
+    const url = await enviar(VALIDA, VALIDA);
+
+    expect(client.auth.updateUser).toHaveBeenCalledWith({ password: VALIDA });
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
+    expect(mockedPostLogin).toHaveBeenCalledWith(client, USER_ID);
+    expect(url.pathname).toBe('/bienvenida');
+    expect(url.search).toBe('');
+  });
+
+  it('usuario que ya terminó el onboarding → /dashboard', async () => {
+    clienteFalso();
+
+    const url = await enviar(VALIDA, VALIDA);
+
+    expect(url.pathname).toBe('/dashboard');
+  });
+
+  it.each([
+    ['weak_password', 'Password is known to be weak', 'weak_password'],
+    [
+      'same_password',
+      'New password should be different from the old password.',
+      'same_password',
+    ],
+    ['unexpected_failure', 'detalle interno del servidor', 'error_desconocido'],
+  ])(
+    'error %s de updateUser («%s») → código %s, nunca el mensaje crudo',
+    async (code, crudo, esperado) => {
+      clienteFalso({ updateError: { message: crudo, code, status: 422 } });
+
+      const url = await enviar(VALIDA, VALIDA);
+
+      expect(url.pathname).toBe('/auth/reset-password');
+      expect(url.searchParams.get('error')).toBe(esperado);
+      expect(url.href).not.toContain(encodeURIComponent(crudo));
+      expect(revalidatePath).not.toHaveBeenCalled();
+      expect(vi.mocked(console.error).mock.calls[0]?.[1]).toEqual({
+        code,
+        status: 422,
+      });
+    },
+  );
 });
