@@ -1016,7 +1016,7 @@ Tareas TDD aparte, una por commit, pedidas por el orquestador en la misma zona (
 - [x] **A1:** `loginAction`: un `redirectTo` presente pero inseguro cuenta como ausente y decide `getPostLoginPath`.
 - [x] **A2:** login: `?error=` y `?message=` llevan códigos; la página los resuelve con una función pura (lista cerrada) y nunca muestra texto libre de la URL.
 - [x] **A3:** `translateAuthError`: subcadena solo para `signup_not_allowed`; lo demás, coincidencia exacta.
-- [ ] **A4:** `/auth/callback` redirige a `/auth/confirm` con los mismos parámetros (`code`, `type`; `redirectTo` → `next`).
+- [x] **A4:** `/auth/callback` redirige a `/auth/confirm` con los mismos parámetros (`code`, `type`; `redirectTo` → `next`).
 - [ ] **A5:** `getSiteUrl`: en `VERCEL_ENV=production` sin `NEXT_PUBLIC_SITE_URL`, usa `VERCEL_PROJECT_PRODUCTION_URL` antes que `VERCEL_URL`.
 - [ ] **A6:** `middleware.test.ts` con `createServerClient` simulado.
 
