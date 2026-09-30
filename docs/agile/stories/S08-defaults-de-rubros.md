@@ -78,7 +78,7 @@
     - `function pickCatalogId(rows: readonly CatalogRow[], preferredName: string): CatalogPick | null`
     - `function itemDefaultNamesFor(categoryName?: string | null): ItemDefaultNames`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/budget/catalog-defaults.test.ts`:
 
@@ -178,12 +178,12 @@ describe('itemDefaultNamesFor', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/catalog-defaults.test.ts`
 Expected: FAIL — `Failed to resolve import "@/lib/constants/budget-defaults"` (el archivo no existe).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/constants/budget-defaults.ts`:
 
@@ -304,12 +304,12 @@ export function itemDefaultNamesFor(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/catalog-defaults.test.ts`
 Expected: PASS (9 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/constants/budget-defaults.ts src/lib/budget/catalog-defaults.ts src/lib/budget/catalog-defaults.test.ts && git commit -m "$(cat <<'EOF'
