@@ -337,7 +337,7 @@ EOF
   - Consultas que hace (las tres en paralelo): `from(<tabla>).select('id, name').eq('is_active', true).order('name')` para `classifications`, `controls` y `budget_statuses`.
   - Aviso de respaldo: `console.warn('[budget-defaults] No existe <etiqueta> "<buscado>"; se usa "<usado>".')` con etiqueta `la clasificación` | `el control` | `el estado`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/budget/item-defaults-supabase.test.ts`:
 
@@ -526,12 +526,12 @@ describe('resolveBudgetItemDefaults', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/item-defaults-supabase.test.ts`
 Expected: FAIL — `Failed to resolve import "./item-defaults-supabase"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/budget/item-defaults-supabase.ts`:
 
@@ -652,12 +652,12 @@ export async function resolveBudgetItemDefaults(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/item-defaults-supabase.test.ts && bun run type-check`
 Expected: PASS (6 tests) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/budget/item-defaults-supabase.ts src/lib/budget/item-defaults-supabase.test.ts && git commit -m "$(cat <<'EOF'
