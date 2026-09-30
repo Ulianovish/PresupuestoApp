@@ -331,7 +331,7 @@ Resuelven los huecos que reportaron los 13 planificadores. Donde choquen con el 
   - `/auth/confirm` acepta también `?code=` (`exchangeCodeForSession`) por si la plantilla usa `{{ .ConfirmationURL }}`.
   - Sin `next` válido, `/auth/confirm` decide con `getPostLoginPath` (recovery → `/auth/reset-password`). Las plantillas de H4 no llevan `next` salvo recovery.
   - `forgotPasswordAction` **se traga todo error** de `resetPasswordForEmail` (incluido el límite de envíos: revelaría que el correo existe) y solo registra el `code`.
-  - `registerAction` muestra el primer mensaje de Zod, no "Datos inválidos".
+  - `registerAction` manda en `?error=` un código por campo y la página lo traduce con `resolveRegisterError` desde una lista cerrada.
   - La plantilla "Invite user" lleva `next=/auth/reset-password` (excepción a "sin next"): no invitar antes de desplegar S05, y el correo debe estar en la allowlist.
   - `resetPasswordAction`, tras `updateUser` exitoso, redirige con `getPostLoginPath` (no fijo a `/dashboard`): así el invitado que fija su contraseña ve `/bienvenida`.
   - Lógica de rutas del middleware en `src/lib/auth/route-access.ts` (S04).
