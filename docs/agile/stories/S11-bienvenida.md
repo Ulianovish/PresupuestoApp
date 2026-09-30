@@ -1010,7 +1010,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: tabla `budget_items(id, user_id, budgeted_amount)`; política UPDATE de RLS del dueño.
 - Produces: `export async function saveOnboardingBudgetAction(amounts: Record<string, number>): Promise<{ ok: boolean; error?: string }>`. Claves = ids (uuid) de `budget_items`; valores = pesos enteros ≥ 0. Objeto vacío → `{ ok: true }` sin tocar la base.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `src/lib/actions/onboarding.test.ts` (`revalidatePath` ya está importado desde la Task 4), cambiar la importación de `./onboarding` por:
 
@@ -1118,12 +1118,12 @@ describe('saveOnboardingBudgetAction', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: FAIL — `saveOnboardingBudgetAction is not a function`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/actions/onboarding.ts`, agregar a las importaciones:
 
@@ -1197,12 +1197,12 @@ export async function saveOnboardingBudgetAction(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (17 + 9 = 26 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/actions/onboarding.ts src/lib/actions/onboarding.test.ts

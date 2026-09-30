@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { z } from 'zod';
+
 import { createClient } from '@/lib/supabase/server';
 import { todayBogota } from '@/lib/whatsapp/format';
 
@@ -97,5 +99,74 @@ export async function saveOnboardingIncomeAction(input: {
   }
 
   revalidatePath('/ingresos');
+  return { ok: true };
+}
+
+const itemIdSchema = z.string().uuid();
+const MAX_RUBROS = 200;
+
+/**
+ * Paso 2 de la bienvenida: guarda el monto presupuestado de cada rubro.
+ * Solo toca `budgeted_amount` y solo de rubros del usuario (filtro explícito
+ * por `user_id` además de RLS). Montos en pesos enteros >= 0.
+ */
+export async function saveOnboardingBudgetAction(
+  amounts: Record<string, number>,
+): Promise<OnboardingResult> {
+  if (!amounts || typeof amounts !== 'object' || Array.isArray(amounts)) {
+    return { ok: false, error: 'No entendimos los montos del presupuesto.' };
+  }
+  const entradas = Object.entries(amounts);
+  if (entradas.length > MAX_RUBROS) {
+    return {
+      ok: false,
+      error: 'Son demasiados rubros para guardar de una vez.',
+    };
+  }
+  for (const [id, monto] of entradas) {
+    if (!itemIdSchema.safeParse(id).success) {
+      return { ok: false, error: 'Hay un rubro que no reconocemos.' };
+    }
+    if (
+      typeof monto !== 'number' ||
+      !Number.isSafeInteger(monto) ||
+      monto < 0
+    ) {
+      return {
+        ok: false,
+        error: 'Los montos deben ser pesos enteros, sin negativos.',
+      };
+    }
+  }
+  if (entradas.length === 0) return { ok: true };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'No autenticado' };
+
+  const resultados = await Promise.all(
+    entradas.map(([id, monto]) =>
+      supabase
+        .from('budget_items')
+        .update({ budgeted_amount: monto })
+        .eq('id', id)
+        .eq('user_id', user.id),
+    ),
+  );
+  const fallo = resultados.find(r => r.error);
+  if (fallo?.error) {
+    console.error(
+      'saveOnboardingBudgetAction: error guardando montos:',
+      fallo.error.code,
+    );
+    return {
+      ok: false,
+      error: 'No pudimos guardar tu presupuesto. Intenta de nuevo.',
+    };
+  }
+
+  revalidatePath('/presupuesto');
   return { ok: true };
 }

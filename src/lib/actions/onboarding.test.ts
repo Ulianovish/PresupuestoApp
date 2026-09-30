@@ -17,12 +17,15 @@ import { createClient } from '@/lib/supabase/server';
 
 import {
   ensureStarterKitAction,
+  saveOnboardingBudgetAction,
   saveOnboardingIncomeAction,
 } from './onboarding';
 
 const mockedCreateClient = createClient as unknown as ReturnType<typeof vi.fn>;
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
+const ITEM_A = '11111111-1111-4111-8111-111111111111';
+const ITEM_B = '22222222-2222-4222-8222-222222222222';
 
 interface Resultado {
   data: unknown;
@@ -272,6 +275,91 @@ describe('saveOnboardingIncomeAction', () => {
       error: 'No pudimos guardar tu ingreso. Intenta de nuevo.',
     });
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('3500000');
+    errorSpy.mockRestore();
+  });
+});
+
+describe('saveOnboardingBudgetAction', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('actualiza solo budgeted_amount de cada rubro, filtrando por id y user_id', async () => {
+    const { llamadas } = clienteFalso();
+
+    const r = await saveOnboardingBudgetAction({
+      [ITEM_A]: 1_200_000,
+      [ITEM_B]: 0,
+    });
+
+    expect(r).toEqual({ ok: true });
+    const updates = llamadasDe(llamadas, 'budget_items', 'update');
+    expect(updates.map(u => u.args[0])).toEqual([
+      { budgeted_amount: 1_200_000 },
+      { budgeted_amount: 0 },
+    ]);
+    const filtros = llamadasDe(llamadas, 'budget_items', 'eq').map(l => l.args);
+    expect(filtros).toContainEqual(['id', ITEM_A]);
+    expect(filtros).toContainEqual(['id', ITEM_B]);
+    expect(filtros.filter(f => f[0] === 'user_id')).toEqual([
+      ['user_id', USER_ID],
+      ['user_id', USER_ID],
+    ]);
+    expect(revalidatePath).toHaveBeenCalledWith('/presupuesto');
+  });
+
+  it.each([-1, 1000.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'monto inválido (%s) → error sin tocar la DB',
+    async monto => {
+      const { client } = clienteFalso();
+
+      const r = await saveOnboardingBudgetAction({ [ITEM_A]: monto });
+
+      expect(r.ok).toBe(false);
+      expect(r.error).toMatch(/pesos enteros/i);
+      expect(client.from).not.toHaveBeenCalled();
+    },
+  );
+
+  it('id que no es uuid → error sin tocar la DB', async () => {
+    const { client } = clienteFalso();
+
+    const r = await saveOnboardingBudgetAction({ 'otro-rubro': 1000 });
+
+    expect(r.ok).toBe(false);
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it('sin montos → ok sin tocar la DB', async () => {
+    clienteFalso();
+
+    expect(await saveOnboardingBudgetAction({})).toEqual({ ok: true });
+    expect(mockedCreateClient).not.toHaveBeenCalled();
+  });
+
+  it('sin sesión → No autenticado', async () => {
+    const { client } = clienteFalso({ user: null });
+
+    expect(await saveOnboardingBudgetAction({ [ITEM_A]: 1000 })).toEqual({
+      ok: false,
+      error: 'No autenticado',
+    });
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it('error de la DB → mensaje genérico y no revalida', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    clienteFalso({
+      results: {
+        budget_items: { data: null, error: { code: '42501', message: 'x' } },
+      },
+    });
+
+    const r = await saveOnboardingBudgetAction({ [ITEM_A]: 1000 });
+
+    expect(r).toEqual({
+      ok: false,
+      error: 'No pudimos guardar tu presupuesto. Intenta de nuevo.',
+    });
+    expect(revalidatePath).not.toHaveBeenCalled();
     errorSpy.mockRestore();
   });
 });
