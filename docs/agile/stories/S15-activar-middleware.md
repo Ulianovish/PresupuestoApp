@@ -47,3 +47,11 @@ Alineado con contratos v2 (§5). Escrito por el orquestador (sin planificador): 
 - Matcher: `(?!api/|api$|…)`; `/apiario` sí pasa por el middleware.
 - `/test` pública queda como deuda en ADR-004 (S15 no cambia reglas de acceso).
 - H9 (CA4): la guarda de `CONTACT_EMAIL` pasó de romper el build a un `console.warn` por decisión de la persona. El aviso no basta como única defensa: **antes de abrir el registro, comprobar a mano que `CONTACT_EMAIL` en `src/lib/constants/legal.ts` es un buzón real** (check previo de la integración S14; tarea H9 en contratos §5.4). Pendiente: crear la tarea en Plane.
+
+## S15b — Deuda de S15 (middleware más observable y guardias con helper)
+
+- [x] T1: el middleware registra `{ code: error.code ?? error.name, status }` para cualquier error de `getUser()` que no sea `AuthSessionMissingError` (sin el mensaje).
+- [ ] T2: helper `esFaltaDeSesion(error)` en `src/lib/auth/`, usado por el middleware y `resetPasswordAction`.
+- [ ] T3: el matcher excluye también `json|txt|xml|map|webmanifest`.
+- [ ] T4: helper `loginUrl(pathname, search?)` en `src/lib/auth/`, usado por las guardias de las páginas.
+- [ ] T5: CA8 ajustado a lo implementado y deuda cerrada documentada.

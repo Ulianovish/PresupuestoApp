@@ -242,6 +242,33 @@ describe('middleware', () => {
     expect(console.error).not.toHaveBeenCalled();
   });
 
+  it('un error sin code (Supabase caído) registra el nombre y el status, sin el mensaje', async () => {
+    mockedCreateServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: null },
+          error: {
+            name: 'AuthRetryableFetchError',
+            message: 'fetch failed para usuario@ejemplo.com',
+            status: 0,
+          },
+        }),
+      },
+    } as unknown as ReturnType<typeof createServerClient>);
+
+    const res = await pedir('/gastos');
+
+    expect(res.status).toBe(307);
+    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(console.error).mock.calls[0]?.[1]).toEqual({
+      code: 'AuthRetryableFetchError',
+      status: 0,
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+      'usuario@ejemplo.com',
+    );
+  });
+
   describe('sesión vencida (refresh_token_not_found)', () => {
     it('una ruta protegida va al login con las cookies de borrado', async () => {
       sesionVencida();

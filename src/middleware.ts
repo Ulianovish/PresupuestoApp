@@ -43,10 +43,14 @@ export async function middleware(request: NextRequest) {
 
     const { data, error } = await supabase.auth.getUser();
     user = data.user;
-    // Sin sesión es lo normal (no se registra); un error con code sí (p. ej.
-    // refresh_token_not_found). Solo el code: nada de datos personales.
-    if (error?.code) {
-      console.error('middleware: getUser falló', { code: error.code });
+    // Sin sesión es lo normal (no se registra); cualquier otro error sí: con
+    // code (refresh_token_not_found) o sin él (AuthRetryableFetchError cuando
+    // Supabase no responde). Nunca el mensaje: podría llevar datos personales.
+    if (error && error.name !== 'AuthSessionMissingError') {
+      console.error('middleware: getUser falló', {
+        code: error.code ?? error.name,
+        status: error.status,
+      });
     }
   } catch (err) {
     console.error('middleware: no se pudo verificar la sesión', {
