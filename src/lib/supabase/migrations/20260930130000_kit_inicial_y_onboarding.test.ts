@@ -158,7 +158,9 @@ describe('migración 20260930130000: _seed_starter_kit', () => {
 
   it('reactiva solo la categoría elegida para cada rubro, DESPUÉS de resolver category_id', () => {
     const body = seed();
-    const map = body.indexOf("SELECT jsonb_agg(kit.item || jsonb_build_object('category_id'");
+    const map = body.indexOf(
+      "SELECT jsonb_agg(kit.item || jsonb_build_object('category_id'",
+    );
     const update = body.indexOf(
       "UPDATE public.categories c SET is_active = true WHERE c.user_id = p_user_id AND c.id IN ( SELECT (kit.item->>'category_id')::uuid FROM jsonb_array_elements(v_kit) AS kit(item) ) AND c.is_active = false;",
     );
