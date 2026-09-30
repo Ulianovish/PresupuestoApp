@@ -3,6 +3,7 @@
  * Conecta con Supabase para CRUD de datos de presupuesto
  */
 
+import type { Sobregasto } from '@/lib/budget-overspend';
 import { createClient } from '@/lib/supabase/client';
 
 // Tipos para el servicio de presupuesto
@@ -502,4 +503,51 @@ export function getAvailableMonths(): Array<{ value: string; label: string }> {
       label: `${name} ${currentYear}`,
     };
   });
+}
+
+/**
+ * Sobregastos del mes anterior, por ítem del mes que se está viendo.
+ *
+ * Alimenta la alerta histórica del presupuesto: informa que ese ítem se pasó
+ * el mes pasado, sin tocar ningún valor del mes actual.
+ */
+export async function getPreviousMonthOverspend(
+  monthYear: string,
+): Promise<Sobregasto[]> {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase.rpc('get_previous_month_overspend', {
+      p_user_id: user.id,
+      p_month_year: monthYear,
+    });
+
+    if (error) {
+      console.error('Error obteniendo sobregastos del mes anterior:', error);
+      return [];
+    }
+
+    return ((data as unknown[]) || []).map(row => {
+      const r = row as {
+        item_id: string;
+        previous_month: string;
+        budgeted: number | string;
+        spent: number | string;
+        excess: number | string;
+      };
+      return {
+        itemId: r.item_id,
+        previousMonth: r.previous_month,
+        budgeted: Number(r.budgeted) || 0,
+        spent: Number(r.spent) || 0,
+        excess: Number(r.excess) || 0,
+      };
+    });
+  } catch (error) {
+    console.error('Error en getPreviousMonthOverspend:', error);
+    return [];
+  }
 }

@@ -6,7 +6,7 @@
  *
  *   - % del ingreso destinado a deudas de consumo (tarjetas de crédito)
  *   - % del ingreso destinado a deudas de activos
- *   - % del ingreso destinado a todas las deudas
+ *   - Índice de flujo de deuda: % del ingreso que se va en cuotas de crédito
  *
  * Debajo de cada porcentaje se deja a la vista la división que lo produce,
  * para que el número sea auditable de un vistazo.
@@ -23,8 +23,19 @@ import Card, {
 } from '@/components/atoms/Card/Card';
 import {
   alertasEndeudamiento,
+  mensajeFlujoDeuda,
+  nivelFlujoDeuda,
+  FLUJO_DEUDA_SANO,
   type IndicadoresEndeudamiento as Indicadores,
 } from '@/lib/indicadores-endeudamiento';
+
+/** Color del índice de flujo de deuda según su nivel. */
+const COLOR_NIVEL = {
+  sano: 'text-emerald-400',
+  atencion: 'text-amber-400',
+  riesgo: 'text-red-400',
+  'sin-dato': 'text-white',
+} as const;
 
 interface IndicadoresEndeudamientoProps {
   indicadores: Indicadores;
@@ -33,30 +44,46 @@ interface IndicadoresEndeudamientoProps {
   formatCurrency: (amount: number) => string;
 }
 
-/** Un indicador: porcentaje grande y la fracción que lo compone debajo. */
+/**
+ * Un indicador: porcentaje grande y la fracción que lo compone debajo.
+ *
+ * `colorPorcentaje` y `nota` solo los usa el índice de flujo de deuda, que
+ * además del número lleva su nivel de riesgo. Los tres se ven igual.
+ */
 function Indicador({
   titulo,
   porcentaje,
   numerador,
   formatCurrency,
   ingresoNeto,
+  colorPorcentaje = 'text-white',
+  nota,
+  notaTitle,
 }: {
   titulo: string;
   porcentaje: number | null;
   numerador: number;
   formatCurrency: (amount: number) => string;
   ingresoNeto: number;
+  colorPorcentaje?: string;
+  nota?: string;
+  notaTitle?: string;
 }) {
   return (
-    <div className="rounded-lg bg-white/5 p-4">
+    <div className="flex flex-col rounded-lg bg-white/5 p-4">
       <p className="text-sm text-gray-300">{titulo}</p>
-      <p className="mt-1 text-3xl font-bold text-white">
+      <p className={`mt-1 text-3xl font-bold ${colorPorcentaje}`}>
         {porcentaje === null ? '—' : `${porcentaje.toFixed(1)} %`}
       </p>
       <p className="mt-2 text-xs text-gray-400">
         {formatCurrency(numerador)} /{' '}
         {ingresoNeto > 0 ? formatCurrency(ingresoNeto) : 'sin ingreso'}
       </p>
+      {nota && (
+        <p className={`mt-1 text-xs ${colorPorcentaje}`} title={notaTitle}>
+          {nota}
+        </p>
+      )}
     </div>
   );
 }
@@ -106,13 +133,27 @@ export default function IndicadoresEndeudamiento({
             ingresoNeto={ingresoNeto}
             formatCurrency={formatCurrency}
           />
-          <Indicador
-            titulo="Del ingreso a todas las deudas"
-            porcentaje={indicadores.porcentajeTotal}
-            numerador={pagosTotales}
-            ingresoNeto={ingresoNeto}
-            formatCurrency={formatCurrency}
-          />
+          {(() => {
+            const nivel = nivelFlujoDeuda(indicadores.porcentajeTotal);
+            const etiqueta = {
+              sano: 'Manejable',
+              atencion: 'Atención',
+              riesgo: 'Alto riesgo',
+              'sin-dato': 'Sin dato',
+            }[nivel];
+            return (
+              <Indicador
+                titulo="Índice de Flujo de Deuda"
+                porcentaje={indicadores.porcentajeTotal}
+                numerador={pagosTotales}
+                ingresoNeto={ingresoNeto}
+                formatCurrency={formatCurrency}
+                colorPorcentaje={COLOR_NIVEL[nivel]}
+                nota={`${etiqueta} · máx. recomendado ${FLUJO_DEUDA_SANO} %`}
+                notaTitle={mensajeFlujoDeuda(nivel)}
+              />
+            );
+          })()}
         </div>
 
         {ingresoNeto <= 0 && (

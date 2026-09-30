@@ -134,3 +134,38 @@ export function alertasEndeudamiento(
 
   return alertas;
 }
+
+/**
+ * Índice de flujo de deuda: qué parte del ingreso mensual se va en cuotas de
+ * crédito. Es el mismo `porcentajeTotal`, nombrado como lo nombran los bancos.
+ *
+ * Umbrales de referencia de la banca: hasta 30 % se considera manejable, y del
+ * 40 % en adelante es zona de alto riesgo, porque ahoga el flujo de caja.
+ */
+export const FLUJO_DEUDA_SANO = 30;
+export const FLUJO_DEUDA_RIESGO = 40;
+
+export type NivelFlujoDeuda = 'sano' | 'atencion' | 'riesgo' | 'sin-dato';
+
+export function nivelFlujoDeuda(
+  porcentajeTotal: number | null,
+): NivelFlujoDeuda {
+  if (porcentajeTotal === null) return 'sin-dato';
+  if (porcentajeTotal >= FLUJO_DEUDA_RIESGO) return 'riesgo';
+  if (porcentajeTotal > FLUJO_DEUDA_SANO) return 'atencion';
+  return 'sano';
+}
+
+/** Texto que acompaña al índice según el nivel. */
+export function mensajeFlujoDeuda(nivel: NivelFlujoDeuda): string {
+  switch (nivel) {
+    case 'riesgo':
+      return `Del ${FLUJO_DEUDA_RIESGO} % en adelante se considera alto riesgo: las cuotas ahogan el flujo de caja.`;
+    case 'atencion':
+      return `Por encima del ${FLUJO_DEUDA_SANO} % recomendado, aunque todavía por debajo del ${FLUJO_DEUDA_RIESGO} % de alto riesgo.`;
+    case 'sano':
+      return `Dentro del ${FLUJO_DEUDA_SANO} % que la banca considera manejable.`;
+    default:
+      return 'Falta el ingreso del mes para calcularlo.';
+  }
+}
