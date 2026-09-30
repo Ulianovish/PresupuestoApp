@@ -16,15 +16,4 @@ export const EXPENSE_CATEGORIES = [
 // nombre, la RPC que guarda el gasto la crea.
 export const DEFAULT_ACCOUNT_NAME = 'Efectivo';
 
-// Tipos de cuenta predefinidos
-export const ACCOUNT_TYPES = [
-  'Nequi',
-  'TC Falabella',
-  'Efectivo',
-  'Banco Santander',
-  'TC NU',
-  'Ahorros Nu',
-] as const;
-
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
-export type AccountType = (typeof ACCOUNT_TYPES)[number];

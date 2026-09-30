@@ -12,14 +12,18 @@
  * @param onFormChange - Función para manejar cambios en el formulario
  * @param onSubmit - Función para enviar el formulario
  * @param onClose - Función para cerrar el modal
+ * @param submitDisabled - Deshabilita el botón de guardar
+ * @param submitDisabledLabel - Texto del botón mientras está deshabilitado
  *
  * @example
  * <ExpenseModal
  *   isOpen={isModalOpen}
  *   isEditing={isEditing}
  *   formData={form}
- *   expenseCategories={EXPENSE_CATEGORIES}
- *   accountTypes={ACCOUNT_TYPES}
+ *   expenseCategories={categoryNames}
+ *   accountTypes={buildAccountOptions(accountNames, form.account_name)}
+ *   submitDisabled={categoryNames.length === 0}
+ *   submitDisabledLabel={NO_CATEGORIES_LABEL}
  *   onFormChange={handleFormChange}
  *   onSubmit={handleSubmitExpense}
  *   onClose={handleCloseModal}
@@ -27,6 +31,8 @@
  */
 
 import React, { useState } from 'react';
+
+import Link from 'next/link';
 
 import Button from '@/components/atoms/Button/Button';
 import ExpenseFormFields from '@/components/molecules/ExpenseFormFields/ExpenseFormFields';
@@ -64,6 +70,10 @@ interface ExpenseModalProps {
   onCufeSaved?: () => void;
   /** Cuentas que son tarjeta de crédito: habilitan los campos de cuotas. */
   creditAccounts?: string[];
+  /** Deshabilita el botón de guardar (p. ej. el usuario no tiene categorías). */
+  submitDisabled?: boolean;
+  /** Texto del botón de guardar mientras está deshabilitado. */
+  submitDisabledLabel?: string;
 }
 
 export default function ExpenseModal({
@@ -77,6 +87,8 @@ export default function ExpenseModal({
   onSubmit,
   onClose,
   onCufeSaved,
+  submitDisabled = false,
+  submitDisabledLabel,
 }: ExpenseModalProps) {
   const [mode, setMode] = useState<'manual' | 'cufe'>('manual');
 
@@ -139,6 +151,16 @@ export default function ExpenseModal({
               onFormChange={onFormChange}
             />
 
+            {submitDisabled && (
+              <p className="pt-4 text-sm text-amber-300">
+                Aún no tienes categorías para clasificar el gasto.{' '}
+                <Link href="/settings" className="underline">
+                  Créala en Ajustes
+                </Link>
+                .
+              </p>
+            )}
+
             {/* Botones de acción */}
             <div className="flex justify-end space-x-2 pt-6">
               <Button
@@ -149,8 +171,14 @@ export default function ExpenseModal({
               >
                 Cancelar
               </Button>
-              <Button type="submit" variant="gradient">
-                {isEditing ? 'Actualizar' : 'Agregar'} Gasto
+              <Button
+                type="submit"
+                variant="gradient"
+                disabled={submitDisabled}
+              >
+                {submitDisabled && submitDisabledLabel
+                  ? submitDisabledLabel
+                  : `${isEditing ? 'Actualizar' : 'Agregar'} Gasto`}
               </Button>
             </div>
           </form>

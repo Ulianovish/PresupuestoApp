@@ -12,8 +12,8 @@
  * @example
  * <ExpenseFormFields
  *   formData={form}
- *   expenseCategories={EXPENSE_CATEGORIES}
- *   accountTypes={ACCOUNT_TYPES}
+ *   expenseCategories={categoryNames}
+ *   accountTypes={buildAccountOptions(accountNames, form.account_name)}
  *   onFormChange={handleFormChange}
  * />
  */

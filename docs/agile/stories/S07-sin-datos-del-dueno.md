@@ -85,10 +85,10 @@ src/components/organisms/{Expense,Budget}MigrationPanel/*.tsx
 
 - [x] `inicializarDatosEjemplo` no existe en `src/` y `useIngresosDeudas` solo carga datos. Test: un usuario sin ingresos ni deudas no dispara ningún `insert` al cargar (`src/hooks/useIngresosDeudas.test.ts`).
 - [x] El sidebar no importa `useBudgetData`, no muestra montos y `src/hooks/useBudgetData.ts` no existe (`Sidebar.test.ts`).
-- [ ] `ACCOUNT_TYPES` y `AccountType` eliminados; `DEFAULT_ACCOUNT_NAME = 'Efectivo'` exportado (`expense-categories.test.ts`).
-- [ ] `/gastos` ofrece solo las cuentas activas del usuario (más la del gasto en edición si ya no está activa); por defecto `Efectivo` si existe, si no la primera; sin cuentas, `Efectivo` (`expense-form-defaults.test.ts`).
-- [ ] `category_name` inicial = primera categoría del usuario; sin categorías, el botón de guardar está deshabilitado y dice "Primero crea una categoría", con enlace a Ajustes; el submit también lo rechaza.
-- [ ] La importación de Excel sin columna de cuenta usa la cuenta por defecto del usuario, no una lista fija.
+- [x] `ACCOUNT_TYPES` y `AccountType` eliminados; `DEFAULT_ACCOUNT_NAME = 'Efectivo'` exportado (`expense-categories.test.ts`).
+- [x] `/gastos` ofrece solo las cuentas activas del usuario (más la del gasto en edición si ya no está activa); por defecto `Efectivo` si existe, si no la primera; sin cuentas, `Efectivo` (`expense-form-defaults.test.ts`).
+- [x] `category_name` inicial = primera categoría del usuario; sin categorías, el botón de guardar está deshabilitado y dice "Primero crea una categoría", con enlace a Ajustes; el submit también lo rechaza.
+- [x] La importación de Excel sin columna de cuenta usa la cuenta por defecto del usuario, no una lista fija.
 - [ ] (§5.2) No existen `src/scripts/migrate-july-data.ts`, `src/scripts/migrate-july-expenses.ts`, `ExpenseMigrationPanel` ni `BudgetMigrationPanel`; `ExpenseHeader` ya no tiene el botón "Migrar Julio" ligado a `'2025-07'` ni la prop `onShowMigration` (`ExpenseHeader.test.ts`). Un `grep` confirma que nada los importaba antes de borrarlos.
 - [ ] `bun run test && bun run type-check` en verde; `grep -rn "ACCOUNT_TYPES\|inicializarDatosEjemplo\|useBudgetData\|migrate-july\|MigrationPanel\|onShowMigration" src` sin resultados.
 
@@ -758,7 +758,7 @@ EOF
 - Consumes (Task 3): `DEFAULT_ACCOUNT_NAME`, `NO_CATEGORIES_LABEL`, `pickDefaultAccount`, `buildAccountOptions`, `withFormDefaults` con las firmas de la Task 3.
 - Produces: `ExpenseModal` acepta dos props opcionales nuevas: `submitDisabled?: boolean` y `submitDisabledLabel?: string`. Los demás usuarios de `ExpenseModal` no cambian (las props son opcionales).
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 Crear `src/lib/constants/expense-categories.test.ts`:
 
@@ -778,12 +778,12 @@ describe('constantes de gastos', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/constants/expense-categories.test.ts`
 Expected: FAIL en `no trae una lista fija de cuentas` con `expected { …, ACCOUNT_TYPES: [...] } to not have property "ACCOUNT_TYPES"`; el segundo test pasa.
 
-- [ ] **Step 3: Borrar `ACCOUNT_TYPES` y `AccountType`**
+- [x] **Step 3: Borrar `ACCOUNT_TYPES` y `AccountType`**
 
 En `src/lib/constants/expense-categories.ts`, borrar:
 
@@ -829,7 +829,7 @@ export const DEFAULT_ACCOUNT_NAME = 'Efectivo';
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 ```
 
-- [ ] **Step 4: Quitar el re-export en el servicio de gastos**
+- [x] **Step 4: Quitar el re-export en el servicio de gastos**
 
 En `src/lib/services/expenses.ts`, reemplazar:
 
@@ -856,12 +856,12 @@ export { EXPENSE_CATEGORIES } from '@/lib/constants/expense-categories';
 export type { ExpenseCategory } from '@/lib/constants/expense-categories';
 ```
 
-- [ ] **Step 5: Correr el test de constantes**
+- [x] **Step 5: Correr el test de constantes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/constants/expense-categories.test.ts`
 Expected: PASS (2 tests). (`type-check` todavía falla por `/gastos`; se arregla en los pasos siguientes.)
 
-- [ ] **Step 6: `ExpenseModal` con botón deshabilitable**
+- [x] **Step 6: `ExpenseModal` con botón deshabilitable**
 
 En `src/components/organisms/ExpenseModal/ExpenseModal.tsx`:
 
@@ -964,7 +964,7 @@ por:
             </div>
 ```
 
-- [ ] **Step 7: Comentarios que nombraban `ACCOUNT_TYPES`**
+- [x] **Step 7: Comentarios que nombraban `ACCOUNT_TYPES`**
 
 En `src/components/molecules/ExpenseFormFields/ExpenseFormFields.tsx`, en el `@example` del encabezado, reemplazar:
 
@@ -996,7 +996,7 @@ por:
   // existir para el usuario.
 ```
 
-- [ ] **Step 8: `/gastos` — imports y categorías memorizadas**
+- [x] **Step 8: `/gastos` — imports y categorías memorizadas**
 
 En `src/app/gastos/page.tsx`:
 
@@ -1061,7 +1061,7 @@ por:
   const hasCategories = categoryNames.length > 0;
 ```
 
-- [ ] **Step 9: `/gastos` — estado inicial y valores por defecto**
+- [x] **Step 9: `/gastos` — estado inicial y valores por defecto**
 
 Reemplazar el bloque del estado del formulario (líneas 303-312):
 
@@ -1109,7 +1109,7 @@ por:
   }, [categoryNames, accountNames, isEditing]);
 ```
 
-- [ ] **Step 10: `/gastos` — guardar y cerrar**
+- [x] **Step 10: `/gastos` — guardar y cerrar**
 
 1. En `handleSubmitExpense`, después del bloque
 
@@ -1180,7 +1180,7 @@ por:
   };
 ```
 
-- [ ] **Step 11: `/gastos` — importación de Excel y props del modal**
+- [x] **Step 11: `/gastos` — importación de Excel y props del modal**
 
 1. En `processExcelFile`, reemplazar:
 
@@ -1216,14 +1216,14 @@ por:
           submitDisabledLabel={NO_CATEGORIES_LABEL}
 ```
 
-- [ ] **Step 12: Verificar tipos, tests y que no queda la lista fija**
+- [x] **Step 12: Verificar tipos, tests y que no queda la lista fija**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check && bun run test src/lib/constants/expense-categories.test.ts src/lib/expense-form-defaults.test.ts && grep -rn --exclude='*.test.ts' "ACCOUNT_TYPES\|AccountType\b" src`
 Expected: `tsc` sin errores; PASS (19 tests); el `grep` no imprime nada.
 
 Nota para eslint (`react-hooks/exhaustive-deps`): `blankForm` no va en ningún array de dependencias; solo se llama en manejadores de eventos y como inicializador de `useState`.
 
-- [ ] **Step 13: Commit**
+- [x] **Step 13: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/constants/expense-categories.ts src/lib/constants/expense-categories.test.ts src/lib/services/expenses.ts src/app/gastos/page.tsx src/components/organisms/ExpenseModal/ExpenseModal.tsx src/components/molecules/ExpenseFormFields/ExpenseFormFields.tsx src/components/organisms/PendingInvoicesPanel/PendingInvoicesPanel.tsx && git commit -m "$(cat <<'EOF'
