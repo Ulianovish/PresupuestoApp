@@ -74,10 +74,12 @@ describe('/bienvenida', () => {
     mockedLoad.mockResolvedValue({ items: [], categoryNames: ['OTROS'] });
   });
 
-  it('sin sesión → login, sin sembrar el kit', async () => {
+  it('sin sesión → login con redirectTo=/bienvenida, sin sembrar el kit', async () => {
     clienteFalso({ user: null });
 
-    await expect(BienvenidaPage()).rejects.toThrow('NEXT_REDIRECT:/auth/login');
+    await expect(BienvenidaPage()).rejects.toThrow(
+      'NEXT_REDIRECT:/auth/login?redirectTo=%2Fbienvenida',
+    );
     expect(mockedEnsure).not.toHaveBeenCalled();
   });
 

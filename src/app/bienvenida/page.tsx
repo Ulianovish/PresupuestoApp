@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import OnboardingWizard from '@/components/organisms/OnboardingWizard/OnboardingWizard';
 import { ensureStarterKitAction } from '@/lib/actions/onboarding';
+import { loginUrl } from '@/lib/auth/login-url';
 import { loadWizardData } from '@/lib/onboarding/wizard-data';
 import { createClient } from '@/lib/supabase/server';
 import { todayBogota } from '@/lib/whatsapp/format';
@@ -18,7 +19,9 @@ export default async function BienvenidaPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  // Con redirectTo, como las demás guardias (contratos v2.3): el login no
+  // rebota al dashboard y, al entrar, vuelve aquí.
+  if (!user) redirect(loginUrl('/bienvenida'));
 
   const { data: perfil } = await supabase
     .from('profiles')
