@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import IngresosDeudas from '@/components/pages/IngresosDeudas';
 import { getCurrentUser } from '@/lib/actions/auth';
+import { loginUrl } from '@/lib/auth/login-url';
 
 /**
  * IngresosDeudas Page
@@ -15,7 +16,7 @@ export default async function IngresosDeudaPage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/auth/login?redirectTo=/ingresos-deudas');
+    redirect(loginUrl('/ingresos-deudas'));
   }
 
   // Pasar datos del usuario al componente cliente

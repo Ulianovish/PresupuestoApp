@@ -53,5 +53,5 @@ Alineado con contratos v2 (§5). Escrito por el orquestador (sin planificador): 
 - [x] T1: el middleware registra `{ code: error.code ?? error.name, status }` para cualquier error de `getUser()` que no sea `AuthSessionMissingError` (sin el mensaje).
 - [x] T2: helper `esFaltaDeSesion(error)` en `src/lib/auth/`, usado por el middleware y `resetPasswordAction`.
 - [x] T3: el matcher excluye también `json|txt|xml|map|webmanifest`.
-- [ ] T4: helper `loginUrl(pathname, search?)` en `src/lib/auth/`, usado por las guardias de las páginas.
+- [x] T4: helper `loginUrl(pathname, search?)` en `src/lib/auth/`, usado por las guardias de las páginas.
 - [ ] T5: CA8 ajustado a lo implementado y deuda cerrada documentada.
