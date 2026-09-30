@@ -1378,7 +1378,7 @@ Sin commit en esta tarea (no cambia archivos).
 
 ### Task 8 (adicional, deuda de S07): fixtures y comentarios sin aspecto de datos reales
 
-- [ ] Reemplazar en `src/lib/dian/historial-clasificacion.test.ts` y el comentario de `historial-clasificacion.ts` los valores con aspecto de teléfono o nombre real por inventados; buscar con grep otros casos en `src/`.
+- [x] Reemplazar en `src/lib/dian/historial-clasificacion.test.ts` y el comentario de `historial-clasificacion.ts` los valores con aspecto de teléfono o nombre real por inventados; buscar con grep otros casos en `src/`.
 
 ### Task 9 (adicional, deuda de S07): Global Constraints de S07
 

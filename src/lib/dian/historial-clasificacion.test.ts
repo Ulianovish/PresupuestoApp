@@ -45,15 +45,15 @@ describe('normalizarDescripcion', () => {
   it('quita el prefijo bancario "Banco Davibank S.A. <número> De"', () => {
     expect(
       normalizarDescripcion(
-        'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
       ),
-    ).toBe('luisa fernanda gomez franco');
+    ).toBe('persona ejemplo uno');
   });
 
   it('quita "Nequi <número> De"', () => {
     expect(
-      normalizarDescripcion('Nequi 3115230857 De Carlos Arturo Barrero Vega'),
-    ).toBe('carlos arturo barrero vega');
+      normalizarDescripcion('Nequi 3000000001 De Persona Ejemplo Dos'),
+    ).toBe('persona ejemplo dos');
   });
 
   it('quita llaves y transferencias', () => {
@@ -149,7 +149,7 @@ describe('construirHistorial / buscarEnHistorial', () => {
     const idx = indexarHistorial(
       construirHistorial([
         fila(
-          'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+          'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
           'VIVIENDA',
           'Arriendo',
         ),
@@ -157,7 +157,7 @@ describe('construirHistorial / buscarEnHistorial', () => {
     );
     expect(
       buscarEnHistorial(
-        'Banco Davibank S.A. 3009998877 De Luisa Fernanda Gómez Franco',
+        'Banco Davibank S.A. 3000000002 De Persona Ejemplo Úno',
         idx,
       ),
     ).toMatchObject({ categoria: 'VIVIENDA', itemNombre: 'Arriendo' });
@@ -305,7 +305,7 @@ describe('itemDesdeHistorial', () => {
       fila('Carlos Gomez', 'MERCADO', 'Huevos', '2026-09-05'),
       fila('Verduras', 'MERCADO', 'Verduras y frutas', '2026-09-05'),
       fila(
-        'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
         'VIVIENDA',
         'Arriendo',
         '2026-08-15',
@@ -342,7 +342,7 @@ describe('itemDesdeHistorial', () => {
   it('si la categoría del gasto fue ADIVINADA (IA/palabras clave), toma la del historial', () => {
     expect(
       itemDesdeHistorial(
-        'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
         'OTROS',
         idx,
         ITEMS_OCT,
@@ -358,7 +358,7 @@ describe('itemDesdeHistorial', () => {
   it('si el gasto no tiene categoría, toma la del historial', () => {
     expect(
       itemDesdeHistorial(
-        'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
         '',
         idx,
         ITEMS_OCT,
@@ -369,7 +369,7 @@ describe('itemDesdeHistorial', () => {
   it('OTROS elegido por el usuario se respeta: no se le cambia la categoría', () => {
     expect(
       itemDesdeHistorial(
-        'Banco Davibank S.A. 3165766461 De Luisa Fernanda Gomez Franco',
+        'Banco Davibank S.A. 3000000000 De Persona Ejemplo Uno',
         'OTROS',
         idx,
         ITEMS_OCT,

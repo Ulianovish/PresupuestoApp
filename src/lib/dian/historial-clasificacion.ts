@@ -3,7 +3,7 @@
  *
  * El clasificador por IA no conoce las convenciones de la casa (bebidas y
  * mecato van a GASTOS HORMIGA y no a MERCADO; la ropa de la niña a ALICE; la
- * transferencia a "Luisa Fernanda Gomez Franco" es el arriendo...). El usuario
+ * transferencia a "Persona Ejemplo Uno" es el arriendo...). El usuario
  * ya las enseñó cada vez que corrigió una asignación a mano: antes de llamar al
  * LLM se busca un gasto anterior con la misma descripción (normalizada) que el
  * usuario haya asignado a mano ('manual'), y si existe se reutiliza su
@@ -102,7 +102,7 @@ const PREFIJOS: RegExp[] = [
   new RegExp(`^(?:a la )?llave(?: (?:${BANCOS}))?\\s+`),
   /^(?:transferencia|transf|envio|enviado|pago)\s+(?:a|de|desde|para)\s+/,
   /^pago en qr bre ?b\b\s*/,
-  // "banco davibank s a 3165766461 de luisa ...", "nequi 3115230857 de carlos ..."
+  // "banco davibank s a 3000000000 de persona ...", "nequi 3000000001 de persona ..."
   /^(?:[a-z]+ ){0,5}\d{6,} de\s+/,
 ];
 
