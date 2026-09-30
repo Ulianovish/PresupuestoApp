@@ -31,6 +31,7 @@ const REDIRECT_TO =
   'https://app.ejemplo.com/auth/confirm?type=recovery&next=/auth/reset-password';
 
 interface ErrorFalso {
+  name?: string;
   message: string;
   code?: string;
   status?: number;
@@ -227,6 +228,22 @@ describe('resetPasswordAction', () => {
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
       CORREO,
     );
+  });
+
+  it('sin cookie de sesión (AuthSessionMissingError) → no registra nada y va a RESET_LINK_EXPIRED_PATH', async () => {
+    clienteFalso({
+      user: null,
+      getUserError: {
+        name: 'AuthSessionMissingError',
+        message: 'Auth session missing!',
+        status: 400,
+      },
+    });
+
+    const url = await enviar(VALIDA, VALIDA);
+
+    expect(`${url.pathname}${url.search}`).toBe(RESET_LINK_EXPIRED_PATH);
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it('getUser lanza → registra solo el nombre del error y va a RESET_LINK_EXPIRED_PATH', async () => {

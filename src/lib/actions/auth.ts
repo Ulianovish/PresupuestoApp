@@ -18,6 +18,7 @@ import {
 } from '@/lib/auth/password-reset-feedback';
 import { registerValidationErrorCode } from '@/lib/auth/register-feedback';
 import { safeRedirectPath } from '@/lib/auth/safe-redirect';
+import { esFaltaDeSesion } from '@/lib/auth/session-error';
 import { getPostLoginPath } from '@/lib/onboarding/post-login';
 import { getSiteUrl } from '@/lib/site-url';
 import { createClient } from '@/lib/supabase/server';
@@ -309,7 +310,7 @@ export async function resetPasswordAction(formData: FormData): Promise<void> {
   let user: User | null = null;
   try {
     const { data, error } = await supabase.auth.getUser();
-    if (error) {
+    if (error && !esFaltaDeSesion(error)) {
       console.error('resetPasswordAction: getUser falló', {
         code: codigoONombre(error),
       });

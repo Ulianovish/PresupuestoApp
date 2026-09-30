@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 import { getRouteAccess, redirectsSignedInUser } from '@/lib/auth/route-access';
+import { esFaltaDeSesion } from '@/lib/auth/session-error';
 
 /**
  * Middleware de Next.js para proteger rutas y manejar autenticación
@@ -46,7 +47,7 @@ export async function middleware(request: NextRequest) {
     // Sin sesión es lo normal (no se registra); cualquier otro error sí: con
     // code (refresh_token_not_found) o sin él (AuthRetryableFetchError cuando
     // Supabase no responde). Nunca el mensaje: podría llevar datos personales.
-    if (error && error.name !== 'AuthSessionMissingError') {
+    if (error && !esFaltaDeSesion(error)) {
       console.error('middleware: getUser falló', {
         code: error.code ?? error.name,
         status: error.status,
