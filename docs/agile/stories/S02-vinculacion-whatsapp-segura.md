@@ -36,7 +36,7 @@
 | Modificar (test) | `src/lib/services/whatsapp-links.test.ts` | Tests de generación, canje, revinculación y límite |
 | Modificar | `src/lib/whatsapp/handle-linking.ts` | Consulta el límite antes de canjear; registra fallos; `MSG_TOO_MANY_ATTEMPTS` |
 | Modificar (test) | `src/lib/whatsapp/handle-linking.test.ts` | Tests del flujo con límite |
-| Modificar | `src/app/api/whatsapp/webhook/route.ts` | Pasa `isLinkAttemptLimitReached` y `recordFailedLinkAttempt` al flujo de vinculación |
+| Modificar | `src/app/api/whatsapp/webhook/route.ts` | Pasa `reserveLinkAttempt` y `releaseLinkAttempt` al flujo de vinculación (antes `isLinkAttemptLimitReached` y `recordFailedLinkAttempt`; ver «Ronda de corrección 1») |
 | Modificar (test) | `src/app/api/whatsapp/webhook/route.test.ts` | Test del cableado para números sin vincular |
 
 ## Criterios de aceptación
@@ -54,7 +54,8 @@
 ## Notas de diseño (leer antes de empezar)
 
 - **Por qué la revinculación se decide con `whatsapp_conversations.user_id`.** En el webhook, un número ya vinculado nunca entra al flujo de vinculación (sus mensajes van al agente). Un número solo cambia de dueño después de desvincularse (S13 agrega el botón), y en ese momento la fila de `whatsapp_links` del dueño anterior ya no existe. Por eso el borrado es `DELETE FROM whatsapp_conversations WHERE phone_e164 = <n> AND user_id <> <nuevo>`: cubre ese caso y el de un upsert directo, y conserva la conversación si el dueño es el mismo.
-- **Por qué el límite deja pasar si la base falla.** El código puede llegar a producción antes de que se aplique la migración (H8). Si `whatsapp_link_attempts` no existe, bloquear dejaría a todos sin poder vincular. Por eso `isLinkAttemptLimitReached` devuelve `false` ante un error y `recordFailedLinkAttempt` nunca lanza; ambos loguean solo `error.code`.
+- **Por qué el límite deja pasar si la base falla.** El código puede llegar a producción antes de que se aplique la migración (H8). Si `whatsapp_link_attempts` no existe, bloquear dejaría a todos sin poder vincular. Por eso `reserveLinkAttempt` deja pasar ante un error y `releaseLinkAttempt` nunca lanza; ambos loguean solo `error.code`.
+- **Ronda de corrección 1 (revisión).** El límite pasó de «contar y luego registrar el fallo» (dos pasos: una ráfaga en paralelo de `VINCULAR` desde el mismo número pasaba el conteo N veces) a **reservar antes de canjear**: `reserveLinkAttempt` purga las filas del número anteriores a la ventana (la tabla no crece sin límite), inserta el intento y cuenta la ventana con él incluido; con más de 5 borra su reserva y responde `MSG_TOO_MANY_ATTEMPTS`. Si el canje sale bien o falla por la base (`link_failed`), `handleLinkingMessage` libera la reserva con `releaseLinkAttempt`; con `invalid_or_expired` la fila queda como el fallo. Además, si `redeemLinkCode` falla después de consumir el código (conversación o upsert), lo devuelve a pendiente (best-effort) para que el mismo `VINCULAR` se pueda reintentar. Las secciones de tareas de abajo conservan el diseño original como historia.
 - **Por qué `link_failed`.** Antes cualquier error del canje devolvía `invalid_or_expired`. Ahora ese resultado suma un intento fallido al número, así que un error de base (que no es culpa de quien escribe) se separa en `link_failed`. El mensaje al usuario sigue siendo `MSG_CODE_INVALID` en ambos casos.
 - **Los intentos bloqueados no se registran.** Así, quien espera 15 minutos vuelve a poder intentar, como dice el mensaje.
 
