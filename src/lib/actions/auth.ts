@@ -33,7 +33,7 @@ function urlConError(
 /**
  * Server Action para el login de usuarios.
  * Con `redirectTo` (lo pone el middleware) vuelve a esa ruta si es segura;
- * sin él, va a /bienvenida o /dashboard según el onboarding.
+ * sin él, o si no es seguro, va a /bienvenida o /dashboard según el onboarding.
  */
 export async function loginAction(formData: FormData) {
   const redirectTo = texto(formData, 'redirectTo');
@@ -66,9 +66,9 @@ export async function loginAction(formData: FormData) {
     redirect(urlConError('/auth/login', translateAuthError(error), redirectTo));
   }
 
-  const destino = redirectTo
-    ? safeRedirectPath(redirectTo)
-    : await getPostLoginPath(supabase, data.user.id);
+  // Un redirectTo presente pero inseguro cuenta como ausente.
+  const seguro = redirectTo ? safeRedirectPath(redirectTo, '') : '';
+  const destino = seguro || (await getPostLoginPath(supabase, data.user.id));
 
   revalidatePath('/', 'layout');
   redirect(destino);

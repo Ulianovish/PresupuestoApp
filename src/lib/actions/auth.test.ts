@@ -108,21 +108,19 @@ describe('loginAction', () => {
     expect(mockedPostLogin).not.toHaveBeenCalled();
   });
 
-  it('con redirectTo externo va a /dashboard', async () => {
-    clienteFalso();
+  it.each(['//otro.ejemplo.com', '/auth/login', 'https://otro.ejemplo.com'])(
+    'con redirectTo inseguro (%s) cuenta como ausente y usa getPostLoginPath',
+    async redirectTo => {
+      const { client } = clienteFalso();
 
-    const url = await destino(
-      loginAction(
-        form({
-          email: EMAIL,
-          password: PASSWORD,
-          redirectTo: '//otro.ejemplo.com',
-        }),
-      ),
-    );
+      const url = await destino(
+        loginAction(form({ email: EMAIL, password: PASSWORD, redirectTo })),
+      );
 
-    expect(url).toBe('/dashboard');
-  });
+      expect(url).toBe('/bienvenida');
+      expect(mockedPostLogin).toHaveBeenCalledWith(client, USER_ID);
+    },
+  );
 
   it('credenciales malas → texto traducido y conserva redirectTo', async () => {
     clienteFalso({
