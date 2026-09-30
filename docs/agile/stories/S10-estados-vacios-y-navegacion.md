@@ -84,7 +84,7 @@
   export const STARTER_KIT_ERROR_MESSAGE: string;
   ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/onboarding/budget-empty-state.test.ts`:
 
@@ -165,12 +165,12 @@ describe('starterKitToast', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/onboarding/budget-empty-state.test.ts`
 Expected: FAIL — `Failed to resolve import "./budget-empty-state"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/onboarding/budget-empty-state.ts`:
 
@@ -246,12 +246,12 @@ export function starterKitToast(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/onboarding/budget-empty-state.test.ts`
 Expected: PASS (12 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/onboarding/budget-empty-state.ts src/lib/onboarding/budget-empty-state.test.ts
