@@ -122,16 +122,33 @@ export default function Button({
   );
 
   if (href) {
+    // Un <a> no tiene `disabled`: se saca del tab, se anuncia deshabilitado,
+    // se le quitan los eventos de puntero y el clic no navega.
+    const inactivo = Boolean(disabled || loading);
+    const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+      if (inactivo) {
+        e.preventDefault();
+        return;
+      }
+      onClick?.(e as unknown as React.MouseEvent<HTMLButtonElement>);
+    };
     return (
       <ShadcnButton
         asChild
-        className={classes}
+        className={cn(classes, inactivo && 'pointer-events-none')}
         variant={shadcnVariant}
         size={size}
         title={title}
         {...props}
       >
-        <Link href={href}>{content}</Link>
+        <Link
+          href={href}
+          onClick={handleLinkClick}
+          aria-disabled={inactivo ? 'true' : undefined}
+          tabIndex={inactivo ? -1 : undefined}
+        >
+          {content}
+        </Link>
       </ShadcnButton>
     );
   }

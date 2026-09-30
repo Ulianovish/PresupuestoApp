@@ -2197,3 +2197,19 @@ Recorre los 9 criterios de arriba y confirma en el código:
 9. Step 1.
 
 Sin commit en esta tarea (no hay cambios). Si algo falló, corrígelo en la tarea correspondiente con su propio commit.
+
+---
+
+### Task 11: Deuda de S13 — `Button` con `href` deshabilitado (alcance adicional del orquestador)
+
+**Files:** `src/components/atoms/Button/Button.tsx`, test `src/components/atoms/Button/Button.render.test.tsx`.
+
+- [x] **Step 1:** Test (renderToStaticMarkup + árbol sin renderizar): con `href` y `disabled || loading` el `<a>` lleva `aria-disabled="true"`, `tabindex="-1"` y la clase `pointer-events-none`, sin `<button>`; el `onClick` llega al `Link` y, deshabilitado, el clic hace `preventDefault` sin llamar `onClick`. Falla por la razón esperada.
+- [x] **Step 2:** Implementación en `Button.tsx`; test en verde; commit.
+
+### Task 12: Deuda de S13 — secuencia de "Cargar categorías sugeridas" fuera de `/presupuesto` (alcance adicional del orquestador)
+
+**Files:** `src/lib/onboarding/budget-empty-state.ts` (+ test), `src/app/presupuesto/page.tsx`.
+
+- [ ] **Step 1:** Test de `loadStarterKitAndNotify` con dependencias inyectadas (acción, toast, recarga, meses): éxito con recarga, error sin recarga, `seeded: false` sin error con recarga, y la rama del `catch` (acción o recarga que lanza → toast de error).
+- [ ] **Step 2:** Implementación y `handleLoadStarterKit` de `/presupuesto` la usa; commit.
