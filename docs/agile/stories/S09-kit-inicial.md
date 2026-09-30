@@ -139,7 +139,7 @@ describe('migración 20260930130000: columnas de onboarding en profiles', () => 
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: FAIL — el archivo de test no carga: `ENOENT: no such file or directory, open '…/supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql'`.
 
 - [x] **Step 3: Write minimal implementation**
@@ -207,13 +207,13 @@ $migracion$;
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: PASS — 3 tests.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts && git commit -m "$(cat <<'EOF'
 feat(onboarding): columnas de onboarding en profiles con backfill
 
 Los usuarios existentes quedan con onboarding completado y checklist
@@ -424,7 +424,7 @@ describe('migración 20260930130000: _seed_starter_kit', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: FAIL — los 14 tests nuevos fallan con `Error: No está la función _seed_starter_kit` (o, en el de REVOKE, con el `toContain` sin match); los 3 de la Task 1 siguen en PASS.
 
 - [x] **Step 3: Write minimal implementation**
@@ -567,13 +567,13 @@ REVOKE EXECUTE ON FUNCTION public._seed_starter_kit(uuid, text) FROM PUBLIC, ano
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: PASS — 17 tests.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts && git commit -m "$(cat <<'EOF'
 feat(onboarding): siembra idempotente del kit inicial
 
 _seed_starter_kit crea (o reactiva) 6 categorías, la cuenta Efectivo,
@@ -648,7 +648,7 @@ describe('migración 20260930130000: ensure_starter_kit', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: FAIL — los 5 tests nuevos fallan (`Error: No está la función ensure_starter_kit`, y el de grants con `expected [] to deeply equal [ 'authenticated' ]` o el `toContain` del REVOKE sin match); los 17 anteriores en PASS.
 
 - [x] **Step 3: Write minimal implementation**
@@ -686,13 +686,13 @@ GRANT EXECUTE ON FUNCTION public.ensure_starter_kit() TO authenticated;
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: PASS — 22 tests.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts && git commit -m "$(cat <<'EOF'
 feat(onboarding): ensure_starter_kit para reparar el kit desde la app
 
 Sin parámetro de usuario: siembra a auth.uid() con el mes de Bogotá.
@@ -787,7 +787,7 @@ describe('migración 20260930130000: verificación manual', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: FAIL — los 7 tests nuevos fallan (`Error: No está la función handle_new_user`, `expected -1 to be greater than -1` en el marcador de verificación, `toContain` sin match en los grants); los 22 anteriores en PASS.
 
 - [x] **Step 3: Write minimal implementation**
@@ -927,18 +927,18 @@ GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin, servi
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: PASS — 29 tests.
 
 - [x] **Step 5: Verificación completa del proyecto**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test && bun run type-check`
 Expected: toda la suite en PASS (incluidos los 29 de este archivo) y `tsc --noEmit` sin errores. Si `type-check` se queja de `node:fs`/`node:path`, confirmar que `@types/node` está en `devDependencies` (lo está: `"@types/node": "^20"`) y no cambiar imports a `require`.
 
 - [x] **Step 6: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts && git commit -m "$(cat <<'EOF'
 feat(onboarding): handle_new_user siembra el kit sin bloquear el registro
 
 El insert de profiles queda idéntico; después se llama la siembra dentro

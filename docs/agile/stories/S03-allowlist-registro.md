@@ -20,7 +20,7 @@
 - Datos personales: ningún correo real en SQL, tests ni docs. Solo `usuario@ejemplo.com`, `otro@ejemplo.com`, `no-invitado@ejemplo.com`.
 - Verificación del proyecto: `bun run test && bun run type-check`. Todos los commits van con `git commit --no-verify` (regla del orquestador: husky/lint-staged puede descartar cambios); antes de cada commit que toca `src/` se corren `bunx eslint` y `bunx prettier --check` sobre los archivos tocados.
 - Commits en español, terminados con `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-- Ejecutar comandos con `builtin cd /Users/migue/Repos/personal/PresupuestoApp && …` (o la ruta del worktree asignado).
+- Ejecutar comandos con `builtin cd <raíz-del-repo> && …` (o la ruta del worktree asignado).
 - Dependencia: S01 (`20260930100000`) va antes en la serie de migraciones; S03 no toca sus archivos.
 
 ---
@@ -181,7 +181,7 @@ describe('backfill de usuarios existentes', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
 Expected: FAIL — `existe el archivo de la migración` con `expected false to be true`, y el resto con `expected '' to contain …` / `to match`.
 
 - [x] **Step 3: Write minimal implementation**
@@ -245,7 +245,7 @@ ON CONFLICT (email) DO NOTHING;
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
 Expected: PASS (8 tests).
 
 - [x] **Step 5: Commit**
@@ -253,7 +253,7 @@ Expected: PASS (8 tests).
 Va con `--no-verify` (regla del orquestador); antes se corren `bunx eslint` y `bunx prettier --check` sobre el test.
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit --no-verify -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit --no-verify -m "$(cat <<'EOF'
 feat(auth): tabla signup_allowlist, is_signup_allowed y backfill de usuarios
 
 Primera parte de S03: la allowlist vive en una tabla con RLS y sin acceso
@@ -326,7 +326,7 @@ describe('hook_before_user_created', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
 Expected: FAIL — los 5 tests de `hook_before_user_created` fallan (`expected '' to contain 'hook_before_user_created(event jsonb) returns jsonb'`, etc.); `5 failed | 8 passed (13)`. Los de la Tarea 1 siguen en verde.
 
 - [x] **Step 3: Write minimal implementation**
@@ -366,13 +366,13 @@ GRANT EXECUTE ON FUNCTION public.hook_before_user_created(jsonb) TO supabase_aut
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
 Expected: PASS (13 tests).
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit --no-verify -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit --no-verify -m "$(cat <<'EOF'
 feat(auth): hook Before User Created que rechaza correos sin invitación
 
 hook_before_user_created devuelve '{}' si el correo está en la allowlist y
@@ -472,7 +472,7 @@ describe('idempotencia y datos', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
 Expected: FAIL — `7 failed | 15 passed (22)`: los 4 tests del trigger, `el literal signup_not_allowed aparece…` (`expected [ …1 item ] to have a length of 2`), `solo usa correos de ejemplo` (`expected 0 to be greater than 0`) y `termina con el bloque…`. Los de idempotencia y "no borra" pasan.
 
 - [x] **Step 3: Write minimal implementation**
@@ -547,13 +547,13 @@ CREATE TRIGGER enforce_signup_allowlist
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
 Expected: PASS (22 tests).
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit --no-verify -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit --no-verify -m "$(cat <<'EOF'
 feat(auth): trigger de respaldo de la allowlist en auth.users
 
 enforce_signup_allowlist (BEFORE INSERT) rechaza con 'signup_not_allowed'
@@ -624,12 +624,12 @@ No repite el rechazo: con el hook activo, un registro rechazado nunca llega al `
 
 - [x] **Step 2: Verificación completa del proyecto**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test && bun run type-check`
 Expected: todos los tests en verde (incluidos los 22 de `src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`) y `tsc --noEmit` sin errores.
 
 - [x] **Step 3: Revisar que no quedaron correos reales**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -EnoI "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}" supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts docs/agile/decisions/ADR-002-allowlist-registro.md`
+Run: `builtin cd <raíz-del-repo> && grep -EnoI "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}" supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts docs/agile/decisions/ADR-002-allowlist-registro.md`
 Expected: solo direcciones `@ejemplo.com` (o ninguna en la ADR).
 
 - [x] **Step 4: Commit**
@@ -637,7 +637,7 @@ Expected: solo direcciones `@ejemplo.com` (o ninguna en la ADR).
 Solo docs: va con `--no-verify`.
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add docs/agile/decisions/ADR-002-allowlist-registro.md && git commit --no-verify -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add docs/agile/decisions/ADR-002-allowlist-registro.md && git commit --no-verify -m "$(cat <<'EOF'
 docs(adr): ADR-002 cerrada con la verificación del hook Before User Created
 
 Hook disponible en Free y Pro; formato, grants y flujos cubiertos

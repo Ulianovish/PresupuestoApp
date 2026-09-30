@@ -117,7 +117,7 @@ describe('buildWhatsAppLinkUrl', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/whatsapp/link-url.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/whatsapp/link-url.test.ts`
 Expected: FAIL — `Failed to resolve import "./link-url"` (el archivo no existe).
 
 - [x] **Step 3: Write minimal implementation**
@@ -147,13 +147,13 @@ export function buildWhatsAppLinkUrl(
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/whatsapp/link-url.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/whatsapp/link-url.test.ts`
 Expected: PASS (5 tests).
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/whatsapp/link-url.ts src/lib/whatsapp/link-url.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/whatsapp/link-url.ts src/lib/whatsapp/link-url.test.ts && git commit -m "$(cat <<'EOF'
 feat(whatsapp): enlace wa.me con el mensaje VINCULAR listo para enviar
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -229,7 +229,7 @@ por:
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/whatsapp/handle-linking.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/whatsapp/handle-linking.test.ts`
 Expected: FAIL en 2 tests: "VINCULAR con código válido → confirma y canjea" con `expected '✅ ¡Listo! Tu WhatsApp quedó vinculado…' to be '¡Listo! Tu número quedó vinculado…'` y "número ya vinculado y mensaje cualquiera → avisa que ya está vinculado" con `expected 'Tu número ya está vinculado a tu presupuesto. 👍 El registro de gastos por mensaje llegará muy pronto.' to be 'Este número ya está vinculado. Ya puedes mandarme tus gastos.'`.
 
 - [x] **Step 3: Write minimal implementation**
@@ -270,13 +270,13 @@ No toques ninguna otra constante ni función del archivo.
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/whatsapp/handle-linking.test.ts src/app/api/whatsapp/webhook/route.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/whatsapp/handle-linking.test.ts src/app/api/whatsapp/webhook/route.test.ts`
 Expected: PASS (todos; el test del webhook se corre porque consume `handleLinkingMessage`).
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/whatsapp/handle-linking.ts src/lib/whatsapp/handle-linking.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/whatsapp/handle-linking.ts src/lib/whatsapp/handle-linking.test.ts && git commit -m "$(cat <<'EOF'
 feat(whatsapp): al vincular, el bot cuenta qué se le puede mandar
 
 MSG_ALREADY_LINKED deja de prometer que el registro por mensaje "llegará
@@ -436,7 +436,7 @@ describe('unlinkWhatsAppLinkAction', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/whatsapp.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/actions/whatsapp.test.ts`
 Expected: FAIL — los 5 tests de `unlinkWhatsAppLinkAction` fallan con `TypeError: unlinkWhatsAppLinkAction is not a function`; los tests existentes de `guardarDocumentoDianAction` y `listarDocumentosDianAction` siguen en verde.
 
 - [x] **Step 3: Write minimal implementation**
@@ -492,16 +492,16 @@ export async function unlinkWhatsAppLinkAction(
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/whatsapp.test.ts && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/actions/whatsapp.test.ts && bun run type-check`
 Expected: PASS (15 tests: 7 + 3 existentes + 5 nuevos) y `tsc --noEmit` sin errores.
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn "unlinkWhatsAppPhoneAction\|UnlinkPhoneResult" src`
+Run: `builtin cd <raíz-del-repo> && grep -rn "unlinkWhatsAppPhoneAction\|UnlinkPhoneResult" src`
 Expected: sin salida (la firma vieja de §2.8 no existe en ningún lado).
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/whatsapp.ts src/lib/actions/whatsapp.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/actions/whatsapp.ts src/lib/actions/whatsapp.test.ts && git commit -m "$(cat <<'EOF'
 feat(whatsapp): acción para desvincular un número propio por el id del link
 
 Borra por id y user_id con el cliente de la cookie: el número completo no
@@ -640,10 +640,10 @@ NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000
 
 - [x] **Step 3: Verificar tipos y lint**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check && bunx eslint src/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel.tsx`
+Run: `builtin cd <raíz-del-repo> && bun run type-check && bunx eslint src/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel.tsx`
 Expected: `tsc --noEmit` sin errores; eslint sin errores (orden de imports incluido).
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && tail -n 1 .env.example`
+Run: `builtin cd <raíz-del-repo> && tail -n 1 .env.example`
 Expected: `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000`
 
 - [x] **Step 4 (solo humano, opcional; nunca producción): revisión visual**
@@ -653,7 +653,7 @@ El implementador **no** corre `bun run dev` ni `next build` (`.env.local` apunta
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel.tsx .env.example && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel.tsx .env.example && git commit -m "$(cat <<'EOF'
 feat(ajustes): botón "Abrir WhatsApp" con el código de vinculación ya escrito
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -730,7 +730,7 @@ describe('Ajustes: el número completo no llega al navegador', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts`
 Expected: FAIL en 3 tests (`expected '' to contain 'unlinkWhatsAppLinkAction(linkId)'`, `expected '…' to contain 'key={l.id as string}'`, `expected '…maskPhone…' not to contain 'maskPhone'`).
 
 - [x] **Step 3: Crear el botón con confirmación**
@@ -907,7 +907,7 @@ Notas para el implementador:
 
 - [x] **Step 5: Verificar tests, tipos y lint**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts src/lib/actions/whatsapp.test.ts && bun run type-check && bunx eslint src/app/settings/page.tsx src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.tsx src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts src/lib/actions/whatsapp.test.ts && bun run type-check && bunx eslint src/app/settings/page.tsx src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.tsx src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts`
 Expected: PASS (3 + 15 tests); `tsc --noEmit` sin errores; eslint sin errores.
 
 - [ ] **Step 6 (solo humano, opcional; nunca producción): revisión visual**
@@ -917,7 +917,7 @@ El implementador **no** corre `bun run dev` ni `next build` (`.env.local` apunta
 - [x] **Step 7: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.tsx src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts src/app/settings/page.tsx && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.tsx src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.test.ts src/app/settings/page.tsx && git commit -m "$(cat <<'EOF'
 feat(ajustes): desvincular un número de WhatsApp con confirmación
 
 El botón recibe el id del link y el número enmascarado y llama a
@@ -937,12 +937,12 @@ EOF
 
 - [x] **Step 1: Suite completa y tipos**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test && bun run type-check`
 Expected: todos los tests en verde y `tsc --noEmit` sin errores.
 
 - [x] **Step 2: Sin teléfonos reales en lo nuevo**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git diff main --name-only | xargs grep -nE '\+57[0-9]{10}' | grep -v '573000000000' | grep -v '573001234567'`
+Run: `builtin cd <raíz-del-repo> && git diff main --name-only | xargs grep -nE '\+57[0-9]{10}' | grep -v '573000000000' | grep -v '573001234567'`
 Expected: sin salida (solo aparecen `+573000000000` y el `+573001234567` que ya existía en los tests previos).
 
 - [x] **Step 3: Revisar criterios de aceptación**

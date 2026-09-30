@@ -19,7 +19,7 @@
 - Textos de UI y mensajes en español colombiano, tuteo.
 - Verificación del proyecto: `bun run test && bun run type-check`.
 - Commits en español terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, siempre con `git commit --no-verify`; antes, `bunx eslint` y `bunx prettier --check` a mano sobre los archivos de `src/` tocados.
-- Ejecutar comandos con `builtin cd /Users/migue/Repos/personal/PresupuestoApp-app && …` (worktree del flujo APP; las rutas `PresupuestoApp` de los pasos de abajo se ejecutan ahí).
+- Ejecutar comandos con `builtin cd <worktree-app> && …` (worktree del flujo APP; las rutas `PresupuestoApp` de los pasos de abajo se ejecutan ahí).
 - Orden (contratos §5.3, flujo APP, en serie en el mismo worktree): S08 va **después de S07** (ya hecho: borró `src/scripts/migrate-july-data.ts`) y **antes de S10**. Ambas tocan `src/app/presupuesto/page.tsx`: S08 solo el estado del formulario (~203-235) y un import; S10 luego cablea el panel vacío sobre el archivo ya modificado por S08.
 - Prohibido `bun run dev` y `next build` contra `.env.local` (apunta a producción, §5.0). Nunca `bun run db:types`.
 
@@ -189,7 +189,7 @@ describe('itemDefaultNamesFor', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/catalog-defaults.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/budget/catalog-defaults.test.ts`
 Expected: FAIL — `Failed to resolve import "@/lib/constants/budget-defaults"` (el archivo no existe).
 
 - [x] **Step 3: Write minimal implementation**
@@ -315,13 +315,13 @@ export function itemDefaultNamesFor(
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/catalog-defaults.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/budget/catalog-defaults.test.ts`
 Expected: PASS (9 tests).
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/constants/budget-defaults.ts src/lib/budget/catalog-defaults.ts src/lib/budget/catalog-defaults.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/constants/budget-defaults.ts src/lib/budget/catalog-defaults.ts src/lib/budget/catalog-defaults.test.ts && git commit -m "$(cat <<'EOF'
 feat(presupuesto): constantes y selección por nombre de los valores por defecto de rubros
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -537,7 +537,7 @@ describe('resolveBudgetItemDefaults', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/item-defaults-supabase.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/budget/item-defaults-supabase.test.ts`
 Expected: FAIL — `Failed to resolve import "./item-defaults-supabase"`.
 
 - [x] **Step 3: Write minimal implementation**
@@ -663,13 +663,13 @@ export async function resolveBudgetItemDefaults(
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/item-defaults-supabase.test.ts && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/budget/item-defaults-supabase.test.ts && bun run type-check`
 Expected: PASS (6 tests) y `tsc --noEmit` sin errores.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/budget/item-defaults-supabase.ts src/lib/budget/item-defaults-supabase.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/budget/item-defaults-supabase.ts src/lib/budget/item-defaults-supabase.test.ts && git commit -m "$(cat <<'EOF'
 feat(presupuesto): resolver de catálogos por nombre con respaldo y aviso
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -886,7 +886,7 @@ describe('createBudgetItemInMonth', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/categories.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/actions/categories.test.ts`
 Expected: FAIL — `expected "spy" to be called with arguments` en `mockedResolve` (las acciones todavía consultan `classifications`/`controls` con `.limit(1)`; además `cadena` no tiene `limit`, así que puede fallar con `limit is not a function` y la acción devolver `Error interno del servidor`).
 
 - [x] **Step 3: Write minimal implementation**
@@ -965,18 +965,18 @@ y en su `.insert({ … })` cambiar las tres líneas de catálogo:
 
 Verificar que no quedan referencias viejas:
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n "classificationResult\|controlResult\|statusResult\|limit(1)" src/lib/actions/categories.ts`
+Run: `builtin cd <raíz-del-repo> && grep -n "classificationResult\|controlResult\|statusResult\|limit(1)" src/lib/actions/categories.ts`
 Expected: sin salida.
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/categories.test.ts && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/actions/categories.test.ts && bun run type-check`
 Expected: PASS (7 tests) y `tsc --noEmit` sin errores.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/categories.ts src/lib/actions/categories.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/actions/categories.ts src/lib/actions/categories.test.ts && git commit -m "$(cat <<'EOF'
 fix(presupuesto): los rubros nuevos de una categoría nacen como Estilo de Vida/Reducir, no Basico/Eliminar
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -1120,7 +1120,7 @@ describe('createBudgetItemsForDeuda', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/deudas-budget.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/actions/deudas-budget.test.ts`
 Expected: FAIL — `mockedResolve` no fue llamado (la acción todavía consulta `classifications`/`controls` con `.limit(1)`, y `cadena` no tiene `limit`, así que devuelve `Error interno del servidor`).
 
 - [x] **Step 3: Write minimal implementation**
@@ -1164,18 +1164,18 @@ En el `.map(t => ({ … }))` que arma `rows`, cambiar las tres líneas de catál
         status_id: defaults.ids.statusId,
 ```
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n "classificationResult\|controlResult\|statusResult\|limit(1)" src/lib/actions/deudas-budget.ts`
+Run: `builtin cd <raíz-del-repo> && grep -n "classificationResult\|controlResult\|statusResult\|limit(1)" src/lib/actions/deudas-budget.ts`
 Expected: sin salida.
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/deudas-budget.test.ts && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/actions/deudas-budget.test.ts && bun run type-check`
 Expected: PASS (2 tests) y `tsc --noEmit` sin errores.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/deudas-budget.ts src/lib/actions/deudas-budget.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/actions/deudas-budget.ts src/lib/actions/deudas-budget.test.ts && git commit -m "$(cat <<'EOF'
 fix(deudas): los rubros de una deuda nacen como Basico/Necesario por nombre
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -1257,7 +1257,7 @@ describe('defaultItemFormNames', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/catalog-defaults.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/budget/catalog-defaults.test.ts`
 Expected: FAIL — `defaultItemFormNames is not a function` (no está exportada).
 
 - [x] **Step 3: Write minimal implementation**
@@ -1335,18 +1335,18 @@ por:
       ...defaultItemFormNames(classifications, controls, categoryName),
 ```
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n "classifications\[0\]\|controls\[0\]\|defaultClasificacion\|defaultControl" src/app/presupuesto/page.tsx`
+Run: `builtin cd <raíz-del-repo> && grep -n "classifications\[0\]\|controls\[0\]\|defaultClasificacion\|defaultControl" src/app/presupuesto/page.tsx`
 Expected: sin salida.
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/catalog-defaults.test.ts && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/budget/catalog-defaults.test.ts && bun run type-check`
 Expected: PASS (13 tests) y `tsc --noEmit` sin errores.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/budget/catalog-defaults.ts src/lib/budget/catalog-defaults.test.ts src/app/presupuesto/page.tsx && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/budget/catalog-defaults.ts src/lib/budget/catalog-defaults.test.ts src/app/presupuesto/page.tsx && git commit -m "$(cat <<'EOF'
 fix(presupuesto): el formulario de rubro nuevo propone Estilo de Vida/Reducir en vez del primero de la lista
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -1362,20 +1362,20 @@ EOF
 
 - [x] **Step 1: Suite completa y tipos**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test && bun run type-check`
 Expected: todos los tests en verde (incluye los 4 archivos nuevos) y `tsc --noEmit` sin errores.
 
 - [x] **Step 2: No quedan selecciones "el primero" de catálogos al crear rubros**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rnE "from\('(classifications|controls)'\)" src --include='*.ts' --include='*.tsx' | grep -v "\.test\."`
+Run: `builtin cd <raíz-del-repo> && grep -rnE "from\('(classifications|controls)'\)" src --include='*.ts' --include='*.tsx' | grep -v "\.test\."`
 Expected: solo `src/lib/budget/item-defaults-supabase.ts`, `src/lib/services/budget.ts` (listados de UI), `src/app/api/budget/route.ts` y `src/app/api/budget/[id]/route.ts` (por nombre enviado). (`src/scripts/migrate-july-data.ts` ya no aparece: lo borró S07.) Ninguno con `.limit(1)`:
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn "limit(1)" src/lib/actions src/lib/budget`
+Run: `builtin cd <raíz-del-repo> && grep -rn "limit(1)" src/lib/actions src/lib/budget`
 Expected: sin salida.
 
 - [x] **Step 3: Sin migraciones nuevas**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git diff --name-only main...HEAD -- supabase/`
+Run: `builtin cd <raíz-del-repo> && git diff --name-only main...HEAD -- supabase/`
 Expected: sin archivos de S08 (solo los que existieran de otras historias).
 
 Sin commit en esta tarea (no cambia archivos).

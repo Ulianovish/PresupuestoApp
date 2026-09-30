@@ -19,7 +19,7 @@
 - Textos de UI en español colombiano, tuteo.
 - Ningún dato personal en código, tests ni fixtures: cuentas inventadas (`Cuenta A`, `Tarjeta B`), UUIDs inventados. Nada de nombres de bancos, empresas ni montos reales del dueño.
 - Ningún test toca una base real; el cliente de Supabase se mockea. No se accede a la base de producción.
-- Ejecutar comandos en el worktree del flujo APP: `builtin cd /Users/migue/Repos/personal/PresupuestoApp-app && …` (el `cd` del shell está envuelto). Nunca en `/Users/migue/Repos/personal/PresupuestoApp`.
+- Ejecutar comandos en el worktree del flujo APP: `builtin cd <worktree-app> && …` (el `cd` del shell está envuelto). Nunca en `<raíz-del-repo>`.
 - Verificación: `bun run test <archivo>` por tarea; al final `bun run test && bun run type-check`.
 - Commits en español, terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, **siempre** con `git commit --no-verify` (el hook de husky revierte cambios). Antes de cada commit que toque `src/`, correr a mano `bunx eslint <archivos tocados>` y `bunx prettier --check <archivos tocados>` (`--write` si hace falta).
 - Orden y propiedad (contratos §5.3, flujo APP, en serie en el mismo worktree): S07 es la **primera** historia del flujo (S07 → S08 → S10 → S13 → S11 → S12). No depende de ninguna. S10 toca después `Sidebar.tsx` (quita `/test`) y `src/app/gastos/page.tsx` (un `useEffect`); aquí no se toca el ítem `/test`.
@@ -184,7 +184,7 @@ describe('cargarIngresosDeudas', () => {
 
 - [x] **Step 2: Correr el test y verificar que falla**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/hooks/useIngresosDeudas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/hooks/useIngresosDeudas.test.ts`
 Expected: FAIL. El primer test con `TypeError: cargarIngresosDeudas is not a function` (o `(0 , cargarIngresosDeudas) is not a function`); el segundo con `expected [ …, 'inicializarDatosEjemplo', … ] to not include 'inicializarDatosEjemplo'`.
 
 - [x] **Step 3: Borrar `inicializarDatosEjemplo` del servicio**
@@ -295,18 +295,18 @@ export async function cargarIngresosDeudas(): Promise<{
 
 - [x] **Step 5: Correr el test y verificar que pasa**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/hooks/useIngresosDeudas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/hooks/useIngresosDeudas.test.ts`
 Expected: PASS (2 tests).
 
 - [x] **Step 6: Verificar tipos y que no quedan llamadas**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check && grep -rn --exclude='*.test.ts' "inicializarDatosEjemplo\|inicializarDatos\b" src`
+Run: `builtin cd <raíz-del-repo> && bun run type-check && grep -rn --exclude='*.test.ts' "inicializarDatosEjemplo\|inicializarDatos\b" src`
 Expected: `tsc --noEmit` sin errores; el `grep` no imprime nada (sale con código 1). Los tests se excluyen porque `useIngresosDeudas.test.ts` nombra la función para afirmar que no existe.
 
 - [x] **Step 7: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/services/ingresos-deudas.ts src/hooks/useIngresosDeudas.ts src/hooks/useIngresosDeudas.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/services/ingresos-deudas.ts src/hooks/useIngresosDeudas.ts src/hooks/useIngresosDeudas.test.ts && git commit -m "$(cat <<'EOF'
 fix(multiusuario): un usuario sin ingresos ni deudas ya no recibe datos de ejemplo
 
 Se elimina inicializarDatosEjemplo, que insertaba los ingresos y deudas del
@@ -369,7 +369,7 @@ describe('Sidebar sin presupuesto de ejemplo', () => {
 
 - [x] **Step 2: Correr el test y verificar que falla**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/organisms/Sidebar/Sidebar.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/components/organisms/Sidebar/Sidebar.test.ts`
 Expected: FAIL en los 3 tests (`expected '…useBudgetData…' not to contain 'useBudgetData'`, idem `formatCurrency`, y `expected true to be false`).
 
 - [x] **Step 3: Quitar el mock del Sidebar**
@@ -442,18 +442,18 @@ por un espaciador del ancho del botón de menú, para que el título siga centra
 
 - [x] **Step 4: Borrar el hook del mock**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git rm src/hooks/useBudgetData.ts`
+Run: `builtin cd <raíz-del-repo> && git rm src/hooks/useBudgetData.ts`
 Expected: `rm 'src/hooks/useBudgetData.ts'`.
 
 - [x] **Step 5: Correr el test y verificar que pasa**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/organisms/Sidebar/Sidebar.test.ts && bun run type-check && grep -rn --exclude='*.test.ts' "useBudgetData" src`
+Run: `builtin cd <raíz-del-repo> && bun run test src/components/organisms/Sidebar/Sidebar.test.ts && bun run type-check && grep -rn --exclude='*.test.ts' "useBudgetData" src`
 Expected: PASS (3 tests); `tsc` sin errores; el `grep` no imprime nada.
 
 - [x] **Step 6: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/organisms/Sidebar/Sidebar.tsx src/components/organisms/Sidebar/Sidebar.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/components/organisms/Sidebar/Sidebar.tsx src/components/organisms/Sidebar/Sidebar.test.ts && git commit -m "$(cat <<'EOF'
 fix(multiusuario): el sidebar deja de mostrar un presupuesto inventado
 
 La tarjeta Total/Gastado y el monto de la barra móvil salían de un mock con
@@ -625,7 +625,7 @@ describe('withFormDefaults', () => {
 
 - [x] **Step 2: Correr el test y verificar que falla**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/expense-form-defaults.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/expense-form-defaults.test.ts`
 Expected: FAIL con `Failed to resolve import "./expense-form-defaults"` (o `Cannot find module`).
 
 - [x] **Step 3: Agregar `DEFAULT_ACCOUNT_NAME`**
@@ -724,13 +724,13 @@ export function withFormDefaults<
 
 - [x] **Step 5: Correr el test y verificar que pasa**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/expense-form-defaults.test.ts && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/expense-form-defaults.test.ts && bun run type-check`
 Expected: PASS (17 tests); `tsc` sin errores.
 
 - [x] **Step 6: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/constants/expense-categories.ts src/lib/expense-form-defaults.ts src/lib/expense-form-defaults.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/constants/expense-categories.ts src/lib/expense-form-defaults.ts src/lib/expense-form-defaults.test.ts && git commit -m "$(cat <<'EOF'
 feat(gastos): valores por defecto del formulario a partir de los datos del usuario
 
 DEFAULT_ACCOUNT_NAME = 'Efectivo' y un módulo puro con pickDefaultAccount,
@@ -780,7 +780,7 @@ describe('constantes de gastos', () => {
 
 - [x] **Step 2: Correr el test y verificar que falla**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/constants/expense-categories.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/constants/expense-categories.test.ts`
 Expected: FAIL en `no trae una lista fija de cuentas` con `expected { …, ACCOUNT_TYPES: [...] } to not have property "ACCOUNT_TYPES"`; el segundo test pasa.
 
 - [x] **Step 3: Borrar `ACCOUNT_TYPES` y `AccountType`**
@@ -858,7 +858,7 @@ export type { ExpenseCategory } from '@/lib/constants/expense-categories';
 
 - [x] **Step 5: Correr el test de constantes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/constants/expense-categories.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/constants/expense-categories.test.ts`
 Expected: PASS (2 tests). (`type-check` todavía falla por `/gastos`; se arregla en los pasos siguientes.)
 
 - [x] **Step 6: `ExpenseModal` con botón deshabilitable**
@@ -1218,7 +1218,7 @@ por:
 
 - [x] **Step 12: Verificar tipos, tests y que no queda la lista fija**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check && bun run test src/lib/constants/expense-categories.test.ts src/lib/expense-form-defaults.test.ts && grep -rn --exclude='*.test.ts' "ACCOUNT_TYPES\|AccountType\b" src`
+Run: `builtin cd <raíz-del-repo> && bun run type-check && bun run test src/lib/constants/expense-categories.test.ts src/lib/expense-form-defaults.test.ts && grep -rn --exclude='*.test.ts' "ACCOUNT_TYPES\|AccountType\b" src`
 Expected: `tsc` sin errores; PASS (19 tests); el `grep` no imprime nada.
 
 Nota para eslint (`react-hooks/exhaustive-deps`): `blankForm` no va en ningún array de dependencias; solo se llama en manejadores de eventos y como inicializador de `useState`.
@@ -1226,7 +1226,7 @@ Nota para eslint (`react-hooks/exhaustive-deps`): `blankForm` no va en ningún a
 - [x] **Step 13: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/constants/expense-categories.ts src/lib/constants/expense-categories.test.ts src/lib/services/expenses.ts src/app/gastos/page.tsx src/components/organisms/ExpenseModal/ExpenseModal.tsx src/components/molecules/ExpenseFormFields/ExpenseFormFields.tsx src/components/organisms/PendingInvoicesPanel/PendingInvoicesPanel.tsx && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/constants/expense-categories.ts src/lib/constants/expense-categories.test.ts src/lib/services/expenses.ts src/app/gastos/page.tsx src/components/organisms/ExpenseModal/ExpenseModal.tsx src/components/molecules/ExpenseFormFields/ExpenseFormFields.tsx src/components/organisms/PendingInvoicesPanel/PendingInvoicesPanel.tsx && git commit -m "$(cat <<'EOF'
 fix(gastos): /gastos usa las cuentas y categorías del usuario, no las del dueño
 
 Se elimina ACCOUNT_TYPES (las cuentas del dueño): guardar un gasto con él le
@@ -1259,7 +1259,7 @@ EOF
 
 - [x] **Step 1: Confirmar que nada importa lo que se va a borrar**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn --exclude='*.test.ts' "migrate-july\|migrateJulyData\|checkMigrationStatus\|ExpenseMigrationPanel\|BudgetMigrationPanel\|onShowMigration" src .vercelignore`
+Run: `builtin cd <raíz-del-repo> && grep -rn --exclude='*.test.ts' "migrate-july\|migrateJulyData\|checkMigrationStatus\|ExpenseMigrationPanel\|BudgetMigrationPanel\|onShowMigration" src .vercelignore`
 Expected: solo coincidencias dentro de los 4 archivos que se borran, en `ExpenseHeader.tsx` (prop `onShowMigration`), en los `@example` de `ExpensePageTemplate.tsx:18` y `BudgetPageTemplate.tsx:16`, y en `.vercelignore:15-16`. **Ningún `import`** de esos módulos fuera de sí mismos. Si aparece un `import` en otro archivo, detente y repórtalo (no borres nada).
 
 - [x] **Step 2: Escribir el test que falla**
@@ -1311,12 +1311,12 @@ describe('sin la migración de julio 2025 (contratos §5.2)', () => {
 
 - [x] **Step 3: Correr el test y verificar que falla**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts`
 Expected: FAIL en los 6 tests (4 × `expected true to be false`, `expected '…2025-07…' not to contain '2025-07'` y `expected '…ExpenseMigrationPanel…' not to contain 'ExpenseMigrationPanel'`).
 
 - [x] **Step 4: Borrar scripts y paneles**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git rm src/scripts/migrate-july-data.ts src/scripts/migrate-july-expenses.ts src/components/organisms/ExpenseMigrationPanel/ExpenseMigrationPanel.tsx src/components/organisms/BudgetMigrationPanel/BudgetMigrationPanel.tsx`
+Run: `builtin cd <raíz-del-repo> && git rm src/scripts/migrate-july-data.ts src/scripts/migrate-july-expenses.ts src/components/organisms/ExpenseMigrationPanel/ExpenseMigrationPanel.tsx src/components/organisms/BudgetMigrationPanel/BudgetMigrationPanel.tsx`
 Expected: cuatro líneas `rm '…'`. Las carpetas `src/scripts/`, `ExpenseMigrationPanel/` y `BudgetMigrationPanel/` quedan vacías y git deja de verlas.
 
 - [x] **Step 5: `ExpenseHeader` sin el botón de julio**
@@ -1429,13 +1429,13 @@ En `.vercelignore`, borrar estas tres líneas (y la línea en blanco que las sig
 
 - [x] **Step 7: Correr el test y verificar que pasa**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts && bun run type-check && grep -rn --exclude='*.test.ts' "migrate-july\|migrateJulyData\|checkMigrationStatus\|ExpenseMigrationPanel\|BudgetMigrationPanel\|onShowMigration" src .vercelignore`
+Run: `builtin cd <raíz-del-repo> && bun run test src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts && bun run type-check && grep -rn --exclude='*.test.ts' "migrate-july\|migrateJulyData\|checkMigrationStatus\|ExpenseMigrationPanel\|BudgetMigrationPanel\|onShowMigration" src .vercelignore`
 Expected: PASS (6 tests); `tsc` sin errores; el `grep` no imprime nada (sale con código 1).
 
 - [x] **Step 8: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/organisms/ExpenseHeader/ExpenseHeader.tsx src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts src/components/templates/ExpensePageTemplate/ExpensePageTemplate.tsx src/components/templates/BudgetPageTemplate/BudgetPageTemplate.tsx .vercelignore && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/components/organisms/ExpenseHeader/ExpenseHeader.tsx src/components/organisms/ExpenseHeader/ExpenseHeader.test.ts src/components/templates/ExpensePageTemplate/ExpensePageTemplate.tsx src/components/templates/BudgetPageTemplate/BudgetPageTemplate.tsx .vercelignore && git commit -m "$(cat <<'EOF'
 fix(multiusuario): fuera la migración de datos de julio 2025 del dueño
 
 Se borran los scripts migrate-july-* (gastos y presupuesto de ejemplo del
@@ -1459,17 +1459,17 @@ EOF
 
 - [x] **Step 1: Suite completa y tipos**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test && bun run type-check`
 Expected: todos los tests en verde (incluidos los 5 archivos nuevos) y `tsc` sin errores.
 
 - [x] **Step 2: Nada del dueño queda en los puntos de la historia**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn --exclude='*.test.ts' "inicializarDatosEjemplo\|useBudgetData\|ACCOUNT_TYPES\|mockBudgetItems\|mockIncomeData\|migrate-july\|MigrationPanel\|onShowMigration" src`
+Run: `builtin cd <raíz-del-repo> && grep -rn --exclude='*.test.ts' "inicializarDatosEjemplo\|useBudgetData\|ACCOUNT_TYPES\|mockBudgetItems\|mockIncomeData\|migrate-july\|MigrationPanel\|onShowMigration" src`
 Expected: no imprime nada (sale con código 1).
 
 - [x] **Step 3: Lint de los archivos tocados**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bunx eslint src/app/gastos/page.tsx src/components/organisms/ExpenseModal/ExpenseModal.tsx src/components/organisms/Sidebar/Sidebar.tsx src/components/organisms/ExpenseHeader/ExpenseHeader.tsx src/hooks/useIngresosDeudas.ts src/lib/expense-form-defaults.ts src/lib/constants/expense-categories.ts src/lib/services/expenses.ts src/lib/services/ingresos-deudas.ts`
+Run: `builtin cd <raíz-del-repo> && bunx eslint src/app/gastos/page.tsx src/components/organisms/ExpenseModal/ExpenseModal.tsx src/components/organisms/Sidebar/Sidebar.tsx src/components/organisms/ExpenseHeader/ExpenseHeader.tsx src/hooks/useIngresosDeudas.ts src/lib/expense-form-defaults.ts src/lib/constants/expense-categories.ts src/lib/services/expenses.ts src/lib/services/ingresos-deudas.ts`
 Expected: sin errores (advertencias preexistentes del archivo se aceptan si no vienen de líneas nuevas).
 
 - [ ] **Step 4: Prueba manual (solo humano, opcional; nunca producción)**

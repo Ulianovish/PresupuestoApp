@@ -26,7 +26,7 @@
 - Ningún test toca una base real. Ningún dato personal (correos, teléfonos, nombres, uuids reales) en SQL, tests ni comentarios: en la verificación manual se usan `<uuid propio>` y uuids inventados (`1111…`, `2222…`).
 - Verificación del proyecto: `bun run test && bun run type-check`.
 - Commits en español con la línea `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Estos commits incluyen un `.ts` bajo `src/`, así que van **con** el hook (lint-staged formatea el test). Si un commit quedara solo con SQL/docs, usa `git commit --no-verify` (husky puede revertir cambios en commits sin archivos de `src/`).
-- Ejecuta los comandos desde la raíz: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && …` (el `cd` del shell está envuelto).
+- Ejecuta los comandos desde la raíz: `builtin cd <raíz-del-repo> && …` (el `cd` del shell está envuelto).
 - Las líneas `ERROR: Invalid or corrupt Go version` / `command not found: _encode` que imprime el hook RTK son ruido: juzga por la salida real y el código de salida.
 
 ---
@@ -523,7 +523,7 @@ describe('get_previous_month_overspend', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: FAIL, los 5 tests con `ENOENT: no such file or directory, open '…/supabase/migrations/20260930100000_blindar_funciones_remotas.sql'`.
 
 - [x] **Step 3: Write minimal implementation**
@@ -647,13 +647,13 @@ GRANT EXECUTE ON FUNCTION public.get_previous_month_overspend(uuid, character va
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: PASS, 5 tests.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
 fix(seguridad): get_previous_month_overspend con guard y solo service_role
 
 Era SECURITY DEFINER sin search_path y ejecutable por anon: con la anon key
@@ -742,7 +742,7 @@ describe('copy_budget_items_from_template', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: FAIL en los 6 tests nuevos (5 con `Falta CREATE OR REPLACE de copy_budget_items_from_template`, el de grants con `expected [] to deeply equal [ 'service_role' ]` o con el `toContain` del REVOKE); los 5 de la Task 1 siguen en PASS.
 
 - [x] **Step 3: Write minimal implementation**
@@ -845,13 +845,13 @@ Nota: las líneas `0.00 as spent_amount,  -- Resetear gastos` tienen un comentar
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: PASS, 11 tests.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
 fix(seguridad): copy_budget_items_from_template solo copia plantillas del usuario
 
 Copiaba rubros de cualquier plantilla fuente sin verificar el dueño. Ahora
@@ -966,7 +966,7 @@ describe.each(UNCHANGED_FUNCTIONS)(
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: FAIL en los 16 tests nuevos (`Falta CREATE OR REPLACE de fix_templates_without_items`, etc.); los 11 anteriores en PASS.
 
 - [x] **Step 3: Write minimal implementation**
@@ -1114,13 +1114,13 @@ GRANT EXECUTE ON FUNCTION public.get_invoice_stats_by_supplier(uuid, date, date)
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: PASS, 27 tests.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
 chore(db): traer al repo cuatro funciones remotas que ya filtraban por usuario
 
 fix_templates_without_items, check_cufe_exists,
@@ -1191,7 +1191,7 @@ describe('get_budget_by_month', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: FAIL en los 5 tests nuevos (`Falta CREATE OR REPLACE de get_budget_by_month` y el de grants); los 27 anteriores en PASS.
 
 - [x] **Step 3: Write minimal implementation**
@@ -1253,13 +1253,13 @@ GRANT EXECUTE ON FUNCTION public.get_budget_by_month(uuid, character varying) TO
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: PASS, 32 tests.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
 fix(seguridad): get_budget_by_month valida al usuario y deja de ser ejecutable por anon
 
 Sigue siendo INVOKER; el guard vuelve error explícito pedir el presupuesto
@@ -1351,7 +1351,7 @@ describe('migración 20260930100000 completa', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: FAIL solo en `deja comentado el bloque de verificación…` (`expected '…' to contain '-- VERIFICACIÓN'`). Los otros 3 nuevos pasan desde ya (son candados de regresión sobre lo hecho en las tareas 1–4); los 32 anteriores en PASS.
 
 - [x] **Step 3: Write minimal implementation**
@@ -1445,18 +1445,18 @@ Agrega al final de `supabase/migrations/20260930100000_blindar_funciones_remotas
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: PASS, 36 tests.
 
 - [x] **Step 5: Run the project verification**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test && bun run type-check`
 Expected: toda la suite de vitest en PASS (los tests existentes más los 36 nuevos) y `tsc --noEmit` sin errores.
 
 - [x] **Step 6: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
 test(seguridad): candados globales y verificación manual de la migración S01
 
 Sin overloads ni DROP, fuera de las funciones solo REVOKE/GRANT, ningún

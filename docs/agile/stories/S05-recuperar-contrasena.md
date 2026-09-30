@@ -23,7 +23,7 @@
 - Contratos §5.0: sin tests de render (vitest en `node`); no se toca `vitest.config.ts`; nunca `bun run db:types`; **prohibido** `bun run dev` y `next build` contra `.env.local` (apunta a producción).
 - Un archivo `'use server'` solo puede **exportar** funciones async (Next.js falla en build si exporta una constante). Constantes y helpers de `auth.ts` quedan sin `export`.
 - Los tests mockean Supabase; ningún test toca una base real. No se accede a la base de producción.
-- Comandos siempre con `builtin cd /Users/migue/Repos/personal/PresupuestoApp && …` (el `cd` del shell está envuelto).
+- Comandos siempre con `builtin cd <raíz-del-repo> && …` (el `cd` del shell está envuelto).
 - Verificación del proyecto: `bun run test && bun run type-check`.
 - Commits en español terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
@@ -82,7 +82,7 @@ La plantilla "Invite user" de S04 también lleva a `/auth/reset-password` (contr
 
 Run:
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && ls src/lib/site-url.ts src/lib/auth/safe-redirect.ts src/lib/auth/error-messages.ts src/lib/auth/route-access.ts src/app/auth/confirm/route.ts && grep -n "export function getSiteUrl" src/lib/site-url.ts && grep -n "export function translateAuthError" src/lib/auth/error-messages.ts && grep -n "same_password" src/lib/auth/error-messages.ts
+builtin cd <raíz-del-repo> && ls src/lib/site-url.ts src/lib/auth/safe-redirect.ts src/lib/auth/error-messages.ts src/lib/auth/route-access.ts src/app/auth/confirm/route.ts && grep -n "export function getSiteUrl" src/lib/site-url.ts && grep -n "export function translateAuthError" src/lib/auth/error-messages.ts && grep -n "same_password" src/lib/auth/error-messages.ts
 ```
 Expected: los cinco archivos listados y al menos una línea por cada `grep`. Si algo falta: **detente** y reporta "S04 no está integrada en esta rama; S05 depende de ella".
 
@@ -92,7 +92,7 @@ Además confirma en la tabla de `src/lib/auth/error-messages.ts` que `translateA
 
 Run:
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n -A 3 "export const passwordSchema" src/lib/validations/schemas.ts && bun run test src/lib/validations/schemas.test.ts
+builtin cd <raíz-del-repo> && grep -n -A 3 "export const passwordSchema" src/lib/validations/schemas.ts && bun run test src/lib/validations/schemas.test.ts
 ```
 Expected: la declaración `export const passwordSchema = z.string().min(8, 'Usa al menos 8 caracteres').max(72, 'Usa como máximo 72 caracteres')` (puede estar partida en varias líneas) y los tests de S06 en verde.
 
@@ -274,7 +274,7 @@ describe('forgotPasswordAction', () => {
 
 - [x] **Step 2: Correr el test y verificar que falla**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/auth-password.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/actions/auth-password.test.ts`
 Expected: FAIL — `forgotPasswordAction is not a function` (o error de import equivalente) en los 6 tests.
 
 - [x] **Step 3: Implementar**
@@ -380,18 +380,18 @@ Notas para el implementador:
 
 - [x] **Step 4: Correr el test y verificar que pasa**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/auth-password.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/actions/auth-password.test.ts`
 Expected: PASS (6 tests).
 
 - [x] **Step 5: Type-check**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run type-check`
 Expected: sin errores.
 
 - [x] **Step 6: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/auth.ts src/lib/actions/auth-password.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/actions/auth.ts src/lib/actions/auth-password.test.ts && git commit -m "$(cat <<'EOF'
 feat(auth): forgotPasswordAction con respuesta idéntica exista o no el correo
 
 El enlace va a /auth/confirm (type=recovery, next=/auth/reset-password). Todo
@@ -564,7 +564,7 @@ describe('resetPasswordAction', () => {
 
 - [x] **Step 2: Correr el test y verificar que falla**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/auth-password.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/actions/auth-password.test.ts`
 Expected: los 6 tests de `forgotPasswordAction` PASS; los 8 de `resetPasswordAction` FAIL con `resetPasswordAction is not a function`.
 
 - [x] **Step 3: Implementar**
@@ -649,18 +649,18 @@ Nota: la sesión se revisa **antes** de validar, para que un enlace vencido llev
 
 - [x] **Step 4: Correr el test y verificar que pasa**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/auth-password.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/actions/auth-password.test.ts`
 Expected: PASS (14 tests).
 
 - [x] **Step 5: Type-check**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run type-check`
 Expected: sin errores.
 
 - [x] **Step 6: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/auth.ts src/lib/actions/auth-password.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/actions/auth.ts src/lib/actions/auth-password.test.ts && git commit -m "$(cat <<'EOF'
 feat(auth): resetPasswordAction exige sesión, valida con passwordSchema y va al dashboard
 
 Sin sesión devuelve a pedir otro enlace; los errores de updateUser (incluido
@@ -862,7 +862,7 @@ export default function ForgotPasswordPage() {
 
 - [x] **Step 2: Type-check**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run type-check`
 Expected: sin errores.
 
 Sin revisión manual con `bun run dev`: contratos §5.0 lo prohíben (`.env.local` apunta a producción y el formulario mandaría correos reales). La revisión visual la hace la persona después de desplegar.
@@ -870,7 +870,7 @@ Sin revisión manual con `bun run dev`: contratos §5.0 lo prohíben (`.env.loca
 - [x] **Step 3: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/app/auth/forgot-password/page.tsx && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/app/auth/forgot-password/page.tsx && git commit -m "$(cat <<'EOF'
 feat(auth): página /auth/forgot-password con el estilo de login
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -1107,7 +1107,7 @@ export default async function ResetPasswordPage() {
 
 - [x] **Step 3: Type-check**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run type-check`
 Expected: sin errores.
 
 Sin revisión manual con `bun run dev` (contratos §5.0). La redirección sin sesión de la página usa el mismo destino que la acción, que sí está cubierta por el test "sin sesión" de la Task 3.
@@ -1115,7 +1115,7 @@ Sin revisión manual con `bun run dev` (contratos §5.0). La redirección sin se
 - [x] **Step 4: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/app/auth/reset-password/page.tsx src/app/auth/reset-password/ResetPasswordForm.tsx && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/app/auth/reset-password/page.tsx src/app/auth/reset-password/ResetPasswordForm.tsx && git commit -m "$(cat <<'EOF'
 feat(auth): página /auth/reset-password que exige la sesión del enlace
 
 Sin sesión manda a pedir otro enlace; el formulario dice "Mínimo 8 caracteres."
@@ -1137,17 +1137,17 @@ EOF
 
 - [x] **Step 1: Suite completa y typecheck**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test && bun run type-check`
 Expected: todos los tests PASS (incluidos los 14 de `auth-password.test.ts`, más los de S04 y S06 que ya están en la rama); `tsc --noEmit` sin errores.
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git log --oneline main..HEAD -- vitest.config.ts src/lib/validations/schemas.ts middleware.ts src/lib/auth/route-access.ts`
+Run: `builtin cd <raíz-del-repo> && git log --oneline main..HEAD -- vitest.config.ts src/lib/validations/schemas.ts middleware.ts src/lib/auth/route-access.ts`
 Expected: solo commits de S04/S06 (ninguno de esta historia): S05 no toca esos archivos (§5.0, §5.3).
 
 - [x] **Step 2: Revisar que no quedaron datos personales ni mensajes crudos**
 
 Run:
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git diff main --stat -- src/app/auth src/lib/actions src/lib/validations && grep -n "error.message" src/lib/actions/auth.ts
+builtin cd <raíz-del-repo> && git diff main --stat -- src/app/auth src/lib/actions src/lib/validations && grep -n "error.message" src/lib/actions/auth.ts
 ```
 Expected: solo los archivos de este plan (más los de S04/S06, que ya están en la rama). El `grep` no debe mostrar ningún uso de `error.message` dentro de `forgotPasswordAction` ni `resetPasswordAction`.
 

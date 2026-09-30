@@ -74,12 +74,12 @@ El flujo APP corre en serie (contratos §5.3): `src/lib/actions/onboarding.ts` y
 
 - [x] **Step 1: Comprobar que existen una sola vez**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn "export async function ensureStarterKitAction\|export async function dismissChecklistAction" src`
+Run: `builtin cd <raíz-del-repo> && grep -rn "export async function ensureStarterKitAction\|export async function dismissChecklistAction" src`
 Expected: exactamente dos líneas, ambas en `src/lib/actions/onboarding.ts`. Si falta alguna, detente y repórtalo: S10 o S11 no están hechas. **No** las crees aquí.
 
 - [x] **Step 2: Sus tests pasan**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/onboarding.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (31 tests: 7 de S10 + 24 de S11).
 
 Sin commit en esta tarea.
@@ -208,7 +208,7 @@ describe('computeChecklist', () => {
 
 - [x] **Step 2: Correr el test y ver que falla**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: FAIL con `Failed to resolve import "./checklist"`.
 
 - [x] **Step 3: Implementar**
@@ -287,13 +287,13 @@ export function computeChecklist(input: ChecklistInput): ChecklistItem[] {
 
 - [x] **Step 4: Correr el test y ver que pasa**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: PASS (4 tests).
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts && git commit -m "$(cat <<'EOF'
 feat(onboarding): computeChecklist calcula los 5 pasos desde los datos
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -552,7 +552,7 @@ describe('loadChecklistInput', () => {
 
 - [x] **Step 2: Correr el test y ver que falla**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: FAIL — `loadChecklistInput is not a function` en los 5 tests nuevos (los 4 de `computeChecklist` siguen en verde).
 
 - [x] **Step 3: Implementar**
@@ -638,18 +638,18 @@ export async function loadChecklistInput(
 
 - [x] **Step 4: Correr el test y ver que pasa**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: PASS (9 tests).
 
 - [x] **Step 5: Type-check**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run type-check`
 Expected: sin errores.
 
 - [x] **Step 6: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts && git commit -m "$(cat <<'EOF'
 feat(onboarding): loadChecklistInput cuenta cuentas, deudas, WhatsApp y presupuesto
 
 Cinco conteos head:true filtrados por user_id: solo deudas activas y rubros
@@ -791,7 +791,7 @@ describe('loadDashboardChecklist', () => {
 
 - [x] **Step 2: Correr el test y ver que falla**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: FAIL — `loadDashboardChecklist is not a function` (los 9 tests anteriores siguen en verde).
 
 - [x] **Step 3: Implementar**
@@ -843,18 +843,18 @@ export async function loadDashboardChecklist(
 
 - [x] **Step 4: Correr el test y ver que pasa**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: PASS (15 tests).
 
 - [x] **Step 5: Type-check**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run type-check`
 Expected: sin errores.
 
 - [x] **Step 6: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts && git commit -m "$(cat <<'EOF'
 feat(onboarding): loadDashboardChecklist decide si mostrar la checklist
 
 Null si la ocultó, si ya hizo todo o si falla una lectura: el dashboard
@@ -1102,7 +1102,7 @@ export default async function DashboardPage() {
 
 - [x] **Step 4: Verificación del proyecto**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test && bun run type-check`
 Expected: toda la suite en PASS y `tsc --noEmit` sin errores.
 
 Si `tsc` rechaza pasar `await createClient()` como `SupabaseClient` (no debería: `cargarHistorialManual(await createClient(), userId)` en `src/app/api/invoices/process/route.ts` hace lo mismo con `SupabaseClient<any>`), cambia la línea a:
@@ -1116,13 +1116,13 @@ y agrega al final de los imports `import type { SupabaseClient } from '@supabase
 
 - [x] **Step 5: Lint de los archivos tocados**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bunx eslint src/components/organisms/OnboardingChecklist/OnboardingChecklist.tsx src/components/pages/DashboardContent.tsx src/app/dashboard/page.tsx src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts`
+Run: `builtin cd <raíz-del-repo> && bunx eslint src/components/organisms/OnboardingChecklist/OnboardingChecklist.tsx src/components/pages/DashboardContent.tsx src/app/dashboard/page.tsx src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts`
 Expected: sin errores (warnings de orden de imports se arreglan con `--fix`).
 
 - [x] **Step 6: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/organisms/OnboardingChecklist/OnboardingChecklist.tsx src/components/pages/DashboardContent.tsx src/app/dashboard/page.tsx && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/components/organisms/OnboardingChecklist/OnboardingChecklist.tsx src/components/pages/DashboardContent.tsx src/app/dashboard/page.tsx && git commit -m "$(cat <<'EOF'
 feat(dashboard): checklist de configuración y reparación del kit al cargar
 
 El server component llama ensureStarterKitAction y loadDashboardChecklist;
@@ -1148,7 +1148,7 @@ EOF
 
 ## Desviaciones (implementación)
 
-- **Rutas:** los comandos del plan usan `/Users/migue/Repos/personal/PresupuestoApp`; se corrieron en el worktree `PresupuestoApp-app`.
+- **Rutas:** los comandos del plan usan `<raíz-del-repo>`; se corrieron en el worktree `PresupuestoApp-app`.
 - **Task 1:** `onboarding.test.ts` tiene 36 tests (no 31): S11 agregó más casos. `dismissChecklistAction` ya devuelve `Promise<{ ok: boolean }>` (§5.2), no `Promise<void>`.
 - **Commits:** con `--no-verify` y `bunx eslint` + `bunx prettier --check` manuales antes de cada commit (instrucción del orquestador), no con lint-staged.
 - **Task 5, kit solo con la bienvenida pendiente (orquestador, tras S09):** `page.tsx` lee `profiles.onboarding_completed_at` y llama `ensureStarterKitAction()` solo si es `null`. Si ya terminó la bienvenida no la llama (el kit reactivaría categorías borradas a propósito); si la lectura falla (columna sin migrar) o no hay fila, tampoco. Reemplaza el criterio "en cada carga". Probado en `src/app/dashboard/page.test.tsx` (tres ramas + sin fila + sin sesión + orden kit → checklist).

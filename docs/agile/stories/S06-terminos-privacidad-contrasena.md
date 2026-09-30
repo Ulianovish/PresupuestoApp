@@ -183,7 +183,7 @@ describe('registerSchema', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/validations/schemas.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/validations/schemas.test.ts`
 Expected: FAIL. Los tests de `passwordSchema` fallan con `Cannot read properties of undefined (reading 'safeParse')` (no existe el export) y "rechaza 6 y 7 caracteres" falla porque hoy el mínimo es 6 con otro mensaje.
 
 - [x] **Step 3: Write minimal implementation**
@@ -230,13 +230,13 @@ export const registerSchema = z
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/validations/schemas.test.ts && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test src/lib/validations/schemas.test.ts && bun run type-check`
 Expected: PASS (10 tests) y `tsc --noEmit` sin errores.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/validations/schemas.ts src/lib/validations/schemas.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/validations/schemas.ts src/lib/validations/schemas.test.ts && git commit -m "$(cat <<'EOF'
 feat(auth): regla única de contraseña de 8 a 72 caracteres en el registro
 
 passwordSchema queda exportado para que el reset (S05) use la misma regla.
@@ -299,7 +299,7 @@ describe('formulario de registro', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/auth/register/register-page.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/app/auth/register/register-page.test.ts`
 Expected: FAIL en los 4 tests (el archivo dice "Mínimo 6 caracteres, incluye mayúscula, minúscula y número" y no tiene `minLength`, `maxLength` ni `autoComplete`).
 
 - [x] **Step 3: Write minimal implementation**
@@ -377,13 +377,13 @@ por:
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/auth/register/register-page.test.ts && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test src/app/auth/register/register-page.test.ts && bun run type-check`
 Expected: PASS (4 tests) y `tsc` sin errores.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/app/auth/register/page.tsx src/app/auth/register/register-page.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/app/auth/register/page.tsx src/app/auth/register/register-page.test.ts && git commit -m "$(cat <<'EOF'
 fix(auth): el registro dice la misma regla de contraseña que valida
 
 Antes pedía mayúscula, minúscula y número que nadie validaba.
@@ -523,7 +523,7 @@ describe('página /privacy', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/privacy/privacy.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/app/privacy/privacy.test.ts`
 Expected: FAIL con `Failed to resolve import "@/lib/constants/legal"` (ni las constantes ni el contenido existen).
 
 - [x] **Step 3: Write minimal implementation**
@@ -703,13 +703,13 @@ export default function PrivacyPage() {
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/privacy/privacy.test.ts && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test src/app/privacy/privacy.test.ts && bun run type-check`
 Expected: PASS (10 tests) y `tsc` sin errores.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/constants/legal.ts src/app/privacy/content.ts src/app/privacy/page.tsx src/app/privacy/privacy.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/lib/constants/legal.ts src/app/privacy/content.ts src/app/privacy/page.tsx src/app/privacy/privacy.test.ts && git commit -m "$(cat <<'EOF'
 feat(legal): página de privacidad con lo que la app guarda de verdad
 
 Datos, proveedores y cómo pedir el borrado. El correo de contacto es un
@@ -816,7 +816,7 @@ describe('página /terms', () => {
 
 - [x] **Step 2: Run test to verify it fails**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/terms/terms.test.ts`
+Run: `builtin cd <raíz-del-repo> && bun run test src/app/terms/terms.test.ts`
 Expected: FAIL con `Failed to resolve import "./content"`.
 
 - [x] **Step 3: Write minimal implementation**
@@ -965,13 +965,13 @@ export default function TermsPage() {
 
 - [x] **Step 4: Run test to verify it passes**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/terms/terms.test.ts && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test src/app/terms/terms.test.ts && bun run type-check`
 Expected: PASS (7 tests) y `tsc` sin errores.
 
 - [x] **Step 5: Commit**
 
 ```bash
-builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/app/terms/content.ts src/app/terms/page.tsx src/app/terms/terms.test.ts && git commit -m "$(cat <<'EOF'
+builtin cd <raíz-del-repo> && git add src/app/terms/content.ts src/app/terms/page.tsx src/app/terms/terms.test.ts && git commit -m "$(cat <<'EOF'
 feat(legal): términos y condiciones breves para usuarios invitados
 
 Incluye los límites reales de la app: la IA se equivoca, solo maneja COP y
@@ -992,17 +992,17 @@ EOF
 
 - [x] **Step 1: Confirmar que las páginas son públicas y que no se tocaron archivos ajenos**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n "'/terms'\|'/privacy'" src/lib/auth/route-access.ts middleware.ts; git status --short -- middleware.ts src/lib/auth/route-access.ts vitest.config.ts; git log --oneline main..HEAD -- vitest.config.ts`
+Run: `builtin cd <raíz-del-repo> && grep -n "'/terms'\|'/privacy'" src/lib/auth/route-access.ts middleware.ts; git status --short -- middleware.ts src/lib/auth/route-access.ts vitest.config.ts; git log --oneline main..HEAD -- vitest.config.ts`
 Expected: `/terms` y `/privacy` dentro de `PUBLIC_ROUTES` de `src/lib/auth/route-access.ts` (lo dejó S04; si S04 aún no está en la rama, en `publicRoutes` de `middleware.ts`), y **ninguna** salida de `git status` ni de `git log` para `vitest.config.ts` (contratos §5.0). Los commits de esta historia no tocan `middleware.ts` ni `route-access.ts`. Si alguna ruta faltara, **no** edites esos archivos: repórtalo a S04, que es su dueña.
 
 - [x] **Step 2: Suite completa y tipos**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
+Run: `builtin cd <raíz-del-repo> && bun run test && bun run type-check`
 Expected: todos los tests en verde (incluidos los 31 nuevos: 10 + 4 + 10 + 7) y `tsc --noEmit` sin errores.
 
 - [x] **Step 3: Confirmar que no quedaron datos personales ni marcadores**
 
-Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rnE "TODO|TBD|@(gmail|hotmail|outlook)\.|\+57[0-9]" src/lib/constants/legal.ts src/app/terms src/app/privacy src/lib/validations/schemas.test.ts src/app/auth/register/register-page.test.ts; echo "salida: $?"`
+Run: `builtin cd <raíz-del-repo> && grep -rnE "TODO|TBD|@(gmail|hotmail|outlook)\.|\+57[0-9]" src/lib/constants/legal.ts src/app/terms src/app/privacy src/lib/validations/schemas.test.ts src/app/auth/register/register-page.test.ts; echo "salida: $?"`
 Expected: sin coincidencias (`salida: 1`).
 
 Sin revisión visual con `bun run dev`: contratos §5.0 lo prohíben (`.env.local` apunta a producción). La forma de las páginas queda cubierta por los tests de texto y `type-check`; la revisión visual la hace la persona al desplegar.
