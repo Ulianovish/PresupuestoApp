@@ -1264,7 +1264,7 @@ git commit -m "fix(auth): /auth/callback pasa a route handler para que guarde la
 - Consumes: `getSiteUrl` (Task 1), `safeRedirectPath` (Task 2), `translateAuthError`, `INVALID_LINK_ERROR_CODE` (Task 3), `getPostLoginPath` (Task 4), `loginSchema`/`registerSchema` de `@/lib/validations/schemas` (S06 cambia su regla de contraseña; los tests usan claves de 19 caracteres para no depender de eso).
 - Produces (sin cambio de firma): `loginAction(formData: FormData)`, `registerAction(formData: FormData)`. `loginAction` lee el campo opcional `redirectTo`. Los errores llegan a la página como `?error=<texto traducido>`; si había `redirectTo` seguro, se conserva en la URL de error. Los errores de validación muestran el **primer mensaje de Zod** (`parsed.error.issues[0].message`), nunca "Datos inválidos" (§5.2).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/actions/auth.test.ts`:
 
@@ -1551,12 +1551,12 @@ describe('registerAction', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/actions/auth.test.ts`
 Expected: FAIL en varios tests; por ejemplo `sin redirectTo usa getPostLoginPath` recibe `'/dashboard'` en vez de `'/bienvenida'`, `credenciales malas` recibe `'Email o contraseña incorrectos'`, `manda emailRedirectTo…` falla porque `signUp` se llama sin `emailRedirectTo`, y `contraseñas distintas` / `correo inválido → primer mensaje de Zod` reciben `'Datos inválidos'` (el `catch` actual de `registerAction`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Reemplazar el contenido completo de `src/lib/actions/auth.ts` por:
 
@@ -1810,7 +1810,7 @@ por:
 
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/actions/auth.test.ts`
 Expected: PASS (14 tests).
@@ -1818,7 +1818,7 @@ Expected: PASS (14 tests).
 Run: `bun run type-check`
 Expected: sin errores (valida también `page.tsx`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/actions/auth.ts src/lib/actions/auth.test.ts src/app/auth/login/page.tsx

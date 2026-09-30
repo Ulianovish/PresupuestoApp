@@ -13,6 +13,10 @@ import Card, {
 } from '@/components/atoms/Card/Card';
 import Input from '@/components/atoms/Input/Input';
 import { loginAction } from '@/lib/actions/auth';
+import {
+  INVALID_LINK_ERROR_CODE,
+  translateAuthError,
+} from '@/lib/auth/error-messages';
 
 /**
  * LoginForm - Formulario de inicio de sesión que usa useSearchParams
@@ -22,13 +26,20 @@ function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // Lo pone el middleware al mandar aquí desde una ruta protegida.
+  const redirectTo = searchParams.get('redirectTo');
 
   // Obtener errores y mensajes de los query parameters
   useEffect(() => {
     const errorParam = searchParams.get('error');
     const messageParam = searchParams.get('message');
 
-    setError(errorParam);
+    // /auth/confirm y /auth/callback mandan un código, no un texto.
+    setError(
+      errorParam === INVALID_LINK_ERROR_CODE
+        ? translateAuthError({ code: errorParam })
+        : errorParam,
+    );
     setMessage(messageParam);
   }, [searchParams]);
 
@@ -67,6 +78,10 @@ function LoginForm() {
 
           <CardContent>
             <form action={handleSubmit} className="space-y-6">
+              {redirectTo && (
+                <input type="hidden" name="redirectTo" value={redirectTo} />
+              )}
+
               {/* Campo Email */}
               <div className="space-y-2">
                 <label

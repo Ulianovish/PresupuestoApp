@@ -3,130 +3,127 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
+import { translateAuthError } from '@/lib/auth/error-messages';
+import { safeRedirectPath } from '@/lib/auth/safe-redirect';
+import { getPostLoginPath } from '@/lib/onboarding/post-login';
+import { getSiteUrl } from '@/lib/site-url';
 import { createClient } from '@/lib/supabase/server';
 import { loginSchema, registerSchema } from '@/lib/validations/schemas';
 
-/**
- * Server Action para el login de usuarios
- * Maneja autenticación y redirección automática
- */
-export async function loginAction(formData: FormData) {
-  try {
-    // Extraer datos del FormData
-    const rawData = {
-      email: formData.get('email') as string,
-      password: formData.get('password') as string,
-    };
+const MENSAJE_REVISA_CORREO =
+  'Te enviamos un correo para confirmar tu cuenta. Revisa tu bandeja de entrada.';
 
-    // Validar datos con Zod
-    const validatedData = loginSchema.parse(rawData);
+function texto(formData: FormData, campo: string): string {
+  const valor = formData.get(campo);
+  return typeof valor === 'string' ? valor : '';
+}
 
-    // Crear cliente de Supabase
-    const supabase = await createClient();
-
-    // Intentar login
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: validatedData.email,
-      password: validatedData.password,
-    });
-
-    if (error) {
-      console.error('Error de login:', error);
-      // Redirigir con error en query params
-      redirect(
-        `/auth/login?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`,
-      );
-    }
-
-    if (data.user) {
-      // console.log('✅ Login exitoso para:', validatedData.email);
-
-      // Revalidar y redireccionar
-      revalidatePath('/', 'layout');
-      redirect('/dashboard');
-    }
-
-    // Si llegamos aquí, algo salió mal
-    redirect('/auth/login?error=Error de autenticación');
-  } catch (error) {
-    console.error('Error en loginAction:', error);
-
-    if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
-      // Re-throw redirect errors
-      throw error;
-    }
-
-    // Para errores de validación u otros
-    redirect('/auth/login?error=Datos inválidos');
-  }
+/** '/auth/login?error=…' (y redirectTo si es una ruta interna segura). */
+function urlConError(
+  base: '/auth/login' | '/auth/register',
+  mensaje: string,
+  redirectTo?: string,
+): string {
+  const params = new URLSearchParams({ error: mensaje });
+  const seguro = redirectTo ? safeRedirectPath(redirectTo, '') : '';
+  if (seguro) params.set('redirectTo', seguro);
+  return `${base}?${params.toString()}`;
 }
 
 /**
- * Server Action para el registro de usuarios
- * Crea cuenta y perfil automáticamente
+ * Server Action para el login de usuarios.
+ * Con `redirectTo` (lo pone el middleware) vuelve a esa ruta si es segura;
+ * sin él, va a /bienvenida o /dashboard según el onboarding.
+ */
+export async function loginAction(formData: FormData) {
+  const redirectTo = texto(formData, 'redirectTo');
+  const parsed = loginSchema.safeParse({
+    email: texto(formData, 'email'),
+    password: texto(formData, 'password'),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      urlConError(
+        '/auth/login',
+        parsed.error.issues[0]?.message ?? translateAuthError(null),
+        redirectTo,
+      ),
+    );
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
+  });
+
+  if (error || !data.user) {
+    console.error('Error de login:', {
+      code: error?.code ?? 'sin_usuario',
+      status: error?.status,
+    });
+    redirect(urlConError('/auth/login', translateAuthError(error), redirectTo));
+  }
+
+  const destino = redirectTo
+    ? safeRedirectPath(redirectTo)
+    : await getPostLoginPath(supabase, data.user.id);
+
+  revalidatePath('/', 'layout');
+  redirect(destino);
+}
+
+/**
+ * Server Action para el registro de usuarios.
+ * El correo de confirmación vuelve a /auth/confirm (ADR-003).
  */
 export async function registerAction(formData: FormData) {
-  try {
-    // Extraer datos del FormData
-    const rawData = {
-      email: formData.get('email') as string,
-      password: formData.get('password') as string,
-      confirmPassword: formData.get('confirmPassword') as string,
-      fullName: formData.get('fullName') as string,
-    };
+  const parsed = registerSchema.safeParse({
+    email: texto(formData, 'email'),
+    password: texto(formData, 'password'),
+    confirmPassword: texto(formData, 'confirmPassword'),
+    fullName: texto(formData, 'fullName'),
+  });
 
-    // Validar datos con Zod
-    const validatedData = registerSchema.parse(rawData);
-
-    // Crear cliente de Supabase
-    const supabase = await createClient();
-
-    // Intentar registro
-    const { data, error } = await supabase.auth.signUp({
-      email: validatedData.email,
-      password: validatedData.password,
-      options: {
-        data: {
-          full_name: validatedData.fullName,
-        },
-      },
-    });
-
-    if (error) {
-      console.error('Error de registro:', error);
-      redirect(
-        `/auth/register?error=${encodeURIComponent(getAuthErrorMessage(error.message))}`,
-      );
-    }
-
-    if (data.user) {
-      // console.log('✅ Registro exitoso para:', validatedData.email);
-
-      // Si el registro fue exitoso pero requiere confirmación
-      if (!data.session) {
-        redirect(
-          '/auth/login?message=Revisa tu email para confirmar tu cuenta',
-        );
-      }
-
-      // Si el registro fue exitoso y hay sesión activa
-      revalidatePath('/', 'layout');
-      redirect('/dashboard');
-    }
-
-    // Si llegamos aquí, algo salió mal
-    redirect('/auth/register?error=Error de registro');
-  } catch (error) {
-    console.error('Error en registerAction:', error);
-
-    if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
-      // Re-throw redirect errors
-      throw error;
-    }
-
-    // Para errores de validación u otros
-    redirect('/auth/register?error=Datos inválidos');
+  if (!parsed.success) {
+    redirect(
+      urlConError(
+        '/auth/register',
+        parsed.error.issues[0]?.message ?? translateAuthError(null),
+      ),
+    );
   }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signUp({
+    email: parsed.data.email,
+    password: parsed.data.password,
+    options: {
+      emailRedirectTo: `${getSiteUrl()}/auth/confirm?next=/bienvenida`,
+      data: {
+        full_name: parsed.data.fullName,
+      },
+    },
+  });
+
+  if (error) {
+    console.error('Error de registro:', {
+      code: error.code ?? 'sin_codigo',
+      status: error.status,
+    });
+    redirect(urlConError('/auth/register', translateAuthError(error)));
+  }
+
+  // Con confirmación de correo activa no hay sesión: hay que abrir el enlace.
+  if (data.session && data.user) {
+    revalidatePath('/', 'layout');
+    redirect(await getPostLoginPath(supabase, data.user.id));
+  }
+
+  redirect(
+    `/auth/login?${new URLSearchParams({ message: MENSAJE_REVISA_CORREO }).toString()}`,
+  );
 }
 
 /**
@@ -143,8 +140,6 @@ export async function logoutAction() {
       console.error('Error de logout:', error);
       redirect('/?error=Error al cerrar sesión');
     }
-
-    // console.log('✅ Logout exitoso');
 
     revalidatePath('/', 'layout');
     redirect('/');
@@ -192,24 +187,4 @@ export async function getCurrentUser() {
 export async function isAuthenticated(): Promise<boolean> {
   const user = await getCurrentUser();
   return !!user;
-}
-
-/**
- * Helper para convertir errores de Supabase a mensajes amigables
- */
-function getAuthErrorMessage(errorMessage: string): string {
-  const errorMap: Record<string, string> = {
-    'Invalid login credentials': 'Email o contraseña incorrectos',
-    'Email not confirmed': 'Debes confirmar tu email antes de iniciar sesión',
-    'User already registered': 'Este email ya está registrado',
-    'Password should be at least 6 characters':
-      'La contraseña debe tener al menos 6 caracteres',
-    'Unable to validate email address: invalid format':
-      'Formato de email inválido',
-    signup_disabled: 'El registro está deshabilitado temporalmente',
-  };
-
-  return (
-    errorMap[errorMessage] || 'Error de autenticación. Intenta nuevamente.'
-  );
 }
