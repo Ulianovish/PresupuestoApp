@@ -84,7 +84,7 @@ src/components/organisms/{Expense,Budget}MigrationPanel/*.tsx
 ## Criterios de aceptación
 
 - [x] `inicializarDatosEjemplo` no existe en `src/` y `useIngresosDeudas` solo carga datos. Test: un usuario sin ingresos ni deudas no dispara ningún `insert` al cargar (`src/hooks/useIngresosDeudas.test.ts`).
-- [ ] El sidebar no importa `useBudgetData`, no muestra montos y `src/hooks/useBudgetData.ts` no existe (`Sidebar.test.ts`).
+- [x] El sidebar no importa `useBudgetData`, no muestra montos y `src/hooks/useBudgetData.ts` no existe (`Sidebar.test.ts`).
 - [ ] `ACCOUNT_TYPES` y `AccountType` eliminados; `DEFAULT_ACCOUNT_NAME = 'Efectivo'` exportado (`expense-categories.test.ts`).
 - [ ] `/gastos` ofrece solo las cuentas activas del usuario (más la del gasto en edición si ya no está activa); por defecto `Efectivo` si existe, si no la primera; sin cuentas, `Efectivo` (`expense-form-defaults.test.ts`).
 - [ ] `category_name` inicial = primera categoría del usuario; sin categorías, el botón de guardar está deshabilitado y dice "Primero crea una categoría", con enlace a Ajustes; el submit también lo rechaza.
@@ -331,7 +331,7 @@ EOF
 - Consumes: nada de la Task 1.
 - Produces: `Sidebar` conserva sus props (`collapsed?`, `onToggle?`). El hook `useBudgetData` y sus tipos `BudgetItem`/`BudgetSummary` de `src/hooks/useBudgetData.ts` dejan de existir (no tienen otros usuarios).
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 Crear `src/components/organisms/Sidebar/Sidebar.test.ts`:
 
@@ -367,12 +367,12 @@ describe('Sidebar sin presupuesto de ejemplo', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/organisms/Sidebar/Sidebar.test.ts`
 Expected: FAIL en los 3 tests (`expected '…useBudgetData…' not to contain 'useBudgetData'`, idem `formatCurrency`, y `expected true to be false`).
 
-- [ ] **Step 3: Quitar el mock del Sidebar**
+- [x] **Step 3: Quitar el mock del Sidebar**
 
 En `src/components/organisms/Sidebar/Sidebar.tsx`:
 
@@ -440,17 +440,17 @@ por un espaciador del ancho del botón de menú, para que el título siga centra
           <span className="w-[38px]" aria-hidden="true" />
 ```
 
-- [ ] **Step 4: Borrar el hook del mock**
+- [x] **Step 4: Borrar el hook del mock**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git rm src/hooks/useBudgetData.ts`
 Expected: `rm 'src/hooks/useBudgetData.ts'`.
 
-- [ ] **Step 5: Correr el test y verificar que pasa**
+- [x] **Step 5: Correr el test y verificar que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/components/organisms/Sidebar/Sidebar.test.ts && bun run type-check && grep -rn --exclude='*.test.ts' "useBudgetData" src`
 Expected: PASS (3 tests); `tsc` sin errores; el `grep` no imprime nada.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/components/organisms/Sidebar/Sidebar.tsx src/components/organisms/Sidebar/Sidebar.test.ts && git commit -m "$(cat <<'EOF'

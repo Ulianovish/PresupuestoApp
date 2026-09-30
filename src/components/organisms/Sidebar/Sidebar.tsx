@@ -2,8 +2,9 @@
  * Sidebar - Organism Level
  *
  * Navegación principal en una barra lateral fija a la izquierda (escritorio):
- * logo, usuario, enlaces con icono, resumen de presupuesto, selector de año y
- * acceso a ajustes/cerrar sesión. La sección activa queda resaltada.
+ * logo, usuario, enlaces con icono, selectores de mes y año y acceso a
+ * ajustes/cerrar sesión. La sección activa queda resaltada. No muestra
+ * montos: los totales reales están en el dashboard y en presupuesto.
  *
  * En móvil se muestra una barra superior delgada con el botón de menú, que
  * abre el MobileSidebar existente.
@@ -32,7 +33,6 @@ import {
 
 import MobileSidebar from '@/components/molecules/MobileSidebar/MobileSidebar';
 import { useMonth } from '@/contexts/MonthContext';
-import { useBudgetData } from '@/hooks/useBudgetData';
 import { logoutAction } from '@/lib/actions/auth';
 import { supabase } from '@/lib/supabase/client';
 
@@ -56,7 +56,6 @@ interface SidebarProps {
 export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
-  const { summary, formatCurrency, isLoading } = useBudgetData();
   const {
     selectedYear,
     setSelectedYear,
@@ -158,28 +157,6 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
           </ul>
         </nav>
 
-        {/* Resumen de presupuesto */}
-        <div className="mx-3 mb-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-2 text-gray-300">
-              <Wallet className="h-3.5 w-3.5 text-blue-400" />
-              Total
-            </span>
-            <span className="font-semibold text-white">
-              {isLoading ? '...' : formatCurrency(summary.totalBudget)}
-            </span>
-          </div>
-          <div className="mt-2 flex items-center justify-between text-xs">
-            <span className="flex items-center gap-2 text-gray-300">
-              <TrendingUp className="h-3.5 w-3.5 text-green-400" />
-              Gastado
-            </span>
-            <span className="font-semibold text-white">
-              {isLoading ? '...' : formatCurrency(summary.totalSpent)}
-            </span>
-          </div>
-        </div>
-
         {/* Mes */}
         <div className="mx-3 mb-3">
           <label className="mb-1 flex items-center gap-2 text-xs text-gray-300">
@@ -271,9 +248,8 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
           <span className="text-lg font-bold tracking-tight text-blue-400">
             Presupuesto
           </span>
-          <span className="text-xs text-gray-300">
-            {isLoading ? '...' : formatCurrency(summary.totalSpent)}
-          </span>
+          {/* Espaciador del ancho del botón de menú: mantiene el título centrado */}
+          <span className="w-[38px]" aria-hidden="true" />
         </div>
       </header>
 
