@@ -212,14 +212,15 @@ export default function PresupuestoPage() {
     alertsEnabled: null,
   });
 
-  const openAddModal = (categoriaId: string) => {
+  // El nombre llega de la tarjeta: así DEUDAS propone Basico/Necesario aunque
+  // la lista de categorías aún no haya cargado.
+  const openAddModal = (categoriaId: string, categoryName: string) => {
     setModalState({
       isOpen: true,
       mode: 'add',
       categoriaId,
       item: undefined,
     });
-    const categoryName = categories.find(cat => cat.id === categoriaId)?.nombre;
     setFormData({
       descripcion: '',
       fecha: '',

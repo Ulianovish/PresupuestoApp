@@ -126,6 +126,15 @@ describe('defaultItemFormNames', () => {
     });
   });
 
+  it('DEUDAS con catálogos aún sin cargar → Basico / Necesario', () => {
+    // /presupuesto le pasa el nombre que ya conoce la tarjeta: no depende de
+    // que la lista de categorías ni los catálogos hayan cargado.
+    expect(defaultItemFormNames([], [], 'DEUDAS')).toEqual({
+      clasificacion: 'Basico',
+      control: 'Necesario',
+    });
+  });
+
   it('si el nombre no está en el catálogo → el primero de la lista', () => {
     const sinEstilo = [{ id: 'cls-basico', name: 'Basico' }];
     expect(defaultItemFormNames(sinEstilo, CONTROLES)).toEqual({

@@ -15,7 +15,7 @@
  * <BudgetCategoryRow
  *   category={categoryData}
  *   onToggle={() => toggleCategory(category.id)}
- *   onAddItem={() => openAddModal(category.id)}
+ *   onAddItem={openAddModal}
  *   formatCurrency={formatCurrency}
  * />
  */
@@ -37,7 +37,8 @@ interface BudgetCategory {
 interface BudgetCategoryRowProps {
   category: BudgetCategory;
   onToggle: (categoryId: string) => void;
-  onAddItem: (categoryId: string) => void;
+  /** Recibe también el nombre: la tarjeta ya lo conoce (DEUDAS usa otros valores por defecto). */
+  onAddItem: (categoryId: string, categoryName: string) => void;
   onDeleteCategory: (categoryId: string) => void;
   onRenameCategory?: (categoryId: string, newName: string) => Promise<void>;
   formatCurrency: (amount: number) => string;
@@ -111,7 +112,7 @@ export default function BudgetCategoryRow({
 
   const handleAddClick = (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.stopPropagation();
-    onAddItem(category.id);
+    onAddItem(category.id, category.nombre);
   };
 
   const handleDeleteClick = (e?: React.MouseEvent<HTMLButtonElement>) => {
