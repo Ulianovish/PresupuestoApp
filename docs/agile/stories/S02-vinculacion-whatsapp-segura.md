@@ -41,15 +41,15 @@
 
 ## Criterios de aceptación
 
-- [ ] Índice único parcial `whatsapp_link_codes_code_pending_uq` sobre `code` con `WHERE used_at IS NULL`; la migración limpia antes los pendientes vencidos y los pendientes repetidos para que el índice se pueda crear.
-- [ ] `createLinkCode` borra los códigos vencidos y sin usar del propio usuario antes de insertar; ante `23505` reintenta con otro código hasta 5 veces y luego lanza error; cualquier otro error lanza sin reintentar.
-- [ ] `redeemLinkCode` hace un único UPDATE condicional por `code` (sin usar y vigente según el reloj inyectado); gracias al índice afecta como mucho una fila.
-- [ ] Tabla `whatsapp_link_attempts` con RLS activo, sin políticas, sin privilegios para `PUBLIC`/`anon`/`authenticated`.
-- [ ] 5 fallos por número en 15 min → `MSG_TOO_MANY_ATTEMPTS` sin llamar a `redeemLinkCode`. Solo `invalid_or_expired` cuenta como fallo; los errores de base (`link_failed`) no.
-- [ ] Revincular a otro usuario borra la fila de `whatsapp_conversations` del número (la de otro `user_id`) antes de crear el vínculo; si ese borrado falla, no se vincula.
-- [ ] Tests unitarios de generación, canje, límite y revinculación con cliente mockeado y reloj inyectado; test de texto de la migración.
-- [ ] `MSG_LINKED_OK` sin cambios.
-- [ ] `bun run test && bun run type-check` en verde.
+- [x] Índice único parcial `whatsapp_link_codes_code_pending_uq` sobre `code` con `WHERE used_at IS NULL`; la migración limpia antes los pendientes vencidos y los pendientes repetidos para que el índice se pueda crear.
+- [x] `createLinkCode` borra los códigos vencidos y sin usar del propio usuario antes de insertar; ante `23505` reintenta con otro código hasta 5 veces y luego lanza error; cualquier otro error lanza sin reintentar.
+- [x] `redeemLinkCode` hace un único UPDATE condicional por `code` (sin usar y vigente según el reloj inyectado); gracias al índice afecta como mucho una fila.
+- [x] Tabla `whatsapp_link_attempts` con RLS activo, sin políticas, sin privilegios para `PUBLIC`/`anon`/`authenticated`.
+- [x] 5 fallos por número en 15 min → `MSG_TOO_MANY_ATTEMPTS` sin llamar a `redeemLinkCode`. Solo `invalid_or_expired` cuenta como fallo; los errores de base (`link_failed`) no.
+- [x] Revincular a otro usuario borra la fila de `whatsapp_conversations` del número (la de otro `user_id`) antes de crear el vínculo; si ese borrado falla, no se vincula.
+- [x] Tests unitarios de generación, canje, límite y revinculación con cliente mockeado y reloj inyectado; test de texto de la migración.
+- [x] `MSG_LINKED_OK` sin cambios.
+- [x] `bun run test && bun run type-check` en verde.
 
 ## Notas de diseño (leer antes de empezar)
 
@@ -1553,12 +1553,12 @@ EOF
 - Consumes: todo lo anterior.
 - Produces: evidencia de suite y typecheck en verde.
 
-- [ ] **Step 1: Suite completa y typecheck**
+- [x] **Step 1: Suite completa y typecheck**
 
 Run: `bun run test && bun run type-check`
 Expected: todos los tests en verde y `tsc --noEmit` sin errores.
 
-- [ ] **Step 2: Revisar datos personales y logs**
+- [x] **Step 2: Revisar datos personales y logs**
 
 Run: `grep -nE "\+57[0-9]{10}" src/lib/services/whatsapp-links.test.ts src/lib/supabase/migrations/20260930110000_whatsapp_vinculacion_segura.test.ts src/lib/whatsapp/handle-linking.test.ts`
 Expected: los tests nuevos solo usan `+573000000000` (la constante `TEL`). Los números que ya estaban antes de S02 (`+573001234567`/`+573009999999` en `getLinkByPhone` y `+573000000001`/`+573000000002` en `listarDocumentosDeUsuario`) son inventados y se dejan como están.
@@ -1566,7 +1566,7 @@ Expected: los tests nuevos solo usan `+573000000000` (la constante `TEL`). Los n
 Run: `grep -n "console.error" src/lib/services/whatsapp-links.ts`
 Expected: cada llamada nueva pasa `error.code` o `err.name`, nunca `phoneE164` ni `code`.
 
-- [ ] **Step 3: Confirmar que no se tocaron archivos ajenos a la historia**
+- [x] **Step 3: Confirmar que no se tocaron archivos ajenos a la historia**
 
 Run: `git diff --stat main...HEAD -- src/lib/actions/whatsapp.ts src/lib/whatsapp/link-url.ts`
 Expected: salida vacía.
