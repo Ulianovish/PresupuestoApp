@@ -67,3 +67,12 @@ export function starterKitToast(
     type: 'success',
   };
 }
+
+/**
+ * Tras cargar el kit se recarga el presupuesto salvo que haya habido error:
+ * con `seeded: false` y sin error el usuario ya tenía categorías y el toast
+ * promete mostrárselas.
+ */
+export function shouldReloadAfterStarterKit(result: StarterKitResult): boolean {
+  return !result.error;
+}

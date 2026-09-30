@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   STARTER_KIT_ERROR_MESSAGE,
   getBudgetPanelState,
+  shouldReloadAfterStarterKit,
   starterKitToast,
 } from './budget-empty-state';
 
@@ -74,5 +75,21 @@ describe('starterKitToast', () => {
     expect(STARTER_KIT_ERROR_MESSAGE).toBe(
       'No pudimos cargar las categorías sugeridas. Crea una categoría a mano.',
     );
+  });
+});
+
+describe('shouldReloadAfterStarterKit', () => {
+  it('recarga cuando se sembró el kit', () => {
+    expect(shouldReloadAfterStarterKit({ seeded: true })).toBe(true);
+  });
+
+  it('recarga sin error aunque no se haya sembrado (ya tenía categorías)', () => {
+    expect(shouldReloadAfterStarterKit({ seeded: false })).toBe(true);
+  });
+
+  it('no recarga si hubo error', () => {
+    expect(
+      shouldReloadAfterStarterKit({ seeded: false, error: 'no_session' }),
+    ).toBe(false);
   });
 });

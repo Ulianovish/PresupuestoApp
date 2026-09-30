@@ -28,7 +28,10 @@ import {
   type RubroEstado,
 } from '@/lib/budget/alerts';
 import { defaultItemFormNames } from '@/lib/budget/catalog-defaults';
-import { starterKitToast } from '@/lib/onboarding/budget-empty-state';
+import {
+  shouldReloadAfterStarterKit,
+  starterKitToast,
+} from '@/lib/onboarding/budget-empty-state';
 import {
   formatCurrency,
   getClassifications,
@@ -310,8 +313,15 @@ export default function PresupuestoPage() {
         todayBogota().slice(0, 7),
       );
       showToast(aviso.message, aviso.type);
-      if (!result.error) {
-        await handleCategoryCreated();
+      if (shouldReloadAfterStarterKit(result)) {
+        try {
+          await handleCategoryCreated();
+        } catch {
+          showToast(
+            'Cargamos las categorías pero no pudimos refrescar; recarga la página',
+            'error',
+          );
+        }
       }
     } finally {
       setIsLoadingStarterKit(false);
