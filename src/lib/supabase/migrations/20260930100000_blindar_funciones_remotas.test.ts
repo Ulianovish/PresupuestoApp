@@ -47,7 +47,7 @@ function expectSignature(block: string, header: string, returns: string) {
 
 const GUARD_LINES = [
   "IF auth.role() IS DISTINCT FROM 'service_role'",
-  'AND (auth.uid() IS NULL OR auth.uid() <> p_user_id) THEN',
+  'AND (auth.uid() IS NULL OR auth.uid() IS DISTINCT FROM p_user_id) THEN',
   "RAISE EXCEPTION 'no autorizado' USING ERRCODE = '42501';",
 ];
 
@@ -328,6 +328,16 @@ describe('migración 20260930100000 completa', () => {
     expect(stray).toEqual([]);
   });
 
+  it('el guard compara con IS DISTINCT FROM: un p_user_id NULL es "no autorizado"', () => {
+    // Con `auth.uid() <> NULL` la condición es NULL, el IF no entra y la
+    // función sigue con p_user_id NULL; IS DISTINCT FROM la vuelve true.
+    const code = codeOnly(readMigration());
+    expect(code).not.toMatch(/auth\.uid\(\)\s*<>/);
+    expect(
+      code.match(/auth\.uid\(\) IS DISTINCT FROM p_user_id/g),
+    ).toHaveLength(3);
+  });
+
   it('ningún GRANT le da EXECUTE a anon ni a PUBLIC', () => {
     const code = codeOnly(readMigration());
     for (const name of ALL_FUNCTIONS) {
@@ -335,6 +345,22 @@ describe('migración 20260930100000 completa', () => {
       expect(roles).not.toContain('anon');
       expect(roles).not.toContain('PUBLIC');
     }
+  });
+
+  it('la verificación compara el cuerpo en producción (md5) y prueba plantillas de otro usuario (7b)', () => {
+    const sql = readMigration();
+    expect(sql).toMatch(
+      /^-- SELECT proname, md5\(prosrc\) FROM pg_proc WHERE proname IN \(/m,
+    );
+    const caso7b = sql.slice(sql.indexOf('-- 7b)'));
+    expect(sql).toContain('-- 7b)');
+    const hasta8 = caso7b.slice(0, caso7b.indexOf('-- 8)'));
+    expect(hasta8).toContain('42501');
+    expect(hasta8.match(/^-- BEGIN;/gm)?.length).toBeGreaterThanOrEqual(2);
+    expect(hasta8.match(/^-- ROLLBACK;/gm)?.length).toBeGreaterThanOrEqual(2);
+    expect(hasta8.match(/copy_budget_items_from_template\(/g)).toHaveLength(2);
+    expect(hasta8).toContain('<plantilla ajena>');
+    expect(hasta8).toContain('<plantilla propia>');
   });
 
   it('deja comentado el bloque de verificación (overloads, grants y tablas sin RLS)', () => {

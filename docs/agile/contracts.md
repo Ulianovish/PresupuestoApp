@@ -11,7 +11,7 @@ Fuente de verdad para todas las historias. Diseño: `docs/superpowers/specs/2026
 - Guard de funciones SECURITY DEFINER (patrón de `20260929000000`):
   ```sql
   IF auth.role() IS DISTINCT FROM 'service_role'
-     AND (auth.uid() IS NULL OR auth.uid() <> p_user_id) THEN
+     AND (auth.uid() IS NULL OR auth.uid() IS DISTINCT FROM p_user_id) THEN
       RAISE EXCEPTION 'no autorizado' USING ERRCODE = '42501';
   END IF;
   ```

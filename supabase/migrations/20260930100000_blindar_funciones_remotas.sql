@@ -58,7 +58,7 @@ DECLARE
   v_prev character varying;
 BEGIN
   IF auth.role() IS DISTINCT FROM 'service_role'
-     AND (auth.uid() IS NULL OR auth.uid() <> p_user_id) THEN
+     AND (auth.uid() IS NULL OR auth.uid() IS DISTINCT FROM p_user_id) THEN
       RAISE EXCEPTION 'no autorizado' USING ERRCODE = '42501';
   END IF;
 
@@ -126,7 +126,7 @@ DECLARE
     items_copied INTEGER := 0;
 BEGIN
     IF auth.role() IS DISTINCT FROM 'service_role'
-       AND (auth.uid() IS NULL OR auth.uid() <> p_user_id) THEN
+       AND (auth.uid() IS NULL OR auth.uid() IS DISTINCT FROM p_user_id) THEN
         RAISE EXCEPTION 'no autorizado' USING ERRCODE = '42501';
     END IF;
 
@@ -349,7 +349,7 @@ CREATE OR REPLACE FUNCTION public.get_budget_by_month(p_user_id uuid, p_month_ye
 AS $function$
 BEGIN
     IF auth.role() IS DISTINCT FROM 'service_role'
-       AND (auth.uid() IS NULL OR auth.uid() <> p_user_id) THEN
+       AND (auth.uid() IS NULL OR auth.uid() IS DISTINCT FROM p_user_id) THEN
         RAISE EXCEPTION 'no autorizado' USING ERRCODE = '42501';
     END IF;
 
@@ -391,6 +391,12 @@ GRANT EXECUTE ON FUNCTION public.get_budget_by_month(uuid, character varying) TO
 -- VERIFICACIÓN (correr a mano DESPUÉS de aplicar, en H8; todo con ROLLBACK)
 -- Reemplazar <uuid propio> por el id de la cuenta de quien verifica.
 -- ============================================================================
+--
+-- 0) ANTES de aplicar: huella del cuerpo de las 7 en producción, para detectar
+--    desfase entre lo que hay en la base y lo que esta migración reemplaza. Si
+--    algún md5 cambió respecto al de la revisión del 2026-09-30, comparar con
+--    pg_get_functiondef antes de aplicar (alguien la tocó fuera del repo):
+-- SELECT proname, md5(prosrc) FROM pg_proc WHERE proname IN ('get_previous_month_overspend', 'copy_budget_items_from_template', 'fix_templates_without_items', 'check_cufe_exists', 'get_electronic_invoices_by_date_range', 'get_invoice_stats_by_supplier', 'get_budget_by_month') AND pronamespace = 'public'::regnamespace ORDER BY 1;
 --
 -- 1) Sin overloads de las 7 (esperado: 0 filas):
 -- SELECT proname, count(*) FROM pg_proc
@@ -452,6 +458,26 @@ GRANT EXECUTE ON FUNCTION public.get_budget_by_month(uuid, character varying) TO
 --   SET LOCAL ROLE service_role;
 --   SET LOCAL request.jwt.claims = '{"role":"service_role"}';
 --   SELECT public.copy_budget_items_from_template('<uuid propio>', gen_random_uuid(), gen_random_uuid());
+-- ROLLBACK;
+--
+-- 7b) copy_budget_items_from_template con una plantilla REAL de otro usuario
+--     (esperado en los dos casos: ERROR 42501 'no autorizado'; el ROLLBACK
+--     deshace cualquier copia si el chequeo fallara).
+--     <plantilla ajena>: un budget_templates.id con user_id <> '<uuid propio>'
+--       SELECT id FROM budget_templates WHERE user_id <> '<uuid propio>' LIMIT 1;
+--     <plantilla propia>: un budget_templates.id con user_id = '<uuid propio>'
+--       SELECT id FROM budget_templates WHERE user_id = '<uuid propio>' LIMIT 1;
+--   Fuente ajena, destino propio:
+-- BEGIN;
+--   SET LOCAL ROLE service_role;
+--   SET LOCAL request.jwt.claims = '{"role":"service_role"}';
+--   SELECT public.copy_budget_items_from_template('<uuid propio>', '<plantilla ajena>', '<plantilla propia>');
+-- ROLLBACK;
+--   Fuente propia, destino ajeno:
+-- BEGIN;
+--   SET LOCAL ROLE service_role;
+--   SET LOCAL request.jwt.claims = '{"role":"service_role"}';
+--   SELECT public.copy_budget_items_from_template('<uuid propio>', '<plantilla propia>', '<plantilla ajena>');
 -- ROLLBACK;
 --
 -- 8) upsert_monthly_budget sigue copiando rubros al crear un mes nuevo

@@ -1575,6 +1575,14 @@ Si algún paso falla, corregir en la tarea correspondiente y hacer un commit nue
 
 ---
 
+### Task 7 (alcance adicional del orquestador): deuda de S01 en la misma zona
+
+- [x] **Step 1:** Test: el guard de `20260930100000` usa `auth.uid() IS DISTINCT FROM p_user_id` (un `p_user_id` NULL es "no autorizado") y la verificación manual trae el caso 7b y la huella `md5(prosrc)`. Verificado que falla.
+- [x] **Step 2:** Migración `20260930100000` (sin aplicar): guard con `IS DISTINCT FROM` en las 3 funciones; paso 0 `SELECT proname, md5(prosrc) …`; caso 7b (plantilla real de otro usuario como fuente y como destino, `BEGIN/ROLLBACK`, esperado 42501). Contratos §0 actualizados. Test en verde.
+- [x] **Step 3:** Commit.
+
+---
+
 ## Autorrevisión
 
 - **Cobertura de criterios:** índice único + limpieza (Task 1); generación con limpieza de vencidos propios y reintento `23505` máx. 5 (Task 2); canje atómico con reloj inyectado (Task 3); tabla de intentos con RLS y sin privilegios de cliente (Task 1); límite 5/15 min con reloj inyectado (Task 4) aplicado antes de consultar el código (Task 5); revinculación borra la conversación ajena (Task 3); `MSG_TOO_MANY_ATTEMPTS` literal (Task 5); `MSG_LINKED_OK` intacto (Task 5 Step 4); verificación completa (Task 6).
