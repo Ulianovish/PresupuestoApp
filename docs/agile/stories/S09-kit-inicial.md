@@ -70,7 +70,7 @@ Lo que el plan asume y por qué el SQL se ve como se ve:
 - Consumes: nada.
 - Produces: columnas `public.profiles.onboarding_completed_at timestamptz` y `public.profiles.onboarding_dismissed_at timestamptz` (NULL = pendiente). En el test: constantes `rawSql`, `code` (SQL sin comentarios) y helpers `squash(s)` y `functionBlock(name)` que usan las tareas 2–4.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`:
 
@@ -137,12 +137,12 @@ describe('migración 20260930130000: columnas de onboarding en profiles', () => 
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: FAIL — el archivo de test no carga: `ENOENT: no such file or directory, open '…/supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql'`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql` con este contenido exacto:
 
@@ -205,12 +205,12 @@ END
 $migracion$;
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: PASS — 3 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts && git commit -m "$(cat <<'EOF'
