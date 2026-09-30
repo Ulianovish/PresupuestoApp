@@ -26,6 +26,7 @@ const MENSAJES_VALIDACION = new Map<string, string>([
     `La contraseña puede tener como máximo ${PASSWORD_MAX_LENGTH} caracteres.`,
   ],
   ['no_coinciden', 'Las contraseñas no coinciden.'],
+  ['confirmar_password', 'Confirma tu contraseña.'],
   ['nombre_invalido', 'Escribe tu nombre completo (entre 2 y 255 caracteres).'],
   ['datos_invalidos', 'Revisa los datos del formulario.'],
 ]);
@@ -53,7 +54,8 @@ export function registerValidationErrorCode(
       if (issue.code === 'too_big') return 'password_larga';
       return 'datos_invalidos';
     case 'confirmPassword':
-      return 'no_coinciden';
+      // Vacío (too_small) no es "no coinciden": falta confirmarla.
+      return issue.code === 'too_small' ? 'confirmar_password' : 'no_coinciden';
     case 'fullName':
       return 'nombre_invalido';
     default:

@@ -32,7 +32,7 @@ describe('registerValidationErrorCode', () => {
       'password_larga',
     ],
     [{ confirmPassword: 'otra-clave-de-prueba' }, 'no_coinciden'],
-    [{ confirmPassword: '' }, 'no_coinciden'],
+    [{ confirmPassword: '' }, 'confirmar_password'],
     [{ fullName: 'A' }, 'nombre_invalido'],
   ])('%j → %s', (campos, codigo) => {
     expect(codigoDe(campos)).toBe(codigo);
@@ -50,6 +50,7 @@ describe('registerValidationErrorCode', () => {
       codigoDe({ email: 'x' }),
       codigoDe({ password: 'x', confirmPassword: 'x' }),
       codigoDe({ fullName: 'A' }),
+      codigoDe({ confirmPassword: '' }),
       registerValidationErrorCode([]),
     ]) {
       expect(REGISTER_VALIDATION_ERROR_CODES.has(codigo)).toBe(true);
@@ -68,6 +69,7 @@ describe('resolveRegisterError', () => {
     ['password_corta', 'La contraseña debe tener al menos 8 caracteres.'],
     ['password_larga', 'La contraseña puede tener como máximo 72 caracteres.'],
     ['no_coinciden', 'Las contraseñas no coinciden.'],
+    ['confirmar_password', 'Confirma tu contraseña.'],
     [
       'nombre_invalido',
       'Escribe tu nombre completo (entre 2 y 255 caracteres).',
