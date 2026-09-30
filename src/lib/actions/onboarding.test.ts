@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 
@@ -33,7 +33,15 @@ function clienteFalso({
 }
 
 describe('ensureStarterKitAction', () => {
-  beforeEach(() => vi.clearAllMocks());
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  // Restaura el spy aunque una aserción falle antes del final del test.
+  afterEach(() => vi.restoreAllMocks());
 
   it('llama ensure_starter_kit sin parámetros y devuelve seeded: true', async () => {
     const { client } = clienteFalso();
@@ -66,7 +74,6 @@ describe('ensureStarterKitAction', () => {
   });
 
   it('si la RPC falla devuelve su code y hace console.warn solo con el code', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     clienteFalso({
       rpcResult: {
         data: null,
@@ -86,22 +93,18 @@ describe('ensureStarterKitAction', () => {
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(
       'usuario@ejemplo.com',
     );
-    warnSpy.mockRestore();
   });
 
   it('error de la RPC sin code → error rpc_error', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     clienteFalso({ rpcResult: { data: null, error: { message: 'x' } } });
 
     await expect(ensureStarterKitAction()).resolves.toEqual({
       seeded: false,
       error: 'rpc_error',
     });
-    warnSpy.mockRestore();
   });
 
   it('nunca lanza: si crear el cliente falla → error unexpected, sin loguear el detalle', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockedCreateClient.mockRejectedValueOnce(
       new Error('fallo con usuario@ejemplo.com'),
     );
@@ -113,6 +116,5 @@ describe('ensureStarterKitAction', () => {
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(
       'usuario@ejemplo.com',
     );
-    warnSpy.mockRestore();
   });
 });
