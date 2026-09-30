@@ -28,12 +28,12 @@ Alineado con contratos v2 (§5). Escrito por el orquestador (sin planificador): 
 - [x] CA6 (deuda S05): el texto de `LOGIN_VALIDATION_ERROR_CODE` pasa a "Revisa tu correo y tu contraseña.".
 - [x] CA7 (deuda S05): tests de `resetPasswordAction` cuando `auth.getUser()` devuelve `{ user: null, error }` y cuando lanza: registra solo el `code` (o el nombre del error) y redirige a `RESET_LINK_EXPIRED_PATH`.
 - [x] CA8 (deuda S05): en `auth-password.test.ts` la aserción débil `not.toContain(encodeURIComponent(crudo))` se reemplaza por `expect(url.searchParams.get('error')).not.toBe(crudo)`.
-- [ ] CA9: quitar el comentario de `src/middleware.test.ts` que remite a H10/ADR-004 (ya resuelto) y documentar en `docs/agile/decisions/ADR-004-middleware-en-src.md` (contexto, verificación del 2026-09-30, decisión, riesgo y prueba en preview).
+- [x] CA9: quitar el comentario de `src/middleware.test.ts` que remite a H10/ADR-004 (ya resuelto) y documentar en `docs/agile/decisions/ADR-004-middleware-en-src.md` (contexto, verificación del 2026-09-30, decisión, riesgo y prueba en preview).
 
 ## Tareas (TDD, un commit por tarea, siempre `git commit --no-verify` tras `bunx eslint` y `bunx prettier --check` de los archivos tocados)
 
 - [x] **T1 — Ubicación.** Escribe `src/middleware-location.test.ts` con CA1 y CA2 (usa `fs.existsSync(path.join(process.cwd(), 'middleware.ts'))` y `import { config } from './middleware'`). Córrelo: falla (no existe `src/middleware.ts`). `git mv middleware.ts src/middleware.ts`; cambia el import de `src/middleware.test.ts` a `./middleware`. Corre `bun run test src/middleware` → verde. Commit `fix(auth): mover el middleware a src/ para que Next.js lo ejecute`.
 - [x] **T2 — Aviso de CONTACT_EMAIL.** Cambia el test de `legal.test.ts` que espera que lance en producción: ahora espera `console.warn` (con `vi.spyOn(console, 'warn')`) y que no lance. Rojo → cambia `assertContactEmailReady` → verde. Commit.
 - [x] **T3 — Deuda S05** (CA5–CA8), un commit por criterio o uno solo si son pequeños.
-- [ ] **T4 — ADR-004 y limpieza** (CA9). Commit de docs.
+- [x] **T4 — ADR-004 y limpieza** (CA9). Commit de docs.
 - [ ] **T5 — Verificación.** `bun run test && bun run type-check` en verde; árbol limpio.

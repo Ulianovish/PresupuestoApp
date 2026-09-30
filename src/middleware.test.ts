@@ -54,9 +54,6 @@ function pasa(res: Response): boolean {
 }
 
 describe('middleware', () => {
-  // Prueba ../middleware (raíz), que según ADR-004 / H10 Next.js quizá no
-  // carga con src/: pasar aquí no garantiza que corra en producción. Al
-  // resolver H10 y moverlo a src/middleware.ts, actualizar el import.
   beforeEach(() => vi.resetAllMocks());
 
   it('ruta protegida sin sesión → 307 al login con la ruta y la query', async () => {
