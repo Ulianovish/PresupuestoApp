@@ -19,6 +19,8 @@ vi.mock('@/lib/whatsapp/twilio-signature', () => ({
 vi.mock('@/lib/services/whatsapp-links', () => ({
   getLinkByPhone: vi.fn(),
   redeemLinkCode: vi.fn(),
+  isLinkAttemptLimitReached: vi.fn(),
+  recordFailedLinkAttempt: vi.fn(),
 }));
 vi.mock('@/lib/whatsapp/classify', async importOriginal => {
   const real = await importOriginal<typeof import('@/lib/whatsapp/classify')>();
@@ -43,7 +45,12 @@ vi.mock('@/lib/whatsapp/transport', () => ({
   downloadTwilioMedia: vi.fn(),
 }));
 
-import { getLinkByPhone } from '@/lib/services/whatsapp-links';
+import {
+  getLinkByPhone,
+  isLinkAttemptLimitReached,
+  recordFailedLinkAttempt,
+  redeemLinkCode,
+} from '@/lib/services/whatsapp-links';
 import {
   intentarCuentaEscrita,
   manejarEleccionCuenta,
@@ -150,5 +157,48 @@ describe('webhook de WhatsApp: lista de cuentas', () => {
       phone: TEL,
       body: '40k huevos',
     });
+  });
+});
+
+describe('webhook de WhatsApp: número sin vincular', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    enSegundoPlano.length = 0;
+    vi.stubEnv('TWILIO_AUTH_TOKEN', 'tok');
+    vi.stubEnv('WHATSAPP_WEBHOOK_URL', 'https://app.test/api/whatsapp/webhook');
+    vi.mocked(getLinkByPhone).mockResolvedValue(null);
+    vi.mocked(isLinkAttemptLimitReached).mockResolvedValue(false);
+    vi.mocked(recordFailedLinkAttempt).mockResolvedValue(undefined);
+  });
+
+  it('con el límite de intentos alcanzado responde que espere y no canjea el código', async () => {
+    vi.mocked(isLinkAttemptLimitReached).mockResolvedValue(true);
+
+    const res = await post({
+      From: `whatsapp:${TEL}`,
+      Body: 'VINCULAR 123456',
+      NumMedia: '0',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('Hiciste demasiados intentos');
+    expect(isLinkAttemptLimitReached).toHaveBeenCalledWith(TEL);
+    expect(redeemLinkCode).not.toHaveBeenCalled();
+  });
+
+  it('un código inválido registra el intento fallido del número', async () => {
+    vi.mocked(redeemLinkCode).mockResolvedValue({
+      ok: false,
+      reason: 'invalid_or_expired',
+    });
+
+    await post({
+      From: `whatsapp:${TEL}`,
+      Body: 'VINCULAR 123456',
+      NumMedia: '0',
+    });
+
+    expect(redeemLinkCode).toHaveBeenCalledWith('123456', TEL);
+    expect(recordFailedLinkAttempt).toHaveBeenCalledWith(TEL);
   });
 });

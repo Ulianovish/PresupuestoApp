@@ -1245,7 +1245,7 @@ EOF
   - `export const MSG_TOO_MANY_ATTEMPTS = 'Hiciste demasiados intentos. Espera 15 minutos y genera un código nuevo en Ajustes.'`
   - `MSG_LINKED_OK` queda idéntico y sin exportar (S13 lo cambia).
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 Reemplazar todo `src/lib/whatsapp/handle-linking.test.ts` por:
 
@@ -1417,12 +1417,12 @@ describe('webhook de WhatsApp: número sin vincular', () => {
 });
 ```
 
-- [ ] **Step 2: Correr los tests y verificar que fallan**
+- [x] **Step 2: Correr los tests y verificar que fallan**
 
 Run: `bun run test src/lib/whatsapp/handle-linking.test.ts src/app/api/whatsapp/webhook/route.test.ts`
 Expected: FAIL. En `handle-linking`: `MSG_TOO_MANY_ATTEMPTS es el texto del contrato` (`expected undefined to be 'Hiciste demasiados intentos…'`), el de límite alcanzado (`redeemLinkCode` sí fue llamado) y el de registro de fallo (`recordFailedLinkAttempt` no fue llamado). En `route.test`: los dos tests de "número sin vincular" (`isLinkAttemptLimitReached` nunca llamado). Los 4 tests de "lista de cuentas" siguen pasando.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/whatsapp/handle-linking.ts`:
 
@@ -1515,7 +1515,7 @@ por:
 
 (Las funciones del servicio se pasan tal cual: se llaman con un solo argumento y usan el reloj real por defecto.)
 
-- [ ] **Step 4: Correr los tests y verificar que pasan**
+- [x] **Step 4: Correr los tests y verificar que pasan**
 
 Run: `bun run test src/lib/whatsapp/handle-linking.test.ts src/app/api/whatsapp/webhook/route.test.ts`
 Expected: PASS (8 tests de `handle-linking`, 6 de `route.test`).
@@ -1526,7 +1526,7 @@ Expected: sin errores.
 Run: `grep -n "Tu WhatsApp quedó vinculado a tu presupuesto" src/lib/whatsapp/handle-linking.ts`
 Expected: una coincidencia (`MSG_LINKED_OK` intacto).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/whatsapp/handle-linking.ts src/lib/whatsapp/handle-linking.test.ts src/app/api/whatsapp/webhook/route.ts src/app/api/whatsapp/webhook/route.test.ts

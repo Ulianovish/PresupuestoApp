@@ -7,6 +7,10 @@ import { parseCommand } from '@/lib/whatsapp/message';
 export interface LinkingDeps {
   redeemLinkCode: (code: string, phoneE164: string) => Promise<RedeemResult>;
   getLinkByPhone: (phoneE164: string) => Promise<{ userId: string } | null>;
+  /** true si el número ya tiene 5 VINCULAR fallidos en los últimos 15 min. */
+  isLinkAttemptLimitReached: (phoneE164: string) => Promise<boolean>;
+  /** Suma un VINCULAR fallido (código inexistente o vencido) al número. */
+  recordFailedLinkAttempt: (phoneE164: string) => Promise<void>;
 }
 
 const MSG_LINKED_OK =
@@ -23,6 +27,9 @@ const MSG_NEEDS_LINK =
   'Ajustes → Conectar WhatsApp, genera tu código de 6 dígitos y envíame: ' +
   'VINCULAR 123456';
 
+export const MSG_TOO_MANY_ATTEMPTS =
+  'Hiciste demasiados intentos. Espera 15 minutos y genera un código nuevo en Ajustes.';
+
 export async function handleLinkingMessage(
   phoneE164: string,
   body: string,
@@ -31,8 +38,22 @@ export async function handleLinkingMessage(
   const cmd = parseCommand(body);
 
   if (cmd.kind === 'link') {
+    // Con el límite alcanzado ni se mira el código: adivinar los 6 dígitos a
+    // fuerza de intentos deja de ser posible. Estos intentos no se registran,
+    // así que al pasar 15 minutos el número vuelve a poder.
+    if (await deps.isLinkAttemptLimitReached(phoneE164)) {
+      return MSG_TOO_MANY_ATTEMPTS;
+    }
     const res = await deps.redeemLinkCode(cmd.code, phoneE164);
-    return res.ok ? MSG_LINKED_OK : MSG_CODE_INVALID;
+    if (res.ok) {
+      return MSG_LINKED_OK;
+    }
+    // Solo un código inexistente o vencido cuenta; un error de base no es
+    // culpa de quien escribe.
+    if (res.reason === 'invalid_or_expired') {
+      await deps.recordFailedLinkAttempt(phoneE164);
+    }
+    return MSG_CODE_INVALID;
   }
 
   const link = await deps.getLinkByPhone(phoneE164);
