@@ -24,10 +24,20 @@ import {
 } from '@/lib/actions/onboarding';
 import { generateWhatsAppLinkCodeAction } from '@/lib/actions/whatsapp';
 import { DEFAULT_ACCOUNT_NAME } from '@/lib/constants/expense-categories';
-import { suggest503020 } from '@/lib/onboarding/budget-503020';
 import type { WizardItem } from '@/lib/onboarding/wizard-data';
+import {
+  applySuggestion,
+  buildFirstExpense,
+  finishOnboarding,
+  ingresoSinCambios,
+  saveBudgetStep,
+  saveExpenseAndFinish,
+  saveIncomeStep,
+  type IngresoGuardado,
+  type WizardNotify,
+} from '@/lib/onboarding/wizard-steps';
 import { cn } from '@/lib/utils';
-import { formatCOP, todayBogota } from '@/lib/whatsapp/format';
+import { formatCOP } from '@/lib/whatsapp/format';
 import { buildWhatsAppLinkUrl } from '@/lib/whatsapp/link-url';
 
 type Paso = 1 | 2 | 3;
@@ -40,6 +50,11 @@ const PASOS: Array<{ n: Paso; titulo: string }> = [
 
 /** Cuenta con la que se guarda el primer gasto (contratos §2.6, S07). */
 const CUENTA_GASTO = DEFAULT_ACCOUNT_NAME;
+
+const notify: WizardNotify = (message, type) => {
+  if (type === 'error') toast.error(message);
+  else toast.success(message);
+};
 
 const SELECT_CLASES =
   'w-full rounded-md border border-slate-600 bg-slate-800 p-2 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500';
@@ -65,6 +80,8 @@ export default function OnboardingWizard({
   const [ingreso, setIngreso] = useState(0);
   const [fuente, setFuente] = useState('Salario');
   const [guardandoIngreso, setGuardandoIngreso] = useState(false);
+  const [ingresoGuardado, setIngresoGuardado] =
+    useState<IngresoGuardado | null>(null);
 
   // Paso 2
   const [montos, setMontos] = useState<Record<string, number>>(() =>
@@ -80,6 +97,8 @@ export default function OnboardingWizard({
     categoryNames.includes('OTROS') ? 'OTROS' : (categoryNames[0] ?? ''),
   );
   const [guardandoGasto, setGuardandoGasto] = useState(false);
+  // true en cuanto el gasto se crea: un reintento de terminar no lo repite.
+  const [gastoGuardado, setGastoGuardado] = useState(false);
   const [codigo, setCodigo] = useState<string | null>(null);
   const [generandoCodigo, setGenerandoCodigo] = useState(false);
 
@@ -100,81 +119,87 @@ export default function OnboardingWizard({
   const gastoListo =
     gastoMonto > 0 && gastoDescripcion.trim() !== '' && gastoCategoria !== '';
 
+  const ingresoYaGuardado = ingresoSinCambios(ingresoGuardado, ingreso, fuente);
+
+  // Sin try/catch alrededor: el NEXT_REDIRECT que relanza finishOnboarding
+  // debe quedar sin manejar para que Next navegue al dashboard.
   const terminar = async () => {
     setTerminando(true);
-    try {
-      // Redirige a /dashboard desde el servidor.
-      await completeOnboardingAction();
-    } catch {
-      toast.error('No pudimos terminar la bienvenida. Intenta de nuevo.');
-      setTerminando(false);
-    }
+    const ok = await finishOnboarding({
+      complete: completeOnboardingAction,
+      notify,
+    });
+    if (!ok) setTerminando(false);
   };
 
   const guardarIngreso = async () => {
     setGuardandoIngreso(true);
     try {
-      const r = await saveOnboardingIncomeAction({ monto: ingreso, fuente });
-      if (!r.ok) {
-        toast.error(r.error ?? 'No pudimos guardar tu ingreso.');
-        return;
-      }
+      const guardado = await saveIncomeStep({
+        monto: ingreso,
+        fuente,
+        guardado: ingresoGuardado,
+        save: saveOnboardingIncomeAction,
+        notify,
+      });
+      if (!guardado) return;
+      setIngresoGuardado(guardado);
       setPaso(2);
-    } catch {
-      toast.error('No pudimos guardar tu ingreso. Intenta de nuevo.');
     } finally {
       setGuardandoIngreso(false);
     }
   };
 
   const sugerir = () => {
-    const sugerencia = suggest503020(
+    const sugerencia = applySuggestion(
+      montos,
       ingreso,
       items.map(i => ({ id: i.id, classificationName: i.classificationName })),
     );
-    setMontos(prev => ({ ...prev, ...sugerencia.amounts }));
+    setMontos(sugerencia.montos);
     setAhorroSinAsignar(sugerencia.ahorroSinAsignar);
   };
 
   const guardarPresupuesto = async () => {
     setGuardandoPresupuesto(true);
     try {
-      const r = await saveOnboardingBudgetAction(montos);
-      if (!r.ok) {
-        toast.error(r.error ?? 'No pudimos guardar tu presupuesto.');
-        return;
-      }
-      setPaso(3);
-    } catch {
-      toast.error('No pudimos guardar tu presupuesto. Intenta de nuevo.');
+      const ok = await saveBudgetStep({
+        montos,
+        save: saveOnboardingBudgetAction,
+        notify,
+      });
+      if (ok) setPaso(3);
     } finally {
       setGuardandoPresupuesto(false);
     }
   };
 
   const guardarGasto = async () => {
-    if (!gastoListo) {
+    if (!gastoGuardado && !gastoListo) {
       toast.error('Completa el monto, la descripción y la categoría.');
       return;
     }
     setGuardandoGasto(true);
     try {
-      // Import dinámico: expenses.ts crea un cliente de navegador al cargar el
-      // módulo y no debe evaluarse al renderizar en el servidor.
-      const { createExpenseTransaction } = await import(
-        '@/lib/services/expenses'
-      );
-      await createExpenseTransaction({
-        description: gastoDescripcion.trim(),
-        amount: gastoMonto,
-        transaction_date: todayBogota(),
-        category_name: gastoCategoria,
-        account_name: CUENTA_GASTO,
+      await saveExpenseAndFinish({
+        gastoGuardado,
+        expense: buildFirstExpense({
+          monto: gastoMonto,
+          descripcion: gastoDescripcion,
+          categoria: gastoCategoria,
+        }),
+        create: async expense => {
+          // Import dinámico: expenses.ts crea un cliente de navegador al
+          // cargar el módulo y no debe evaluarse al renderizar en el servidor.
+          const { createExpenseTransaction } = await import(
+            '@/lib/services/expenses'
+          );
+          await createExpenseTransaction(expense);
+        },
+        onSaved: () => setGastoGuardado(true),
+        finish: terminar,
+        notify,
       });
-      toast.success('¡Listo! Guardamos tu primer gasto.');
-      await terminar();
-    } catch {
-      toast.error('No pudimos guardar el gasto. Intenta de nuevo.');
     } finally {
       setGuardandoGasto(false);
     }
@@ -295,7 +320,7 @@ export default function OnboardingWizard({
                 loading={guardandoIngreso}
                 disabled={guardandoIngreso || ingreso <= 0 || !fuente.trim()}
               >
-                Guardar y seguir
+                {ingresoYaGuardado ? 'Seguir' : 'Guardar y seguir'}
               </Button>
             </div>
           </section>
@@ -454,7 +479,7 @@ export default function OnboardingWizard({
                   <CurrencyInput
                     value={gastoMonto}
                     onChange={setGastoMonto}
-                    disabled={guardandoGasto || terminando}
+                    disabled={guardandoGasto || terminando || gastoGuardado}
                   />
                 </label>
 
@@ -472,7 +497,7 @@ export default function OnboardingWizard({
                     onChange={e => setGastoDescripcion(e.target.value)}
                     placeholder="Ej.: Almuerzo"
                     maxLength={255}
-                    disabled={guardandoGasto || terminando}
+                    disabled={guardandoGasto || terminando || gastoGuardado}
                   />
                 </div>
 
@@ -489,7 +514,7 @@ export default function OnboardingWizard({
                       value={gastoCategoria}
                       onChange={e => setGastoCategoria(e.target.value)}
                       className={SELECT_CLASES}
-                      disabled={guardandoGasto || terminando}
+                      disabled={guardandoGasto || terminando || gastoGuardado}
                     >
                       {categoryNames.map(nombre => (
                         <option key={nombre} value={nombre}>
@@ -508,15 +533,22 @@ export default function OnboardingWizard({
                   Se guarda con la fecha de hoy en la cuenta {CUENTA_GASTO}.
                 </p>
 
-                <Button
-                  variant="gradient"
-                  className="w-full"
-                  onClick={guardarGasto}
-                  loading={guardandoGasto}
-                  disabled={!gastoListo || guardandoGasto || terminando}
-                >
-                  Guardar gasto
-                </Button>
+                {gastoGuardado ? (
+                  <p className="text-sm text-emerald-400" role="status">
+                    Ya guardamos tu gasto. Pulsa «Ir a mi tablero» para
+                    terminar.
+                  </p>
+                ) : (
+                  <Button
+                    variant="gradient"
+                    className="w-full"
+                    onClick={guardarGasto}
+                    loading={guardandoGasto}
+                    disabled={!gastoListo || guardandoGasto || terminando}
+                  >
+                    Guardar gasto
+                  </Button>
+                )}
               </div>
 
               <div className="space-y-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
