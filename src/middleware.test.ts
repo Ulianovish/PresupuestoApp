@@ -22,6 +22,28 @@ function sesion(conUsuario: boolean) {
   } as unknown as ReturnType<typeof createServerClient>);
 }
 
+/** getUser() que, como hace Supabase al refrescar, escribe cookies. */
+function sesionQueRefresca(conUsuario: boolean) {
+  mockedCreateServerClient.mockImplementation((_url, _key, opciones) => {
+    const getUser = vi.fn().mockImplementation(async () => {
+      await opciones.cookies.setAll?.([
+        {
+          name: 'sb-prueba-auth-token',
+          value: 'renovado',
+          options: { path: '/' },
+        },
+      ]);
+      return {
+        data: { user: conUsuario ? { id: USER_ID } : null },
+        error: null,
+      };
+    });
+    return { auth: { getUser } } as unknown as ReturnType<
+      typeof createServerClient
+    >;
+  });
+}
+
 function pedir(ruta: string) {
   return middleware(new NextRequest(`${ORIGEN}${ruta}`));
 }
@@ -35,7 +57,7 @@ describe('middleware', () => {
   // Prueba ../middleware (raíz), que según ADR-004 / H10 Next.js quizá no
   // carga con src/: pasar aquí no garantiza que corra en producción. Al
   // resolver H10 y moverlo a src/middleware.ts, actualizar el import.
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => vi.resetAllMocks());
 
   it('ruta protegida sin sesión → 307 al login con la ruta y la query', async () => {
     sesion(false);
@@ -83,9 +105,49 @@ describe('middleware', () => {
     expect(pasa(await pedir('/gastos?mes=3'))).toBe(true);
   });
 
-  it.each(['/terms', '/privacy'])('%s es pública sin sesión', async ruta => {
+  it.each(['/', '/terms', '/privacy'])(
+    '%s es pública sin sesión',
+    async ruta => {
+      sesion(false);
+
+      expect(pasa(await pedir(ruta))).toBe(true);
+    },
+  );
+
+  it('/ingresos-deudas sin sesión redirige al login', async () => {
     sesion(false);
 
-    expect(pasa(await pedir(ruta))).toBe(true);
+    const res = await pedir('/ingresos-deudas');
+
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toBe(
+      `${ORIGEN}/auth/login?redirectTo=%2Fingresos-deudas`,
+    );
   });
+
+  it('/auth/login sin sesión pasa (sin bucle de redirección)', async () => {
+    sesion(false);
+
+    expect(pasa(await pedir('/auth/login?redirectTo=%2Fgastos'))).toBe(true);
+  });
+
+  // Patrón oficial de @supabase/ssr: si getUser() refresca la sesión, las
+  // cookies nuevas deben viajar también en las redirecciones; si no, el
+  // navegador se queda con el refresh token ya usado y la sesión se pierde.
+  it.each([
+    ['/auth/login', true],
+    ['/gastos', false],
+  ])(
+    'la redirección desde %s conserva las cookies que escribió Supabase',
+    async (ruta, conUsuario) => {
+      sesionQueRefresca(conUsuario);
+
+      const res = await pedir(ruta);
+
+      expect(res.status).toBe(307);
+      expect(res.headers.get('set-cookie')).toContain(
+        'sb-prueba-auth-token=renovado',
+      );
+    },
+  );
 });

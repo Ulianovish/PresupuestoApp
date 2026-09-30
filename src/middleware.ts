@@ -51,6 +51,17 @@ export async function middleware(request: NextRequest) {
     );
   }
 
+  // Toda redirección lleva las cookies que Supabase haya escrito al refrescar
+  // la sesión (patrón oficial de @supabase/ssr); si no, el navegador se queda
+  // con el refresh token ya usado y la sesión se pierde.
+  const redirigir = (url: URL) => {
+    const respuesta = NextResponse.redirect(url);
+    supabaseResponse.cookies
+      .getAll()
+      .forEach(cookie => respuesta.cookies.set(cookie));
+    return respuesta;
+  };
+
   if (access === 'public') {
     return supabaseResponse;
   }
@@ -59,7 +70,7 @@ export async function middleware(request: NextRequest) {
   // pero login y registro redirigen al dashboard si ya hay sesión.
   if (access === 'auth') {
     if (user && redirectsSignedInUser(pathname)) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return redirigir(new URL('/dashboard', request.url));
     }
     return supabaseResponse;
   }
@@ -67,7 +78,7 @@ export async function middleware(request: NextRequest) {
   if (access === 'protected' && !user) {
     const redirectUrl = new URL('/auth/login', request.url);
     redirectUrl.searchParams.set('redirectTo', `${pathname}${search}`);
-    return NextResponse.redirect(redirectUrl);
+    return redirigir(redirectUrl);
   }
 
   return supabaseResponse;
