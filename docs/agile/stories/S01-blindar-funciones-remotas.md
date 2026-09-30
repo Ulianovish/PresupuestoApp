@@ -1144,7 +1144,7 @@ EOF
 - Consumes: helpers de la Task 1. Llamadores que no deben romperse: `src/lib/services/budget.ts:81` y `src/scripts/migrate-july-data.ts:1127` (cliente del navegador con sesión; pasan `p_user_id: user.id`, así que el guard pasa). No se cambia TypeScript.
 - Produces: sección 4 del `.sql`. Firma y `RETURNS TABLE` (19 columnas) sin cambios.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Agrega al final del archivo de test:
 
@@ -1189,12 +1189,12 @@ describe('get_budget_by_month', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: FAIL en los 5 tests nuevos (`Falta CREATE OR REPLACE de get_budget_by_month` y el de grants); los 27 anteriores en PASS.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Agrega al final de `supabase/migrations/20260930100000_blindar_funciones_remotas.sql`:
 
@@ -1251,12 +1251,12 @@ REVOKE EXECUTE ON FUNCTION public.get_budget_by_month(uuid, character varying) F
 GRANT EXECUTE ON FUNCTION public.get_budget_by_month(uuid, character varying) TO authenticated, service_role;
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: PASS, 32 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'

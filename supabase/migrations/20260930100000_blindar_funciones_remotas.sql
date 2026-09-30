@@ -335,3 +335,53 @@ GRANT EXECUTE ON FUNCTION public.fix_templates_without_items(uuid) TO service_ro
 GRANT EXECUTE ON FUNCTION public.check_cufe_exists(uuid, character varying) TO service_role;
 GRANT EXECUTE ON FUNCTION public.get_electronic_invoices_by_date_range(uuid, date, date) TO service_role;
 GRANT EXECUTE ON FUNCTION public.get_invoice_stats_by_supplier(uuid, date, date) TO service_role;
+
+
+-- ============================================================================
+-- 4. get_budget_by_month: guard. Sigue INVOKER (RLS sigue aplicando).
+--    Llamadores: src/lib/services/budget.ts y src/scripts/migrate-july-data.ts
+--    (navegador con sesión, p_user_id = su propio id).
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.get_budget_by_month(p_user_id uuid, p_month_year character varying)
+ RETURNS TABLE(template_id uuid, template_name character varying, category_id uuid, category_name character varying, category_color character varying, category_icon character varying, item_id uuid, item_name character varying, item_description text, due_date character varying, classification_name character varying, classification_color character varying, control_name character varying, control_color character varying, budgeted_amount numeric, real_amount numeric, spent_amount numeric, deuda_id uuid, alerts_enabled boolean)
+ LANGUAGE plpgsql
+ SET search_path = public, pg_temp
+AS $function$
+BEGIN
+    IF auth.role() IS DISTINCT FROM 'service_role'
+       AND (auth.uid() IS NULL OR auth.uid() <> p_user_id) THEN
+        RAISE EXCEPTION 'no autorizado' USING ERRCODE = '42501';
+    END IF;
+
+    RETURN QUERY
+    SELECT
+        bt.id, bt.name, c.id, c.name, c.color, c.icon,
+        bi.id, bi.name, bi.description, bi.due_date,
+        cl.name, cl.color, co.name, co.color,
+        bi.budgeted_amount,
+        -- Real híbrido: si hay gastos asignados, su suma; si no, el manual
+        COALESCE(
+            (SELECT SUM(t.amount)
+             FROM transactions t
+             JOIN transaction_types tt ON t.type_id = tt.id
+             WHERE t.budget_item_id = bi.id AND tt.name = 'Gasto'),
+            bi.real_amount
+        ) AS real_amount,
+        bi.spent_amount,
+        bi.deuda_id,
+        bi.alerts_enabled
+    FROM budget_templates bt
+    LEFT JOIN budget_items bi ON bt.id = bi.template_id
+    LEFT JOIN categories c ON bi.category_id = c.id
+    LEFT JOIN classifications cl ON bi.classification_id = cl.id
+    LEFT JOIN controls co ON bi.control_id = co.id
+    WHERE bt.user_id = p_user_id
+      AND bt.month_year = p_month_year
+      AND bt.is_active = true
+      AND (bi.is_active = true OR bi.id IS NULL)
+    ORDER BY c.name, bi.name;
+END;
+$function$;
+
+REVOKE EXECUTE ON FUNCTION public.get_budget_by_month(uuid, character varying) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_budget_by_month(uuid, character varying) TO authenticated, service_role;

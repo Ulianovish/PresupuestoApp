@@ -249,3 +249,42 @@ describe.each(UNCHANGED_FUNCTIONS)(
     });
   },
 );
+
+describe('get_budget_by_month', () => {
+  const NAME = 'get_budget_by_month';
+
+  it('conserva la firma y el RETURNS TABLE de producción (no crea overload)', () => {
+    expectSignature(
+      functionBlock(readMigration(), NAME),
+      'CREATE OR REPLACE FUNCTION public.get_budget_by_month(p_user_id uuid, p_month_year character varying)',
+      ' RETURNS TABLE(template_id uuid, template_name character varying, category_id uuid, category_name character varying, category_color character varying, category_icon character varying, item_id uuid, item_name character varying, item_description text, due_date character varying, classification_name character varying, classification_color character varying, control_name character varying, control_color character varying, budgeted_amount numeric, real_amount numeric, spent_amount numeric, deuda_id uuid, alerts_enabled boolean)',
+    );
+  });
+
+  it('sigue siendo INVOKER, con search_path fijo', () => {
+    const block = functionBlock(readMigration(), NAME);
+    expect(block).toContain('\n LANGUAGE plpgsql\n');
+    expect(block).not.toContain('SECURITY DEFINER');
+    expect(block).toContain(SEARCH_PATH);
+  });
+
+  it('valida al usuario antes de todo', () => {
+    expectGuardFirst(functionBlock(readMigration(), NAME));
+  });
+
+  it('conserva la consulta de producción', () => {
+    const block = functionBlock(readMigration(), NAME);
+    expect(block).toContain('WHERE bt.user_id = p_user_id');
+    expect(block).toContain('AND (bi.is_active = true OR bi.id IS NULL)');
+    expect(block).toContain('bi.alerts_enabled');
+    expect(block).toContain('ORDER BY c.name, bi.name;');
+  });
+
+  it('solo authenticated y service_role la ejecutan', () => {
+    const code = codeOnly(readMigration());
+    expect(code).toContain(
+      'REVOKE EXECUTE ON FUNCTION public.get_budget_by_month(uuid, character varying) FROM PUBLIC, anon;',
+    );
+    expect(grantedRoles(code, NAME)).toEqual(['authenticated', 'service_role']);
+  });
+});
