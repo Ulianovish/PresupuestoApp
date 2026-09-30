@@ -15,6 +15,8 @@ import Input from '@/components/atoms/Input/Input';
 import { loginAction } from '@/lib/actions/auth';
 import { resolveLoginFeedback } from '@/lib/auth/login-feedback';
 
+import AuthLoadingFallback from '../AuthLoadingFallback';
+
 /**
  * LoginForm - Formulario de inicio de sesión que usa useSearchParams
  */
@@ -184,23 +186,7 @@ function LoginForm() {
  */
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/5 to-emerald-500/10" />
-          <div className="relative">
-            <Card variant="glass" className="p-8">
-              <CardContent>
-                <div className="text-center text-white">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
-                  <p>Cargando...</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<AuthLoadingFallback />}>
       <LoginForm />
     </Suspense>
   );

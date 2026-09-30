@@ -31,20 +31,35 @@ function texto(formData: FormData, campo: string): string {
   return typeof valor === 'string' ? valor : '';
 }
 
+type RutaAuth =
+  | '/auth/login'
+  | '/auth/register'
+  | '/auth/forgot-password'
+  | '/auth/reset-password';
+
 /**
- * '/auth/login?error=…' (y redirectTo si es una ruta interna segura).
- * Siempre va un CÓDIGO, nunca texto: la página lo traduce con una lista
- * cerrada (resolveLoginFeedback / resolveRegisterError).
+ * `path?clave=codigo&…`. Siempre CÓDIGOS, nunca texto: cada página los
+ * traduce con una lista cerrada (resolveLoginFeedback, resolveRegisterError,
+ * resolveForgotPasswordFeedback, resolveResetPasswordError).
  */
+function urlConCodigo(
+  path: RutaAuth,
+  params: Readonly<Record<string, string>>,
+): string {
+  return `${path}?${new URLSearchParams(params).toString()}`;
+}
+
+/** '/auth/login?error=…' (y redirectTo si es una ruta interna segura). */
 function urlConError(
   base: '/auth/login' | '/auth/register',
   codigo: string,
   redirectTo?: string,
 ): string {
-  const params = new URLSearchParams({ error: codigo });
   const seguro = redirectTo ? safeRedirectPath(redirectTo, '') : '';
-  if (seguro) params.set('redirectTo', seguro);
-  return `${base}?${params.toString()}`;
+  return urlConCodigo(
+    base,
+    seguro ? { error: codigo, redirectTo: seguro } : { error: codigo },
+  );
 }
 
 /**
@@ -209,15 +224,6 @@ export async function isAuthenticated(): Promise<boolean> {
 
 const forgotPasswordEmailSchema = z.string().trim().email();
 
-/** `path?key=codigo`. Siempre un CÓDIGO: la página lo traduce. */
-function conCodigo(
-  path: '/auth/forgot-password' | '/auth/reset-password',
-  key: 'error' | 'message',
-  codigo: string,
-): string {
-  return `${path}?${new URLSearchParams({ [key]: codigo }).toString()}`;
-}
-
 /** Solo el `code` del error (sin mensaje, que podría llevar el correo). */
 function codigoDeError(error: unknown): string {
   if (
@@ -246,11 +252,9 @@ export async function forgotPasswordAction(formData: FormData): Promise<void> {
 
   if (!parsed.success) {
     redirect(
-      conCodigo(
-        '/auth/forgot-password',
-        'error',
-        FORGOT_PASSWORD_INVALID_EMAIL_CODE,
-      ),
+      urlConCodigo('/auth/forgot-password', {
+        error: FORGOT_PASSWORD_INVALID_EMAIL_CODE,
+      }),
     );
   }
 
@@ -272,7 +276,9 @@ export async function forgotPasswordAction(formData: FormData): Promise<void> {
   }
 
   redirect(
-    conCodigo('/auth/forgot-password', 'message', FORGOT_PASSWORD_SENT_CODE),
+    urlConCodigo('/auth/forgot-password', {
+      message: FORGOT_PASSWORD_SENT_CODE,
+    }),
   );
 }
 
@@ -290,7 +296,7 @@ export async function resetPasswordAction(formData: FormData): Promise<void> {
 
   // La sesión se revisa antes de validar: un enlace vencido lleva a pedir otro.
   if (!user) {
-    redirect(conCodigo('/auth/forgot-password', 'error', 'otp_expired'));
+    redirect(urlConCodigo('/auth/forgot-password', { error: 'otp_expired' }));
   }
 
   const parsed = resetPasswordFormSchema.safeParse({
@@ -300,11 +306,9 @@ export async function resetPasswordAction(formData: FormData): Promise<void> {
 
   if (!parsed.success) {
     redirect(
-      conCodigo(
-        '/auth/reset-password',
-        'error',
-        resetPasswordValidationErrorCode(parsed.error.issues),
-      ),
+      urlConCodigo('/auth/reset-password', {
+        error: resetPasswordValidationErrorCode(parsed.error.issues),
+      }),
     );
   }
 
@@ -317,7 +321,9 @@ export async function resetPasswordAction(formData: FormData): Promise<void> {
       code: error.code,
       status: error.status,
     });
-    redirect(conCodigo('/auth/reset-password', 'error', authErrorCode(error)));
+    redirect(
+      urlConCodigo('/auth/reset-password', { error: authErrorCode(error) }),
+    );
   }
 
   revalidatePath('/', 'layout');
