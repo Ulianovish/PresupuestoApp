@@ -180,17 +180,25 @@ describe('loginAction', () => {
     expect(url).not.toContain('detalle');
   });
 
-  it('correo inválido → código de credenciales, sin llamar a Supabase', async () => {
-    const { auth } = clienteFalso();
+  it.each([
+    [{ email: 'no-es-correo', password: PASSWORD }],
+    [{ email: '', password: PASSWORD }],
+    [{ email: EMAIL, password: '' }],
+  ])(
+    'datos del formulario inválidos (%j) → código propio, sin llamar a Supabase',
+    async campos => {
+      const { auth } = clienteFalso();
 
-    const url = await destino(
-      loginAction(form({ email: 'no-es-correo', password: PASSWORD })),
-    );
+      const url = await destino(
+        loginAction(form({ ...campos, redirectTo: '/gastos' })),
+      );
 
-    expect(url.startsWith('/auth/login?')).toBe(true);
-    expect(query(url).get('error')).toBe('invalid_credentials');
-    expect(auth.signInWithPassword).not.toHaveBeenCalled();
-  });
+      expect(url.startsWith('/auth/login?')).toBe(true);
+      expect(query(url).get('error')).toBe('datos_login_invalidos');
+      expect(query(url).get('redirectTo')).toBe('/gastos');
+      expect(auth.signInWithPassword).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('registerAction', () => {

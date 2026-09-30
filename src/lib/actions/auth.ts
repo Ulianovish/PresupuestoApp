@@ -6,7 +6,10 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { authErrorCode } from '@/lib/auth/error-messages';
-import { CHECK_EMAIL_MESSAGE_CODE } from '@/lib/auth/login-feedback';
+import {
+  CHECK_EMAIL_MESSAGE_CODE,
+  LOGIN_VALIDATION_ERROR_CODE,
+} from '@/lib/auth/login-feedback';
 import {
   FORGOT_PASSWORD_INVALID_EMAIL_CODE,
   FORGOT_PASSWORD_SENT_CODE,
@@ -56,9 +59,11 @@ export async function loginAction(formData: FormData) {
     password: texto(formData, 'password'),
   });
 
-  // Formato inválido: mismo aviso que unas credenciales malas.
+  // Formulario inválido: código propio, sin llamar a Supabase.
   if (!parsed.success) {
-    redirect(urlConError('/auth/login', 'invalid_credentials', redirectTo));
+    redirect(
+      urlConError('/auth/login', LOGIN_VALIDATION_ERROR_CODE, redirectTo),
+    );
   }
 
   const supabase = await createClient();
