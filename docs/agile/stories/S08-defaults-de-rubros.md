@@ -985,7 +985,7 @@ EOF
 - Consumes (Tasks 1–2): `DEUDA_ITEM_CLASSIFICATION`, `DEUDA_ITEM_CONTROL`, `resolveBudgetItemDefaults(supabase, { classification, control })`.
 - Produces: firma sin cambios `createBudgetItemsForDeuda(deudaId: string, itemName: string)` → `{ success: boolean; error?: string }`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/actions/deudas-budget.test.ts`:
 
@@ -1107,12 +1107,12 @@ describe('createBudgetItemsForDeuda', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/deudas-budget.test.ts`
 Expected: FAIL — `mockedResolve` no fue llamado (la acción todavía consulta `classifications`/`controls` con `.limit(1)`, y `cadena` no tiene `limit`, así que devuelve `Error interno del servidor`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/actions/deudas-budget.ts`, reemplazar:
 
@@ -1156,12 +1156,12 @@ En el `.map(t => ({ … }))` que arma `rows`, cambiar las tres líneas de catál
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n "classificationResult\|controlResult\|statusResult\|limit(1)" src/lib/actions/deudas-budget.ts`
 Expected: sin salida.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/deudas-budget.test.ts && bun run type-check`
 Expected: PASS (2 tests) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/deudas-budget.ts src/lib/actions/deudas-budget.test.ts && git commit -m "$(cat <<'EOF'
