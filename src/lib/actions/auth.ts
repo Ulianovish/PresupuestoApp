@@ -13,6 +13,7 @@ import {
 import {
   FORGOT_PASSWORD_INVALID_EMAIL_CODE,
   FORGOT_PASSWORD_SENT_CODE,
+  RESET_LINK_EXPIRED_PATH,
   resetPasswordValidationErrorCode,
 } from '@/lib/auth/password-reset-feedback';
 import { registerValidationErrorCode } from '@/lib/auth/register-feedback';
@@ -25,6 +26,8 @@ import {
   registerSchema,
   resetPasswordFormSchema,
 } from '@/lib/validations/schemas';
+
+import type { User } from '@supabase/supabase-js';
 
 function texto(formData: FormData, campo: string): string {
   const valor = formData.get(campo);
@@ -238,6 +241,15 @@ function codigoDeError(error: unknown): string {
   return 'sin_codigo';
 }
 
+/** El `code` del error o, si no trae, su nombre (nunca el mensaje). */
+function codigoONombre(error: unknown): string {
+  const code = codigoDeError(error);
+  if (code === 'sin_codigo' && error instanceof Error && error.name) {
+    return error.name;
+  }
+  return code;
+}
+
 /**
  * Server Action: envía el correo para restablecer la contraseña.
  * El enlace del correo (plantilla "Reset Password") pasa por /auth/confirm,
@@ -290,13 +302,27 @@ export async function forgotPasswordAction(formData: FormData): Promise<void> {
  */
 export async function resetPasswordAction(formData: FormData): Promise<void> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   // La sesión se revisa antes de validar: un enlace vencido lleva a pedir otro.
+  // Si getUser falla se registra solo el code (o el nombre del error): el
+  // mensaje podría llevar el correo.
+  let user: User | null = null;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error('resetPasswordAction: getUser falló', {
+        code: codigoONombre(error),
+      });
+    }
+    user = data.user;
+  } catch (e) {
+    console.error('resetPasswordAction: getUser lanzó', {
+      code: codigoONombre(e),
+    });
+  }
+
   if (!user) {
-    redirect(urlConCodigo('/auth/forgot-password', { error: 'otp_expired' }));
+    redirect(RESET_LINK_EXPIRED_PATH);
   }
 
   const parsed = resetPasswordFormSchema.safeParse({

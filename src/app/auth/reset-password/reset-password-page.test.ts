@@ -18,9 +18,12 @@ const pagina = leer('page.tsx');
 const formulario = leer('ResetPasswordForm.tsx');
 
 describe('página de contraseña nueva (servidor)', () => {
-  it('exige sesión: sin usuario manda a pedir otro enlace con el código otp_expired', () => {
+  it('exige sesión: sin usuario manda a RESET_LINK_EXPIRED_PATH (pedir otro enlace)', () => {
     expect(pagina).toContain('auth.getUser()');
-    expect(pagina).toContain("'/auth/forgot-password?error=otp_expired'");
+    expect(pagina).toContain('redirect(RESET_LINK_EXPIRED_PATH)');
+    expect(pagina).toMatch(
+      /import \{ RESET_LINK_EXPIRED_PATH \} from '@\/lib\/auth\/password-reset-feedback'/,
+    );
     expect(pagina).toContain("export const dynamic = 'force-dynamic'");
   });
 });

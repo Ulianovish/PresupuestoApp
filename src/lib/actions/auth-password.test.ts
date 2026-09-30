@@ -16,6 +16,7 @@ vi.mock('@/lib/site-url', () => ({
   getSiteUrl: vi.fn(() => 'https://app.ejemplo.com'),
 }));
 
+import { RESET_LINK_EXPIRED_PATH } from '@/lib/auth/password-reset-feedback';
 import { getPostLoginPath } from '@/lib/onboarding/post-login';
 import { createClient } from '@/lib/supabase/server';
 
@@ -43,13 +44,17 @@ function clienteFalso({
   resetError = null as ErrorFalso | null,
   resetThrows = null as Error | null,
   updateError = null as ErrorFalso | null,
+  getUserError = null as ErrorFalso | null,
+  getUserThrows = null as Error | null,
 } = {}) {
   const client = {
     auth: {
       resetPasswordForEmail: resetThrows
         ? vi.fn().mockRejectedValue(resetThrows)
         : vi.fn().mockResolvedValue({ data: {}, error: resetError }),
-      getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }),
+      getUser: getUserThrows
+        ? vi.fn().mockRejectedValue(getUserThrows)
+        : vi.fn().mockResolvedValue({ data: { user }, error: getUserError }),
       updateUser: vi
         .fn()
         .mockResolvedValue({ data: { user }, error: updateError }),
@@ -194,9 +199,50 @@ describe('resetPasswordAction', () => {
 
     const url = await enviar(VALIDA, VALIDA);
 
-    expect(url.pathname).toBe('/auth/forgot-password');
-    expect(url.searchParams.get('error')).toBe('otp_expired');
+    expect(RESET_LINK_EXPIRED_PATH).toBe(
+      '/auth/forgot-password?error=otp_expired',
+    );
+    expect(`${url.pathname}${url.search}`).toBe(RESET_LINK_EXPIRED_PATH);
     expect(client.auth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('getUser devuelve error → registra solo el code y va a RESET_LINK_EXPIRED_PATH', async () => {
+    const client = clienteFalso({
+      user: null,
+      getUserError: {
+        message: `sesión vencida de ${CORREO}`,
+        code: 'session_expired',
+        status: 403,
+      },
+    });
+
+    const url = await enviar(VALIDA, VALIDA);
+
+    expect(`${url.pathname}${url.search}`).toBe(RESET_LINK_EXPIRED_PATH);
+    expect(client.auth.updateUser).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(console.error).mock.calls[0]?.[1]).toEqual({
+      code: 'session_expired',
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+      CORREO,
+    );
+  });
+
+  it('getUser lanza → registra solo el nombre del error y va a RESET_LINK_EXPIRED_PATH', async () => {
+    const fallo = new TypeError(`fetch failed para ${CORREO}`);
+    const client = clienteFalso({ getUserThrows: fallo });
+
+    const url = await enviar(VALIDA, VALIDA);
+
+    expect(`${url.pathname}${url.search}`).toBe(RESET_LINK_EXPIRED_PATH);
+    expect(client.auth.updateUser).not.toHaveBeenCalled();
+    expect(vi.mocked(console.error).mock.calls[0]?.[1]).toEqual({
+      code: 'TypeError',
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+      CORREO,
+    );
   });
 
   it.each([
@@ -255,7 +301,7 @@ describe('resetPasswordAction', () => {
 
       expect(url.pathname).toBe('/auth/reset-password');
       expect(url.searchParams.get('error')).toBe(esperado);
-      expect(url.href).not.toContain(encodeURIComponent(crudo));
+      expect(url.searchParams.get('error')).not.toBe(crudo);
       expect(revalidatePath).not.toHaveBeenCalled();
       expect(vi.mocked(console.error).mock.calls[0]?.[1]).toEqual({
         code,

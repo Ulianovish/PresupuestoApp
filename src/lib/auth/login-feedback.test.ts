@@ -36,7 +36,7 @@ describe('resolveLoginFeedback', () => {
         error: LOGIN_VALIDATION_ERROR_CODE,
         message: null,
       }).error,
-    ).toBe('Escribe tu correo y tu contraseña.');
+    ).toBe('Revisa tu correo y tu contraseña.');
   });
 
   it('un error con texto libre nunca se muestra: cae en el genérico', () => {

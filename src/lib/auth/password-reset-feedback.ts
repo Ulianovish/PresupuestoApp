@@ -20,6 +20,14 @@ export const FORGOT_PASSWORD_INVALID_EMAIL_CODE = 'correo_invalido';
 /** `?message=` de /auth/forgot-password: mismo código exista o no el correo. */
 export const FORGOT_PASSWORD_SENT_CODE = 'enlace_enviado';
 
+/**
+ * Destino cuando no hay sesión para cambiar la contraseña (enlace vencido o
+ * ya usado): /auth/reset-password y resetPasswordAction mandan aquí.
+ * `otp_expired` se traduce a "El enlace venció. Pide uno nuevo."
+ */
+export const RESET_LINK_EXPIRED_PATH =
+  '/auth/forgot-password?error=otp_expired';
+
 // Map (no objeto) para que 'constructor' o 'toString' no encuentren nada.
 const ERRORES_FORGOT = new Map<string, string>([
   [FORGOT_PASSWORD_INVALID_EMAIL_CODE, 'Escribe un correo válido.'],

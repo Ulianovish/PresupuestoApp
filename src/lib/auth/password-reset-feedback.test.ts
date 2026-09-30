@@ -6,6 +6,7 @@ import { GENERIC_AUTH_ERROR } from './error-messages';
 import {
   FORGOT_PASSWORD_INVALID_EMAIL_CODE,
   FORGOT_PASSWORD_SENT_CODE,
+  RESET_LINK_EXPIRED_PATH,
   RESET_PASSWORD_VALIDATION_ERROR_CODES,
   resetPasswordValidationErrorCode,
   resolveForgotPasswordFeedback,
@@ -135,5 +136,17 @@ describe('resolveResetPasswordError', () => {
     'constructor',
   ])('texto libre en ?error= cae en el genérico (%s)', texto => {
     expect(resolveResetPasswordError(texto)).toBe(GENERIC_AUTH_ERROR);
+  });
+});
+
+describe('RESET_LINK_EXPIRED_PATH', () => {
+  it('vuelve a pedir el enlace con un código que la página traduce', () => {
+    expect(RESET_LINK_EXPIRED_PATH).toBe(
+      '/auth/forgot-password?error=otp_expired',
+    );
+    expect(
+      resolveForgotPasswordFeedback({ error: 'otp_expired', message: null })
+        .error,
+    ).toBe('El enlace venció. Pide uno nuevo.');
   });
 });

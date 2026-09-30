@@ -23,7 +23,7 @@ const MENSAJES = new Map<string, string>([
 
 // Códigos de error propios del login (el resto va a translateAuthError).
 const ERRORES = new Map<string, string>([
-  [LOGIN_VALIDATION_ERROR_CODE, 'Escribe tu correo y tu contraseña.'],
+  [LOGIN_VALIDATION_ERROR_CODE, 'Revisa tu correo y tu contraseña.'],
 ]);
 
 export type LoginFeedback = { error: string | null; message: string | null };
