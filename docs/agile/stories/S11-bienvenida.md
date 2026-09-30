@@ -337,12 +337,12 @@ El flujo APP corre en serie (contratos §5.3): cuando empieza S11, S07, S08, S10
   - `DEFAULT_ACCOUNT_NAME = 'Efectivo'` en `src/lib/constants/expense-categories.ts` (S07, §2.6).
 - Produces: nada.
 
-- [ ] **Step 1: Comprobar que existen**
+- [x] **Step 1: Comprobar que existen**
 
 Run: `grep -n "export function buildWhatsAppLinkUrl" src/lib/whatsapp/link-url.ts && grep -n "export async function ensureStarterKitAction" src/lib/actions/onboarding.ts && grep -n "export const DEFAULT_ACCOUNT_NAME" src/lib/constants/expense-categories.ts && grep -c "export async function" src/lib/actions/onboarding.ts`
 Expected: las tres firmas y, en la última línea, `1` (S10 dejó `onboarding.ts` solo con `ensureStarterKitAction`). Si falta alguna, detente y repórtalo: una historia anterior del flujo no está hecha. **No** las crees aquí.
 
-- [ ] **Step 2: Sus tests pasan**
+- [x] **Step 2: Sus tests pasan**
 
 Run: `bun run test src/lib/whatsapp/link-url.test.ts src/lib/actions/onboarding.test.ts`
 Expected: PASS (5 tests de S13 y 7 de S10).
@@ -367,7 +367,7 @@ Sin commit en esta tarea.
   ```
   Nunca lanza: ante error devuelve listas vacías y loguea solo `error.code`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/onboarding/wizard-data.test.ts`:
 
@@ -534,12 +534,12 @@ describe('loadWizardData', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/onboarding/wizard-data.test.ts`
 Expected: FAIL — `Failed to resolve import "./wizard-data"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/onboarding/wizard-data.ts`:
 
@@ -632,17 +632,17 @@ export async function loadWizardData(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/onboarding/wizard-data.test.ts`
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `bun run type-check`
 Expected: sin errores. (El cliente tipado con `src/types/database.ts` acepta `rpc('get_budget_by_month', …)` igual que `categories.ts` acepta `rpc('upsert_monthly_budget', …)`; si el compilador rechaza el nombre de la RPC, castea solo esa llamada: `(supabase as unknown as SupabaseClient).rpc(...)`, como `expense-classification.ts:171`, y anótalo en `deviations`.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/onboarding/wizard-data.ts src/lib/onboarding/wizard-data.test.ts
