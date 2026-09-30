@@ -332,7 +332,8 @@ Resuelven los huecos que reportaron los 13 planificadores. Donde choquen con el 
   - Sin `next` válido, `/auth/confirm` decide con `getPostLoginPath` (recovery → `/auth/reset-password`). Las plantillas de H4 no llevan `next` salvo recovery.
   - `forgotPasswordAction` **se traga todo error** de `resetPasswordForEmail` (incluido el límite de envíos: revelaría que el correo existe) y solo registra el `code`.
   - `registerAction` muestra el primer mensaje de Zod, no "Datos inválidos".
-  - La plantilla "Invite user" lleva a `/auth/reset-password` (S05): no invitar antes de desplegar S05, y el correo debe estar en la allowlist.
+  - La plantilla "Invite user" lleva `next=/auth/reset-password` (excepción a "sin next"): no invitar antes de desplegar S05, y el correo debe estar en la allowlist.
+  - `resetPasswordAction`, tras `updateUser` exitoso, redirige con `getPostLoginPath` (no fijo a `/dashboard`): así el invitado que fija su contraseña ve `/bienvenida`.
   - Lógica de rutas del middleware en `src/lib/auth/route-access.ts` (S04).
 - **§2.6 limpieza (S07)**: además borra `src/scripts/migrate-july-data.ts`, `src/scripts/migrate-july-expenses.ts`, los paneles sin uso `ExpenseMigrationPanel` y `BudgetMigrationPanel`, y el botón ligado a `'2025-07'` de `ExpenseHeader.tsx` (verificar con grep que nada los importe). "Primero crea una categoría" es la etiqueta del botón deshabilitado, más un aviso con enlace a `/settings`.
 - **§2.7 onboarding**:
