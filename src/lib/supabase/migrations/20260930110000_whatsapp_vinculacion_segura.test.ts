@@ -50,6 +50,12 @@ describe(`migración ${ARCHIVO}`, () => {
     );
   });
 
+  it('indexa created_at: la purga borra lo anterior a la ventana de cualquier número', () => {
+    expect(sql).toMatch(
+      /CREATE INDEX IF NOT EXISTS whatsapp_link_attempts_created_idx\s+ON public\.whatsapp_link_attempts \(created_at\);/,
+    );
+  });
+
   it('whatsapp_link_attempts: RLS activo, sin políticas y sin acceso para PUBLIC/anon/authenticated', () => {
     expect(sql).toMatch(
       /ALTER TABLE public\.whatsapp_link_attempts ENABLE ROW LEVEL SECURITY;/,

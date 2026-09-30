@@ -45,6 +45,11 @@ CREATE TABLE IF NOT EXISTS public.whatsapp_link_attempts (
 CREATE INDEX IF NOT EXISTS whatsapp_link_attempts_phone_created_idx
   ON public.whatsapp_link_attempts (phone_e164, created_at DESC);
 
+-- La purga de cada VINCULAR borra lo anterior a la ventana de CUALQUIER
+-- número (created_at < …): sin este índice recorrería la tabla entera.
+CREATE INDEX IF NOT EXISTS whatsapp_link_attempts_created_idx
+  ON public.whatsapp_link_attempts (created_at);
+
 -- RLS activo SIN políticas: nadie salvo service_role/postgres entra.
 ALTER TABLE public.whatsapp_link_attempts ENABLE ROW LEVEL SECURITY;
 
