@@ -561,7 +561,7 @@ EOF
   - `export async function redeemLinkCode(code: string, phoneE164: string, now?: () => Date): Promise<RedeemResult>`
   - Solo `reason: 'invalid_or_expired'` significa "código inexistente, usado o vencido" (lo usa Task 5 para contar fallos).
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 En `src/lib/services/whatsapp-links.test.ts`, reemplazar todo lo que va desde el comentario `/** Tabla whatsapp_links: lectura del vínculo previo + upsert. */` hasta el cierre de `describe('redeemLinkCode', …)` (justo antes de `describe('getLinkByPhone', …)`) por:
 
@@ -775,12 +775,12 @@ describe('redeemLinkCode', () => {
 });
 ```
 
-- [ ] **Step 2: Correr los tests y verificar que fallan**
+- [x] **Step 2: Correr los tests y verificar que fallan**
 
 Run: `bun run test src/lib/services/whatsapp-links.test.ts`
 Expected: FAIL en `redeemLinkCode`: el primer test (`update` llamado con la hora real, no con `NOW_ISO`), los de conversación (`expected "spy" to be called`), y los de `link_failed` (devuelve `invalid_or_expired`).
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/services/whatsapp-links.ts`, reemplazar desde `export type RedeemResult =` hasta el cierre de `redeemLinkCode` (la llave que sigue a `return { ok: true, userId };`) por:
 
@@ -883,7 +883,7 @@ export async function redeemLinkCode(
 }
 ```
 
-- [ ] **Step 4: Correr los tests y verificar que pasan**
+- [x] **Step 4: Correr los tests y verificar que pasan**
 
 Run: `bun run test src/lib/services/whatsapp-links.test.ts src/lib/whatsapp/handle-linking.test.ts`
 Expected: PASS (el test de `handle-linking` "VINCULAR con código inválido" sigue pasando porque `link_failed` y `invalid_or_expired` responden el mismo mensaje).
@@ -891,7 +891,7 @@ Expected: PASS (el test de `handle-linking` "VINCULAR con código inválido" sig
 Run: `bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/services/whatsapp-links.ts src/lib/services/whatsapp-links.test.ts

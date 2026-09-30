@@ -20,6 +20,7 @@ const mockedAdmin = createAdminClient as unknown as ReturnType<typeof vi.fn>;
 const NOW = new Date('2026-09-30T12:00:00.000Z');
 const NOW_ISO = '2026-09-30T12:00:00.000Z';
 const now = () => NOW;
+const TEL = '+573000000000';
 
 describe('generateSixDigitCode', () => {
   it('devuelve exactamente 6 dígitos', () => {
@@ -151,69 +152,120 @@ describe('createLinkCode', () => {
 });
 
 /** Tabla whatsapp_links: lectura del vínculo previo + upsert. */
-function tablaLinks(previo: { data: unknown; error: unknown }) {
-  const upsert = vi.fn().mockResolvedValue({ error: null });
+function tablaLinks(
+  previo: { data: unknown; error: unknown },
+  upsertResult: { error: unknown } = { error: null },
+) {
   return {
-    upsert,
+    upsert: vi.fn().mockResolvedValue(upsertResult),
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockResolvedValue(previo),
   };
 }
 
-function codigoValido(userId = 'user-1') {
+/** Tabla whatsapp_link_codes para el canje: update().eq().is().gt().select(). */
+function tablaCanje(resultado: { data: unknown; error: unknown }) {
   return {
     update: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     is: vi.fn().mockReturnThis(),
     gt: vi.fn().mockReturnThis(),
-    select: vi
-      .fn()
-      .mockResolvedValue({ data: [{ user_id: userId }], error: null }),
+    select: vi.fn().mockResolvedValue(resultado),
   };
+}
+
+function codigoValido(userId = 'user-1') {
+  return tablaCanje({ data: [{ user_id: userId }], error: null });
+}
+
+/** Tabla whatsapp_conversations: delete().eq().neq(). */
+function tablaConversaciones(resultado: { error: unknown } = { error: null }) {
+  return {
+    delete: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    neq: vi.fn().mockResolvedValue(resultado),
+  };
+}
+
+/** Cliente con solo las tablas dadas; pedir cualquier otra hace fallar el test. */
+function clienteCanje(tablas: Record<string, unknown>) {
+  const from = vi.fn((table: string) => {
+    if (table in tablas) return tablas[table];
+    throw new Error(`tabla inesperada ${table}`);
+  });
+  mockedAdmin.mockReturnValue({ from });
+  return from;
 }
 
 describe('redeemLinkCode', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('canjea con UPDATE atómico condicional según el reloj inyectado y devuelve userId', async () => {
+    const codigos = codigoValido();
+    const links = tablaLinks({ data: null, error: null });
+    clienteCanje({
+      whatsapp_link_codes: codigos,
+      whatsapp_links: links,
+      whatsapp_conversations: tablaConversaciones(),
+    });
+
+    const res = await redeemLinkCode('482913', TEL, now);
+
+    expect(res).toEqual({ ok: true, userId: 'user-1' });
+    // Un solo statement: marca usado SOLO si está sin usar y vigente.
+    expect(codigos.update).toHaveBeenCalledWith({ used_at: NOW_ISO });
+    expect(codigos.eq).toHaveBeenCalledWith('code', '482913');
+    expect(codigos.is).toHaveBeenCalledWith('used_at', null);
+    expect(codigos.gt).toHaveBeenCalledWith('expires_at', NOW_ISO);
+    // Número nuevo: el documento arranca vacío.
+    expect(links.upsert).toHaveBeenCalledWith(
+      { phone_e164: TEL, user_id: 'user-1', documento: null },
+      { onConflict: 'phone_e164' },
+    );
+  });
+
   it('re-vincular el número a OTRO usuario borra el documento del dueño anterior', async () => {
     const links = tablaLinks({ data: { user_id: 'otro' }, error: null });
-    const from = vi.fn((table: string) =>
-      table === 'whatsapp_link_codes' ? codigoValido() : links,
-    );
-    mockedAdmin.mockReturnValue({ from });
+    clienteCanje({
+      whatsapp_link_codes: codigoValido(),
+      whatsapp_links: links,
+      whatsapp_conversations: tablaConversaciones(),
+    });
 
-    await redeemLinkCode('482913', '+573001234567');
+    await redeemLinkCode('482913', TEL, now);
 
     expect(links.upsert).toHaveBeenCalledWith(
-      { phone_e164: '+573001234567', user_id: 'user-1', documento: null },
+      { phone_e164: TEL, user_id: 'user-1', documento: null },
       { onConflict: 'phone_e164' },
     );
   });
 
   it('re-vincular al MISMO usuario conserva el documento', async () => {
     const links = tablaLinks({ data: { user_id: 'user-1' }, error: null });
-    const from = vi.fn((table: string) =>
-      table === 'whatsapp_link_codes' ? codigoValido() : links,
-    );
-    mockedAdmin.mockReturnValue({ from });
+    clienteCanje({
+      whatsapp_link_codes: codigoValido(),
+      whatsapp_links: links,
+      whatsapp_conversations: tablaConversaciones(),
+    });
 
-    await redeemLinkCode('482913', '+573001234567');
+    await redeemLinkCode('482913', TEL, now);
 
     expect(links.upsert).toHaveBeenCalledWith(
-      { phone_e164: '+573001234567', user_id: 'user-1' },
+      { phone_e164: TEL, user_id: 'user-1' },
       { onConflict: 'phone_e164' },
     );
   });
 
   it('si no se puede leer el vínculo previo, borra el documento (ante la duda, no se hereda)', async () => {
     const links = tablaLinks({ data: null, error: { message: 'boom' } });
-    const from = vi.fn((table: string) =>
-      table === 'whatsapp_link_codes' ? codigoValido() : links,
-    );
-    mockedAdmin.mockReturnValue({ from });
+    clienteCanje({
+      whatsapp_link_codes: codigoValido(),
+      whatsapp_links: links,
+      whatsapp_conversations: tablaConversaciones(),
+    });
 
-    await redeemLinkCode('482913', '+573001234567');
+    await redeemLinkCode('482913', TEL, now);
 
     expect(links.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ documento: null }),
@@ -221,61 +273,89 @@ describe('redeemLinkCode', () => {
     );
   });
 
-  it('canjea con UPDATE atómico condicional: marca usado, upserta y devuelve userId', async () => {
+  it('borra la conversación del número que era de OTRO usuario, antes de vincular', async () => {
+    const conversaciones = tablaConversaciones();
     const links = tablaLinks({ data: null, error: null });
-    const upsert = links.upsert;
-    // Cadena del UPDATE atómico: update().eq().is().gt().select() → {data:[{user_id}]}
-    const updateChain = {
-      update: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      is: vi.fn().mockReturnThis(),
-      gt: vi.fn().mockReturnThis(),
-      select: vi
-        .fn()
-        .mockResolvedValue({ data: [{ user_id: 'user-1' }], error: null }),
-    };
-    const from = vi.fn((table: string) => {
-      if (table === 'whatsapp_link_codes') return updateChain;
-      if (table === 'whatsapp_links') return links;
-      throw new Error(`tabla inesperada ${table}`);
+    clienteCanje({
+      whatsapp_link_codes: codigoValido(),
+      whatsapp_links: links,
+      whatsapp_conversations: conversaciones,
     });
-    mockedAdmin.mockReturnValue({ from });
 
-    const res = await redeemLinkCode('482913', '+573001234567');
+    await redeemLinkCode('482913', TEL, now);
 
-    expect(res).toEqual({ ok: true, userId: 'user-1' });
-    // El UPDATE filtra por código sin usar y vigente (un solo statement atómico).
-    expect(updateChain.update).toHaveBeenCalledWith(
-      expect.objectContaining({ used_at: expect.any(String) }),
-    );
-    expect(updateChain.is).toHaveBeenCalledWith('used_at', null);
-    // Número nuevo: el documento arranca vacío.
-    expect(upsert).toHaveBeenCalledWith(
-      { phone_e164: '+573001234567', user_id: 'user-1', documento: null },
-      { onConflict: 'phone_e164' },
+    expect(conversaciones.delete).toHaveBeenCalled();
+    expect(conversaciones.eq).toHaveBeenCalledWith('phone_e164', TEL);
+    // Solo la de otro dueño: si el dueño es el mismo, la conversación sigue.
+    expect(conversaciones.neq).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(conversaciones.delete.mock.invocationCallOrder[0]).toBeLessThan(
+      links.upsert.mock.invocationCallOrder[0],
     );
   });
 
-  it('rechaza un código inexistente/expirado (UPDATE no afecta filas) sin upsertar', async () => {
-    const upsert = vi.fn().mockResolvedValue({ error: null });
-    const updateChain = {
-      update: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      is: vi.fn().mockReturnThis(),
-      gt: vi.fn().mockReturnThis(),
-      select: vi.fn().mockResolvedValue({ data: [], error: null }),
-    };
-    const from = vi.fn((table: string) => {
-      if (table === 'whatsapp_link_codes') return updateChain;
-      if (table === 'whatsapp_links') return { upsert };
-      throw new Error(`tabla inesperada ${table}`);
+  it('si no se puede borrar la conversación ajena, no vincula (link_failed) y no loguea el número', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const links = tablaLinks({ data: null, error: null });
+    clienteCanje({
+      whatsapp_link_codes: codigoValido(),
+      whatsapp_links: links,
+      whatsapp_conversations: tablaConversaciones({
+        error: { code: 'XX000', message: 'boom' },
+      }),
     });
-    mockedAdmin.mockReturnValue({ from });
 
-    const res = await redeemLinkCode('000000', '+573001234567');
+    const res = await redeemLinkCode('482913', TEL, now);
+
+    expect(res).toEqual({ ok: false, reason: 'link_failed' });
+    expect(links.upsert).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('redeemLinkCode'),
+      'XX000',
+    );
+    expect(errorSpy.mock.calls.flat().join(' ')).not.toContain(TEL);
+    errorSpy.mockRestore();
+  });
+
+  it('rechaza un código inexistente/vencido (UPDATE sin filas) sin tocar vínculos ni conversaciones', async () => {
+    clienteCanje({
+      whatsapp_link_codes: tablaCanje({ data: [], error: null }),
+    });
+
+    const res = await redeemLinkCode('000000', TEL, now);
 
     expect(res).toEqual({ ok: false, reason: 'invalid_or_expired' });
-    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('un error de base en el UPDATE es link_failed (no es culpa del número)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    clienteCanje({
+      whatsapp_link_codes: tablaCanje({
+        data: null,
+        error: { code: '57014', message: 'canceling statement due to timeout' },
+      }),
+    });
+
+    const res = await redeemLinkCode('482913', TEL, now);
+
+    expect(res).toEqual({ ok: false, reason: 'link_failed' });
+    expect(errorSpy.mock.calls.flat().join(' ')).not.toContain('482913');
+    errorSpy.mockRestore();
+  });
+
+  it('si el upsert del vínculo falla devuelve link_failed', async () => {
+    const links = tablaLinks(
+      { data: null, error: null },
+      { error: { code: 'XX000', message: 'boom' } },
+    );
+    clienteCanje({
+      whatsapp_link_codes: codigoValido(),
+      whatsapp_links: links,
+      whatsapp_conversations: tablaConversaciones(),
+    });
+
+    const res = await redeemLinkCode('482913', TEL, now);
+
+    expect(res).toEqual({ ok: false, reason: 'link_failed' });
   });
 });
 

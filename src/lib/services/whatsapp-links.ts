@@ -80,23 +80,33 @@ export async function createLinkCode(
 
 export type RedeemResult =
   | { ok: true; userId: string }
-  | { ok: false; reason: 'invalid_or_expired' };
+  | { ok: false; reason: 'invalid_or_expired' | 'link_failed' };
 
 /**
  * Canjea un código y vincula el número.
  *
- * Usa un UPDATE atómico condicional (marca `used_at` SOLO si la fila está sin
- * usar y vigente, devolviendo `user_id`): un único statement que garantiza que
- * un código se canjee una sola vez aunque lleguen dos peticiones a la vez
- * (evita la carrera SELECT→UPDATE). El upsert por `phone_e164` mueve el número
- * de presupuesto al re-vincular.
+ * - `invalid_or_expired`: el código no existe, ya se usó o venció. Es lo único
+ *   que cuenta como intento fallido para el límite por número.
+ * - `link_failed`: falló la base (el UPDATE, borrar la conversación ajena o el
+ *   upsert). No es culpa de quien escribe, así que no suma al límite.
+ *
+ * El canje es un UPDATE condicional (sin usar y vigente) en un único
+ * statement: un código se canjea una sola vez aunque lleguen dos peticiones a
+ * la vez, y el índice único parcial de códigos pendientes garantiza que afecte
+ * como mucho una fila. El upsert por `phone_e164` mueve el número de
+ * presupuesto al re-vincular.
+ *
+ * Si el número tenía conversación con OTRO usuario, esa fila se borra ANTES de
+ * vincular: trae turnos y pendientes del dueño anterior que el agente leería
+ * como propios. Si no se puede borrar, no se vincula.
  */
 export async function redeemLinkCode(
   code: string,
   phoneE164: string,
+  now: () => Date = () => new Date(),
 ): Promise<RedeemResult> {
   const supabase = createAdminClient();
-  const nowIso = new Date().toISOString();
+  const nowIso = now().toISOString();
 
   const { data: rows, error } = await supabase
     .from('whatsapp_link_codes')
@@ -105,9 +115,13 @@ export async function redeemLinkCode(
     .is('used_at', null)
     .gt('expires_at', nowIso)
     .select('user_id');
+  if (error) {
+    console.error('redeemLinkCode: error canjeando el código:', error.code);
+    return { ok: false, reason: 'link_failed' };
+  }
 
   const row = rows?.[0];
-  if (error || !row) {
+  if (!row) {
     return { ok: false, reason: 'invalid_or_expired' };
   }
 
@@ -124,6 +138,22 @@ export async function redeemLinkCode(
     .maybeSingle();
   const mismoDueno = (previo as { user_id: string } | null)?.user_id === userId;
 
+  // La conversación se decide por SU user_id y no por el vínculo previo: un
+  // número vinculado no llega a este flujo, así que cambia de dueño después de
+  // desvincularse, cuando la fila de whatsapp_links del anterior ya no existe.
+  const { error: conversacionError } = await supabase
+    .from('whatsapp_conversations')
+    .delete()
+    .eq('phone_e164', phoneE164)
+    .neq('user_id', userId);
+  if (conversacionError) {
+    console.error(
+      'redeemLinkCode: no se pudo borrar la conversación del dueño anterior:',
+      conversacionError.code,
+    );
+    return { ok: false, reason: 'link_failed' };
+  }
+
   const { error: upsertError } = await supabase.from('whatsapp_links').upsert(
     {
       phone_e164: phoneE164,
@@ -135,7 +165,11 @@ export async function redeemLinkCode(
   if (upsertError) {
     // El código ya quedó consumido; reportamos fallo para que el usuario
     // reintente con uno nuevo en vez de creer que quedó vinculado.
-    return { ok: false, reason: 'invalid_or_expired' };
+    console.error(
+      'redeemLinkCode: no se pudo guardar el vínculo:',
+      upsertError.code,
+    );
+    return { ok: false, reason: 'link_failed' };
   }
 
   return { ok: true, userId };
