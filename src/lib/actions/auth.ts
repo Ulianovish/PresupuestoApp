@@ -18,7 +18,7 @@ import {
 } from '@/lib/auth/password-reset-feedback';
 import { registerValidationErrorCode } from '@/lib/auth/register-feedback';
 import { safeRedirectPath } from '@/lib/auth/safe-redirect';
-import { esFaltaDeSesion } from '@/lib/auth/session-error';
+import { esFaltaDeSesion, resumenErrorAuth } from '@/lib/auth/session-error';
 import { getPostLoginPath } from '@/lib/onboarding/post-login';
 import { getSiteUrl } from '@/lib/site-url';
 import { createClient } from '@/lib/supabase/server';
@@ -242,15 +242,6 @@ function codigoDeError(error: unknown): string {
   return 'sin_codigo';
 }
 
-/** El `code` del error o, si no trae, su nombre (nunca el mensaje). */
-function codigoONombre(error: unknown): string {
-  const code = codigoDeError(error);
-  if (code === 'sin_codigo' && error instanceof Error && error.name) {
-    return error.name;
-  }
-  return code;
-}
-
 /**
  * Server Action: envía el correo para restablecer la contraseña.
  * El enlace del correo (plantilla "Reset Password") pasa por /auth/confirm,
@@ -305,21 +296,20 @@ export async function resetPasswordAction(formData: FormData): Promise<void> {
   const supabase = await createClient();
 
   // La sesión se revisa antes de validar: un enlace vencido lleva a pedir otro.
-  // Si getUser falla se registra solo el code (o el nombre del error): el
-  // mensaje podría llevar el correo.
+  // Si getUser falla se registra el code (o el nombre del error) y el status,
+  // igual que el middleware: el mensaje podría llevar el correo.
   let user: User | null = null;
   try {
     const { data, error } = await supabase.auth.getUser();
     if (error && !esFaltaDeSesion(error)) {
-      console.error('resetPasswordAction: getUser falló', {
-        code: codigoONombre(error),
-      });
+      console.error(
+        'resetPasswordAction: getUser falló',
+        resumenErrorAuth(error),
+      );
     }
     user = data.user;
   } catch (e) {
-    console.error('resetPasswordAction: getUser lanzó', {
-      code: codigoONombre(e),
-    });
+    console.error('resetPasswordAction: getUser lanzó', resumenErrorAuth(e));
   }
 
   if (!user) {

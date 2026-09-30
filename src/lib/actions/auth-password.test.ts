@@ -222,8 +222,31 @@ describe('resetPasswordAction', () => {
     expect(`${url.pathname}${url.search}`).toBe(RESET_LINK_EXPIRED_PATH);
     expect(client.auth.updateUser).not.toHaveBeenCalled();
     expect(console.error).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(console.error).mock.calls[0]?.[1]).toEqual({
+    expect(vi.mocked(console.error).mock.calls[0]?.[1]).toStrictEqual({
       code: 'session_expired',
+      status: 403,
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+      CORREO,
+    );
+  });
+
+  it('getUser devuelve un error sin code como objeto plano → registra el nombre y el status', async () => {
+    clienteFalso({
+      user: null,
+      getUserError: {
+        name: 'AuthRetryableFetchError',
+        message: `fetch failed para ${CORREO}`,
+        status: 0,
+      },
+    });
+
+    const url = await enviar(VALIDA, VALIDA);
+
+    expect(`${url.pathname}${url.search}`).toBe(RESET_LINK_EXPIRED_PATH);
+    expect(vi.mocked(console.error).mock.calls[0]?.[1]).toStrictEqual({
+      code: 'AuthRetryableFetchError',
+      status: 0,
     });
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
       CORREO,
