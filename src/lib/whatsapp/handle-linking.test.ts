@@ -44,28 +44,40 @@ describe('handleLinkingMessage', () => {
     expect(d.releaseLinkAttempt).not.toHaveBeenCalled();
   });
 
-  it('código ya consumido pero el número YA quedó vinculado (reintento de Twilio) → libera la reserva y confirma el vínculo', async () => {
+  it('reintento de Twilio (código canjeado hace poco por el mismo vínculo) → libera la reserva UNA vez y confirma el vínculo', async () => {
+    const d = deps({
+      redeemLinkCode: vi
+        .fn()
+        .mockResolvedValue({ ok: false, reason: 'already_redeemed_same_link' }),
+    });
+    const reply = await handleLinkingMessage(TEL, 'VINCULAR 482913', d);
+    expect(reply).toContain('¡Listo!');
+    expect(reply).not.toMatch(/válido|expir/i);
+    expect(d.releaseLinkAttempt).toHaveBeenCalledWith(7);
+    expect(d.releaseLinkAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('número YA vinculado + código que nunca existió → código inválido y el intento cuenta', async () => {
     const d = deps({
       redeemLinkCode: vi
         .fn()
         .mockResolvedValue({ ok: false, reason: 'invalid_or_expired' }),
       getLinkByPhone: vi.fn().mockResolvedValue({ userId: 'u1' }),
     });
-    const reply = await handleLinkingMessage(TEL, 'VINCULAR 482913', d);
-    expect(d.getLinkByPhone).toHaveBeenCalledWith(TEL);
-    expect(reply).toContain('¡Listo!');
-    expect(reply).not.toMatch(/válido|expir/i);
-    expect(d.releaseLinkAttempt).toHaveBeenCalledWith(7);
+    const reply = await handleLinkingMessage(TEL, 'VINCULAR 000000', d);
+    expect(reply).toMatch(/válido|expir/i);
+    expect(reply).not.toContain('¡Listo!');
+    expect(d.releaseLinkAttempt).not.toHaveBeenCalled();
   });
 
-  it('código inválido y la consulta del vínculo falla → mensaje de código inválido y el intento cuenta', async () => {
+  it('número vinculado a otro usuario + código canjeado por un tercero (invalid_or_expired) → inválido y cuenta', async () => {
     const d = deps({
       redeemLinkCode: vi
         .fn()
         .mockResolvedValue({ ok: false, reason: 'invalid_or_expired' }),
-      getLinkByPhone: vi.fn().mockRejectedValue(new Error('red')),
+      getLinkByPhone: vi.fn().mockResolvedValue({ userId: 'otro' }),
     });
-    const reply = await handleLinkingMessage(TEL, 'VINCULAR 000000', d);
+    const reply = await handleLinkingMessage(TEL, 'VINCULAR 482913', d);
     expect(reply).toMatch(/válido|expir/i);
     expect(d.releaseLinkAttempt).not.toHaveBeenCalled();
   });

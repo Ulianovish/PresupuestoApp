@@ -323,13 +323,86 @@ describe('redeemLinkCode', () => {
   });
 
   it('rechaza un código inexistente/vencido (UPDATE sin filas) sin tocar vínculos ni conversaciones', async () => {
-    clienteCanje({
+    const links = tablaLinks({ data: null, error: null });
+    const from = clienteCanje({
       whatsapp_link_codes: tablaCanje({ data: [], error: null }),
+      whatsapp_links: links,
     });
 
     const res = await redeemLinkCode('000000', TEL, now);
 
     expect(res).toEqual({ ok: false, reason: 'invalid_or_expired' });
+    expect(links.upsert).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalledWith('whatsapp_conversations');
+  });
+
+  it('código ya canjeado hace poco para el MISMO vínculo del número (reintento de Twilio) → already_redeemed_same_link', async () => {
+    const canje = consulta({ data: [], error: null });
+    const vinculo = consulta({ data: { user_id: 'user-1' }, error: null });
+    const reciente = consulta({ data: [{ code: '482913' }], error: null });
+    const from = clienteIntentos(canje, vinculo, reciente);
+
+    const res = await redeemLinkCode('482913', TEL, now);
+
+    expect(res).toEqual({ ok: false, reason: 'already_redeemed_same_link' });
+    expect(from).toHaveBeenNthCalledWith(2, 'whatsapp_links');
+    expect(vinculo.eq).toHaveBeenCalledWith('phone_e164', TEL);
+    expect(from).toHaveBeenNthCalledWith(3, 'whatsapp_link_codes');
+    // Solo ese código, del dueño del vínculo y canjeado en los últimos 2 min.
+    expect(reciente.eq).toHaveBeenCalledWith('code', '482913');
+    expect(reciente.eq).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(reciente.gte).toHaveBeenCalledWith(
+      'used_at',
+      '2026-09-30T11:58:00.000Z',
+    );
+  });
+
+  it('número vinculado + código que no se canjeó para su vínculo (ajeno o inexistente) → invalid_or_expired', async () => {
+    const from = clienteIntentos(
+      consulta({ data: [], error: null }),
+      consulta({ data: { user_id: 'user-1' }, error: null }),
+      consulta({ data: [], error: null }),
+    );
+
+    const res = await redeemLinkCode('999999', TEL, now);
+
+    expect(res).toEqual({ ok: false, reason: 'invalid_or_expired' });
+    expect(from).toHaveBeenCalledTimes(3);
+  });
+
+  it('número sin vínculo + código inválido → invalid_or_expired sin buscar canjes recientes', async () => {
+    const from = clienteIntentos(
+      consulta({ data: [], error: null }),
+      consulta({ data: null, error: null }),
+    );
+
+    const res = await redeemLinkCode('999999', TEL, now);
+
+    expect(res).toEqual({ ok: false, reason: 'invalid_or_expired' });
+    expect(from).toHaveBeenCalledTimes(2);
+  });
+
+  it('si falla la búsqueda del vínculo o del canje reciente, el intento sigue siendo invalid_or_expired', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    clienteIntentos(
+      consulta({ data: [], error: null }),
+      consulta({ data: null, error: { code: 'XX000', message: 'boom' } }),
+    );
+    expect(await redeemLinkCode('482913', TEL, now)).toEqual({
+      ok: false,
+      reason: 'invalid_or_expired',
+    });
+
+    clienteIntentos(
+      consulta({ data: [], error: null }),
+      consulta({ data: { user_id: 'user-1' }, error: null }),
+      consulta({ data: null, error: { code: 'XX000', message: 'boom' } }),
+    );
+    expect(await redeemLinkCode('482913', TEL, now)).toEqual({
+      ok: false,
+      reason: 'invalid_or_expired',
+    });
+    errorSpy.mockRestore();
   });
 
   it('un error de base en el UPDATE es link_failed (no es culpa del número)', async () => {
@@ -533,6 +606,8 @@ function consulta(result: unknown) {
     'is',
     'gt',
     'neq',
+    'maybeSingle',
+    'limit',
   ]) {
     c[m] = vi.fn(() => c);
   }

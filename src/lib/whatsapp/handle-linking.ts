@@ -66,21 +66,14 @@ export async function handleLinkingMessage(
       throw err;
     }
     // Solo un código inexistente o vencido cuenta (su reserva queda como el
-    // fallo); un canje exitoso o un error de base no es culpa de quien escribe.
-    if (res.ok || res.reason === 'link_failed') {
+    // fallo). Un canje exitoso, un error de base o un reintento de Twilio del
+    // mismo VINCULAR (el código lo canjeó hace poco el mismo vínculo; lo decide
+    // redeemLinkCode) no es culpa de quien escribe.
+    if (res.ok || res.reason !== 'invalid_or_expired') {
       await liberar();
     }
-    if (res.ok) return MSG_LINKED_OK;
-
-    // Twilio reintenta el webhook si la primera respuesta tardó: el código ya
-    // se canjeó y el reintento lo ve como inválido. Si el número ya quedó
-    // vinculado, no fue un fallo: se libera la reserva y se confirma.
-    if (res.reason === 'invalid_or_expired') {
-      const vinculado = await deps.getLinkByPhone(phoneE164).catch(() => null);
-      if (vinculado) {
-        await liberar();
-        return MSG_LINKED_OK;
-      }
+    if (res.ok || res.reason === 'already_redeemed_same_link') {
+      return MSG_LINKED_OK;
     }
     return MSG_CODE_INVALID;
   }

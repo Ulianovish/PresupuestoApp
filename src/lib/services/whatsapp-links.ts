@@ -81,13 +81,83 @@ export async function createLinkCode(
 
 export type RedeemResult =
   | { ok: true; userId: string }
-  | { ok: false; reason: 'invalid_or_expired' | 'link_failed' };
+  | {
+      ok: false;
+      reason:
+        | 'invalid_or_expired'
+        | 'link_failed'
+        | 'already_redeemed_same_link';
+    };
+
+/**
+ * Minutos en los que un código ya canjeado se reconoce como reintento del
+ * mismo VINCULAR (Twilio reintenta el webhook si la respuesta tardó).
+ */
+export const LINK_RETRY_WINDOW_MINUTES = 2;
+
+/**
+ * ¿Este código lo canjeó hace poco el MISMO vínculo del número? Solo así un
+ * código que ya no está pendiente se trata como reintento de Twilio y no como
+ * intento fallido. Ante cualquier duda (sin vínculo, código de otro usuario,
+ * error de base) responde false y el intento sigue contando.
+ */
+async function esReintentoDelMismoVinculo(
+  supabase: ReturnType<typeof createAdminClient>,
+  code: string,
+  phoneE164: string,
+  ahora: Date,
+): Promise<boolean> {
+  try {
+    const { data: vinculo, error: vinculoError } = await supabase
+      .from('whatsapp_links')
+      .select('user_id')
+      .eq('phone_e164', phoneE164)
+      .maybeSingle();
+    if (vinculoError) {
+      console.error(
+        'redeemLinkCode: no se pudo leer el vínculo del número:',
+        vinculoError.code,
+      );
+      return false;
+    }
+    const userId = (vinculo as { user_id: string } | null)?.user_id;
+    if (!userId) return false;
+
+    const desde = new Date(
+      ahora.getTime() - LINK_RETRY_WINDOW_MINUTES * 60_000,
+    ).toISOString();
+    const { data: canjes, error: canjeError } = await supabase
+      .from('whatsapp_link_codes')
+      .select('code')
+      .eq('code', code)
+      .eq('user_id', userId)
+      .gte('used_at', desde)
+      .limit(1);
+    if (canjeError) {
+      console.error(
+        'redeemLinkCode: no se pudo buscar el canje reciente:',
+        canjeError.code,
+      );
+      return false;
+    }
+    return (canjes?.length ?? 0) > 0;
+  } catch (err) {
+    console.error(
+      'redeemLinkCode: fallo buscando el canje reciente:',
+      err instanceof Error ? err.name : 'error desconocido',
+    );
+    return false;
+  }
+}
 
 /**
  * Canjea un código y vincula el número.
  *
  * - `invalid_or_expired`: el código no existe, ya se usó o venció. Es lo único
  *   que cuenta como intento fallido para el límite por número.
+ * - `already_redeemed_same_link`: el código ya no está pendiente, pero lo
+ *   canjeó en los últimos LINK_RETRY_WINDOW_MINUTES el mismo usuario al que
+ *   está vinculado este número: es un reintento del webhook, no un fallo.
  * - `link_failed`: falló la base (el UPDATE, borrar la conversación ajena o el
  *   upsert). No es culpa de quien escribe, así que no suma al límite, y si el
  *   código ya se había consumido se libera (best-effort) para reintentarlo.
@@ -124,6 +194,9 @@ export async function redeemLinkCode(
 
   const row = rows?.[0];
   if (!row) {
+    if (await esReintentoDelMismoVinculo(supabase, code, phoneE164, now())) {
+      return { ok: false, reason: 'already_redeemed_same_link' };
+    }
     return { ok: false, reason: 'invalid_or_expired' };
   }
 
