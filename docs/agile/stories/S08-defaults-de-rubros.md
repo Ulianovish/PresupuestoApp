@@ -1349,12 +1349,12 @@ EOF
 
 **Files:** ninguno nuevo.
 
-- [ ] **Step 1: Suite completa y tipos**
+- [x] **Step 1: Suite completa y tipos**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: todos los tests en verde (incluye los 4 archivos nuevos) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 2: No quedan selecciones "el primero" de catálogos al crear rubros**
+- [x] **Step 2: No quedan selecciones "el primero" de catálogos al crear rubros**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rnE "from\('(classifications|controls)'\)" src --include='*.ts' --include='*.tsx' | grep -v "\.test\."`
 Expected: solo `src/lib/budget/item-defaults-supabase.ts`, `src/lib/services/budget.ts` (listados de UI), `src/app/api/budget/route.ts` y `src/app/api/budget/[id]/route.ts` (por nombre enviado). (`src/scripts/migrate-july-data.ts` ya no aparece: lo borró S07.) Ninguno con `.limit(1)`:
@@ -1362,7 +1362,7 @@ Expected: solo `src/lib/budget/item-defaults-supabase.ts`, `src/lib/services/bud
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rn "limit(1)" src/lib/actions src/lib/budget`
 Expected: sin salida.
 
-- [ ] **Step 3: Sin migraciones nuevas**
+- [x] **Step 3: Sin migraciones nuevas**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git diff --name-only main...HEAD -- supabase/`
 Expected: sin archivos de S08 (solo los que existieran de otras historias).

@@ -24,9 +24,10 @@ describe('ExpenseModal sin categorías (contratos §2.6 y §5.2)', () => {
     );
   });
 
-  it('el aviso enlaza a /settings solo cuando el guardado está deshabilitado', () => {
+  it('el aviso enlaza a /settings solo cuando el guardado está deshabilitado por falta de categorías (trae texto)', () => {
+    // Mientras las categorías cargan, /gastos deshabilita sin texto: sin aviso.
     expect(modal).toMatch(
-      /\{submitDisabled && \([\s\S]*?<Link href="\/settings"[\s\S]*?\)\}/,
+      /\{submitDisabled && submitDisabledLabel && \([\s\S]*?<Link href="\/settings"[\s\S]*?\)\}/,
     );
   });
 });
