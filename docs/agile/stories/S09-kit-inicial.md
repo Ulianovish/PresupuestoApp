@@ -964,7 +964,7 @@ EOF
 Recarga del kit robusta (la migración `20260930130000` aún no está aplicada, así que se edita en sitio). Test de texto en `src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`, TDD y un commit por punto.
 
 - [x] **1. Plantilla del mes:** `ON CONFLICT (user_id, month_year) DO UPDATE SET is_active = true` (antes `DO NOTHING`); el id se sigue leyendo con el `SELECT` posterior.
-- [ ] **2. Rubros inactivos:** los rubros del kit que ya existen inactivos en la plantilla (misma categoría + `lower(name)`) se reactivan con un `UPDATE` antes del `INSERT … NOT EXISTS`.
+- [x] **2. Rubros inactivos:** los rubros del kit que ya existen inactivos en la plantilla (misma categoría + `lower(name)`) se reactivan con un `UPDATE` antes del `INSERT … NOT EXISTS`.
 - [ ] **3. Categorías por `upper(btrim(name))`:** antes del `INSERT` se reactivan las categorías del usuario que coinciden con una del kit; solo se insertan las que no existen con ese criterio (no se duplica `Vivienda` vs `VIVIENDA`). Los rubros usan esas categorías por id.
 - [ ] **4. Verificación manual:** caso con plantilla y un rubro del kit inactivos + categoría `Vivienda` en minúsculas → recargar → todo reactivado, sin duplicados.
 - [ ] **5. Global Constraints:** commits siempre con `git commit --no-verify`; antes de cada commit que toque `src/`, `bunx eslint` y `bunx prettier --check`.

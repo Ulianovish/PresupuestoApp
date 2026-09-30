@@ -164,6 +164,17 @@ BEGIN
     FROM public.budget_templates
     WHERE user_id = p_user_id AND month_year = p_month_year;
 
+    -- Rubros del kit que ya están en la plantilla pero inactivos: se reactivan
+    -- (misma categoría y mismo nombre sin distinguir mayúsculas).
+    UPDATE public.budget_items bi
+       SET is_active = true
+      FROM jsonb_array_elements(v_kit) AS kit(item)
+      JOIN public.categories cat ON cat.user_id = p_user_id AND cat.name = kit.item->>'categoria'
+     WHERE bi.template_id = v_template_id
+       AND bi.category_id = cat.id
+       AND lower(bi.name) = lower(kit.item->>'rubro')
+       AND bi.is_active = false;
+
     -- Rubros ya resueltos (v_kit). Los que ya estén en la plantilla (misma
     -- categoría y mismo nombre sin distinguir mayúsculas) no se repiten: una
     -- recarga del kit puede insertar menos de 12, y está bien.

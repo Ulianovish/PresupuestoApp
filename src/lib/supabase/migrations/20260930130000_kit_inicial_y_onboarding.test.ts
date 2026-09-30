@@ -195,6 +195,22 @@ describe('migración 20260930130000: _seed_starter_kit', () => {
     expect(notExists).toBeGreaterThan(insert);
   });
 
+  it('reactiva los rubros del kit que ya están inactivos en la plantilla ANTES de insertar los que faltan', () => {
+    const body = seed();
+    const template = body.indexOf('SELECT id INTO v_template_id');
+    const update = body.indexOf(
+      'UPDATE public.budget_items bi SET is_active = true FROM jsonb_array_elements(v_kit) AS kit(item)',
+    );
+    const match = body.indexOf(
+      "WHERE bi.template_id = v_template_id AND bi.category_id = cat.id AND lower(bi.name) = lower(kit.item->>'rubro') AND bi.is_active = false;",
+    );
+    const insert = body.indexOf('INSERT INTO public.budget_items');
+    expect(template).toBeGreaterThan(-1);
+    expect(update).toBeGreaterThan(template);
+    expect(match).toBeGreaterThan(update);
+    expect(insert).toBeGreaterThan(match);
+  });
+
   it('verifica los catálogos ANTES de insertar nada y falla en vez de inventarlos', () => {
     const body = seed();
     const firstInsert = body.indexOf('INSERT INTO');
