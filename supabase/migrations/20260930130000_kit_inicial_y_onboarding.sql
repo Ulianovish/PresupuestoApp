@@ -381,6 +381,18 @@ GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin, servi
 --   SELECT is_active FROM public.budget_templates WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- true (una sola fila)
 --   SELECT count(*), count(*) FILTER (WHERE is_active) FROM public.budget_items WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- 12, 12 (Internet reactivado)
 --
+--   -- Dos variantes de VIVIENDA inactivas y un rubro con espacios de borde: solo
+--   -- se reactiva la categoría que usan los rubros y ' Internet ' no se duplica.
+--   UPDATE public.categories SET name = 'VIVIENDA' WHERE user_id = '22222222-2222-2222-2222-222222222222' AND name = 'Vivienda';
+--   INSERT INTO public.categories (user_id, name, is_active) VALUES ('22222222-2222-2222-2222-222222222222', 'vivienda', false);
+--   UPDATE public.categories SET is_active = false WHERE user_id = '22222222-2222-2222-2222-222222222222';
+--   UPDATE public.budget_items SET name = ' Internet ', is_active = false WHERE user_id = '22222222-2222-2222-2222-222222222222' AND name = 'Internet';
+--   SET LOCAL ROLE authenticated;
+--   SELECT public.ensure_starter_kit();                               -- true (recargó)
+--   RESET ROLE;
+--   SELECT count(*), count(*) FILTER (WHERE is_active) FROM public.categories WHERE user_id = '22222222-2222-2222-2222-222222222222' AND upper(btrim(name)) = 'VIVIENDA';  -- 2, 1 (solo VIVIENDA reactivada)
+--   SELECT count(*), count(*) FILTER (WHERE is_active) FROM public.budget_items WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- 12, 12 (' Internet ' reactivado, sin duplicar)
+--
 --   -- Sin categorías ni rubros: el kit se siembra completo otra vez.
 --   DELETE FROM public.budget_items WHERE user_id = '22222222-2222-2222-2222-222222222222';
 --   DELETE FROM public.categories   WHERE user_id = '22222222-2222-2222-2222-222222222222';

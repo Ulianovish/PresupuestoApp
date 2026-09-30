@@ -399,4 +399,18 @@ describe('migración 20260930130000: verificación manual', () => {
       /upper\(btrim\(name\)\) = 'VIVIENDA'.*-- 1 \(Vivienda reactivada, sin VIVIENDA nueva\)/,
     );
   });
+
+  it('incluye el caso con dos variantes de VIVIENDA inactivas y un rubro con espacios de borde', () => {
+    const tail = rawSql.slice(rawSql.indexOf('-- VERIFICACIÓN'));
+    expect(tail).toContain(
+      "INSERT INTO public.categories (user_id, name, is_active) VALUES ('22222222-2222-2222-2222-222222222222', 'vivienda', false);",
+    );
+    expect(tail).toContain(
+      "UPDATE public.budget_items SET name = ' Internet ', is_active = false WHERE user_id = '22222222-2222-2222-2222-222222222222' AND name = 'Internet';",
+    );
+    expect(tail).toMatch(
+      /upper\(btrim\(name\)\) = 'VIVIENDA'.*-- 2, 1 \(solo VIVIENDA reactivada\)/,
+    );
+    expect(tail).toMatch(/-- 12, 12 \(' Internet ' reactivado, sin duplicar\)/);
+  });
 });
