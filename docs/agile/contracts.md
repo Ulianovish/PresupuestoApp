@@ -294,6 +294,71 @@ NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000
 
 Choques previstos y orden: `Sidebar.tsx` (S07 antes de S10); `handle-linking.ts` (S02 antes de S13); `src/lib/actions/whatsapp.ts` (S13 solo); `.env.example` (S04 y S13 agregan al final: conservar ambos lados).
 
+## 5. Enmiendas v2 (prevalecen sobre §0–§4)
+
+Resuelven los huecos que reportaron los 13 planificadores. Donde choquen con el texto de arriba, gana esta sección.
+
+### 5.0 Convenciones
+- **Tests de texto de migraciones**: `src/lib/supabase/migrations/<timestamp>_<slug>.test.ts`, con sus helpers dentro del archivo (vitest solo recoge `src/**`). Aplica a S01, S02, S03 y S09.
+- **Grants "solo X"**: Supabase da EXECUTE a `service_role` por default privileges. Cuando el contrato dice "solo authenticated" o "solo el dueño", se revoca también a `service_role`.
+- **Sin tests de render**: vitest corre en `node`, sin Testing Library ni JSX. Los componentes se cubren con type-check; la lógica va en funciones puras testeadas; si hace falta, tests que leen el texto del archivo. No se toca `vitest.config.ts`.
+- **Tipos**: `src/types/database.ts` está desactualizado. **Nunca** correr `bun run db:types`. Si una tabla o columna nueva no compila, tipar a mano en el módulo que la usa.
+- **Prohibido** `bun run dev` y `next build` contra `.env.local` (apunta a producción).
+- SQL directo sin JWT (SQL editor como `postgres`) no puede llamar funciones con guard: simular con `set_config('request.jwt.claims', …, true)`.
+
+### 5.1 Base de datos
+- **§1.1 allowlist**: se usan **hook y trigger a la vez** (el hook no corre en `auth.admin.createUser` ni en "Add user" del dashboard; el trigger cubre eso y el tiempo entre H8 y H5). Hook disponible en plan Free. Backfill: `lower(btrim(email))` con `WHERE email IS NOT NULL AND btrim(email) <> ''`. La tabla usa `text` + CHECK (no `citext`, que no está instalado).
+- **§1.2 backfill**: solo si las columnas se crean en esa ejecución (bloque `DO` que detecta si ya existían), para que re-ejecutar no marque como onboardeados a usuarios nuevos.
+- **§1.3 kit**:
+  - Idempotencia: `_seed_starter_kit` no hace nada si el usuario tiene alguna categoría **activa** (`is_active = true`). Así quien borró todas puede recargar el kit.
+  - Categorías: `INSERT … ON CONFLICT (name, user_id) DO UPDATE SET is_active = true` (reactiva las inactivas con el mismo nombre).
+  - Rubros: se insertan con `NOT EXISTS` sobre `(template_id, category_id, lower(name))`. Antes de insertar se verifica que los 12 pares clasificación/control/estado resuelvan por nombre; si falta alguno, excepción (nada a medias).
+  - Se mantienen el `pg_advisory_xact_lock` por usuario y la validación `YYYY-MM`.
+  - Las FK `user_id` de `accounts`, `budget_templates` y `budget_items` apuntan a `profiles(id)` (`categories` a `auth.users`): sin perfil, la siembra falla con 23503 (ver §5.2 `ensureStarterKitAction`).
+- **§1.4 funciones**: `copy_budget_items_from_template` **no validaba dueño**: guard + las dos plantillas deben ser de `p_user_id`. `get_previous_month_overspend` solo `service_role` (se revoca también `authenticated`). `get_budget_by_month`: guard, `search_path` fijo, sin EXECUTE para `PUBLIC`/`anon`, EXECUTE a `authenticated, service_role`. Las del grupo B ya tenían grants correctos: se traen al repo con el cuerpo intacto, salvo `copy_budget_items_from_template` (guard + chequeo de dueño, arriba).
+- **§1.5 WhatsApp**: revincular se decide por `whatsapp_conversations.user_id <> <usuario nuevo>` (un número ya vinculado nunca llega al flujo de vinculación). Límite **fail-open**: si la tabla de intentos no se puede leer o escribir, no bloquea. `RedeemResult` suma `'link_failed'` (error de base; no cuenta como intento; el usuario ve `MSG_CODE_INVALID`). La migración borra códigos pendientes vencidos y duplicados antes de crear el índice.
+
+### 5.2 TypeScript
+- **§2.2 `translateAuthError`**: primero `code` **si es uno conocido**; si no hay `code` o no está en la tabla, `message`. El rechazo del hook llega sin `code` (message `signup_not_allowed`, 403); el del trigger con `code: 'unexpected_failure'` y message `Database error saving new user`: ambos casos con test. Filas nuevas:
+
+  | Entrada | Texto |
+  |---|---|
+  | `enlace_invalido` | El enlace no es válido o ya venció. Si ya confirmaste tu correo, inicia sesión. |
+  | `same_password` | La contraseña nueva debe ser distinta de la anterior. |
+
+  Exporta `INVALID_LINK_ERROR_CODE`, `INVALID_LINK_LOGIN_PATH`, `GENERIC_AUTH_ERROR`. Implementación con `Map` (sin lookups en el prototipo).
+- **§2.3 auth**:
+  - `/auth/confirm` acepta también `?code=` (`exchangeCodeForSession`) por si la plantilla usa `{{ .ConfirmationURL }}`.
+  - Sin `next` válido, `/auth/confirm` decide con `getPostLoginPath` (recovery → `/auth/reset-password`). Las plantillas de H4 no llevan `next` salvo recovery.
+  - `forgotPasswordAction` **se traga todo error** de `resetPasswordForEmail` (incluido el límite de envíos: revelaría que el correo existe) y solo registra el `code`.
+  - `registerAction` muestra el primer mensaje de Zod, no "Datos inválidos".
+  - La plantilla "Invite user" lleva a `/auth/reset-password` (S05): no invitar antes de desplegar S05, y el correo debe estar en la allowlist.
+  - Lógica de rutas del middleware en `src/lib/auth/route-access.ts` (S04).
+- **§2.6 limpieza (S07)**: además borra `src/scripts/migrate-july-data.ts`, `src/scripts/migrate-july-expenses.ts`, los paneles sin uso `ExpenseMigrationPanel` y `BudgetMigrationPanel`, y el botón ligado a `'2025-07'` de `ExpenseHeader.tsx` (verificar con grep que nada los importe). "Primero crea una categoría" es la etiqueta del botón deshabilitado, más un aviso con enlace a `/settings`.
+- **§2.7 onboarding**:
+  - `ensureStarterKitAction(): Promise<{ seeded: boolean; error?: string }>` **nunca lanza**, no llama `revalidatePath` ni `redirect` (se ejecuta durante el render). Sin sesión → `{ seeded: false, error: 'no_session' }`; error de RPC (incluido 23503 o la función inexistente antes de H8) → `{ seeded: false, error: <code> }` y `console.warn` solo con el code. Los llamadores no necesitan try/catch.
+  - `suggest503020`: `'Basico'` → 50 %; `'Estilo de Vida' | 'Caprichos' | 'Calidad de Vida'` → 30 %; el **20 % va siempre** a `ahorroSinAsignar` (más el porcentaje de cualquier grupo sin ítems). `'Impuestos'` → 0.
+  - Checklist: el ítem `'alertas'` se **reemplaza** por `'presupuesto'` ("Ponle montos a tu presupuesto" → `/presupuesto`), hecho si hay algún `budget_items` del mes actual con `budgeted_amount > 0`. `ChecklistInput.hasExplicitAlerts` → `hasBudgetAmounts`. `deudaCount` cuenta solo deudas activas (verificar el nombre real de la columna de actividad en `supabase_ingresos_deudas.sql`).
+  - Extras aceptados: `loadDashboardChecklist` (S12, nunca lanza, `null` = no mostrar), `src/lib/onboarding/wizard-data.ts` (S11), `src/lib/onboarding/budget-empty-state.ts` (S10). El paso 3 de la bienvenida reusa `createExpenseTransaction`.
+  - `src/lib/actions/onboarding.ts` y su test los **crea S10** (solo `ensureStarterKitAction`); S11 y S12 los extienden.
+- **§2.8 WhatsApp**: `unlinkWhatsAppPhoneAction(phoneE164)` se reemplaza por **`unlinkWhatsAppLinkAction(linkId: string): Promise<UnlinkLinkResult>`** con `UnlinkLinkResult = { ok: true } | { ok: false; error: string }`. Borra por `id` y `user_id` con el cliente de cookie; así el número completo no llega al navegador. `key` de la lista = `l.id`. S13 también actualiza `MSG_ALREADY_LINKED` (texto viejo "llegará muy pronto").
+
+### 5.3 Orden y propiedad (reemplaza la tabla de §4)
+
+Tres flujos en worktrees separados; dentro de cada uno, en serie:
+
+| Flujo | Orden | Archivos adicionales a §4 |
+|---|---|---|
+| SEG | S01 → S02 → S03 → S09 | tests en `src/lib/supabase/migrations/`; `src/lib/onboarding/` **no** (S09 solo SQL + su test) |
+| AUTH | S04 → S06 → S05 | `src/lib/auth/route-access.ts`, `src/app/auth/login/page.tsx`, `src/app/auth/reset-password/ResetPasswordForm.tsx`, `src/lib/constants/legal.ts` y contenidos legales |
+| APP | S07 → S08 → S10 → S13 → S11 → S12 | `ExpenseModal.tsx`, `services/expenses.ts`, `src/lib/expense-form-defaults.ts`, `src/lib/budget/**`, `src/app/presupuesto/page.tsx`, `DashboardContent.tsx`, `UnlinkPhoneButton` (molecules), `settings/page.tsx`, `src/lib/actions/whatsapp.ts` |
+
+Choques al integrar: `handle-linking.ts` (S02 en SEG, S13 en APP: líneas distintas), `.env.example` (S04 y S13: conservar ambos lados), `middleware.ts` (solo S04). S05 depende de `passwordSchema` de S06 (mismo flujo, va después).
+
+### 5.4 Tareas humanas nuevas
+- **H9**: cambiar `CONTACT_EMAIL` (`src/lib/constants/legal.ts`) por un buzón real antes de abrir el registro.
+
 ## Registro de cambios
 
+- v2 (2026-09-30): enmiendas §5 tras la planificación (13 planes, huecos consolidados).
 - v1 (2026-09-30): versión inicial.

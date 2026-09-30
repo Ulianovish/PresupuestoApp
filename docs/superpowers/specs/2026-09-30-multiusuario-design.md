@@ -18,7 +18,7 @@ Fuera de alcance: hogares con varios logins sobre un mismo presupuesto, separar 
 | D4 | **Kit mínimo**: 6 categorías, 12 rubros | Persona | Simplicidad; el usuario crece su lista |
 | D5 | **Bienvenida de 3 pasos saltables + checklist** en el dashboard | Persona | Onboarding progresivo; primer valor rápido |
 | D6 | El kit se siembra con una función SQL idempotente `seed_starter_kit(p_user_id)`, llamada desde `handle_new_user` dentro de un bloque `EXCEPTION` que nunca bloquea el registro, y de nuevo desde una acción de servidor `ensureStarterKit()` al entrar a `/bienvenida` o `/dashboard` | Orquestador (ADR-001) | El trigger garantiza el kit; la acción repara si el trigger falló. La idempotencia hace seguras ambas llamadas |
-| D7 | La allowlist vive en `public.signup_allowlist(email citext PK, note, created_at)`, sin acceso para `anon`/`authenticated`, administrada por SQL/dashboard. Enforcement: hook **Before User Created**; si el plan no lo permite, trigger `BEFORE INSERT ON auth.users` que lanza excepción | Orquestador (ADR-002) | Una sola persona administra; una UI de admin no se justifica todavía |
+| D7 | La allowlist vive en `public.signup_allowlist(email text PK en minúsculas, note, created_at)`, sin acceso para `anon`/`authenticated`, administrada por SQL/dashboard. Enforcement: hook **Before User Created**; si el plan no lo permite, trigger `BEFORE INSERT ON auth.users` que lanza excepción | Orquestador (ADR-002) | Una sola persona administra; una UI de admin no se justifica todavía |
 | D8 | Confirmación y recuperación con `token_hash` + route handler `/auth/confirm` (`verifyOtp`). El `/auth/callback` actual se reemplaza por route handler o se elimina | Orquestador (ADR-003) | Patrón oficial; funciona si el correo se abre en otro dispositivo |
 | D9 | Contraseña: mínimo 8 caracteres, sin reglas de composición; la UI dice lo mismo que Zod | Orquestador | NIST 800-63B; hoy UI y validación se contradicen |
 | D10 | Los rubros creados desde la app toman clasificación y control por nombre explícito ("Basico"/"Necesario" para DEUDAS, "Estilo de Vida"/"Reducir" por defecto), no el primero alfabético | Orquestador | Hoy 135 rubros quedaron como "Eliminar" |
@@ -38,7 +38,7 @@ Formato: rubro — clasificación / control. Montos en 0.
 
 Además: cuenta `Efectivo` (tipo efectivo) y plantilla del mes actual (`upsert_monthly_budget`). Los meses siguientes se copian solos.
 
-Sugerencia 50/30/20 del paso 2: "Basico" = necesidades (50 %), "Estilo de Vida"/"Caprichos" = deseos (30 %), "Calidad de Vida" = ahorro (20 %). Se reparte en partes iguales entre los rubros de cada grupo y el usuario ajusta. Como el kit no tiene rubro de ahorro, el 20 % se muestra como "sin asignar: ahorro" y no se crea rubro.
+Sugerencia 50/30/20 del paso 2: "Basico" = necesidades (50 %), "Estilo de Vida"/"Caprichos"/"Calidad de Vida" = deseos (30 %). Se reparte en partes iguales entre los rubros de cada grupo y el usuario ajusta. El 20 % de ahorro se muestra siempre como "sin asignar: ahorro" y no se crea rubro (contratos §5.2).
 
 ## Onboarding (D5)
 
@@ -56,7 +56,7 @@ Al terminar o saltar el último paso: `profiles.onboarding_completed_at = now()`
 - Registra tarjetas y deudas (hay `deudas`)
 - Vincula WhatsApp (hay `whatsapp_links`)
 - Carga tu cédula para facturas DIAN (`whatsapp_links.documento`)
-- Revisa qué rubros te avisan (hay algún `alerts_enabled` explícito)
+- Ponle montos a tu presupuesto (hay rubros del mes con monto > 0)
 
 ## Épicas e historias
 
