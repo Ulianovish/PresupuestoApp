@@ -727,7 +727,7 @@ git commit -m "feat(onboarding): getPostLoginPath decide entre bienvenida y dash
 
 Nota: se usa `redirect()` de `next/navigation` (como pide contratos §2.3). En un route handler Next responde 307 y copia a esa respuesta las cookies que escribió `createClient()` vía `cookies()`, así que la sesión queda guardada. Es el mismo efecto que `NextResponse.redirect` del ejemplo oficial de Supabase (`app/auth/confirm/route.ts`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/app/auth/confirm/route.test.ts`:
 
@@ -929,12 +929,12 @@ describe('GET /auth/confirm', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/app/auth/confirm/route.test.ts`
 Expected: FAIL con `Failed to resolve import "./route"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/app/auth/confirm/route.ts`:
 
@@ -1032,12 +1032,12 @@ export async function GET(request: Request) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/app/auth/confirm/route.test.ts`
 Expected: PASS (15 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/auth/confirm/route.ts src/app/auth/confirm/route.test.ts
