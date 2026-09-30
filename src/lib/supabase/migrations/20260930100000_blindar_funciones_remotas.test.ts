@@ -165,3 +165,87 @@ describe('copy_budget_items_from_template', () => {
     expect(grantedRoles(code, NAME)).toEqual(['service_role']);
   });
 });
+
+const UNCHANGED_FUNCTIONS = [
+  {
+    name: 'fix_templates_without_items',
+    argTypes: 'uuid',
+    header:
+      'CREATE OR REPLACE FUNCTION public.fix_templates_without_items(p_user_id uuid)',
+    returns:
+      ' RETURNS TABLE(template_id uuid, month_year character varying, items_copied integer)',
+    bodyMarkers: [
+      'WHERE bt.user_id = p_user_id',
+      'WHERE bt2.user_id = p_user_id',
+      'SELECT copy_budget_items_from_template(',
+      'RETURN NEXT;',
+    ],
+  },
+  {
+    name: 'check_cufe_exists',
+    argTypes: 'uuid, character varying',
+    header:
+      'CREATE OR REPLACE FUNCTION public.check_cufe_exists(p_user_id uuid, p_cufe_code character varying)',
+    returns: ' RETURNS boolean',
+    bodyMarkers: [
+      'FROM electronic_invoices',
+      'WHERE user_id = p_user_id',
+      'AND cufe_code = p_cufe_code',
+    ],
+  },
+  {
+    name: 'get_electronic_invoices_by_date_range',
+    argTypes: 'uuid, date, date',
+    header:
+      'CREATE OR REPLACE FUNCTION public.get_electronic_invoices_by_date_range(p_user_id uuid, p_start_date date DEFAULT NULL::date, p_end_date date DEFAULT NULL::date)',
+    returns:
+      ' RETURNS TABLE(id uuid, cufe_code character varying, supplier_name character varying, supplier_nit character varying, invoice_date date, total_amount numeric, processed_at timestamp with time zone, has_expenses boolean)',
+    bodyMarkers: [
+      'WHERE ei.user_id = p_user_id',
+      'WHERE t.electronic_invoice_id = ei.id',
+      'ORDER BY ei.invoice_date DESC, ei.created_at DESC;',
+    ],
+  },
+  {
+    name: 'get_invoice_stats_by_supplier',
+    argTypes: 'uuid, date, date',
+    header:
+      'CREATE OR REPLACE FUNCTION public.get_invoice_stats_by_supplier(p_user_id uuid, p_start_date date DEFAULT NULL::date, p_end_date date DEFAULT NULL::date)',
+    returns:
+      ' RETURNS TABLE(supplier_name character varying, supplier_nit character varying, invoice_count bigint, total_amount numeric, avg_amount numeric, last_invoice_date date)',
+    bodyMarkers: [
+      'WHERE ei.user_id = p_user_id',
+      'GROUP BY ei.supplier_name, ei.supplier_nit',
+      'ORDER BY total_amount DESC;',
+    ],
+  },
+];
+
+describe.each(UNCHANGED_FUNCTIONS)(
+  '$name (ya filtraba: cuerpo sin cambios)',
+  ({ name, argTypes, header, returns, bodyMarkers }) => {
+    it('conserva la firma de producción (no crea overload)', () => {
+      expectSignature(functionBlock(readMigration(), name), header, returns);
+    });
+
+    it('es SECURITY DEFINER con search_path fijo', () => {
+      const block = functionBlock(readMigration(), name);
+      expect(block).toContain('\n SECURITY DEFINER\n');
+      expect(block).toContain(SEARCH_PATH);
+    });
+
+    it('filtra por el usuario con el cuerpo de producción y sin guard nuevo', () => {
+      const block = functionBlock(readMigration(), name);
+      for (const marker of bodyMarkers) expect(block).toContain(marker);
+      expect(block).not.toContain('auth.uid()');
+    });
+
+    it('solo service_role la ejecuta', () => {
+      const code = codeOnly(readMigration());
+      expect(code).toContain(
+        `REVOKE EXECUTE ON FUNCTION public.${name}(${argTypes}) FROM PUBLIC, anon, authenticated;`,
+      );
+      expect(grantedRoles(code, name)).toEqual(['service_role']);
+    });
+  },
+);

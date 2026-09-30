@@ -199,3 +199,139 @@ $function$;
 
 REVOKE EXECUTE ON FUNCTION public.copy_budget_items_from_template(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.copy_budget_items_from_template(uuid, uuid, uuid) TO service_role;
+
+
+-- ============================================================================
+-- 3. Ya filtraban por p_user_id: cuerpo de producción SIN cambios, solo se
+--    traen al repo. Grants y search_path iguales a los de 20260929000000.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fix_templates_without_items(p_user_id uuid)
+ RETURNS TABLE(template_id uuid, month_year character varying, items_copied integer)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path = public, pg_temp
+AS $function$
+DECLARE
+    template_record RECORD;
+    previous_template_id UUID;
+    items_copied_count INTEGER;
+BEGIN
+    -- Iterar sobre todos los templates del usuario que no tienen items
+    FOR template_record IN
+        SELECT bt.id, bt.month_year, bt.name
+        FROM budget_templates bt
+        LEFT JOIN budget_items bi ON bt.id = bi.template_id AND bi.is_active = true
+        WHERE bt.user_id = p_user_id
+        AND bt.is_active = true
+        AND bi.id IS NULL
+        ORDER BY bt.month_year
+    LOOP
+        -- Buscar el template anterior más reciente
+        SELECT bt2.id INTO previous_template_id
+        FROM budget_templates bt2
+        WHERE bt2.user_id = p_user_id
+        AND bt2.month_year < template_record.month_year
+        AND bt2.is_active = true
+        ORDER BY bt2.month_year DESC
+        LIMIT 1;
+
+        -- Si hay template anterior, copiar items
+        IF previous_template_id IS NOT NULL THEN
+            -- Llamar función de copia
+            SELECT copy_budget_items_from_template(
+                p_user_id,
+                previous_template_id,
+                template_record.id
+            ) INTO items_copied_count;
+
+            -- Retornar resultado
+            template_id := template_record.id;
+            month_year := template_record.month_year;
+            items_copied := items_copied_count;
+
+            RETURN NEXT;
+        END IF;
+    END LOOP;
+
+    RETURN;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.check_cufe_exists(p_user_id uuid, p_cufe_code character varying)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path = public, pg_temp
+AS $function$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1
+    FROM electronic_invoices
+    WHERE user_id = p_user_id
+    AND cufe_code = p_cufe_code
+  );
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_electronic_invoices_by_date_range(p_user_id uuid, p_start_date date DEFAULT NULL::date, p_end_date date DEFAULT NULL::date)
+ RETURNS TABLE(id uuid, cufe_code character varying, supplier_name character varying, supplier_nit character varying, invoice_date date, total_amount numeric, processed_at timestamp with time zone, has_expenses boolean)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path = public, pg_temp
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT
+    ei.id,
+    ei.cufe_code,
+    ei.supplier_name,
+    ei.supplier_nit,
+    ei.invoice_date,
+    ei.total_amount,
+    ei.processed_at,
+    EXISTS(
+      SELECT 1
+      FROM transactions t
+      WHERE t.electronic_invoice_id = ei.id
+    ) as has_expenses
+  FROM electronic_invoices ei
+  WHERE ei.user_id = p_user_id
+    AND (p_start_date IS NULL OR ei.invoice_date >= p_start_date)
+    AND (p_end_date IS NULL OR ei.invoice_date <= p_end_date)
+  ORDER BY ei.invoice_date DESC, ei.created_at DESC;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_invoice_stats_by_supplier(p_user_id uuid, p_start_date date DEFAULT NULL::date, p_end_date date DEFAULT NULL::date)
+ RETURNS TABLE(supplier_name character varying, supplier_nit character varying, invoice_count bigint, total_amount numeric, avg_amount numeric, last_invoice_date date)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path = public, pg_temp
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT
+    ei.supplier_name,
+    ei.supplier_nit,
+    COUNT(*) as invoice_count,
+    SUM(ei.total_amount) as total_amount,
+    AVG(ei.total_amount) as avg_amount,
+    MAX(ei.invoice_date) as last_invoice_date
+  FROM electronic_invoices ei
+  WHERE ei.user_id = p_user_id
+    AND (p_start_date IS NULL OR ei.invoice_date >= p_start_date)
+    AND (p_end_date IS NULL OR ei.invoice_date <= p_end_date)
+  GROUP BY ei.supplier_name, ei.supplier_nit
+  ORDER BY total_amount DESC;
+END;
+$function$;
+
+REVOKE EXECUTE ON FUNCTION public.fix_templates_without_items(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.check_cufe_exists(uuid, character varying) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.get_electronic_invoices_by_date_range(uuid, date, date) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.get_invoice_stats_by_supplier(uuid, date, date) FROM PUBLIC, anon, authenticated;
+
+GRANT EXECUTE ON FUNCTION public.fix_templates_without_items(uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.check_cufe_exists(uuid, character varying) TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_electronic_invoices_by_date_range(uuid, date, date) TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_invoice_stats_by_supplier(uuid, date, date) TO service_role;
