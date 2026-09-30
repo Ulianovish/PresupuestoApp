@@ -18,6 +18,8 @@ import Button from '@/components/atoms/Button/Button';
 import ConfirmModal from '@/components/atoms/ConfirmModal/ConfirmModal';
 import { unlinkWhatsAppLinkAction } from '@/lib/actions/whatsapp';
 
+import { confirmarDesvinculo } from './confirmar-desvinculo';
+
 interface UnlinkPhoneButtonProps {
   linkId: string;
   maskedPhone: string;
@@ -33,15 +35,11 @@ export default function UnlinkPhoneButton({
   const confirmar = async () => {
     setLoading(true);
     try {
-      const res = await unlinkWhatsAppLinkAction(linkId);
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success('Número desvinculado');
-      setOpen(false);
-    } catch {
-      toast.error('No se pudo desvincular el número.');
+      const cerrar = await confirmarDesvinculo(linkId, {
+        unlink: unlinkWhatsAppLinkAction,
+        toast,
+      });
+      if (cerrar) setOpen(false);
     } finally {
       setLoading(false);
     }
@@ -68,6 +66,7 @@ export default function UnlinkPhoneButton({
         confirmText="Desvincular"
         cancelText="Cancelar"
         isLoading={loading}
+        loadingText="Desvinculando..."
       />
     </>
   );

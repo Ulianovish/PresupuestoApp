@@ -15,6 +15,7 @@ const boton = leer(
   'src/components/molecules/UnlinkPhoneButton/UnlinkPhoneButton.tsx',
 );
 const ajustes = leer('src/app/settings/page.tsx');
+const modal = leer('src/components/atoms/ConfirmModal/ConfirmModal.tsx');
 
 describe('archivos leídos', () => {
   // `leer` devuelve '' si el archivo falta: sin esto, los `not.toContain`
@@ -22,12 +23,14 @@ describe('archivos leídos', () => {
   it('existen', () => {
     expect(boton).not.toBe('');
     expect(ajustes).not.toBe('');
+    expect(modal).not.toBe('');
   });
 });
 
 describe('UnlinkPhoneButton (S13, contratos §5.2)', () => {
   it('desvincula por el id del link con la server action', () => {
-    expect(boton).toContain('unlinkWhatsAppLinkAction(linkId)');
+    expect(boton).toContain('confirmarDesvinculo(linkId');
+    expect(boton).toContain('unlink: unlinkWhatsAppLinkAction');
     expect(boton).toContain('linkId: string;');
     expect(boton).toContain('maskedPhone: string;');
   });
@@ -69,5 +72,23 @@ describe('Ajustes: lista de números vinculados', () => {
     expect(ajustes).toMatch(
       /linksError \?[\s\S]*?Aún no hay números vinculados/,
     );
+  });
+});
+
+describe('UnlinkPhoneButton: confirmación', () => {
+  // La lógica (toasts y cierre) se prueba en confirmar-desvinculo.test.ts.
+  it('la confirmación muestra el número enmascarado', () => {
+    expect(boton).toContain('message={`El número ${maskedPhone}');
+  });
+
+  it('usa confirmarDesvinculo y solo cierra el modal si salió bien', () => {
+    expect(boton).toContain('confirmarDesvinculo(linkId');
+    expect(boton).toMatch(/if \(cerrar\) setOpen\(false\)/);
+  });
+
+  it('mientras carga el botón dice "Desvinculando...", no "Eliminando..."', () => {
+    expect(boton).toContain('loadingText="Desvinculando..."');
+    expect(modal).toContain("loadingText = 'Eliminando...'");
+    expect(modal).toContain('{isLoading ? loadingText : confirmText}');
   });
 });
