@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
+import { isEmailOtpType } from '@/lib/auth/email-otp-types';
 import { INVALID_LINK_LOGIN_PATH } from '@/lib/auth/error-messages';
 import { safeRedirectPath } from '@/lib/auth/safe-redirect';
 import { getPostLoginPath } from '@/lib/onboarding/post-login';
@@ -20,18 +21,6 @@ import type { EmailOtpType } from '@supabase/supabase-js';
  *
  * Sin `next` válido: recovery → /auth/reset-password; lo demás → getPostLoginPath.
  */
-const TIPOS_PERMITIDOS: readonly string[] = [
-  'signup',
-  'email',
-  'recovery',
-  'invite',
-  'email_change',
-];
-
-function esTipoPermitido(valor: string | null): valor is EmailOtpType {
-  return valor !== null && TIPOS_PERMITIDOS.includes(valor);
-}
-
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 type Enlace = { tokenHash: string; type: EmailOtpType } | { code: string };
 
@@ -42,7 +31,7 @@ function leerEnlace(searchParams: URLSearchParams): Enlace | null {
   const code = searchParams.get('code');
 
   if (tokenHash) {
-    return esTipoPermitido(type) ? { tokenHash, type } : null;
+    return isEmailOtpType(type) ? { tokenHash, type } : null;
   }
   return code ? { code } : null;
 }

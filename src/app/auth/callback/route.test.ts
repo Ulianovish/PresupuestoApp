@@ -82,4 +82,65 @@ describe('GET /auth/callback', () => {
     expect(ruta).toBe('/auth/confirm');
     expect([...query.keys()]).toEqual([]);
   });
+
+  it('decisión explícita: sin code va a /auth/confirm (→ enlace_invalido), ya no al login a secas', async () => {
+    const { ruta, query } = partes(await destino(''));
+
+    expect(ruta).toBe('/auth/confirm');
+    expect([...query.keys()]).toEqual([]);
+  });
+
+  it('registra el error_code de Supabase sin datos personales', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await destino(
+      '?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid',
+    );
+
+    expect(log).toHaveBeenCalledWith('Callback de auth con error:', {
+      code: 'otp_expired',
+    });
+    log.mockRestore();
+  });
+
+  it('error sin error_code → sin_codigo', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await destino('?error=server_error');
+
+    expect(log).toHaveBeenCalledWith('Callback de auth con error:', {
+      code: 'sin_codigo',
+    });
+    log.mockRestore();
+  });
+
+  it('sin error no registra nada', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await destino('?code=c');
+
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it.each(['signup', 'email', 'recovery', 'invite', 'email_change'])(
+    'reenvía type=%s (permitido por /auth/confirm)',
+    async type => {
+      const { query } = partes(await destino(`?code=c&type=${type}`));
+
+      expect(query.get('type')).toBe(type);
+    },
+  );
+
+  it.each(['magiclink', 'sms', 'RECOVERY', '<script>'])(
+    'no reenvía un type fuera de la lista (%s)',
+    async type => {
+      const { query } = partes(
+        await destino(`?code=c&type=${encodeURIComponent(type)}`),
+      );
+
+      expect(query.get('code')).toBe('c');
+      expect(query.has('type')).toBe(false);
+    },
+  );
 });
