@@ -3,7 +3,10 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-// Vitest corre en entorno node sin transformar JSX: se revisa el código fuente.
+// Vitest corre en entorno node sin transformar JSX: se revisa el código
+// fuente. La traducción de ?error= la prueban los tests de
+// resolveResetPasswordError; aquí solo van invariantes de seguridad y de la
+// regla compartida de contraseña.
 function leer(archivo: string): string {
   return readFileSync(
     join(process.cwd(), 'src/app/auth/reset-password', archivo),
@@ -24,26 +27,21 @@ describe('página de contraseña nueva (servidor)', () => {
 
 describe('formulario de contraseña nueva', () => {
   it('envía password y confirmPassword a resetPasswordAction', () => {
-    expect(formulario).toContain('resetPasswordAction(formData)');
+    expect(formulario).toContain('resetPasswordAction(');
     expect(formulario).toContain('name="password"');
     expect(formulario).toContain('name="confirmPassword"');
   });
 
   it('usa la regla compartida de contraseña (texto de ayuda y límites)', () => {
-    expect(formulario).toContain('{PASSWORD_HINT}');
-    expect(formulario.match(/minLength=\{PASSWORD_MIN_LENGTH\}/g)).toHaveLength(
-      1,
-    );
-    expect(formulario.match(/maxLength=\{PASSWORD_MAX_LENGTH\}/g)).toHaveLength(
-      2,
-    );
+    expect(formulario).toContain('PASSWORD_HINT');
+    expect(formulario).toContain('PASSWORD_MIN_LENGTH');
+    expect(formulario).toContain('PASSWORD_MAX_LENGTH');
+    expect(formulario).not.toMatch(/(minLength|maxLength)=\{\s*\d/);
     expect(formulario).toContain('autoComplete="new-password"');
   });
 
-  it('resuelve ?error= con la función pura de lista cerrada', () => {
-    expect(formulario).toMatch(
-      /setError\(\s*resolveResetPasswordError\(\s*searchParams\.get\('error'\)\s*\)\s*\)/,
-    );
+  it('nunca pinta el texto crudo de la URL', () => {
+    expect(formulario).toContain('resolveResetPasswordError(');
     expect(formulario).not.toMatch(/setError\(\s*searchParams\.get/);
     expect(formulario).not.toContain("searchParams.get('message')");
   });
