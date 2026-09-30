@@ -39,6 +39,15 @@
 | Modificar | `src/lib/actions/deudas-budget.ts` (bloque ~45-79, imports) | `createBudgetItemsForDeuda` usa el resolver con `DEUDA_ITEM_*` |
 | Crear | `src/lib/actions/deudas-budget.test.ts` | Tests de la acción |
 | Modificar | `src/app/presupuesto/page.tsx` (~203-235, imports) | El formulario de rubro nuevo toma los nombres por defecto del contrato en lugar de `classifications[0]` |
+| Modificar | `src/lib/constants/budget-defaults.ts` | + `DEUDAS_CATEGORY_NAME` (lo usan `catalog-defaults.ts` y `deudas-budget.ts`) — ronda de corrección 1 |
+| Crear | `src/lib/constants/budget-defaults.contract.test.ts` | Contrato: los nombres por defecto quedan activos tras las migraciones — ronda 1 |
+| Crear | `src/test-utils/postgrest-chain.ts` | Cadena falsa de PostgREST compartida por los tests de acciones — ronda 1 |
+| Modificar | `src/app/gastos/page.tsx` | Task 7: no se guarda mientras cargan las categorías; ronda 1: usa `expenseSubmitGuard` / `missingCategoryMessage` |
+| Modificar | `src/lib/expense-form-defaults.ts` (+ `.test.ts`) | Ronda 1: guard de guardado puro (`expenseSubmitGuard`, `missingCategoryMessage`) |
+| Modificar | `src/components/organisms/ExpenseModal/ExpenseModal.tsx` (+ `.test.ts`) | Task 7: el aviso "sin categorías" exige `submitDisabledLabel`; ronda 1: test por render |
+| Modificar | `src/__tests__/gastos-page.test.ts` | Task 7 / ronda 1: cableado de /gastos |
+| Modificar | `vitest.config.ts` | Ronda 1: transforma JSX (oxc, runtime automático) para renderizar componentes en tests |
+| Modificar | fixtures de `src/lib/{dian,whatsapp,services}/*.test.ts`, `historial-clasificacion.ts`, `handle-image.ts` | Task 8 / ronda 1: nombres inventados |
 
 **Búsqueda de otros sitios "el primero" (hecha al planear):**
 - `src/app/api/budget/route.ts` y `src/app/api/budget/[id]/route.ts`: buscan clasificación/control **por el nombre que manda el formulario** — no eligen "el primero". Se corrigen indirectamente porque el formulario (`presupuesto/page.tsx`) deja de proponer `classifications[0]`. Sin cambios.
@@ -1383,6 +1392,17 @@ Sin commit en esta tarea (no cambia archivos).
 ### Task 9 (adicional, deuda de S07): Global Constraints de S07
 
 - [x] `docs/agile/stories/S07-sin-datos-del-dueno.md`: commits con `--no-verify` + eslint/prettier a mano; ruta del worktree `PresupuestoApp-app`.
+
+---
+
+## Desviaciones
+
+- **Ruta de ejecución:** todos los pasos se ejecutaron en el worktree `PresupuestoApp-app`, no en `PresupuestoApp`.
+- **Task 7 tocó `ExpenseModal.tsx` y su test**, que no estaban en el plan original: el aviso "sin categorías" del modal ahora sale solo con `submitDisabled && submitDisabledLabel`, para que /gastos pueda deshabilitar el botón sin avisar mientras las categorías cargan.
+- **Estado del rubro nuevo:** antes se buscaba con `.eq('name', 'Activo')` y, si no existía, la acción fallaba. Ahora el resolver lee el catálogo `budget_statuses` **activo** (`is_active = true`, ordenado por nombre) y, si `Activo` no existe o está inactivo, cae al primer estado activo con `console.warn` — el mismo respaldo general de contratos §2.5. Cubierto en `item-defaults-supabase.test.ts`.
+- **`createBudgetItemInMonth` sin categoría (ronda 1):** el plan decía "si no la encuentra usa los valores generales". Se cambió: si la consulta falla devuelve `{ success:false, error:'No se pudo leer la categoría' }` (con `console.error`) y si la categoría no existe o no es del usuario, `{ success:false, error:'Categoría no encontrada' }`, sin insertar. Así un rubro de DEUDAS no nace mal clasificado por un fallo transitorio y no se inserta un `category_id` sin validar. El contrato §2.5 no fija este caso.
+- **Respaldo al primero activo (ronda 1):** se mantiene porque lo exige §2.5, pero `budget-defaults.contract.test.ts` reproduce las migraciones y falla si `Estilo de Vida`, `Basico`, `Reducir` o `Necesario` quedan inactivos o desaparecen. `Activo` (`budget_statuses`) no tiene siembra en `supabase/migrations`, así que no se puede comprobar ahí.
+- **Tests de /gastos y ExpenseModal (ronda 1):** los regex sobre el código fuente se sustituyeron por funciones puras testeadas y un render de `ExpenseModal` con `react-dom/server` (con `Dialog` sustituido, porque el portal de Radix no se renderiza en servidor). No se agregó Testing Library ni jsdom; solo se habilitó la transformación de JSX en `vitest.config.ts`.
 
 ---
 
