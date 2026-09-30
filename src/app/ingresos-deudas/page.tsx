@@ -15,7 +15,7 @@ export default async function IngresosDeudaPage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth/login?redirectTo=/ingresos-deudas');
   }
 
   // Pasar datos del usuario al componente cliente

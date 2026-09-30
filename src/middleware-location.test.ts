@@ -22,12 +22,16 @@ describe('ubicación del middleware', () => {
   });
 });
 
+// Aproximación: Next.js interpreta el matcher con path-to-regexp; aquí se
+// compila como RegExp nativo. Para este patrón (un solo grupo con lookahead)
+// ambos coinciden.
 describe('config.matcher', () => {
   const patron = new RegExp(`^${middlewareModule.config.matcher[0]}$`);
 
   it.each([
     '/api/whatsapp/webhook',
     '/api/cron/alertas-pendientes',
+    '/api',
     '/_next/static/x.js',
     '/_next/image',
     '/favicon.ico',
@@ -45,6 +49,7 @@ describe('config.matcher', () => {
     '/terms',
     '/privacy',
     '/ingresos-deudas',
+    '/apiario',
   ])('se ejecuta en %s', ruta => {
     expect(patron.test(ruta)).toBe(true);
   });

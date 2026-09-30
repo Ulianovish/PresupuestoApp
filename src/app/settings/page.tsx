@@ -20,7 +20,7 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth/login?redirectTo=/settings');
   }
 
   const { data: links } = await supabase

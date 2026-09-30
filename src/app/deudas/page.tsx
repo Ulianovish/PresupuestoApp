@@ -7,7 +7,7 @@ export default async function DeudasRoutePage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth/login?redirectTo=/deudas');
   }
 
   return <DeudasPage user={user} />;

@@ -7,7 +7,7 @@ export default async function IngresosRoutePage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth/login?redirectTo=/ingresos');
   }
 
   return <IngresosPage user={user} />;

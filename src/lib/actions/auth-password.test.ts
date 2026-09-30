@@ -301,7 +301,8 @@ describe('resetPasswordAction', () => {
 
       expect(url.pathname).toBe('/auth/reset-password');
       expect(url.searchParams.get('error')).toBe(esperado);
-      expect(url.searchParams.get('error')).not.toBe(crudo);
+      expect([...url.searchParams.keys()]).toEqual(['error']);
+      expect(decodeURIComponent(url.href)).not.toContain(crudo);
       expect(revalidatePath).not.toHaveBeenCalled();
       expect(vi.mocked(console.error).mock.calls[0]?.[1]).toEqual({
         code,
