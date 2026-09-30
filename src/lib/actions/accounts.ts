@@ -188,7 +188,7 @@ export async function deactivateAccount(id: string) {
 /**
  * Nombre de cuenta para una tarjeta de crédito registrada en Deudas.
  * Usa el acreedor con el prefijo "TC", evitando repetirlo si el acreedor ya
- * empieza por "Tarjeta"/"TC" (ej. "Tarjeta Nu Bank Milo" -> "TC Nu Bank Milo").
+ * empieza por "Tarjeta"/"TC" (ej. "Tarjeta Nu Bank Coco" -> "TC Nu Bank Coco").
  */
 export async function accountNameForCard(acreedor: string): Promise<string> {
   const base = (acreedor || '')

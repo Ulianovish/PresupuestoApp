@@ -21,11 +21,11 @@ const NOMBRES = [
   'Ahorros Nu',
   'Davivienda',
   'Efectivo',
-  'Nequi Migue',
-  'Nequi Milo',
+  'Nequi Bruno',
+  'Nequi Coco',
   'TC Davivienda',
   'TC Falabella',
-  'TC Nu Bank Migue',
+  'TC Nu Bank Bruno',
 ];
 const CUENTAS: CuentaActiva[] = NOMBRES.map((name, i) => ({
   id: uuid(i + 1),
@@ -190,13 +190,13 @@ describe('preguntarCuenta', () => {
       targetKind: 'transactions',
       targetIds: ['tx-1'],
       pregunta: '¿Con qué cuenta fue?',
-      candidatas: ['Nequi Migue', 'Nequi Milo'],
+      candidatas: ['Nequi Bruno', 'Nequi Coco'],
     });
     const vars = deps.sendContent.mock.calls[0][2] as unknown as Record<
       string,
       string
     >;
-    expect([vars['3'], vars['6']]).toEqual(['Nequi Migue', 'Nequi Milo']);
+    expect([vars['3'], vars['6']]).toEqual(['Nequi Bruno', 'Nequi Coco']);
   });
 
   it('sin TWILIO_CONTENT_SID_CUENTAS pregunta por texto con las opciones', async () => {
@@ -214,7 +214,7 @@ describe('preguntarCuenta', () => {
     expect(deps.crearPrompt).toHaveBeenCalled();
     const texto = ultimoTexto(deps);
     expect(texto).toContain('¿Con qué cuenta la pagaste?');
-    expect(texto).toContain('Nequi Migue');
+    expect(texto).toContain('Nequi Bruno');
     expect(texto).toMatch(/respondé con el nombre/i);
   });
 
@@ -296,23 +296,23 @@ describe('manejarEleccionCuenta', () => {
       userId: U,
       phone: TEL,
       promptId: P1,
-      accountId: idDe('Nequi Milo'),
+      accountId: idDe('Nequi Coco'),
     });
-    expect(deps.registrarFactura).toHaveBeenCalledWith('inv-1', 'Nequi Milo');
+    expect(deps.registrarFactura).toHaveBeenCalledWith('inv-1', 'Nequi Coco');
     expect(deps.onExpenseCreated).toHaveBeenCalledWith({
       categoria: 'FACTURA',
       budgetItemIds: ['b1'],
       monthYear: '2026-09',
     });
     const texto = ultimoTexto(deps);
-    expect(texto).toContain('✅ Listo, quedó en Nequi Milo');
+    expect(texto).toContain('✅ Listo, quedó en Nequi Coco');
     expect(texto).toMatch(/45.?000/);
     expect(texto).toContain('3 ítems');
     expect(texto).toContain('Mercado al 90%');
     expect(deps.alResolver).toHaveBeenCalledWith({
       targetKind: 'invoice',
       targetIds: ['inv-1'],
-      cuenta: 'Nequi Milo',
+      cuenta: 'Nequi Coco',
     });
   });
 
@@ -324,12 +324,12 @@ describe('manejarEleccionCuenta', () => {
       userId: U,
       phone: TEL,
       promptId: P1,
-      accountId: idDe('Nequi Milo'),
+      accountId: idDe('Nequi Coco'),
     };
     await manejarEleccionCuenta(deps, toque);
     await manejarEleccionCuenta(deps, toque);
     expect(deps.registrarFactura).toHaveBeenCalledTimes(1);
-    expect(ultimoTexto(deps)).toContain('Ya estaba en Nequi Milo');
+    expect(ultimoTexto(deps)).toContain('Ya estaba en Nequi Coco');
   });
 
   it('factura: si el registro falla sin crear nada, libera la pregunta para reintentar', async () => {
@@ -430,15 +430,15 @@ describe('manejarEleccionCuenta', () => {
       userId: U,
       phone: TEL,
       promptId: P1,
-      accountId: idDe('Nequi Migue'),
+      accountId: idDe('Nequi Bruno'),
     });
     expect(deps.moverTransacciones).toHaveBeenCalledWith(
       U,
       ['tx-1', 'tx-2'],
-      idDe('Nequi Migue'),
+      idDe('Nequi Bruno'),
     );
-    expect(prompts.get(P1)!.resolvedAccountId).toBe(idDe('Nequi Migue'));
-    expect(ultimoTexto(deps)).toBe('✅ Listo, quedó en Nequi Migue.');
+    expect(prompts.get(P1)!.resolvedAccountId).toBe(idDe('Nequi Bruno'));
+    expect(ultimoTexto(deps)).toBe('✅ Listo, quedó en Nequi Bruno.');
   });
 
   it('gastos: un segundo toque con otra cuenta corrige; con la misma no hace nada', async () => {
@@ -446,26 +446,26 @@ describe('manejarEleccionCuenta', () => {
     const base = { userId: U, phone: TEL, promptId: P1 };
     await manejarEleccionCuenta(deps, {
       ...base,
-      accountId: idDe('Nequi Migue'),
+      accountId: idDe('Nequi Bruno'),
     });
     await manejarEleccionCuenta(deps, {
       ...base,
-      accountId: idDe('Nequi Milo'),
+      accountId: idDe('Nequi Coco'),
     });
     expect(deps.moverTransacciones).toHaveBeenLastCalledWith(
       U,
       ['tx-1'],
-      idDe('Nequi Milo'),
+      idDe('Nequi Coco'),
     );
-    expect(prompts.get(P1)!.resolvedAccountId).toBe(idDe('Nequi Milo'));
-    expect(ultimoTexto(deps)).toBe('✅ Listo, quedó en Nequi Milo.');
+    expect(prompts.get(P1)!.resolvedAccountId).toBe(idDe('Nequi Coco'));
+    expect(ultimoTexto(deps)).toBe('✅ Listo, quedó en Nequi Coco.');
 
     await manejarEleccionCuenta(deps, {
       ...base,
-      accountId: idDe('Nequi Milo'),
+      accountId: idDe('Nequi Coco'),
     });
     expect(deps.moverTransacciones).toHaveBeenCalledTimes(2);
-    expect(ultimoTexto(deps)).toContain('Ya estaba en Nequi Milo');
+    expect(ultimoTexto(deps)).toContain('Ya estaba en Nequi Coco');
   });
 
   it('una lista de OTRO número no se puede tocar desde este', async () => {
@@ -513,16 +513,16 @@ describe('intentarCuentaEscrita', () => {
     const manejado = await intentarCuentaEscrita(deps, {
       userId: U,
       phone: TEL,
-      body: 'Nequi Milo',
+      body: 'Nequi Coco',
     });
     expect(manejado).toBe(true);
     expect(deps.ultimoPromptAbierto).toHaveBeenCalledWith(TEL);
     expect(deps.moverTransacciones).toHaveBeenCalledWith(
       U,
       ['tx-1'],
-      idDe('Nequi Milo'),
+      idDe('Nequi Coco'),
     );
-    expect(ultimoTexto(deps)).toBe('✅ Listo, quedó en Nequi Milo.');
+    expect(ultimoTexto(deps)).toBe('✅ Listo, quedó en Nequi Coco.');
   });
 
   it('"40k huevos" va al agente: ni siquiera busca la pregunta abierta', async () => {
@@ -574,8 +574,8 @@ describe('intentarCuentaEscrita', () => {
       string,
       string
     >;
-    expect([vars['3'], vars['6']]).toEqual(['Nequi Migue', 'Nequi Milo']);
-    expect(vars['2']).toBe(armarIdOpcion(P1, idDe('Nequi Migue')));
-    expect(vars['1']).toContain('Nequi Migue o Nequi Milo');
+    expect([vars['3'], vars['6']]).toEqual(['Nequi Bruno', 'Nequi Coco']);
+    expect(vars['2']).toBe(armarIdOpcion(P1, idDe('Nequi Bruno')));
+    expect(vars['1']).toContain('Nequi Bruno o Nequi Coco');
   });
 });

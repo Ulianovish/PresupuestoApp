@@ -5,11 +5,11 @@ import { aColumnasDeActualizacion } from './deudas-columnas';
 describe('aColumnasDeActualizacion', () => {
   it('traduce tipo_deuda a la columna real tipo', () => {
     const r = aColumnasDeActualizacion({
-      descripcion: 'Tarjeta Nu Bank Milo',
+      descripcion: 'Tarjeta Nu Bank Coco',
       tipo_deuda: 'tarjeta_credito',
     });
     expect(r).toEqual({
-      descripcion: 'Tarjeta Nu Bank Milo',
+      descripcion: 'Tarjeta Nu Bank Coco',
       tipo: 'tarjeta_credito',
     });
   });

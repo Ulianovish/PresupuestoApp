@@ -131,12 +131,12 @@ describe('webhook de WhatsApp: lista de cuentas', () => {
 
   it('texto normal: primero prueba si es el nombre de una cuenta; si lo es, no pasa al agente', async () => {
     vi.mocked(intentarCuentaEscrita).mockResolvedValue(true);
-    await post({ From: `whatsapp:${TEL}`, Body: 'Nequi Milo', NumMedia: '0' });
+    await post({ From: `whatsapp:${TEL}`, Body: 'Nequi Coco', NumMedia: '0' });
     await terminar();
 
     expect(intentarCuentaEscrita).toHaveBeenCalledWith(
       { fake: 'eleccion' },
-      { userId: 'u1', phone: TEL, body: 'Nequi Milo' },
+      { userId: 'u1', phone: TEL, body: 'Nequi Coco' },
     );
     expect(handleAgentTurn).not.toHaveBeenCalled();
   });

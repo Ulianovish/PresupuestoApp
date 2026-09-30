@@ -2,7 +2,7 @@
  * Reutiliza lo que el USUARIO ya decidió antes para clasificar un gasto nuevo.
  *
  * El clasificador por IA no conoce las convenciones de la casa (bebidas y
- * mecato van a GASTOS HORMIGA y no a MERCADO; la ropa de la niña a ALICE; la
+ * mecato van a GASTOS HORMIGA y no a MERCADO; la ropa de la niña a NINOS; la
  * transferencia a "Persona Ejemplo Uno" es el arriendo...). El usuario
  * ya las enseñó cada vez que corrigió una asignación a mano: antes de llamar al
  * LLM se busca un gasto anterior con la misma descripción (normalizada) que el
@@ -232,7 +232,7 @@ export function primerosDeGrupo(items: ItemHermano[]): Set<string> {
   return out;
 }
 
-/** Palabras de 4+ letras del nombre del ítem ("Alimentación Alice" → alimentacion, alice). */
+/** Palabras de 4+ letras del nombre del ítem ("Alimentación Ninos" → alimentacion, ninos). */
 function palabrasDeItem(nombre: string): string[] {
   return normalizarNombre(nombre)
     .replace(/[^a-z0-9\s]/g, ' ')

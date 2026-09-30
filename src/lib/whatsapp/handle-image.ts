@@ -62,7 +62,7 @@ export function resolveAccountFromMessage(
 
 /**
  * Cuentas que el texto (o, si no dice nada, la visión) nombró sin decidir
- * entre ellas: "con nequi" → Nequi Migue y Nequi Milo. Van primero en la
+ * entre ellas: "con nequi" → Nequi Bruno y Nequi Coco. Van primero en la
  * lista de cuentas.
  */
 function candidatasDeCuenta(

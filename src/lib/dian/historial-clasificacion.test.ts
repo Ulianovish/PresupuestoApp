@@ -584,17 +584,17 @@ describe('ejemplosParaPrompt', () => {
       fila('Arroz', 'MERCADO', 'Lacena', '2026-09-08'),
       fila('Leche', 'MERCADO', 'Lacteos', '2026-09-07'),
       fila('Gaseosa', 'GASTOS HORMIGA', 'Bebidas', '2026-09-06'),
-      fila('Blusa niña', 'ALICE', 'Vestuario Alice', '2026-09-05'),
+      fila('Blusa niña', 'NINOS', 'Vestuario Ninos', '2026-09-05'),
     ]);
     const ej = ejemplosParaPrompt(
       entradas,
-      ['MERCADO', 'Gastos Hormiga', 'ALICE'],
+      ['MERCADO', 'Gastos Hormiga', 'NINOS'],
       4,
     );
     expect(ej).toHaveLength(4);
     // Ronda por categoría: no se llena todo con MERCADO.
     expect(ej.map(e => e.category)).toEqual(
-      expect.arrayContaining(['MERCADO', 'Gastos Hormiga', 'ALICE']),
+      expect.arrayContaining(['MERCADO', 'Gastos Hormiga', 'NINOS']),
     );
     // Sin descripciones repetidas.
     expect(new Set(ej.map(e => e.description.toLowerCase())).size).toBe(4);

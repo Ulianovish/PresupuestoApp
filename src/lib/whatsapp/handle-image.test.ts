@@ -637,7 +637,7 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
 
   it('caption ambigua ("con nequi" y hay dos Nequi): registra YA con la por defecto, lo dice y manda la lista con las dos primero', async () => {
     const deps = makeDeps({
-      accounts: ['Efectivo', 'Nequi Migue', 'Nequi Milo', 'TC Davivienda'],
+      accounts: ['Efectivo', 'Nequi Bruno', 'Nequi Coco', 'TC Davivienda'],
       analyzeImage: transferencia(),
       createDirectExpense: vi.fn(async () => ({
         ok: true,
@@ -666,7 +666,7 @@ describe('handleImageMessage: texto del usuario, fecha y memoria', () => {
     };
     expect(pedido.targetKind).toBe('transactions');
     expect(pedido.targetIds).toEqual(['tx-foto']);
-    expect(pedido.candidatas).toEqual(['Nequi Migue', 'Nequi Milo']);
+    expect(pedido.candidatas).toEqual(['Nequi Bruno', 'Nequi Coco']);
     expect(pedido.previo).toMatch(
       /^✅ Registré \$\s?9\.000 · Huevos en MERCADO\./,
     );

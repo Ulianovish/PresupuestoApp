@@ -921,8 +921,8 @@ describe('handleAgentTurn: lista de cuentas', () => {
     mockedCreateAdminClient.mockReturnValue(
       fakeAdmin([
         'Efectivo',
-        'Nequi Migue',
-        'Nequi Milo',
+        'Nequi Bruno',
+        'Nequi Coco',
       ]) as unknown as ReturnType<typeof createAdminClient>,
     );
     mockedSendWhatsAppMessage.mockResolvedValue({ ok: true });
@@ -965,7 +965,7 @@ describe('handleAgentTurn: lista de cuentas', () => {
       targetKind: 'transactions',
       targetIds: ['tx-1', 'tx-2'],
       previo: 'Listo, anoté los dos.',
-      candidatas: ['Nequi Migue', 'Nequi Milo'],
+      candidatas: ['Nequi Bruno', 'Nequi Coco'],
     });
     expect(pedido.pregunta).toContain('Efectivo');
     expect(pedido.pregunta).toMatch(/¿con qué cuenta fueron\?/i);
@@ -1007,14 +1007,14 @@ describe('handleAgentTurn: lista de cuentas', () => {
       await deps.executeTool('registrar_gasto', {
         monto: 40000,
         descripcion: 'huevos',
-        cuenta: 'Nequi Milo',
+        cuenta: 'Nequi Coco',
       });
       return { text: 'Anotado.', calls: [] };
     });
     await handleAgentTurn({
       userId: 'u1',
       phone: '+57300',
-      body: '40k huevos nequi milo',
+      body: '40k huevos nequi coco',
     });
     expect(mockedPreguntarCuenta).not.toHaveBeenCalled();
     expect(mockedSendWhatsAppMessage).toHaveBeenCalledWith(
