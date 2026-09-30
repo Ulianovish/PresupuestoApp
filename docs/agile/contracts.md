@@ -11,7 +11,7 @@ Fuente de verdad para todas las historias. Diseño: `docs/superpowers/specs/2026
 - Guard de funciones SECURITY DEFINER (patrón de `20260929000000`):
   ```sql
   IF auth.role() IS DISTINCT FROM 'service_role'
-     AND (auth.uid() IS NULL OR auth.uid() <> p_user_id) THEN
+     AND (auth.uid() IS NULL OR auth.uid() IS DISTINCT FROM p_user_id) THEN
       RAISE EXCEPTION 'no autorizado' USING ERRCODE = '42501';
   END IF;
   ```
@@ -311,12 +311,13 @@ Resuelven los huecos que reportaron los 13 planificadores. Donde choquen con el 
 - **§1.2 backfill**: solo si las columnas se crean en esa ejecución (bloque `DO` que detecta si ya existían), para que re-ejecutar no marque como onboardeados a usuarios nuevos.
 - **§1.3 kit**:
   - Idempotencia: `_seed_starter_kit` no hace nada si el usuario tiene alguna categoría **activa** (`is_active = true`). Así quien borró todas puede recargar el kit.
-  - Categorías: `INSERT … ON CONFLICT (name, user_id) DO UPDATE SET is_active = true` (reactiva las inactivas con el mismo nombre).
-  - Rubros: se insertan con `NOT EXISTS` sobre `(template_id, category_id, lower(name))`. Antes de insertar se verifica que los 12 pares clasificación/control/estado resuelvan por nombre; si falta alguno, excepción (nada a medias).
+  - Categorías (S09b): se comparan por `upper(btrim(name))` (`Vivienda` o ` vivienda ` cuentan como `VIVIENDA`). Solo se insertan las del kit que no existen con ese criterio, activas o no (`INSERT … WHERE NOT EXISTS …`, con `ON CONFLICT (name, user_id) DO NOTHING` como seguro). El `category_id` de cada rubro se resuelve con esa misma comparación (si hay varias variantes gana la escrita igual al kit y luego el menor id) y queda en `v_kit`. Después se reactiva con un `UPDATE` **solo la categoría elegida** para cada rubro, no todas las variantes.
+  - Plantilla del mes (S09b): `ON CONFLICT (user_id, month_year) DO UPDATE SET is_active = true` (una plantilla inactiva se reactiva).
+  - Rubros (S09b): los rubros del kit que ya están inactivos en esa plantilla (misma categoría + `lower(btrim(name))`) se reactivan con un `UPDATE` antes del `INSERT`; luego se insertan con `NOT EXISTS` sobre `(template_id, category_id, lower(btrim(name)))`. Antes de insertar se verifica que los 12 pares clasificación/control/estado resuelvan por nombre; si falta alguno, excepción (nada a medias).
   - Se mantienen el `pg_advisory_xact_lock` por usuario y la validación `YYYY-MM`.
   - Las FK `user_id` de `accounts`, `budget_templates` y `budget_items` apuntan a `profiles(id)` (`categories` a `auth.users`): sin perfil, la siembra falla con 23503 (ver §5.2 `ensureStarterKitAction`).
 - **§1.4 funciones**: `copy_budget_items_from_template` **no validaba dueño**: guard + las dos plantillas deben ser de `p_user_id`. `get_previous_month_overspend` solo `service_role` (se revoca también `authenticated`). `get_budget_by_month`: guard, `search_path` fijo, sin EXECUTE para `PUBLIC`/`anon`, EXECUTE a `authenticated, service_role`. Las del grupo B ya tenían grants correctos: se traen al repo con el cuerpo intacto, salvo `copy_budget_items_from_template` (guard + chequeo de dueño, arriba).
-- **§1.5 WhatsApp**: revincular se decide por `whatsapp_conversations.user_id <> <usuario nuevo>` (un número ya vinculado nunca llega al flujo de vinculación). Límite **fail-open**: si la tabla de intentos no se puede leer o escribir, no bloquea. `RedeemResult` suma `'link_failed'` (error de base; no cuenta como intento; el usuario ve `MSG_CODE_INVALID`). La migración borra códigos pendientes vencidos y duplicados antes de crear el índice.
+- **§1.5 WhatsApp**: revincular se decide por `whatsapp_conversations.user_id <> <usuario nuevo>` (un número ya vinculado nunca llega al flujo de vinculación). Límite **fail-open**: si la tabla de intentos no se puede leer o escribir, no bloquea. `RedeemResult` suma `'link_failed'` (error de base; no cuenta como intento; el usuario ve `MSG_CODE_INVALID`). `RedeemResult` también tiene `'already_redeemed_same_link'`: reintento de Twilio, el mismo código lo canjeó el dueño del vínculo del número en los últimos 2 minutos → `MSG_LINKED_OK` y la reserva del intento se libera. El orquestador ratificó esta variante acotada frente a la literal de «número ya vinculado», porque la literal permitía probar códigos sin límite. La migración borra códigos pendientes vencidos y duplicados antes de crear el índice.
 
 ### 5.2 TypeScript
 - **§2.2 `translateAuthError`**: primero `code` **si es uno conocido**; si no hay `code` o no está en la tabla, `message`. El rechazo del hook llega sin `code` (message `signup_not_allowed`, 403); el del trigger con `code: 'unexpected_failure'` y message `Database error saving new user`: ambos casos con test. Filas nuevas:

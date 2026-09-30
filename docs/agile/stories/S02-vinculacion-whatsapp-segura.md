@@ -23,7 +23,7 @@
 - Tests: el cliente Supabase siempre mockeado (`vi.mock('@/lib/supabase/server', …)`), ninguno toca una base real. Datos de prueba: teléfono `+573000000000`, ids `user-1`/`otro`. Nunca loguear el número ni el código: solo `error.code`.
 - Textos para el usuario en español colombiano con tuteo.
 - Verificación: `bun run test <archivo>` por tarea; al final `bun run test && bun run type-check`.
-- Commits en español terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Todos los commits de esta historia tocan `src/`, así que van **sin** `--no-verify`.
+- Commits en español terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Todos los commits van **con** `--no-verify` (regla del orquestador: husky/lint-staged puede descartar cambios); antes de cada commit que toca `src/` se corren `bunx eslint` y `bunx prettier --check` sobre los archivos tocados.
 - No se toca `src/lib/actions/whatsapp.ts` (es de S13): `createLinkCode(user.id)` sigue funcionando con la firma nueva porque el segundo parámetro es opcional.
 
 ## Archivos
@@ -36,25 +36,26 @@
 | Modificar (test) | `src/lib/services/whatsapp-links.test.ts` | Tests de generación, canje, revinculación y límite |
 | Modificar | `src/lib/whatsapp/handle-linking.ts` | Consulta el límite antes de canjear; registra fallos; `MSG_TOO_MANY_ATTEMPTS` |
 | Modificar (test) | `src/lib/whatsapp/handle-linking.test.ts` | Tests del flujo con límite |
-| Modificar | `src/app/api/whatsapp/webhook/route.ts` | Pasa `isLinkAttemptLimitReached` y `recordFailedLinkAttempt` al flujo de vinculación |
+| Modificar | `src/app/api/whatsapp/webhook/route.ts` | Pasa `reserveLinkAttempt` y `releaseLinkAttempt` al flujo de vinculación (antes `isLinkAttemptLimitReached` y `recordFailedLinkAttempt`; ver «Ronda de corrección 1») |
 | Modificar (test) | `src/app/api/whatsapp/webhook/route.test.ts` | Test del cableado para números sin vincular |
 
 ## Criterios de aceptación
 
-- [ ] Índice único parcial `whatsapp_link_codes_code_pending_uq` sobre `code` con `WHERE used_at IS NULL`; la migración limpia antes los pendientes vencidos y los pendientes repetidos para que el índice se pueda crear.
-- [ ] `createLinkCode` borra los códigos vencidos y sin usar del propio usuario antes de insertar; ante `23505` reintenta con otro código hasta 5 veces y luego lanza error; cualquier otro error lanza sin reintentar.
-- [ ] `redeemLinkCode` hace un único UPDATE condicional por `code` (sin usar y vigente según el reloj inyectado); gracias al índice afecta como mucho una fila.
-- [ ] Tabla `whatsapp_link_attempts` con RLS activo, sin políticas, sin privilegios para `PUBLIC`/`anon`/`authenticated`.
-- [ ] 5 fallos por número en 15 min → `MSG_TOO_MANY_ATTEMPTS` sin llamar a `redeemLinkCode`. Solo `invalid_or_expired` cuenta como fallo; los errores de base (`link_failed`) no.
-- [ ] Revincular a otro usuario borra la fila de `whatsapp_conversations` del número (la de otro `user_id`) antes de crear el vínculo; si ese borrado falla, no se vincula.
-- [ ] Tests unitarios de generación, canje, límite y revinculación con cliente mockeado y reloj inyectado; test de texto de la migración.
-- [ ] `MSG_LINKED_OK` sin cambios.
-- [ ] `bun run test && bun run type-check` en verde.
+- [x] Índice único parcial `whatsapp_link_codes_code_pending_uq` sobre `code` con `WHERE used_at IS NULL`; la migración limpia antes los pendientes vencidos y los pendientes repetidos para que el índice se pueda crear.
+- [x] `createLinkCode` borra los códigos vencidos y sin usar del propio usuario antes de insertar; ante `23505` reintenta con otro código hasta 5 veces y luego lanza error; cualquier otro error lanza sin reintentar.
+- [x] `redeemLinkCode` hace un único UPDATE condicional por `code` (sin usar y vigente según el reloj inyectado); gracias al índice afecta como mucho una fila.
+- [x] Tabla `whatsapp_link_attempts` con RLS activo, sin políticas, sin privilegios para `PUBLIC`/`anon`/`authenticated`.
+- [x] 5 fallos por número en 15 min → `MSG_TOO_MANY_ATTEMPTS` sin llamar a `redeemLinkCode`. Solo `invalid_or_expired` cuenta como fallo; los errores de base (`link_failed`) no.
+- [x] Revincular a otro usuario borra la fila de `whatsapp_conversations` del número (la de otro `user_id`) antes de crear el vínculo; si ese borrado falla, no se vincula.
+- [x] Tests unitarios de generación, canje, límite y revinculación con cliente mockeado y reloj inyectado; test de texto de la migración.
+- [x] `MSG_LINKED_OK` sin cambios.
+- [x] `bun run test && bun run type-check` en verde.
 
 ## Notas de diseño (leer antes de empezar)
 
 - **Por qué la revinculación se decide con `whatsapp_conversations.user_id`.** En el webhook, un número ya vinculado nunca entra al flujo de vinculación (sus mensajes van al agente). Un número solo cambia de dueño después de desvincularse (S13 agrega el botón), y en ese momento la fila de `whatsapp_links` del dueño anterior ya no existe. Por eso el borrado es `DELETE FROM whatsapp_conversations WHERE phone_e164 = <n> AND user_id <> <nuevo>`: cubre ese caso y el de un upsert directo, y conserva la conversación si el dueño es el mismo.
-- **Por qué el límite deja pasar si la base falla.** El código puede llegar a producción antes de que se aplique la migración (H8). Si `whatsapp_link_attempts` no existe, bloquear dejaría a todos sin poder vincular. Por eso `isLinkAttemptLimitReached` devuelve `false` ante un error y `recordFailedLinkAttempt` nunca lanza; ambos loguean solo `error.code`.
+- **Por qué el límite deja pasar si la base falla.** El código puede llegar a producción antes de que se aplique la migración (H8). Si `whatsapp_link_attempts` no existe, bloquear dejaría a todos sin poder vincular. Por eso `reserveLinkAttempt` deja pasar ante un error y `releaseLinkAttempt` nunca lanza; ambos loguean solo `error.code`.
+- **Ronda de corrección 1 (revisión).** El límite pasó de «contar y luego registrar el fallo» (dos pasos: una ráfaga en paralelo de `VINCULAR` desde el mismo número pasaba el conteo N veces) a **reservar antes de canjear**: `reserveLinkAttempt` purga las filas anteriores a la ventana (en S03 pasó a borrar las de **todos** los números, no solo las del que escribe, para que la tabla no crezca con números que no vuelven), inserta el intento y cuenta la ventana con él incluido; con más de 5 borra su reserva y responde `MSG_TOO_MANY_ATTEMPTS`. Si el canje sale bien o falla por la base (`link_failed`), `handleLinkingMessage` libera la reserva con `releaseLinkAttempt`; con `invalid_or_expired` la fila queda como el fallo. Además, si `redeemLinkCode` falla después de consumir el código (conversación o upsert), lo devuelve a pendiente (best-effort) para que el mismo `VINCULAR` se pueda reintentar. Las secciones de tareas de abajo conservan el diseño original como historia.
 - **Por qué `link_failed`.** Antes cualquier error del canje devolvía `invalid_or_expired`. Ahora ese resultado suma un intento fallido al número, así que un error de base (que no es culpa de quien escribe) se separa en `link_failed`. El mensaje al usuario sigue siendo `MSG_CODE_INVALID` en ambos casos.
 - **Los intentos bloqueados no se registran.** Así, quien espera 15 minutos vuelve a poder intentar, como dice el mensaje.
 
@@ -70,7 +71,7 @@
 - Consumes: tablas existentes `public.whatsapp_link_codes` (columnas `id uuid PK`, `code`, `user_id`, `expires_at`, `used_at`, `created_at`; migraciones `20260611000000` y `20260611000001`).
 - Produces: índice `whatsapp_link_codes_code_pending_uq`; tabla `public.whatsapp_link_attempts(id bigserial PK, phone_e164 text NOT NULL, created_at timestamptz NOT NULL DEFAULT now())` que usan las tareas 4 y 5.
 
-- [ ] **Step 1: Escribir el test de texto que falla**
+- [x] **Step 1: Escribir el test de texto que falla**
 
 Crear `src/lib/supabase/migrations/20260930110000_whatsapp_vinculacion_segura.test.ts`:
 
@@ -161,12 +162,12 @@ describe(`migración ${ARCHIVO}`, () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `bun run test src/lib/supabase/migrations/20260930110000_whatsapp_vinculacion_segura.test.ts`
 Expected: FAIL con `ENOENT: no such file or directory, open '…/supabase/migrations/20260930110000_whatsapp_vinculacion_segura.sql'`.
 
-- [ ] **Step 3: Escribir la migración**
+- [x] **Step 3: Escribir la migración**
 
 Crear `supabase/migrations/20260930110000_whatsapp_vinculacion_segura.sql`:
 
@@ -252,12 +253,12 @@ GRANT USAGE, SELECT ON SEQUENCE public.whatsapp_link_attempts_id_seq TO service_
 --  WHERE used_at IS NULL GROUP BY code HAVING count(*) > 1;
 ```
 
-- [ ] **Step 4: Correr el test y verificar que pasa**
+- [x] **Step 4: Correr el test y verificar que pasa**
 
 Run: `bun run test src/lib/supabase/migrations/20260930110000_whatsapp_vinculacion_segura.test.ts`
 Expected: PASS (7 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add supabase/migrations/20260930110000_whatsapp_vinculacion_segura.sql src/lib/supabase/migrations/20260930110000_whatsapp_vinculacion_segura.test.ts
@@ -289,7 +290,7 @@ EOF
   - `export async function createLinkCode(userId: string, options?: CreateLinkCodeOptions): Promise<string>`
   - En el test: constantes `NOW`, `NOW_ISO`, `now`, `TEL` que usan las tareas 3 y 4.
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 En `src/lib/services/whatsapp-links.test.ts`:
 
@@ -440,12 +441,12 @@ describe('createLinkCode', () => {
 });
 ```
 
-- [ ] **Step 2: Correr los tests y verificar que fallan**
+- [x] **Step 2: Correr los tests y verificar que fallan**
 
 Run: `bun run test src/lib/services/whatsapp-links.test.ts`
 Expected: FAIL en `describe('createLinkCode')` (p. ej. `expected "spy" to be called at least once` para `tabla.delete`, y `expected undefined to be 5` para `MAX_CODE_ATTEMPTS`). Los tests de `redeemLinkCode`, `getLinkByPhone` y `listarDocumentosDeUsuario` siguen pasando.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/services/whatsapp-links.ts`, reemplazar desde `const CODE_TTL_MINUTES = 10;` (línea 10) hasta el cierre de `createLinkCode` (línea 31) por:
 
@@ -522,7 +523,7 @@ export async function createLinkCode(
 }
 ```
 
-- [ ] **Step 4: Correr los tests y verificar que pasan**
+- [x] **Step 4: Correr los tests y verificar que pasan**
 
 Run: `bun run test src/lib/services/whatsapp-links.test.ts`
 Expected: PASS (todos, incluidos los 6 nuevos de `createLinkCode`).
@@ -530,7 +531,7 @@ Expected: PASS (todos, incluidos los 6 nuevos de `createLinkCode`).
 Run: `bun run type-check`
 Expected: sin errores (`src/lib/actions/whatsapp.ts` sigue llamando `createLinkCode(user.id)`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/services/whatsapp-links.ts src/lib/services/whatsapp-links.test.ts
@@ -561,7 +562,7 @@ EOF
   - `export async function redeemLinkCode(code: string, phoneE164: string, now?: () => Date): Promise<RedeemResult>`
   - Solo `reason: 'invalid_or_expired'` significa "código inexistente, usado o vencido" (lo usa Task 5 para contar fallos).
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 En `src/lib/services/whatsapp-links.test.ts`, reemplazar todo lo que va desde el comentario `/** Tabla whatsapp_links: lectura del vínculo previo + upsert. */` hasta el cierre de `describe('redeemLinkCode', …)` (justo antes de `describe('getLinkByPhone', …)`) por:
 
@@ -775,12 +776,12 @@ describe('redeemLinkCode', () => {
 });
 ```
 
-- [ ] **Step 2: Correr los tests y verificar que fallan**
+- [x] **Step 2: Correr los tests y verificar que fallan**
 
 Run: `bun run test src/lib/services/whatsapp-links.test.ts`
 Expected: FAIL en `redeemLinkCode`: el primer test (`update` llamado con la hora real, no con `NOW_ISO`), los de conversación (`expected "spy" to be called`), y los de `link_failed` (devuelve `invalid_or_expired`).
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/services/whatsapp-links.ts`, reemplazar desde `export type RedeemResult =` hasta el cierre de `redeemLinkCode` (la llave que sigue a `return { ok: true, userId };`) por:
 
@@ -883,7 +884,7 @@ export async function redeemLinkCode(
 }
 ```
 
-- [ ] **Step 4: Correr los tests y verificar que pasan**
+- [x] **Step 4: Correr los tests y verificar que pasan**
 
 Run: `bun run test src/lib/services/whatsapp-links.test.ts src/lib/whatsapp/handle-linking.test.ts`
 Expected: PASS (el test de `handle-linking` "VINCULAR con código inválido" sigue pasando porque `link_failed` y `invalid_or_expired` responden el mismo mensaje).
@@ -891,7 +892,7 @@ Expected: PASS (el test de `handle-linking` "VINCULAR con código inválido" sig
 Run: `bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/services/whatsapp-links.ts src/lib/services/whatsapp-links.test.ts
@@ -912,6 +913,8 @@ EOF
 
 ### Task 4: Límite de intentos fallidos por número en el servicio
 
+> **Reemplazada en la ronda de corrección 1.** `isLinkAttemptLimitReached` y `recordFailedLinkAttempt` ya no existen: se reemplazaron por `reserveLinkAttempt` (reserva el intento antes de canjear, cuenta la ventana con él incluido y rechaza con más de 5) y `releaseLinkAttempt` (borra la reserva si el canje salió bien o falló por la base). El texto de abajo conserva el diseño original como historia; ver «Notas de diseño → Ronda de corrección 1».
+
 **Files:**
 - Modify: `src/lib/services/whatsapp-links.ts` (comentario de cabecera y funciones nuevas al final)
 - Test: `src/lib/services/whatsapp-links.test.ts`
@@ -926,7 +929,7 @@ EOF
   - `export async function isLinkAttemptLimitReached(phoneE164: string, now?: () => Date): Promise<boolean>` — nunca lanza; ante error devuelve `false`.
   - `export async function recordFailedLinkAttempt(phoneE164: string, now?: () => Date): Promise<void>` — nunca lanza.
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 En `src/lib/services/whatsapp-links.test.ts`:
 
@@ -1100,12 +1103,12 @@ describe('recordFailedLinkAttempt', () => {
 });
 ```
 
-- [ ] **Step 2: Correr los tests y verificar que fallan**
+- [x] **Step 2: Correr los tests y verificar que fallan**
 
 Run: `bun run test src/lib/services/whatsapp-links.test.ts`
 Expected: FAIL en los describe nuevos con `TypeError: linkAttemptsWindowStart is not a function` (y equivalentes para `isOverLinkAttemptLimit`, `isLinkAttemptLimitReached`, `recordFailedLinkAttempt`).
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/services/whatsapp-links.ts`:
 
@@ -1203,7 +1206,7 @@ export async function recordFailedLinkAttempt(
 }
 ```
 
-- [ ] **Step 4: Correr los tests y verificar que pasan**
+- [x] **Step 4: Correr los tests y verificar que pasan**
 
 Run: `bun run test src/lib/services/whatsapp-links.test.ts`
 Expected: PASS (todos).
@@ -1211,7 +1214,7 @@ Expected: PASS (todos).
 Run: `bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/services/whatsapp-links.ts src/lib/services/whatsapp-links.test.ts
@@ -1245,7 +1248,7 @@ EOF
   - `export const MSG_TOO_MANY_ATTEMPTS = 'Hiciste demasiados intentos. Espera 15 minutos y genera un código nuevo en Ajustes.'`
   - `MSG_LINKED_OK` queda idéntico y sin exportar (S13 lo cambia).
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 Reemplazar todo `src/lib/whatsapp/handle-linking.test.ts` por:
 
@@ -1417,12 +1420,12 @@ describe('webhook de WhatsApp: número sin vincular', () => {
 });
 ```
 
-- [ ] **Step 2: Correr los tests y verificar que fallan**
+- [x] **Step 2: Correr los tests y verificar que fallan**
 
 Run: `bun run test src/lib/whatsapp/handle-linking.test.ts src/app/api/whatsapp/webhook/route.test.ts`
 Expected: FAIL. En `handle-linking`: `MSG_TOO_MANY_ATTEMPTS es el texto del contrato` (`expected undefined to be 'Hiciste demasiados intentos…'`), el de límite alcanzado (`redeemLinkCode` sí fue llamado) y el de registro de fallo (`recordFailedLinkAttempt` no fue llamado). En `route.test`: los dos tests de "número sin vincular" (`isLinkAttemptLimitReached` nunca llamado). Los 4 tests de "lista de cuentas" siguen pasando.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/whatsapp/handle-linking.ts`:
 
@@ -1515,7 +1518,7 @@ por:
 
 (Las funciones del servicio se pasan tal cual: se llaman con un solo argumento y usan el reloj real por defecto.)
 
-- [ ] **Step 4: Correr los tests y verificar que pasan**
+- [x] **Step 4: Correr los tests y verificar que pasan**
 
 Run: `bun run test src/lib/whatsapp/handle-linking.test.ts src/app/api/whatsapp/webhook/route.test.ts`
 Expected: PASS (8 tests de `handle-linking`, 6 de `route.test`).
@@ -1526,7 +1529,7 @@ Expected: sin errores.
 Run: `grep -n "Tu WhatsApp quedó vinculado a tu presupuesto" src/lib/whatsapp/handle-linking.ts`
 Expected: una coincidencia (`MSG_LINKED_OK` intacto).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/whatsapp/handle-linking.ts src/lib/whatsapp/handle-linking.test.ts src/app/api/whatsapp/webhook/route.ts src/app/api/whatsapp/webhook/route.test.ts
@@ -1553,12 +1556,12 @@ EOF
 - Consumes: todo lo anterior.
 - Produces: evidencia de suite y typecheck en verde.
 
-- [ ] **Step 1: Suite completa y typecheck**
+- [x] **Step 1: Suite completa y typecheck**
 
 Run: `bun run test && bun run type-check`
 Expected: todos los tests en verde y `tsc --noEmit` sin errores.
 
-- [ ] **Step 2: Revisar datos personales y logs**
+- [x] **Step 2: Revisar datos personales y logs**
 
 Run: `grep -nE "\+57[0-9]{10}" src/lib/services/whatsapp-links.test.ts src/lib/supabase/migrations/20260930110000_whatsapp_vinculacion_segura.test.ts src/lib/whatsapp/handle-linking.test.ts`
 Expected: los tests nuevos solo usan `+573000000000` (la constante `TEL`). Los números que ya estaban antes de S02 (`+573001234567`/`+573009999999` en `getLinkByPhone` y `+573000000001`/`+573000000002` en `listarDocumentosDeUsuario`) son inventados y se dejan como están.
@@ -1566,12 +1569,29 @@ Expected: los tests nuevos solo usan `+573000000000` (la constante `TEL`). Los n
 Run: `grep -n "console.error" src/lib/services/whatsapp-links.ts`
 Expected: cada llamada nueva pasa `error.code` o `err.name`, nunca `phoneE164` ni `code`.
 
-- [ ] **Step 3: Confirmar que no se tocaron archivos ajenos a la historia**
+- [x] **Step 3: Confirmar que no se tocaron archivos ajenos a la historia**
 
 Run: `git diff --stat main...HEAD -- src/lib/actions/whatsapp.ts src/lib/whatsapp/link-url.ts`
 Expected: salida vacía.
 
 Si algún paso falla, corregir en la tarea correspondiente y hacer un commit nuevo con `fix(whatsapp): …` terminado en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Si todo pasa, no hay commit en esta tarea.
+
+---
+
+### Task 7 (alcance adicional del orquestador): deuda de S01 en la misma zona
+
+- [x] **Step 1:** Test: el guard de `20260930100000` usa `auth.uid() IS DISTINCT FROM p_user_id` (un `p_user_id` NULL es "no autorizado") y la verificación manual trae el caso 7b y la huella `md5(prosrc)`. Verificado que falla.
+- [x] **Step 2:** Migración `20260930100000` (sin aplicar): guard con `IS DISTINCT FROM` en las 3 funciones; paso 0 `SELECT proname, md5(prosrc) …`; caso 7b (plantilla real de otro usuario como fuente y como destino, `BEGIN/ROLLBACK`, esperado 42501). Contratos §0 actualizados. Test en verde.
+- [x] **Step 3:** Commit.
+
+### Deuda cerrada en S03 (alcance adicional del orquestador)
+
+- [x] La purga best-effort de `whatsapp_link_attempts` borra todas las filas anteriores a la ventana (`delete().lt('created_at', desde)`, sin filtro por número). Para que no recorra la tabla entera, la migración `20260930110000` (sin aplicar, H8) agrega el índice `whatsapp_link_attempts_created_idx (created_at)`.
+- [x] Reintento de Twilio tras un timeout: si el código ya no está pendiente, `redeemLinkCode` busca si ESE código lo canjeó en los últimos 2 minutos (`LINK_RETRY_WINDOW_MINUTES`) el mismo usuario al que está vinculado el número; si es así devuelve `already_redeemed_same_link` y `handleLinkingMessage` libera la reserva (una vez) y responde `MSG_LINKED_OK`. En cualquier otro caso (número sin vínculo, código ajeno o inexistente, error al consultar) es `invalid_or_expired`: el intento cuenta y la respuesta es `MSG_CODE_INVALID`. (La primera versión, ronda 1 de S03, aceptaba cualquier código inválido si el número ya estaba vinculado: dejaba probar códigos sin límite y se corrigió.)
+
+## Riesgos aceptados
+
+- **Sin límite global multi-número.** El límite de 5 intentos en 15 minutos es por número. Alguien con muchos números (o que falsifique el remitente, cosa que la firma de Twilio impide) podría probar más códigos en total. Con códigos de 6 dígitos que vencen en 10 minutos el riesgo es bajo; queda en el backlog.
 
 ---
 

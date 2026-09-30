@@ -15,7 +15,12 @@ import {
   createVisionReceiptDraft,
   resolveDefaultAccount,
 } from '@/lib/services/whatsapp-expenses';
-import { getLinkByPhone, redeemLinkCode } from '@/lib/services/whatsapp-links';
+import {
+  getLinkByPhone,
+  redeemLinkCode,
+  releaseLinkAttempt,
+  reserveLinkAttempt,
+} from '@/lib/services/whatsapp-links';
 import { parsearIdOpcion } from '@/lib/whatsapp/account-picker';
 import {
   intentarCuentaEscrita,
@@ -91,6 +96,8 @@ export async function POST(request: NextRequest) {
     const reply = await handleLinkingMessage(phone, body, {
       redeemLinkCode,
       getLinkByPhone,
+      reserveLinkAttempt,
+      releaseLinkAttempt,
     });
     return xml(twimlMessage(reply));
   }
