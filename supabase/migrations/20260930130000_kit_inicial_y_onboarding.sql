@@ -365,6 +365,20 @@ GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin, servi
 --   SELECT count(*) FROM public.categories   WHERE user_id = '22222222-2222-2222-2222-222222222222' AND is_active;  -- 6
 --   SELECT count(*) FROM public.budget_items WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- sigue en 12 (NOT EXISTS)
 --
+--   -- Recarga robusta (S09b): plantilla y un rubro del kit inactivos, y la
+--   -- categoría renombrada a 'Vivienda' en minúsculas. Todo se reactiva sin duplicar.
+--   UPDATE public.categories SET name = 'Vivienda' WHERE user_id = '22222222-2222-2222-2222-222222222222' AND name = 'VIVIENDA';
+--   UPDATE public.categories SET is_active = false WHERE user_id = '22222222-2222-2222-2222-222222222222';
+--   UPDATE public.budget_templates SET is_active = false WHERE user_id = '22222222-2222-2222-2222-222222222222';
+--   UPDATE public.budget_items SET is_active = false WHERE user_id = '22222222-2222-2222-2222-222222222222' AND name = 'Internet';
+--   SET LOCAL ROLE authenticated;
+--   SELECT public.ensure_starter_kit();                               -- true (recargó)
+--   RESET ROLE;
+--   SELECT count(*) FROM public.categories WHERE user_id = '22222222-2222-2222-2222-222222222222' AND upper(btrim(name)) = 'VIVIENDA';  -- 1 (Vivienda reactivada, sin VIVIENDA nueva)
+--   SELECT count(*), count(*) FILTER (WHERE is_active) FROM public.categories WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- 6, 6
+--   SELECT is_active FROM public.budget_templates WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- true (una sola fila)
+--   SELECT count(*), count(*) FILTER (WHERE is_active) FROM public.budget_items WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- 12, 12 (Internet reactivado)
+--
 --   -- Sin categorías ni rubros: el kit se siembra completo otra vez.
 --   DELETE FROM public.budget_items WHERE user_id = '22222222-2222-2222-2222-222222222222';
 --   DELETE FROM public.categories   WHERE user_id = '22222222-2222-2222-2222-222222222222';

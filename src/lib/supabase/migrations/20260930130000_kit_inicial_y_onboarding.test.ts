@@ -376,4 +376,20 @@ describe('migración 20260930130000: verificación manual', () => {
     expect(tail).toContain('ROLLBACK;');
     expect(tail).toContain('usuario@ejemplo.com');
   });
+
+  it('incluye el caso de recarga con plantilla, rubro y categoría en minúsculas inactivos', () => {
+    const tail = rawSql.slice(rawSql.indexOf('-- VERIFICACIÓN'));
+    expect(tail).toContain(
+      "UPDATE public.categories SET name = 'Vivienda' WHERE user_id = '22222222-2222-2222-2222-222222222222' AND name = 'VIVIENDA';",
+    );
+    expect(tail).toContain(
+      "UPDATE public.budget_templates SET is_active = false WHERE user_id = '22222222-2222-2222-2222-222222222222';",
+    );
+    expect(tail).toContain(
+      "UPDATE public.budget_items SET is_active = false WHERE user_id = '22222222-2222-2222-2222-222222222222' AND name = 'Internet';",
+    );
+    expect(tail).toMatch(
+      /upper\(btrim\(name\)\) = 'VIVIENDA'.*-- 1 \(Vivienda reactivada, sin VIVIENDA nueva\)/,
+    );
+  });
 });
