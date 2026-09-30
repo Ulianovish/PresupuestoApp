@@ -926,7 +926,7 @@ EOF
   - `export async function isLinkAttemptLimitReached(phoneE164: string, now?: () => Date): Promise<boolean>` — nunca lanza; ante error devuelve `false`.
   - `export async function recordFailedLinkAttempt(phoneE164: string, now?: () => Date): Promise<void>` — nunca lanza.
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 En `src/lib/services/whatsapp-links.test.ts`:
 
@@ -1100,12 +1100,12 @@ describe('recordFailedLinkAttempt', () => {
 });
 ```
 
-- [ ] **Step 2: Correr los tests y verificar que fallan**
+- [x] **Step 2: Correr los tests y verificar que fallan**
 
 Run: `bun run test src/lib/services/whatsapp-links.test.ts`
 Expected: FAIL en los describe nuevos con `TypeError: linkAttemptsWindowStart is not a function` (y equivalentes para `isOverLinkAttemptLimit`, `isLinkAttemptLimitReached`, `recordFailedLinkAttempt`).
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/services/whatsapp-links.ts`:
 
@@ -1203,7 +1203,7 @@ export async function recordFailedLinkAttempt(
 }
 ```
 
-- [ ] **Step 4: Correr los tests y verificar que pasan**
+- [x] **Step 4: Correr los tests y verificar que pasan**
 
 Run: `bun run test src/lib/services/whatsapp-links.test.ts`
 Expected: PASS (todos).
@@ -1211,7 +1211,7 @@ Expected: PASS (todos).
 Run: `bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/services/whatsapp-links.ts src/lib/services/whatsapp-links.test.ts

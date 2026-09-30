@@ -10,8 +10,14 @@ import {
   createLinkCode,
   generateSixDigitCode,
   getLinkByPhone,
+  isLinkAttemptLimitReached,
+  isOverLinkAttemptLimit,
+  LINK_ATTEMPTS_WINDOW_MINUTES,
+  LINK_MAX_FAILED_ATTEMPTS,
+  linkAttemptsWindowStart,
   listarDocumentosDeUsuario,
   MAX_CODE_ATTEMPTS,
+  recordFailedLinkAttempt,
   redeemLinkCode,
 } from './whatsapp-links';
 
@@ -439,6 +445,153 @@ describe('listarDocumentosDeUsuario', () => {
     expect(await listarDocumentosDeUsuario('user-1', client as never)).toEqual(
       [],
     );
+    errorSpy.mockRestore();
+  });
+});
+
+describe('límite de intentos de vinculación (lógica pura)', () => {
+  it('la ventana empieza 15 minutos antes de ahora', () => {
+    expect(LINK_ATTEMPTS_WINDOW_MINUTES).toBe(15);
+    expect(linkAttemptsWindowStart(NOW)).toBe('2026-09-30T11:45:00.000Z');
+  });
+
+  it('con 4 fallos todavía se puede intentar; con 5 ya no', () => {
+    expect(LINK_MAX_FAILED_ATTEMPTS).toBe(5);
+    expect(isOverLinkAttemptLimit(0)).toBe(false);
+    expect(isOverLinkAttemptLimit(4)).toBe(false);
+    expect(isOverLinkAttemptLimit(5)).toBe(true);
+    expect(isOverLinkAttemptLimit(9)).toBe(true);
+  });
+});
+
+/** Tabla whatsapp_link_attempts: conteo select().eq().gte() + insert. */
+function tablaIntentos(
+  conteo: { count: number | null; error: unknown },
+  insertResult: { error: unknown } = { error: null },
+) {
+  return {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    gte: vi.fn().mockResolvedValue(conteo),
+    insert: vi.fn().mockResolvedValue(insertResult),
+  };
+}
+
+describe('isLinkAttemptLimitReached', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('cuenta los fallos del número desde hace 15 minutos (reloj inyectado)', async () => {
+    const tabla = tablaIntentos({ count: 5, error: null });
+    const from = vi.fn(() => tabla);
+    mockedAdmin.mockReturnValue({ from });
+
+    expect(await isLinkAttemptLimitReached(TEL, now)).toBe(true);
+    expect(from).toHaveBeenCalledWith('whatsapp_link_attempts');
+    expect(tabla.select).toHaveBeenCalledWith('id', {
+      count: 'exact',
+      head: true,
+    });
+    expect(tabla.eq).toHaveBeenCalledWith('phone_e164', TEL);
+    expect(tabla.gte).toHaveBeenCalledWith(
+      'created_at',
+      '2026-09-30T11:45:00.000Z',
+    );
+  });
+
+  it('con 4 fallos en la ventana no bloquea', async () => {
+    mockedAdmin.mockReturnValue({
+      from: vi.fn(() => tablaIntentos({ count: 4, error: null })),
+    });
+
+    expect(await isLinkAttemptLimitReached(TEL, now)).toBe(false);
+  });
+
+  it('sin conteo (null) no bloquea', async () => {
+    mockedAdmin.mockReturnValue({
+      from: vi.fn(() => tablaIntentos({ count: null, error: null })),
+    });
+
+    expect(await isLinkAttemptLimitReached(TEL, now)).toBe(false);
+  });
+
+  it('si la consulta falla (p. ej. la migración sin aplicar) no bloquea y no loguea el número', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockedAdmin.mockReturnValue({
+      from: vi.fn(() =>
+        tablaIntentos({
+          count: null,
+          error: {
+            code: '42P01',
+            message: 'relation "whatsapp_link_attempts" does not exist',
+          },
+        }),
+      ),
+    });
+
+    expect(await isLinkAttemptLimitReached(TEL, now)).toBe(false);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('isLinkAttemptLimitReached'),
+      '42P01',
+    );
+    expect(errorSpy.mock.calls.flat().join(' ')).not.toContain(TEL);
+    errorSpy.mockRestore();
+  });
+
+  it('si el cliente lanza, no bloquea', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockedAdmin.mockImplementationOnce(() => {
+      throw new Error('sin variables de entorno');
+    });
+
+    expect(await isLinkAttemptLimitReached(TEL, now)).toBe(false);
+    errorSpy.mockRestore();
+  });
+});
+
+describe('recordFailedLinkAttempt', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('inserta el intento del número con la hora del reloj inyectado', async () => {
+    const tabla = tablaIntentos({ count: 0, error: null });
+    const from = vi.fn(() => tabla);
+    mockedAdmin.mockReturnValue({ from });
+
+    await recordFailedLinkAttempt(TEL, now);
+
+    expect(from).toHaveBeenCalledWith('whatsapp_link_attempts');
+    expect(tabla.insert).toHaveBeenCalledWith({
+      phone_e164: TEL,
+      created_at: NOW_ISO,
+    });
+  });
+
+  it('si el insert falla no lanza y loguea solo el código de error', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockedAdmin.mockReturnValue({
+      from: vi.fn(() =>
+        tablaIntentos(
+          { count: 0, error: null },
+          { error: { code: '42P01', message: 'no existe' } },
+        ),
+      ),
+    });
+
+    await expect(recordFailedLinkAttempt(TEL, now)).resolves.toBeUndefined();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('recordFailedLinkAttempt'),
+      '42P01',
+    );
+    expect(errorSpy.mock.calls.flat().join(' ')).not.toContain(TEL);
+    errorSpy.mockRestore();
+  });
+
+  it('si el cliente lanza, no lanza', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockedAdmin.mockImplementationOnce(() => {
+      throw new Error('sin variables de entorno');
+    });
+
+    await expect(recordFailedLinkAttempt(TEL, now)).resolves.toBeUndefined();
     errorSpy.mockRestore();
   });
 });

@@ -1,6 +1,7 @@
 // Servicio de vinculación número↔usuario. Usa el cliente service-role porque el
-// webhook corre sin sesión; la seguridad la da el código de un solo uso + la
-// firma de Twilio validada antes de llegar aquí.
+// webhook corre sin sesión; la seguridad la dan el código de un solo uso (único
+// entre los pendientes), el límite de intentos fallidos por número y la firma
+// de Twilio validada antes de llegar aquí.
 
 import { randomInt } from 'crypto';
 
@@ -227,5 +228,86 @@ export async function listarDocumentosDeUsuario(
       err instanceof Error ? err.message : err,
     );
     return [];
+  }
+}
+
+/** VINCULAR fallidos permitidos por número dentro de la ventana. */
+export const LINK_MAX_FAILED_ATTEMPTS = 5;
+/** Ventana del límite de intentos, en minutos. */
+export const LINK_ATTEMPTS_WINDOW_MINUTES = 15;
+
+/** Inicio (ISO) de la ventana del límite: `now` menos 15 minutos. */
+export function linkAttemptsWindowStart(now: Date): string {
+  return new Date(
+    now.getTime() - LINK_ATTEMPTS_WINDOW_MINUTES * 60_000,
+  ).toISOString();
+}
+
+/** Con 5 fallos en la ventana el número ya no puede intentar. */
+export function isOverLinkAttemptLimit(failedAttempts: number): boolean {
+  return failedAttempts >= LINK_MAX_FAILED_ATTEMPTS;
+}
+
+/**
+ * ¿El número agotó sus intentos de VINCULAR? Cuenta sus fallos de los últimos
+ * 15 minutos en `whatsapp_link_attempts`.
+ *
+ * Ante cualquier error devuelve false (deja intentar): el código puede llegar
+ * a producción antes de que se aplique la migración (H8) y un error de base no
+ * debe dejar a nadie sin poder vincular. Solo se loguea el código del error,
+ * nunca el número.
+ */
+export async function isLinkAttemptLimitReached(
+  phoneE164: string,
+  now: () => Date = () => new Date(),
+): Promise<boolean> {
+  try {
+    const supabase = createAdminClient();
+    const { count, error } = await supabase
+      .from('whatsapp_link_attempts')
+      .select('id', { count: 'exact', head: true })
+      .eq('phone_e164', phoneE164)
+      .gte('created_at', linkAttemptsWindowStart(now()));
+    if (error) {
+      console.error(
+        'isLinkAttemptLimitReached: no se pudieron contar los intentos:',
+        error.code,
+      );
+      return false;
+    }
+    return isOverLinkAttemptLimit(count ?? 0);
+  } catch (err) {
+    console.error(
+      'isLinkAttemptLimitReached: no se pudieron contar los intentos:',
+      err instanceof Error ? err.name : 'error desconocido',
+    );
+    return false;
+  }
+}
+
+/**
+ * Registra un VINCULAR fallido (código inexistente o vencido) del número.
+ * Nunca lanza: si no se puede guardar, la respuesta al usuario sigue igual.
+ */
+export async function recordFailedLinkAttempt(
+  phoneE164: string,
+  now: () => Date = () => new Date(),
+): Promise<void> {
+  try {
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from('whatsapp_link_attempts')
+      .insert({ phone_e164: phoneE164, created_at: now().toISOString() });
+    if (error) {
+      console.error(
+        'recordFailedLinkAttempt: no se pudo registrar el intento:',
+        error.code,
+      );
+    }
+  } catch (err) {
+    console.error(
+      'recordFailedLinkAttempt: no se pudo registrar el intento:',
+      err instanceof Error ? err.name : 'error desconocido',
+    );
   }
 }
