@@ -385,3 +385,85 @@ $function$;
 
 REVOKE EXECUTE ON FUNCTION public.get_budget_by_month(uuid, character varying) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_budget_by_month(uuid, character varying) TO authenticated, service_role;
+
+
+-- ============================================================================
+-- VERIFICACIÓN (correr a mano DESPUÉS de aplicar, en H8; todo con ROLLBACK)
+-- Reemplazar <uuid propio> por el id de la cuenta de quien verifica.
+-- ============================================================================
+--
+-- 1) Sin overloads de las 7 (esperado: 0 filas):
+-- SELECT proname, count(*) FROM pg_proc
+-- WHERE pronamespace = 'public'::regnamespace
+--   AND proname IN ('get_previous_month_overspend', 'copy_budget_items_from_template',
+--                   'fix_templates_without_items', 'check_cufe_exists',
+--                   'get_electronic_invoices_by_date_range', 'get_invoice_stats_by_supplier',
+--                   'get_budget_by_month')
+-- GROUP BY 1 HAVING count(*) > 1;
+--
+-- 2) SECURITY, search_path y grants de las 7:
+-- SELECT p.oid::regprocedure AS fn, p.prosecdef, p.proconfig,
+--        (SELECT string_agg(CASE WHEN g.grantee = 0 THEN 'PUBLIC' ELSE g.grantee::regrole::text END, ',')
+--           FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) g
+--          WHERE g.privilege_type = 'EXECUTE') AS execute_para
+-- FROM pg_proc p
+-- WHERE p.pronamespace = 'public'::regnamespace
+--   AND p.proname IN ('get_previous_month_overspend', 'copy_budget_items_from_template',
+--                     'fix_templates_without_items', 'check_cufe_exists',
+--                     'get_electronic_invoices_by_date_range', 'get_invoice_stats_by_supplier',
+--                     'get_budget_by_month')
+-- ORDER BY 1;
+-- -- esperado: get_budget_by_month -> prosecdef = f, execute_para = postgres,authenticated,service_role
+-- --           las otras 6         -> prosecdef = t, execute_para = postgres,service_role
+-- --           las 7 con proconfig = {"search_path=public, pg_temp"}
+--
+-- 3) Tablas de public sin RLS (esperado: 0 filas; el 2026-09-30 las 24 tenían RLS):
+-- SELECT c.relname
+-- FROM pg_class c
+-- WHERE c.relnamespace = 'public'::regnamespace
+--   AND c.relkind IN ('r', 'p')
+--   AND c.relrowsecurity = false
+-- ORDER BY 1;
+--
+-- 4) anon ya no ejecuta get_previous_month_overspend (esperado: ERROR 42501 permission denied):
+-- BEGIN;
+--   SET LOCAL ROLE anon;
+--   SET LOCAL request.jwt.claims = '{"role":"anon"}';
+--   SELECT * FROM public.get_previous_month_overspend('00000000-0000-0000-0000-000000000000', '2026-09');
+-- ROLLBACK;
+--
+-- 5) get_budget_by_month con un uid AJENO (esperado: ERROR 42501 'no autorizado'):
+-- BEGIN;
+--   SET LOCAL ROLE authenticated;
+--   SET LOCAL request.jwt.claims = '{"role":"authenticated","sub":"11111111-1111-1111-1111-111111111111"}';
+--   SELECT count(*) FROM public.get_budget_by_month('22222222-2222-2222-2222-222222222222', '2026-09');
+-- ROLLBACK;
+--
+-- 6) get_budget_by_month con SU propio uid (esperado: un número, sin error):
+-- BEGIN;
+--   SET LOCAL request.jwt.claims = '{"role":"authenticated","sub":"<uuid propio>"}';
+--   SET LOCAL ROLE authenticated;
+--   SELECT count(*) FROM public.get_budget_by_month('<uuid propio>', to_char(now() AT TIME ZONE 'America/Bogota', 'YYYY-MM'));
+-- ROLLBACK;
+--
+-- 7) copy_budget_items_from_template con plantillas que no son del usuario
+--    (esperado: ERROR 42501 'no autorizado'):
+-- BEGIN;
+--   SET LOCAL ROLE service_role;
+--   SET LOCAL request.jwt.claims = '{"role":"service_role"}';
+--   SELECT public.copy_budget_items_from_template('<uuid propio>', gen_random_uuid(), gen_random_uuid());
+-- ROLLBACK;
+--
+-- 8) upsert_monthly_budget sigue copiando rubros al crear un mes nuevo
+--    (esperado: devuelve un uuid y el conteo es > 0):
+-- BEGIN;
+--   SET LOCAL request.jwt.claims = '{"role":"authenticated","sub":"<uuid propio>"}';
+--   SET LOCAL ROLE authenticated;
+--   SELECT public.upsert_monthly_budget('<uuid propio>', '2099-01');
+--   SELECT count(*) FROM budget_items bi
+--     JOIN budget_templates bt ON bt.id = bi.template_id
+--    WHERE bt.user_id = '<uuid propio>' AND bt.month_year = '2099-01';
+-- ROLLBACK;
+--
+-- 9) Advisors: get_advisors(security) ya no lista anon_security_definer_function_executable
+--    ni function_search_path_mutable para get_previous_month_overspend ni get_budget_by_month.

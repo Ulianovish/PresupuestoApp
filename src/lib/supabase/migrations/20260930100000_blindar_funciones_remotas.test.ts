@@ -288,3 +288,64 @@ describe('get_budget_by_month', () => {
     expect(grantedRoles(code, NAME)).toEqual(['authenticated', 'service_role']);
   });
 });
+
+const ALL_FUNCTIONS = [
+  'check_cufe_exists',
+  'copy_budget_items_from_template',
+  'fix_templates_without_items',
+  'get_budget_by_month',
+  'get_electronic_invoices_by_date_range',
+  'get_invoice_stats_by_supplier',
+  'get_previous_month_overspend',
+];
+
+describe('migración 20260930100000 completa', () => {
+  it('reemplaza exactamente las 7 funciones, sin DROP ni CREATE sin OR REPLACE', () => {
+    const code = codeOnly(readMigration());
+    const created = [
+      ...code.matchAll(/CREATE OR REPLACE FUNCTION public\.(\w+)\(/g),
+    ]
+      .map(m => m[1])
+      .sort();
+    expect(created).toEqual(ALL_FUNCTIONS);
+    expect(code).not.toMatch(/\bDROP\s+FUNCTION\b/i);
+    expect(code).not.toMatch(/\bCREATE\s+FUNCTION\b/i);
+  });
+
+  it('fuera de las funciones solo hay REVOKE y GRANT de EXECUTE', () => {
+    const sql = readMigration();
+    let rest = codeOnly(sql);
+    for (const name of ALL_FUNCTIONS) {
+      rest = rest.replace(functionBlock(sql, name), '');
+    }
+    const stray = rest
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line !== '')
+      .filter(
+        line => !/^(REVOKE|GRANT) EXECUTE ON FUNCTION public\.\w+\(/.test(line),
+      );
+    expect(stray).toEqual([]);
+  });
+
+  it('ningún GRANT le da EXECUTE a anon ni a PUBLIC', () => {
+    const code = codeOnly(readMigration());
+    for (const name of ALL_FUNCTIONS) {
+      const roles = grantedRoles(code, name);
+      expect(roles).not.toContain('anon');
+      expect(roles).not.toContain('PUBLIC');
+    }
+  });
+
+  it('deja comentado el bloque de verificación (overloads, grants y tablas sin RLS)', () => {
+    const sql = readMigration();
+    expect(sql).toContain('-- VERIFICACIÓN');
+    expect(sql).toMatch(/^-- .*HAVING count\(\*\) > 1/m);
+    expect(sql).toMatch(/^-- .*aclexplode/m);
+    expect(sql).toMatch(/^-- .*c\.relrowsecurity = false/m);
+    const code = codeOnly(sql);
+    expect(code).not.toContain('aclexplode');
+    expect(code).not.toContain('relrowsecurity');
+    expect(code).not.toContain('ROLLBACK');
+  });
+});

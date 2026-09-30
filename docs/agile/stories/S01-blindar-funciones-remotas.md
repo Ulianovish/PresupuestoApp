@@ -384,14 +384,14 @@ $function$
 
 ## Criterios de aceptación
 
-- [ ] La migración `20260930100000_blindar_funciones_remotas.sql` contiene la definición real de producción de `get_previous_month_overspend`, `copy_budget_items_from_template`, `fix_templates_without_items`, `check_cufe_exists`, `get_electronic_invoices_by_date_range`, `get_invoice_stats_by_supplier` y `get_budget_by_month`, con la misma firma (sin overloads, sin `DROP`).
-- [ ] `get_previous_month_overspend` tiene el guard como primera sentencia, `SET search_path = public, pg_temp`, y EXECUTE solo para `service_role` (revocado a `PUBLIC`, `anon` y `authenticated`: no tiene llamadores en `src/`).
-- [ ] Toda función que recibe `p_user_id` filtra por él. `copy_budget_items_from_template` no lo hacía: ahora tiene guard y verifica que la plantilla fuente y la destino sean de `p_user_id` antes de copiar; queda documentado en el encabezado de la migración.
-- [ ] `check_cufe_exists`, `fix_templates_without_items`, `get_electronic_invoices_by_date_range`, `get_invoice_stats_by_supplier` quedan con el cuerpo sin cambios, `search_path` fijo y EXECUTE solo para `service_role`.
-- [ ] `get_budget_by_month` tiene el guard, sigue siendo INVOKER, `search_path` fijo; EXECUTE revocado a `PUBLIC`/`anon` y concedido a `authenticated`, `service_role`.
-- [ ] Bloque comentado de verificación al final: overloads, grants/`search_path` de las 7, tablas `public` con `relrowsecurity = false`, y pruebas manuales del guard con `ROLLBACK`.
-- [ ] Test de texto que verifica guard, `search_path`, revokes/grants, que ninguna firma crea un overload nuevo y que fuera de las funciones solo hay `REVOKE`/`GRANT`.
-- [ ] `bun run test && bun run type-check` en verde.
+- [x] La migración `20260930100000_blindar_funciones_remotas.sql` contiene la definición real de producción de `get_previous_month_overspend`, `copy_budget_items_from_template`, `fix_templates_without_items`, `check_cufe_exists`, `get_electronic_invoices_by_date_range`, `get_invoice_stats_by_supplier` y `get_budget_by_month`, con la misma firma (sin overloads, sin `DROP`).
+- [x] `get_previous_month_overspend` tiene el guard como primera sentencia, `SET search_path = public, pg_temp`, y EXECUTE solo para `service_role` (revocado a `PUBLIC`, `anon` y `authenticated`: no tiene llamadores en `src/`).
+- [x] Toda función que recibe `p_user_id` filtra por él. `copy_budget_items_from_template` no lo hacía: ahora tiene guard y verifica que la plantilla fuente y la destino sean de `p_user_id` antes de copiar; queda documentado en el encabezado de la migración.
+- [x] `check_cufe_exists`, `fix_templates_without_items`, `get_electronic_invoices_by_date_range`, `get_invoice_stats_by_supplier` quedan con el cuerpo sin cambios, `search_path` fijo y EXECUTE solo para `service_role`.
+- [x] `get_budget_by_month` tiene el guard, sigue siendo INVOKER, `search_path` fijo; EXECUTE revocado a `PUBLIC`/`anon` y concedido a `authenticated`, `service_role`.
+- [x] Bloque comentado de verificación al final: overloads, grants/`search_path` de las 7, tablas `public` con `relrowsecurity = false`, y pruebas manuales del guard con `ROLLBACK`.
+- [x] Test de texto que verifica guard, `search_path`, revokes/grants, que ninguna firma crea un overload nuevo y que fuera de las funciones solo hay `REVOKE`/`GRANT`.
+- [x] `bun run test && bun run type-check` en verde.
 
 ---
 
@@ -1282,7 +1282,7 @@ EOF
 - Consumes: helpers de la Task 1; las 7 secciones de las tareas 1–4.
 - Produces: la migración completa y el test final.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Agrega al final del archivo de test:
 
@@ -1349,12 +1349,12 @@ describe('migración 20260930100000 completa', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: FAIL solo en `deja comentado el bloque de verificación…` (`expected '…' to contain '-- VERIFICACIÓN'`). Los otros 3 nuevos pasan desde ya (son candados de regresión sobre lo hecho en las tareas 1–4); los 32 anteriores en PASS.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Agrega al final de `supabase/migrations/20260930100000_blindar_funciones_remotas.sql`:
 
@@ -1443,17 +1443,17 @@ Agrega al final de `supabase/migrations/20260930100000_blindar_funciones_remotas
 --    ni function_search_path_mutable para get_previous_month_overspend ni get_budget_by_month.
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts`
 Expected: PASS, 36 tests.
 
-- [ ] **Step 5: Run the project verification**
+- [x] **Step 5: Run the project verification**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: toda la suite de vitest en PASS (los tests existentes más los 36 nuevos) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930100000_blindar_funciones_remotas.sql src/lib/supabase/migrations/20260930100000_blindar_funciones_remotas.test.ts && git commit -m "$(cat <<'EOF'
