@@ -672,7 +672,7 @@ EOF
 - Consumes: `computeChecklist`, `loadChecklistInput`, `ChecklistItem` (Tasks 2–3); columna `profiles.onboarding_dismissed_at` (S09).
 - Produces: `export async function loadDashboardChecklist(supabase: SupabaseClient, userId: string): Promise<ChecklistItem[] | null>` — `null` = no mostrar. No lanza. (Función adicional a las del contrato; no cambia ninguna firma del contrato.)
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 En `src/lib/onboarding/checklist.test.ts`, agrega `loadDashboardChecklist` al import de `./checklist`:
 
@@ -789,12 +789,12 @@ describe('loadDashboardChecklist', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y ver que falla**
+- [x] **Step 2: Correr el test y ver que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: FAIL — `loadDashboardChecklist is not a function` (los 9 tests anteriores siguen en verde).
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Agrega al final de `src/lib/onboarding/checklist.ts`:
 
@@ -841,17 +841,17 @@ export async function loadDashboardChecklist(
 }
 ```
 
-- [ ] **Step 4: Correr el test y ver que pasa**
+- [x] **Step 4: Correr el test y ver que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/onboarding/checklist.test.ts`
 Expected: PASS (15 tests).
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/onboarding/checklist.ts src/lib/onboarding/checklist.test.ts && git commit -m "$(cat <<'EOF'

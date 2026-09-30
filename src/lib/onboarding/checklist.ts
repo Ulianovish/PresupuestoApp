@@ -139,3 +139,47 @@ export async function loadChecklistInput(
     hasBudgetAmounts: (presupuesto.count ?? 0) > 0,
   };
 }
+
+/**
+ * Lo que el dashboard necesita: los ítems si hay que mostrar la checklist, o
+ * null si no (la ocultó, ya hizo todo, o algo falló). Nunca lanza: la
+ * checklist es opcional y no debe tumbar el dashboard.
+ *
+ * Una fila sin la columna (migración S09 sin aplicar) da undefined y se trata
+ * como ocultada.
+ */
+export async function loadDashboardChecklist(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<ChecklistItem[] | null> {
+  const { data: perfil, error } = await supabase
+    .from('profiles')
+    .select('onboarding_dismissed_at')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) {
+    console.error(
+      'loadDashboardChecklist: error leyendo el perfil:',
+      error.code,
+    );
+    return null;
+  }
+  if (!perfil || perfil.onboarding_dismissed_at !== null) {
+    return null;
+  }
+
+  let input: ChecklistInput;
+  try {
+    input = await loadChecklistInput(supabase, userId);
+  } catch (err) {
+    // El mensaje de loadChecklistInput solo trae la consulta y el código.
+    console.error(
+      'loadDashboardChecklist:',
+      err instanceof Error ? err.message : 'error desconocido',
+    );
+    return null;
+  }
+
+  const items = computeChecklist(input);
+  return items.some(i => !i.done) ? items : null;
+}
