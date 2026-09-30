@@ -1,6 +1,6 @@
 # ADR-007 — Las 4 tareas de deuda de S10 no están escritas en ningún lado
 
-Estado: aceptada (2026-09-30, deliberación por consenso).
+Estado: aceptada (2026-09-30, deliberación por consenso). **Cumplida** en la ronda de corrección 1 de S13: la lista llegó y se implementó (ver Actualización).
 
 > Número: ADR-006 ya existe en el flujo `feat/prueba-jev` (`ADR-006-la-categoria-correcta-es-la-del-usuario.md`); este es el siguiente libre para no chocar al integrar.
 
@@ -25,3 +25,11 @@ Opción 1, con estas condiciones:
 
 ## Consecuencias
 En el relanzamiento que aplica esta decisión la lista **no** llegó. No se implementa nada de esa deuda; queda registrada en las Desviaciones de S10 como pendiente de recuperar. No cambia ningún contrato.
+
+## Actualización (ronda de corrección 1 de S13)
+La lista llegó en las instrucciones del orquestador. Según la condición (a), se anotó literal en las Desviaciones de S10 (`4706c02`) antes de tocar código. Ninguna de las 4 tareas toca teléfonos, desvincular ni el webhook, así que la condición (b) no aplica. Se implementaron en commits propios, separados de los de S13 (condición (c)):
+1. `shouldReloadAfterStarterKit` + refresco con try/catch en `/presupuesto`: `01b7c37`.
+2. Spy de `console.warn` en `beforeEach` + `afterEach(vi.restoreAllMocks)` en `onboarding.test.ts`: `76d927a`.
+3. `initializeMonth` fuera de `useMonthlyBudget`: `db7c496`.
+4. Accesos rápidos del dashboard sin `<button>` dentro de `<a>` (`Button` acepta `href`): `8f5048d`.
+La salida "sin especificar, pendiente de recuperar" queda superada.

@@ -954,6 +954,10 @@ Marcar cada casilla de "Criterios de aceptación" de este archivo contra el cód
 - **Reanudación (ADR-005):** la Task 5 estaba hecha pero sin commit. Se verificó que su test falla sin los cambios (3 fallos) y pasa con ellos, se revisaron las condiciones de seguridad del ADR y se agregó un test más: al botón solo llegan `linkId` y `maskedPhone`, y ni el botón ni sus props mencionan `phone_e164`.
 - **Máscara:** `enmascararTelefono` muestra `+57 300 ••• 4567` en vez de `+57300 ***4567`; misma cantidad de dígitos visibles (menos en formatos no colombianos).
 - **Task 6 Step 2:** el grep contra `main` muestra `+573001111111` y `+573002222222`, ficticios y de commits anteriores a S13 (S07/S10, ya en este flujo); los commits de S13 no agregan ningún teléfono.
+- **Ronda de corrección 1:**
+  - Deuda de S10 (ADR-007, lista recuperada y anotada en S10 en `4706c02`): `01b7c37` (refresco tras el kit), `76d927a` (spy de `console.warn`), `db7c496` (`initializeMonth`), `8f5048d` (accesos rápidos sin `<button>` en `<a>`).
+  - "Vinculado el" se formatea con `formatearFechaBogota` (`src/lib/whatsapp/format.ts`, `dd597e4`); si falla la consulta de `whatsapp_links` se registra solo el `code` y se muestra "No pudimos cargar tus números vinculados" en vez del estado vacío (`e326478`).
+  - La lógica de confirmar (toasts y cierre del modal) sale a `confirmar-desvinculo.ts` con tests de `ok`, `ok: false` y excepción; `ConfirmModal` acepta `loadingText` y el botón dice "Desvinculando..." (`e9e49d0`). Los tests de texto verifican que los archivos existan.
 
 ## Tareas humanas (después de integrar)
 

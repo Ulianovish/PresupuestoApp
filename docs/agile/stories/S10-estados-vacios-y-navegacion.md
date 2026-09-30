@@ -1258,7 +1258,7 @@ No hay commit en esta tarea.
   2. `src/lib/actions/onboarding.test.ts`: el spy de `console.warn` se crea en el `beforeEach`, `afterEach(() => vi.restoreAllMocks())` y se borran los `warnSpy.mockRestore()` manuales.
   3. `src/hooks/useMonthlyBudget.ts`: quitar `initializeMonth` (código muerto) de la interfaz, del `useCallback` y del retorno, tras verificar con grep que nadie lo usa (el `initializeMonth` de `useMonthlyExpenses.ts` es otro y no entra).
   4. `src/components/organisms/DashboardQuickActions/DashboardQuickActions.tsx`: los tres accesos dejan de ser `<Button>` dentro de `<Link>` (HTML inválido, dos elementos enfocables); test que falle si vuelve a aparecer.
-  Ninguna toca teléfonos, desvincular ni el webhook. Los commits quedan registrados en las Desviaciones de S13.
+  Ninguna toca teléfonos, desvincular ni el webhook. Hechas: 1 → `01b7c37`, 2 → `76d927a`, 3 → `db7c496`, 4 → `8f5048d` (el átomo `Button` acepta `href` y renderiza `next/link` vía `asChild`; test de render con `renderToStaticMarkup`).
 
 ## Autorrevisión
 
