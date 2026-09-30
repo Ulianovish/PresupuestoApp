@@ -132,19 +132,11 @@ BEGIN
         RAISE EXCEPTION 'seed_starter_kit: de 12 rubros solo % resuelven clasificación y control por nombre (filas: %)', v_resueltos, v_total;
     END IF;
 
-    -- Categorías del kit que el usuario ya tiene (inactivas), comparando por
-    -- upper(btrim(name)): 'Vivienda' o ' vivienda ' cuentan como VIVIENDA. Se
-    -- reactivan en vez de crear un duplicado.
-    UPDATE public.categories c
-       SET is_active = true
-     WHERE c.user_id = p_user_id
-       AND upper(btrim(c.name)) IN (
-           SELECT kit.item->>'categoria' FROM jsonb_array_elements(v_kit) AS kit(item)
-       );
-
-    -- Solo las que no existen con ese criterio (MAYÚSCULAS, activas). El
-    -- ON CONFLICT es un seguro: con el lock y el NOT EXISTS no debería saltar
-    -- (único: categories_name_user_id_key).
+    -- Categorías del kit: se comparan por upper(btrim(name)), así 'Vivienda' o
+    -- ' vivienda ' cuentan como VIVIENDA (activa o no). Solo se crean las que
+    -- no existen con ese criterio (MAYÚSCULAS, activas). El ON CONFLICT es un
+    -- seguro: con el lock y el NOT EXISTS no debería saltar (único:
+    -- categories_name_user_id_key). Las inactivas se reactivan más abajo.
     INSERT INTO public.categories (user_id, name, is_active)
     SELECT p_user_id, c.name, true
     FROM (VALUES
@@ -175,6 +167,16 @@ BEGIN
       INTO v_kit
     FROM jsonb_array_elements(v_kit) AS kit(item);
 
+    -- Reactiva solo la categoría elegida para cada rubro (no todas las variantes:
+    -- con 'Vivienda' y 'VIVIENDA' inactivas, solo vuelve la que usan los rubros).
+    UPDATE public.categories c
+       SET is_active = true
+     WHERE c.user_id = p_user_id
+       AND c.id IN (
+           SELECT (kit.item->>'category_id')::uuid FROM jsonb_array_elements(v_kit) AS kit(item)
+       )
+       AND c.is_active = false;
+
     -- Cuenta Efectivo, si no hay una con ese nombre (accounts no tiene único por nombre)
     INSERT INTO public.accounts (user_id, name, type, is_active)
     SELECT p_user_id, 'Efectivo', 'cash', true
@@ -195,18 +197,18 @@ BEGIN
     WHERE user_id = p_user_id AND month_year = p_month_year;
 
     -- Rubros del kit que ya están en la plantilla pero inactivos: se reactivan
-    -- (misma categoría y mismo nombre sin distinguir mayúsculas).
+    -- (misma categoría y mismo nombre sin distinguir mayúsculas ni espacios de borde).
     UPDATE public.budget_items bi
        SET is_active = true
       FROM jsonb_array_elements(v_kit) AS kit(item)
      WHERE bi.template_id = v_template_id
        AND bi.category_id = (kit.item->>'category_id')::uuid
-       AND lower(bi.name) = lower(kit.item->>'rubro')
+       AND lower(btrim(bi.name)) = lower(kit.item->>'rubro')
        AND bi.is_active = false;
 
     -- Rubros ya resueltos (v_kit). Los que ya estén en la plantilla (misma
-    -- categoría y mismo nombre sin distinguir mayúsculas) no se repiten: una
-    -- recarga del kit puede insertar menos de 12, y está bien.
+    -- categoría y mismo nombre sin distinguir mayúsculas ni espacios de borde)
+    -- no se repiten: una recarga del kit puede insertar menos de 12, y está bien.
     INSERT INTO public.budget_items (user_id, template_id, category_id, classification_id, control_id, status_id, name, budgeted_amount, is_active, alerts_enabled)
     SELECT p_user_id, v_template_id, (kit.item->>'category_id')::uuid, (kit.item->>'classification_id')::uuid, (kit.item->>'control_id')::uuid, v_status_id, kit.item->>'rubro', 0, true, (kit.item->>'alerts')::boolean
     FROM jsonb_array_elements(v_kit) AS kit(item)
@@ -214,7 +216,7 @@ BEGIN
         SELECT 1 FROM public.budget_items bi
         WHERE bi.template_id = v_template_id
           AND bi.category_id = (kit.item->>'category_id')::uuid
-          AND lower(bi.name) = lower(kit.item->>'rubro')
+          AND lower(btrim(bi.name)) = lower(kit.item->>'rubro')
     );
 
     RETURN true;
