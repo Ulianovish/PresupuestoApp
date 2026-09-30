@@ -274,12 +274,12 @@ Contratos §5.2: **S10 crea** `src/lib/actions/onboarding.ts` y `src/lib/actions
 - Consumes: `createClient()` de `src/lib/supabase/server.ts`; RPC `public.ensure_starter_kit()` → `boolean` (contratos §1.3/§5.1; la crea S09 en el flujo SEG, **no está en este worktree** y no se aplica hasta H8: los tests mockean el cliente).
 - Produces (contratos §5.2, exacto): `export async function ensureStarterKitAction(): Promise<{ seeded: boolean; error?: string }>`. **Nunca lanza.** No llama `revalidatePath` ni `redirect` (se ejecuta durante el render de `/bienvenida` y del dashboard). Sin sesión → `{ seeded: false, error: 'no_session' }`. Error de la RPC (incluido `23503` sin perfil o la función inexistente antes de H8) → `{ seeded: false, error: <code> }` (`'rpc_error'` si la RPC no trae code) y `console.warn` solo con el code. Cualquier otra excepción → `{ seeded: false, error: 'unexpected' }`. Los llamadores no necesitan try/catch.
 
-- [ ] **Step 0: Verificar que el archivo todavía no existe**
+- [x] **Step 0: Verificar que el archivo todavía no existe**
 
 Run: `test -e src/lib/actions/onboarding.ts || test -e src/lib/actions/onboarding.test.ts && echo "YA EXISTE"`
 Expected: no imprime nada. Si imprime `YA EXISTE`, detente y repórtalo: el orden del flujo APP (§5.3) garantiza que S10 es quien los crea.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/actions/onboarding.test.ts`:
 
@@ -404,12 +404,12 @@ describe('ensureStarterKitAction', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: FAIL — `Failed to resolve import "./onboarding"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/actions/onboarding.ts`:
 
@@ -459,7 +459,7 @@ export async function ensureStarterKitAction(): Promise<{
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/actions/onboarding.test.ts`
 Expected: PASS (7 tests).
@@ -467,7 +467,7 @@ Expected: PASS (7 tests).
 Run: `bun run type-check`
 Expected: sin errores. Si el compilador rechaza el nombre `'ensure_starter_kit'` (no está en `src/types/database.ts`), **no regeneres tipos** (§5.0): castea solo esa llamada, `(supabase as unknown as SupabaseClient).rpc('ensure_starter_kit')` con `import type { SupabaseClient } from '@supabase/supabase-js';`, como `expense-classification.ts:171`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/actions/onboarding.ts src/lib/actions/onboarding.test.ts
