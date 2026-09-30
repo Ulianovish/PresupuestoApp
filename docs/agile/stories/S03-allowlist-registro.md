@@ -399,7 +399,7 @@ EOF
 
 Verificado con SELECT de solo lectura (2026-09-30): `postgres` tiene privilegio TRIGGER sobre `auth.users` y ya existe `on_auth_user_created` (AFTER INSERT → `handle_new_user`), así que el trigger se puede crear por migración. Un trigger BEFORE corre siempre antes de uno AFTER: si rechaza, `handle_new_user` no se ejecuta.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Agregar al final de `src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`:
 
@@ -470,12 +470,12 @@ describe('idempotencia y datos', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
 Expected: FAIL — `7 failed | 15 passed (22)`: los 4 tests del trigger, `el literal signup_not_allowed aparece…` (`expected [ …1 item ] to have a length of 2`), `solo usa correos de ejemplo` (`expected 0 to be greater than 0`) y `termina con el bloque…`. Los de idempotencia y "no borra" pasan.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Agregar al final de `supabase/migrations/20260930120000_signup_allowlist.sql`:
 

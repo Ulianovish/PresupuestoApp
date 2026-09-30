@@ -137,3 +137,68 @@ describe('hook_before_user_created', () => {
     );
   });
 });
+
+describe('trigger de respaldo enforce_signup_allowlist', () => {
+  const fn = functionBlock('enforce_signup_allowlist');
+
+  it('es una función de trigger security definer con search_path fijo', () => {
+    expect(fn).toContain('enforce_signup_allowlist() returns trigger');
+    expect(fn).toContain('security definer');
+    expect(fn).toContain('set search_path = public, pg_temp');
+  });
+
+  it('rechaza con el literal signup_not_allowed si el correo no está permitido', () => {
+    expect(fn).toContain('if not public.is_signup_allowed(new.email) then');
+    expect(fn).toContain(
+      "raise exception 'signup_not_allowed' using errcode = '42501';",
+    );
+    expect(fn).toContain('return new;');
+  });
+
+  it('se engancha BEFORE INSERT en auth.users de forma idempotente', () => {
+    const drop =
+      'drop trigger if exists enforce_signup_allowlist on auth.users;';
+    const create =
+      'create trigger enforce_signup_allowlist before insert on auth.users for each row execute function public.enforce_signup_allowlist();';
+    expect(sql).toContain(drop);
+    expect(sql).toContain(create);
+    expect(sql.indexOf(drop)).toBeLessThan(sql.indexOf(create));
+  });
+
+  it('nadie la ejecuta directo salvo supabase_auth_admin', () => {
+    expect(sql).toContain(
+      'revoke execute on function public.enforce_signup_allowlist() from public, anon, authenticated, service_role;',
+    );
+    expect(sql).toContain(
+      'grant execute on function public.enforce_signup_allowlist() to supabase_auth_admin;',
+    );
+  });
+});
+
+describe('idempotencia y datos', () => {
+  it('toda función es create or replace y toda tabla if not exists', () => {
+    expect(sql).not.toMatch(/create function /);
+    expect(sql).not.toMatch(/create table (?!if not exists)/);
+  });
+
+  it('no borra ni vacía datos', () => {
+    expect(sql).not.toMatch(/\b(drop table|truncate|delete from)\b/);
+  });
+
+  it('el literal signup_not_allowed aparece en el hook y en el trigger', () => {
+    const matches = sql.match(/'signup_not_allowed'/g) ?? [];
+    expect(matches).toHaveLength(2);
+  });
+
+  it('solo usa correos de ejemplo (en todo el archivo, incluidos comentarios)', () => {
+    const emails = raw.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) ?? [];
+    expect(emails.length).toBeGreaterThan(0);
+    for (const email of emails) {
+      expect(email.toLowerCase()).toMatch(/@ejemplo\.com$/);
+    }
+  });
+
+  it('termina con el bloque comentado de verificación manual', () => {
+    expect(raw).toContain('-- VERIFICACIÓN MANUAL');
+  });
+});
