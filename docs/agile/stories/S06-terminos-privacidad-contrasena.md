@@ -68,7 +68,7 @@
 - Consumes: nada.
 - Produces: `export const passwordSchema` (tipo inferido `z.ZodString`) en `src/lib/validations/schemas.ts`. S05 lo importa para el reset: `import { passwordSchema } from '@/lib/validations/schemas'`. `registerSchema` conserva su nombre, sus campos (`email`, `password`, `confirmPassword`, `fullName`) y el tipo `RegisterFormData`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/validations/schemas.test.ts`:
 
@@ -181,12 +181,12 @@ describe('registerSchema', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/validations/schemas.test.ts`
 Expected: FAIL. Los tests de `passwordSchema` fallan con `Cannot read properties of undefined (reading 'safeParse')` (no existe el export) y "rechaza 6 y 7 caracteres" falla porque hoy el mínimo es 6 con otro mensaje.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/validations/schemas.ts`, justo debajo del comentario de bloque `// ESQUEMAS DE AUTENTICACIÓN` (antes de `// Esquema para login`), agregar:
 
@@ -228,12 +228,12 @@ export const registerSchema = z
 
 `loginSchema` queda igual.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/validations/schemas.test.ts && bun run type-check`
 Expected: PASS (10 tests) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/validations/schemas.ts src/lib/validations/schemas.test.ts && git commit -m "$(cat <<'EOF'
