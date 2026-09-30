@@ -50,3 +50,31 @@ SELECT lower(btrim(u.email)), 'usuario existente (backfill S03)'
 FROM auth.users u
 WHERE u.email IS NOT NULL AND btrim(u.email) <> ''
 ON CONFLICT (email) DO NOTHING;
+
+-- 4) Hook "Before User Created" (se activa en H5: Authentication → Auth Hooks,
+--    tipo Postgres, public.hook_before_user_created).
+--    Entrada: { metadata: {...}, user: { email, ... } }. Salida: '{}' permite;
+--    { error: { http_code, message } } rechaza y el mensaje llega al cliente.
+--    INVOKER a propósito (la documentación de Supabase desaconseja SECURITY
+--    DEFINER en hooks): corre como supabase_auth_admin y lee la tabla solo a
+--    través de is_signup_allowed.
+CREATE OR REPLACE FUNCTION public.hook_before_user_created(event jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF public.is_signup_allowed(event->'user'->>'email') THEN
+    RETURN '{}'::jsonb;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'error', jsonb_build_object('http_code', 403, 'message', 'signup_not_allowed')
+  );
+END;
+$$;
+
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+REVOKE EXECUTE ON FUNCTION public.hook_before_user_created(jsonb) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.hook_before_user_created(jsonb) TO supabase_auth_admin;

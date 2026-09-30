@@ -101,3 +101,39 @@ describe('backfill de usuarios existentes', () => {
     );
   });
 });
+
+describe('hook_before_user_created', () => {
+  const fn = functionBlock('hook_before_user_created');
+
+  it('recibe el evento jsonb y devuelve jsonb', () => {
+    expect(fn).toContain('hook_before_user_created(event jsonb) returns jsonb');
+  });
+
+  it('lee el correo de event.user.email y consulta la allowlist', () => {
+    expect(fn).toContain("public.is_signup_allowed(event->'user'->>'email')");
+  });
+
+  it("permite con '{}' y rechaza con 403 y el literal signup_not_allowed", () => {
+    expect(fn).toContain("return '{}'::jsonb;");
+    expect(fn).toMatch(
+      /jsonb_build_object\( ?'error', ?jsonb_build_object\( ?'http_code', ?403, ?'message', ?'signup_not_allowed' ?\) ?\)/,
+    );
+  });
+
+  it('no es security definer (Supabase lo desaconseja) y fija search_path', () => {
+    expect(fn).not.toContain('security definer');
+    expect(fn).toContain('set search_path = public, pg_temp');
+  });
+
+  it('solo supabase_auth_admin la ejecuta', () => {
+    expect(sql).toContain(
+      'grant usage on schema public to supabase_auth_admin;',
+    );
+    expect(sql).toContain(
+      'revoke execute on function public.hook_before_user_created(jsonb) from public, anon, authenticated, service_role;',
+    );
+    expect(sql).toContain(
+      'grant execute on function public.hook_before_user_created(jsonb) to supabase_auth_admin;',
+    );
+  });
+});

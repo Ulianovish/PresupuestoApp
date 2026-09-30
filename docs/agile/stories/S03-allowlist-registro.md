@@ -280,7 +280,7 @@ EOF
 
 Formato verificado (https://supabase.com/docs/guides/auth/auth-hooks/before-user-created-hook): la entrada trae `event.user.email` (el usuario aún no existe en `auth.users`); `{}` permite; `{"error":{"http_code":…,"message":…}}` rechaza y el mensaje llega al cliente. La documentación desaconseja `SECURITY DEFINER` en el hook: por eso es INVOKER y la lectura de la tabla pasa por `is_signup_allowed`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Agregar al final de `src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`:
 
@@ -324,12 +324,12 @@ describe('hook_before_user_created', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
 Expected: FAIL — los 5 tests de `hook_before_user_created` fallan (`expected '' to contain 'hook_before_user_created(event jsonb) returns jsonb'`, etc.); `5 failed | 8 passed (13)`. Los de la Tarea 1 siguen en verde.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Agregar al final de `supabase/migrations/20260930120000_signup_allowlist.sql`:
 
@@ -364,12 +364,12 @@ REVOKE EXECUTE ON FUNCTION public.hook_before_user_created(jsonb) FROM PUBLIC, a
 GRANT EXECUTE ON FUNCTION public.hook_before_user_created(jsonb) TO supabase_auth_admin;
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts`
 Expected: PASS (13 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930120000_signup_allowlist.sql src/lib/supabase/migrations/20260930120000_signup_allowlist.test.ts && git commit -m "$(cat <<'EOF'
