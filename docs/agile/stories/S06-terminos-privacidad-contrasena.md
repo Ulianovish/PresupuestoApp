@@ -48,7 +48,7 @@
 
 - [x] `passwordSchema` exportado desde `src/lib/validations/schemas.ts`: rechaza 7 caracteres con "Usa al menos 8 caracteres", acepta 8 y 72, rechaza 73 con "Usa como máximo 72 caracteres", y no exige mayúsculas, números ni símbolos.
 - [x] `registerSchema.password` usa `passwordSchema`; `confirmPassword` solo exige no estar vacío ("Confirma tu contraseña") y debe coincidir ("Las contraseñas no coinciden").
-- [x] El registro muestra "Mínimo 8 caracteres." como único texto de ayuda de la contraseña; ya no menciona mayúsculas, minúsculas ni números. Los inputs tienen `minLength={8}` y `maxLength={72}`.
+- [x] El registro muestra "Mínimo 8 caracteres." como único texto de ayuda de la contraseña; ya no menciona mayúsculas, minúsculas ni números. Los inputs tienen `minLength={8}` y `maxLength={72}` (desde la ronda 1 salen de `PASSWORD_MIN_LENGTH`, `PASSWORD_MAX_LENGTH` y `PASSWORD_HINT` en `src/lib/validations/password-rules.ts`, que también usa `passwordSchema`).
 - [x] `/privacy` existe, es una página pública sin sesión (está en `PUBLIC_ROUTES`; no se afirma protección por middleware, ver Riesgos y ADR-004) y dice, de forma breve: quién la administra (sin nombre), qué se guarda (cuenta, presupuesto, gastos, facturas con CUFE, números de WhatsApp, cédula/NIT, últimos mensajes con el bot), qué no se guarda (fotos, números de tarjeta, cookies de publicidad), para qué se usa, con quién se comparte (Supabase, Vercel, Twilio y Meta, Vercel AI Gateway y MiniMax, Resend, DIAN vía servicio propio), cuánto tiempo y cómo pedir copia, corrección o borrado escribiendo a `CONTACT_EMAIL`.
 - [x] `/terms` existe y dice: acceso por invitación, responsabilidades de la cuenta, que los números vinculados ven y registran en el presupuesto, que la IA se equivoca, que la app solo maneja COP, que no es asesoría financiera, uso aceptable, cómo cerrar la cuenta, enlace a privacidad.
 - [x] Ningún texto legal contiene correos distintos de `CONTACT_EMAIL`, números de teléfono ni secuencias de 7+ dígitos, ni voseo.
@@ -1020,6 +1020,13 @@ Tareas TDD aparte, una por commit, pedidas por el orquestador en la misma zona (
 - [x] **A5:** `getSiteUrl`: en `VERCEL_ENV=production` sin `NEXT_PUBLIC_SITE_URL`, usa `VERCEL_PROJECT_PRODUCTION_URL` antes que `VERCEL_URL`.
 - [x] **A6:** `middleware.test.ts` con `createServerClient` simulado.
 
+Ronda de corrección 1 (revisores):
+
+- [x] **R1:** registro: `?error=` lleva códigos (`authErrorCode` para Supabase; `email_invalido`, `password_corta`, `password_larga`, `no_coinciden`, `nombre_invalido`, `datos_invalidos` para Zod). La página los resuelve con `resolveRegisterError` (`src/lib/auth/register-feedback.ts`, lista cerrada; lo desconocido cae en el genérico). El texto que ve la persona es el del campo que falló primero, no "Datos inválidos" (espíritu de §5.2), pero ya no es el literal de Zod.
+- [x] **R2:** `assertContactEmailReady` en `legal.ts`: con `VERCEL_ENV=production` y `CONTACT_EMAIL` de un dominio de ejemplo, el módulo lanza y el build de producción falla hasta resolver H9. Preview y local lo toleran. Un test (`describe.skipIf`) se activa solo cuando H9 esté resuelta.
+- [x] **R3:** `/auth/callback` registra `error_code` (sin datos personales) y reenvía `type` solo si está en `EMAIL_OTP_TYPES` (`src/lib/auth/email-otp-types.ts`, compartida con `/auth/confirm`). Decisión explícita: sin `code` termina en `?error=enlace_invalido` (antes iba al login sin error).
+- [x] **R4:** `login-page.test.ts` exige además que `setError`/`setMessage` reciban `feedback.error`/`feedback.message`; `middleware.test.ts` remite a ADR-004/H10.
+
 ---
 
 ## Riesgos
@@ -1028,7 +1035,7 @@ Tareas TDD aparte, una por commit, pedidas por el orquestador en la misma zona (
 
 ## Tareas humanas
 
-- **H9** (contratos §5.4): antes de abrir el registro (junto con H1/H6), cambiar `CONTACT_EMAIL` en `src/lib/constants/legal.ts` por un buzón real que alguien lea. Ningún agente la hace: el valor de ejemplo `contacto@ejemplo.com` se queda en el código hasta entonces.
+- **H9** (contratos §5.4): antes de abrir el registro (junto con H1/H6), cambiar `CONTACT_EMAIL` en `src/lib/constants/legal.ts` por un buzón real que alguien lea. Ningún agente la hace: el valor de ejemplo `contacto@ejemplo.com` se queda en el código hasta entonces. **Ojo:** mientras siga el marcador, el build de producción de Vercel falla a propósito (R2); los previews no.
 - **H10** (contratos §5.4, ADR-004): verificar en un preview de Vercel si `/gastos` y `/bienvenida` redirigen al login sin sesión y si el build muestra "ƒ Middleware". No la hace ningún agente.
 - Si el proveedor de correo final no es Resend (decisión D2), actualizar el ítem "Resend" en `src/app/privacy/content.ts`, su test y `LEGAL_UPDATED_AT`.
 
