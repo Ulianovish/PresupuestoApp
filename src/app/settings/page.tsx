@@ -6,7 +6,10 @@ import CategoriesPanel from '@/components/organisms/CategoriesPanel/CategoriesPa
 import DocumentosDianPanel from '@/components/organisms/DocumentosDianPanel/DocumentosDianPanel';
 import WhatsAppLinkPanel from '@/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel';
 import { createClient } from '@/lib/supabase/server';
-import { enmascararTelefono } from '@/lib/whatsapp/format';
+import {
+  enmascararTelefono,
+  formatearFechaBogota,
+} from '@/lib/whatsapp/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,11 +22,18 @@ export default async function SettingsPage() {
     redirect('/auth/login');
   }
 
-  const { data: links } = await supabase
+  const { data: links, error: linksError } = await supabase
     .from('whatsapp_links')
     .select('id, phone_e164, linked_at')
     .eq('user_id', user.id)
     .order('linked_at', { ascending: false });
+  if (linksError) {
+    // Solo el code: el mensaje podría traer datos del usuario.
+    console.error(
+      'SettingsPage: error cargando números vinculados:',
+      linksError.code,
+    );
+  }
 
   return (
     <main className="mx-auto max-w-2xl space-y-6 p-6">
@@ -39,7 +49,13 @@ export default async function SettingsPage() {
         <h3 className="mb-3 text-lg font-medium text-white">
           Números vinculados
         </h3>
-        {links && links.length > 0 ? (
+        {linksError ? (
+          // Sin esto se vería "no hay números" mientras el bot sigue
+          // registrando gastos desde ellos y no se podrían desvincular.
+          <p className="text-sm text-red-400">
+            No pudimos cargar tus números vinculados. Recarga la página.
+          </p>
+        ) : links && links.length > 0 ? (
           <ul className="space-y-2">
             {links.map(l => {
               // El número completo se queda en el servidor: al cliente solo
@@ -53,10 +69,7 @@ export default async function SettingsPage() {
                   <div className="flex flex-col">
                     <span className="font-mono text-slate-200">{masked}</span>
                     <span className="text-xs text-slate-500">
-                      Vinculado el{' '}
-                      {new Date(l.linked_at as string).toLocaleDateString(
-                        'es-CO',
-                      )}
+                      Vinculado el {formatearFechaBogota(l.linked_at as string)}
                     </span>
                   </div>
                   <UnlinkPhoneButton

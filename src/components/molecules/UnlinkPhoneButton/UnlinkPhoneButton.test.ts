@@ -16,6 +16,15 @@ const boton = leer(
 );
 const ajustes = leer('src/app/settings/page.tsx');
 
+describe('archivos leídos', () => {
+  // `leer` devuelve '' si el archivo falta: sin esto, los `not.toContain`
+  // pasarían en falso.
+  it('existen', () => {
+    expect(boton).not.toBe('');
+    expect(ajustes).not.toBe('');
+  });
+});
+
 describe('UnlinkPhoneButton (S13, contratos §5.2)', () => {
   it('desvincula por el id del link con la server action', () => {
     expect(boton).toContain('unlinkWhatsAppLinkAction(linkId)');
@@ -44,5 +53,21 @@ describe('Ajustes: el número completo no llega al navegador', () => {
     expect(ajustes).not.toContain("'use server'");
     expect(ajustes).not.toContain('unlinkWhatsAppPhoneAction');
     expect(ajustes).not.toContain('maskPhone');
+  });
+});
+
+describe('Ajustes: lista de números vinculados', () => {
+  it('la fecha de vinculación se muestra en horario de Bogotá', () => {
+    expect(ajustes).toContain('formatearFechaBogota(l.linked_at');
+    expect(ajustes).not.toContain('toLocaleDateString(');
+  });
+
+  it('si la consulta falla muestra un error y no el estado vacío', () => {
+    expect(ajustes).toMatch(/const \{ data: links, error: linksError \}/);
+    expect(ajustes).toContain('linksError.code');
+    expect(ajustes).toContain('No pudimos cargar tus números vinculados');
+    expect(ajustes).toMatch(
+      /linksError \?[\s\S]*?Aún no hay números vinculados/,
+    );
   });
 });
