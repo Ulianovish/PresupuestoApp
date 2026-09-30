@@ -413,7 +413,7 @@ EOF
   - `src/app/privacy/content.ts`: `export const PRIVACY_SECTIONS: LegalSection[]`
   - `src/app/privacy/page.tsx`: `export const metadata: Metadata`, `export default function PrivacyPage()`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/app/privacy/privacy.test.ts`:
 
@@ -521,12 +521,12 @@ describe('página /privacy', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/privacy/privacy.test.ts`
 Expected: FAIL con `Failed to resolve import "@/lib/constants/legal"` (ni las constantes ni el contenido existen).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/constants/legal.ts`:
 
@@ -701,12 +701,12 @@ export default function PrivacyPage() {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/privacy/privacy.test.ts && bun run type-check`
 Expected: PASS (10 tests) y `tsc` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/constants/legal.ts src/app/privacy/content.ts src/app/privacy/page.tsx src/app/privacy/privacy.test.ts && git commit -m "$(cat <<'EOF'
