@@ -1011,7 +1011,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   export function stripNewExpenseParam(pathname: string, search: string): string;
   ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Crear `src/lib/onboarding/nuevo-gasto.test.ts`:
 
@@ -1101,12 +1101,12 @@ describe('Agregar Gasto (S10)', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `bun run test src/lib/onboarding/nuevo-gasto.test.ts src/components/organisms/DashboardQuickActions/DashboardQuickActions.test.ts`
 Expected: FAIL — `Failed to resolve import "./nuevo-gasto"` y 2 fallos de texto (`expected … to contain '<Link href={NUEVO_GASTO_HREF}'`, `… to contain 'wantsNewExpenseForm(window.location.search)'`).
 
-- [ ] **Step 3a: Funciones puras**
+- [x] **Step 3a: Funciones puras**
 
 Crear `src/lib/onboarding/nuevo-gasto.ts`:
 
@@ -1134,7 +1134,7 @@ export function stripNewExpenseParam(pathname: string, search: string): string {
 }
 ```
 
-- [ ] **Step 3b: Botón del dashboard**
+- [x] **Step 3b: Botón del dashboard**
 
 En `src/components/organisms/DashboardQuickActions/DashboardQuickActions.tsx`:
 
@@ -1164,7 +1164,7 @@ por (mismo patrón `Link` + `Button` que los otros dos botones del archivo):
       </Link>
 ```
 
-- [ ] **Step 3c: `/gastos` (cambio mínimo; S07 ya lo modificó)**
+- [x] **Step 3c: `/gastos` (cambio mínimo; S07 ya lo modificó)**
 
 En `src/app/gastos/page.tsx`:
 
@@ -1197,7 +1197,7 @@ import {
 
 (`useEffect` ya está importado en el import de `react`. No tocar nada más del archivo.)
 
-- [ ] **Step 4: Run tests and type-check**
+- [x] **Step 4: Run tests and type-check**
 
 Run: `bun run test src/lib/onboarding/nuevo-gasto.test.ts src/components/organisms/DashboardQuickActions/DashboardQuickActions.test.ts`
 Expected: PASS (12 + 2 tests).
@@ -1205,7 +1205,7 @@ Expected: PASS (12 + 2 tests).
 Run: `bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/onboarding/nuevo-gasto.ts src/lib/onboarding/nuevo-gasto.test.ts src/components/organisms/DashboardQuickActions/DashboardQuickActions.tsx src/components/organisms/DashboardQuickActions/DashboardQuickActions.test.ts src/app/gastos/page.tsx

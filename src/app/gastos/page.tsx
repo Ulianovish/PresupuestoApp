@@ -43,6 +43,10 @@ import {
   withFormDefaults,
 } from '@/lib/expense-form-defaults';
 import { montoDeCelda } from '@/lib/money/parse-cop';
+import {
+  stripNewExpenseParam,
+  wantsNewExpenseForm,
+} from '@/lib/onboarding/nuevo-gasto';
 import { updateBudgetItem, deleteBudgetItem } from '@/lib/services/budget';
 import {
   createExpenseTransaction,
@@ -181,6 +185,19 @@ export default function GastosPage() {
     updateExpense,
     deleteExpense,
   } = useMonthlyExpenses();
+
+  // "Agregar Gasto" del dashboard llega con ?nuevo=1 (S10): abrir el
+  // formulario y quitar el parámetro para que recargar no lo reabra. Se lee
+  // window.location en vez de useSearchParams para no exigir un Suspense.
+  useEffect(() => {
+    if (!wantsNewExpenseForm(window.location.search)) return;
+    openModal();
+    window.history.replaceState(
+      null,
+      '',
+      stripNewExpenseParam(window.location.pathname, window.location.search),
+    );
+  }, [openModal]);
 
   // Cargar categorías dinámicas desde la BD. Memorizadas: el efecto que
   // completa los valores por defecto del formulario depende de ellas.
