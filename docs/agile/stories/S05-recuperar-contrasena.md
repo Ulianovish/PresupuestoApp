@@ -1130,7 +1130,7 @@ EOF
 - Consumes: todo lo anterior.
 - Produces: evidencia de suite y typecheck en verde.
 
-- [ ] **Step 1: Suite completa y typecheck**
+- [x] **Step 1: Suite completa y typecheck**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: todos los tests PASS (incluidos los 14 de `auth-password.test.ts`, más los de S04 y S06 que ya están en la rama); `tsc --noEmit` sin errores.
@@ -1138,7 +1138,7 @@ Expected: todos los tests PASS (incluidos los 14 de `auth-password.test.ts`, má
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && git log --oneline main..HEAD -- vitest.config.ts src/lib/validations/schemas.ts middleware.ts src/lib/auth/route-access.ts`
 Expected: solo commits de S04/S06 (ninguno de esta historia): S05 no toca esos archivos (§5.0, §5.3).
 
-- [ ] **Step 2: Revisar que no quedaron datos personales ni mensajes crudos**
+- [x] **Step 2: Revisar que no quedaron datos personales ni mensajes crudos**
 
 Run:
 ```bash
@@ -1146,7 +1146,7 @@ builtin cd /Users/migue/Repos/personal/PresupuestoApp && git diff main --stat --
 ```
 Expected: solo los archivos de este plan (más los de S04/S06, que ya están en la rama). El `grep` no debe mostrar ningún uso de `error.message` dentro de `forgotPasswordAction` ni `resetPasswordAction`.
 
-- [ ] **Step 3: Recordar H4**
+- [x] **Step 3: Recordar H4**
 
 Sin commit. En el reporte final al orquestador, incluye que la tarea humana H4 debe pegar la plantilla de la sección siguiente.
 
