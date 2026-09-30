@@ -1185,7 +1185,7 @@ EOF
 - Consumes (Task 1): `pickCatalogId`, `itemDefaultNamesFor`, `type CatalogRow`.
 - Produces: `function defaultItemFormNames(classifications: readonly CatalogRow[], controls: readonly CatalogRow[], categoryName?: string | null): { clasificacion: string; control: string }` — nombre del catálogo elegido por `pickCatalogId`; con catálogo vacío (aún no cargó) devuelve el nombre del contrato.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `src/lib/budget/catalog-defaults.test.ts`, cambiar el import:
 
@@ -1244,12 +1244,12 @@ describe('defaultItemFormNames', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/catalog-defaults.test.ts`
 Expected: FAIL — `defaultItemFormNames is not a function` (no está exportada).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Agregar al final de `src/lib/budget/catalog-defaults.ts`:
 
@@ -1327,12 +1327,12 @@ por:
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n "classifications\[0\]\|controls\[0\]\|defaultClasificacion\|defaultControl" src/app/presupuesto/page.tsx`
 Expected: sin salida.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/budget/catalog-defaults.test.ts && bun run type-check`
 Expected: PASS (13 tests) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/budget/catalog-defaults.ts src/lib/budget/catalog-defaults.test.ts src/app/presupuesto/page.tsx && git commit -m "$(cat <<'EOF'

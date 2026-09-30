@@ -26,6 +26,7 @@ import {
   rubrosEnRiesgo,
   type RubroEstado,
 } from '@/lib/budget/alerts';
+import { defaultItemFormNames } from '@/lib/budget/catalog-defaults';
 import {
   formatCurrency,
   getClassifications,
@@ -199,15 +200,11 @@ export default function PresupuestoPage() {
     type: 'success',
   });
 
-  // Estado del formulario
-  const defaultClasificacion = classifications[0]?.name || 'Basico';
-  const defaultControl = controls[0]?.name || 'Reducir';
-
+  // Estado del formulario (al montar los catálogos aún no cargan: nombres del contrato)
   const [formData, setFormData] = useState<BudgetFormData>({
     descripcion: '',
     fecha: '',
-    clasificacion: defaultClasificacion,
-    control: defaultControl,
+    ...defaultItemFormNames([], []),
     presupuestado: 0,
     real: 0,
     deuda_id: null,
@@ -221,11 +218,11 @@ export default function PresupuestoPage() {
       categoriaId,
       item: undefined,
     });
+    const categoryName = categories.find(cat => cat.id === categoriaId)?.nombre;
     setFormData({
       descripcion: '',
       fecha: '',
-      clasificacion: classifications[0]?.name || 'Basico',
-      control: controls[0]?.name || 'Reducir',
+      ...defaultItemFormNames(classifications, controls, categoryName),
       presupuestado: 0,
       real: 0,
       deuda_id: null,

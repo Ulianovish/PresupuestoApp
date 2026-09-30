@@ -84,3 +84,22 @@ export function itemDefaultNamesFor(
         control: DEFAULT_ITEM_CONTROL,
       };
 }
+
+/**
+ * Clasificación y control que propone el formulario "agregar rubro" de
+ * /presupuesto. Devuelve el nombre tal como está en el catálogo; si el
+ * catálogo todavía no cargó (vacío), el nombre del contrato.
+ */
+export function defaultItemFormNames(
+  classifications: readonly CatalogRow[],
+  controls: readonly CatalogRow[],
+  categoryName?: string | null,
+): { clasificacion: string; control: string } {
+  const wanted = itemDefaultNamesFor(categoryName);
+  return {
+    clasificacion:
+      pickCatalogId(classifications, wanted.classification)?.name ??
+      wanted.classification,
+    control: pickCatalogId(controls, wanted.control)?.name ?? wanted.control,
+  };
+}

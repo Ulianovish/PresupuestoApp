@@ -8,7 +8,11 @@ import {
   DEUDA_ITEM_CONTROL,
 } from '@/lib/constants/budget-defaults';
 
-import { itemDefaultNamesFor, pickCatalogId } from './catalog-defaults';
+import {
+  defaultItemFormNames,
+  itemDefaultNamesFor,
+  pickCatalogId,
+} from './catalog-defaults';
 
 const CLASIFICACIONES = [
   { id: 'cls-basico', name: 'Basico' },
@@ -89,5 +93,44 @@ describe('itemDefaultNamesFor', () => {
     expect(itemDefaultNamesFor(null)).toEqual(esperado);
     expect(itemDefaultNamesFor(undefined)).toEqual(esperado);
     expect(itemDefaultNamesFor('')).toEqual(esperado);
+  });
+});
+
+describe('defaultItemFormNames', () => {
+  const CONTROLES = [
+    { id: 'ctl-eliminar', name: 'Eliminar' },
+    { id: 'ctl-necesario', name: 'Necesario' },
+    { id: 'ctl-reducir', name: 'Reducir' },
+  ];
+
+  it('catálogos aún sin cargar → nombres del contrato', () => {
+    expect(defaultItemFormNames([], [])).toEqual({
+      clasificacion: 'Estilo de Vida',
+      control: 'Reducir',
+    });
+  });
+
+  it('con catálogos → el nombre del contrato tal como está en el catálogo', () => {
+    expect(
+      defaultItemFormNames(CLASIFICACIONES, CONTROLES, 'VIVIENDA'),
+    ).toEqual({
+      clasificacion: 'Estilo de Vida',
+      control: 'Reducir',
+    });
+  });
+
+  it('categoría DEUDAS → Basico / Necesario', () => {
+    expect(defaultItemFormNames(CLASIFICACIONES, CONTROLES, 'DEUDAS')).toEqual({
+      clasificacion: 'Basico',
+      control: 'Necesario',
+    });
+  });
+
+  it('si el nombre no está en el catálogo → el primero de la lista', () => {
+    const sinEstilo = [{ id: 'cls-basico', name: 'Basico' }];
+    expect(defaultItemFormNames(sinEstilo, CONTROLES)).toEqual({
+      clasificacion: 'Basico',
+      control: 'Reducir',
+    });
   });
 });
