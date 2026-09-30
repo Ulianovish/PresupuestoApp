@@ -3,8 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
+import { z } from 'zod';
+
 import { authErrorCode } from '@/lib/auth/error-messages';
 import { CHECK_EMAIL_MESSAGE_CODE } from '@/lib/auth/login-feedback';
+import {
+  FORGOT_PASSWORD_INVALID_EMAIL_CODE,
+  FORGOT_PASSWORD_SENT_CODE,
+} from '@/lib/auth/password-reset-feedback';
 import { registerValidationErrorCode } from '@/lib/auth/register-feedback';
 import { safeRedirectPath } from '@/lib/auth/safe-redirect';
 import { getPostLoginPath } from '@/lib/onboarding/post-login';
@@ -185,4 +191,77 @@ export async function getCurrentUser() {
 export async function isAuthenticated(): Promise<boolean> {
   const user = await getCurrentUser();
   return !!user;
+}
+
+// ============================================
+// RECUPERAR CONTRASEÑA (S05)
+// ============================================
+
+const forgotPasswordEmailSchema = z.string().trim().email();
+
+/** `path?key=codigo`. Siempre un CÓDIGO: la página lo traduce. */
+function conCodigo(
+  path: '/auth/forgot-password' | '/auth/reset-password',
+  key: 'error' | 'message',
+  codigo: string,
+): string {
+  return `${path}?${new URLSearchParams({ [key]: codigo }).toString()}`;
+}
+
+/** Solo el `code` del error (sin mensaje, que podría llevar el correo). */
+function codigoDeError(error: unknown): string {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof error.code === 'string' &&
+    error.code
+  ) {
+    return error.code;
+  }
+  return 'sin_codigo';
+}
+
+/**
+ * Server Action: envía el correo para restablecer la contraseña.
+ * El enlace del correo (plantilla "Reset Password") pasa por /auth/confirm,
+ * que deja la sesión y redirige a /auth/reset-password.
+ *
+ * Se traga todo error de resetPasswordForEmail, devuelto o lanzado, incluido
+ * el límite de envíos: responder distinto revelaría que el correo existe
+ * (contratos §5.2). Solo se registra el `code`.
+ */
+export async function forgotPasswordAction(formData: FormData): Promise<void> {
+  const parsed = forgotPasswordEmailSchema.safeParse(texto(formData, 'email'));
+
+  if (!parsed.success) {
+    redirect(
+      conCodigo(
+        '/auth/forgot-password',
+        'error',
+        FORGOT_PASSWORD_INVALID_EMAIL_CODE,
+      ),
+    );
+  }
+
+  const supabase = await createClient();
+  let fallo: unknown = null;
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
+      redirectTo: `${getSiteUrl()}/auth/confirm?type=recovery&next=/auth/reset-password`,
+    });
+    fallo = error;
+  } catch (e) {
+    fallo = e;
+  }
+
+  if (fallo) {
+    console.error('forgotPasswordAction: resetPasswordForEmail falló', {
+      code: codigoDeError(fallo),
+    });
+  }
+
+  redirect(
+    conCodigo('/auth/forgot-password', 'message', FORGOT_PASSWORD_SENT_CODE),
+  );
 }

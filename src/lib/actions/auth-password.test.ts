@@ -1,0 +1,171 @@
+import { redirect } from 'next/navigation';
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+vi.mock('next/navigation', () => ({
+  // Igual que el redirect real: lanza para cortar la ejecución.
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT:${url}`);
+  }),
+}));
+vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
+vi.mock('@/lib/onboarding/post-login', () => ({ getPostLoginPath: vi.fn() }));
+vi.mock('@/lib/site-url', () => ({
+  getSiteUrl: vi.fn(() => 'https://app.ejemplo.com'),
+}));
+
+import { createClient } from '@/lib/supabase/server';
+
+import { forgotPasswordAction } from './auth';
+
+const mockedCreateClient = vi.mocked(createClient);
+const mockedRedirect = vi.mocked(redirect);
+
+const CORREO = 'usuario@ejemplo.com';
+const REDIRECT_TO =
+  'https://app.ejemplo.com/auth/confirm?type=recovery&next=/auth/reset-password';
+
+interface ErrorFalso {
+  message: string;
+  code?: string;
+  status?: number;
+}
+
+/** Cliente de cookie falso con solo los métodos de auth que usan las acciones. */
+function clienteFalso({
+  user = { id: '11111111-1111-4111-8111-111111111111' } as {
+    id: string;
+  } | null,
+  resetError = null as ErrorFalso | null,
+  resetThrows = null as Error | null,
+  updateError = null as ErrorFalso | null,
+} = {}) {
+  const client = {
+    auth: {
+      resetPasswordForEmail: resetThrows
+        ? vi.fn().mockRejectedValue(resetThrows)
+        : vi.fn().mockResolvedValue({ data: {}, error: resetError }),
+      getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }),
+      updateUser: vi
+        .fn()
+        .mockResolvedValue({ data: { user }, error: updateError }),
+    },
+  };
+  mockedCreateClient.mockResolvedValue(
+    client as unknown as Awaited<ReturnType<typeof createClient>>,
+  );
+  return client;
+}
+
+function formulario(campos: Record<string, string>): FormData {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(campos)) fd.set(k, v);
+  return fd;
+}
+
+/** Ejecuta la acción, exige que termine en redirect y devuelve la URL destino. */
+async function destino(p: Promise<unknown>): Promise<URL> {
+  await expect(p).rejects.toThrow('NEXT_REDIRECT:');
+  const url = mockedRedirect.mock.calls.at(-1)?.[0] as string;
+  return new URL(url, 'http://localhost');
+}
+
+describe('forgotPasswordAction', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it('pide el correo de recuperación hacia /auth/confirm y responde el código genérico', async () => {
+    const client = clienteFalso();
+
+    const url = await destino(
+      forgotPasswordAction(formulario({ email: CORREO })),
+    );
+
+    expect(client.auth.resetPasswordForEmail).toHaveBeenCalledWith(CORREO, {
+      redirectTo: REDIRECT_TO,
+    });
+    expect(url.pathname).toBe('/auth/forgot-password');
+    expect(url.searchParams.get('message')).toBe('enlace_enviado');
+    expect(url.searchParams.get('error')).toBeNull();
+  });
+
+  it('quita espacios alrededor del correo', async () => {
+    const client = clienteFalso();
+
+    await destino(forgotPasswordAction(formulario({ email: `  ${CORREO}  ` })));
+
+    expect(client.auth.resetPasswordForEmail).toHaveBeenCalledWith(CORREO, {
+      redirectTo: REDIRECT_TO,
+    });
+  });
+
+  it('límite de envíos: responde exactamente lo mismo y registra solo el code', async () => {
+    clienteFalso();
+    const exito = await destino(
+      forgotPasswordAction(formulario({ email: CORREO })),
+    );
+
+    clienteFalso({
+      resetError: {
+        message:
+          'For security purposes, you can only request this after 60 seconds.',
+        code: 'over_email_send_rate_limit',
+        status: 429,
+      },
+    });
+    const fallo = await destino(
+      forgotPasswordAction(formulario({ email: CORREO })),
+    );
+
+    expect(fallo.href).toBe(exito.href);
+    expect(fallo.searchParams.get('error')).toBeNull();
+    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(console.error).mock.calls[0]?.[1]).toEqual({
+      code: 'over_email_send_rate_limit',
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+      CORREO,
+    );
+  });
+
+  it('si resetPasswordForEmail lanza, se lo traga y responde lo mismo', async () => {
+    clienteFalso({ resetThrows: new Error(`fetch failed para ${CORREO}`) });
+
+    const url = await destino(
+      forgotPasswordAction(formulario({ email: CORREO })),
+    );
+
+    expect(url.pathname).toBe('/auth/forgot-password');
+    expect(url.searchParams.get('message')).toBe('enlace_enviado');
+    expect(vi.mocked(console.error).mock.calls[0]?.[1]).toEqual({
+      code: 'sin_codigo',
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+      CORREO,
+    );
+  });
+
+  it('correo con formato inválido → código de error y no llama a Supabase', async () => {
+    const client = clienteFalso();
+
+    const url = await destino(
+      forgotPasswordAction(formulario({ email: 'no-es-correo' })),
+    );
+
+    expect(url.pathname).toBe('/auth/forgot-password');
+    expect(url.searchParams.get('error')).toBe('correo_invalido');
+    expect(client.auth.resetPasswordForEmail).not.toHaveBeenCalled();
+  });
+
+  it('sin campo email → mismo código de validación', async () => {
+    const client = clienteFalso();
+
+    const url = await destino(forgotPasswordAction(new FormData()));
+
+    expect(url.searchParams.get('error')).toBe('correo_invalido');
+    expect(client.auth.resetPasswordForEmail).not.toHaveBeenCalled();
+  });
+});

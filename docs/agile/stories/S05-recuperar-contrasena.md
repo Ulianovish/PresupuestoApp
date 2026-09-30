@@ -73,7 +73,7 @@ La plantilla "Invite user" de S04 también lleva a `/auth/reset-password` (contr
 - Consumes: de S04 `getSiteUrl` (`@/lib/site-url`), `translateAuthError` (`@/lib/auth/error-messages`, con las filas `otp_expired`, `weak_password` y `same_password`), `GET /auth/confirm`; de S06 `export const passwordSchema` (`@/lib/validations/schemas`, contrato §2.4).
 - Produces: nada. Las Tasks 3 y 5 usan `passwordSchema` y `translateAuthError` tal como los dejaron S06 y S04.
 
-- [ ] **Step 1: Verificar que S04 está implementada**
+- [x] **Step 1: Verificar que S04 está implementada**
 
 Run:
 ```bash
@@ -83,7 +83,7 @@ Expected: los cinco archivos listados y al menos una línea por cada `grep`. Si 
 
 Además confirma en la tabla de `src/lib/auth/error-messages.ts` que `translateAuthError({ code: 'otp_expired' })` devuelve "El enlace venció. Pide uno nuevo.", `translateAuthError({ code: 'weak_password' })` devuelve "La contraseña es muy débil. Usa al menos 8 caracteres." y `translateAuthError({ code: 'same_password' })` devuelve "La contraseña nueva debe ser distinta de la anterior." (contratos §2.2 y §5.2). Los tests de la Task 3 dependen de esos textos.
 
-- [ ] **Step 2: Verificar que `passwordSchema` existe (lo crea S06)**
+- [x] **Step 2: Verificar que `passwordSchema` existe (lo crea S06)**
 
 Run:
 ```bash
@@ -108,7 +108,7 @@ Expected: la declaración `export const passwordSchema = z.string().min(8, 'Usa 
   - cualquier otro caso → `/auth/forgot-password?message=<"Si el correo está registrado, te enviamos un enlace." codificado>`, **también** si `resetPasswordForEmail` devuelve un error (incluido `over_email_send_rate_limit`) o lanza (contratos §5.2). El error se registra con `console.error(<texto>, { code })` y nada más (sin `status`, sin correo).
   - Helper privado (sin export) `withQueryParam(path: string, key: 'error' | 'message', text: string): string`, que también usa la Task 3.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 Crea `src/lib/actions/auth-password.test.ts`:
 
@@ -267,12 +267,12 @@ describe('forgotPasswordAction', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/auth-password.test.ts`
 Expected: FAIL — `forgotPasswordAction is not a function` (o error de import equivalente) en los 6 tests.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/actions/auth.ts`:
 
@@ -373,17 +373,17 @@ Notas para el implementador:
 - `redirect` es de tipo `never`, así que después del primer `if` TypeScript sabe que `parsed.success` es `true` y `parsed.data` es `string`.
 - No exportes `FORGOT_PASSWORD_MESSAGE`, `withQueryParam` ni `codigoDeError` (archivo `'use server'`).
 
-- [ ] **Step 4: Correr el test y verificar que pasa**
+- [x] **Step 4: Correr el test y verificar que pasa**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/actions/auth-password.test.ts`
 Expected: PASS (6 tests).
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/actions/auth.ts src/lib/actions/auth-password.test.ts && git commit -m "$(cat <<'EOF'
