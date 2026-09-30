@@ -7,19 +7,146 @@ vi.mock('@/lib/supabase/server', () => ({
 import { createAdminClient } from '@/lib/supabase/server';
 
 import {
+  createLinkCode,
   generateSixDigitCode,
   getLinkByPhone,
   listarDocumentosDeUsuario,
+  MAX_CODE_ATTEMPTS,
   redeemLinkCode,
 } from './whatsapp-links';
 
 const mockedAdmin = createAdminClient as unknown as ReturnType<typeof vi.fn>;
+
+const NOW = new Date('2026-09-30T12:00:00.000Z');
+const NOW_ISO = '2026-09-30T12:00:00.000Z';
+const now = () => NOW;
 
 describe('generateSixDigitCode', () => {
   it('devuelve exactamente 6 dígitos', () => {
     for (let i = 0; i < 50; i++) {
       expect(generateSixDigitCode()).toMatch(/^\d{6}$/);
     }
+  });
+});
+
+/** Tabla whatsapp_link_codes para createLinkCode: limpieza (delete) + inserts. */
+function tablaCodigosNuevos(
+  inserts: Array<{ error: unknown }>,
+  limpieza: { error: unknown } = { error: null },
+) {
+  const insert = vi.fn();
+  for (const r of inserts) insert.mockResolvedValueOnce(r);
+  return {
+    delete: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
+    lte: vi.fn().mockResolvedValue(limpieza),
+    insert,
+  };
+}
+
+const CHOQUE = {
+  error: {
+    code: '23505',
+    message: 'duplicate key value violates unique constraint',
+  },
+};
+
+describe('createLinkCode', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('antes de insertar borra los códigos vencidos y sin usar del propio usuario', async () => {
+    const tabla = tablaCodigosNuevos([{ error: null }]);
+    const from = vi.fn(() => tabla);
+    mockedAdmin.mockReturnValue({ from });
+
+    await createLinkCode('user-1', { now, generateCode: () => '111111' });
+
+    expect(from).toHaveBeenCalledWith('whatsapp_link_codes');
+    expect(tabla.delete).toHaveBeenCalled();
+    expect(tabla.eq).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(tabla.is).toHaveBeenCalledWith('used_at', null);
+    expect(tabla.lte).toHaveBeenCalledWith('expires_at', NOW_ISO);
+    expect(tabla.delete.mock.invocationCallOrder[0]).toBeLessThan(
+      tabla.insert.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('inserta el código con vencimiento a 10 minutos del reloj inyectado', async () => {
+    const tabla = tablaCodigosNuevos([{ error: null }]);
+    mockedAdmin.mockReturnValue({ from: vi.fn(() => tabla) });
+
+    const code = await createLinkCode('user-1', {
+      now,
+      generateCode: () => '111111',
+    });
+
+    expect(code).toBe('111111');
+    expect(tabla.insert).toHaveBeenCalledWith({
+      code: '111111',
+      user_id: 'user-1',
+      expires_at: '2026-09-30T12:10:00.000Z',
+    });
+  });
+
+  it('si el código choca con otro pendiente (23505) reintenta con uno nuevo', async () => {
+    const tabla = tablaCodigosNuevos([CHOQUE, { error: null }]);
+    mockedAdmin.mockReturnValue({ from: vi.fn(() => tabla) });
+    const generateCode = vi
+      .fn()
+      .mockReturnValueOnce('111111')
+      .mockReturnValueOnce('222222');
+
+    const code = await createLinkCode('user-1', { now, generateCode });
+
+    expect(code).toBe('222222');
+    expect(tabla.insert).toHaveBeenCalledTimes(2);
+    expect(tabla.insert).toHaveBeenLastCalledWith(
+      expect.objectContaining({ code: '222222' }),
+    );
+  });
+
+  it('tras 5 choques seguidos lanza error', async () => {
+    expect(MAX_CODE_ATTEMPTS).toBe(5);
+    const tabla = tablaCodigosNuevos([CHOQUE, CHOQUE, CHOQUE, CHOQUE, CHOQUE]);
+    mockedAdmin.mockReturnValue({ from: vi.fn(() => tabla) });
+
+    await expect(
+      createLinkCode('user-1', { now, generateCode: () => '111111' }),
+    ).rejects.toThrow('No se pudo crear el código');
+    expect(tabla.insert).toHaveBeenCalledTimes(5);
+  });
+
+  it('un error que no es de código repetido lanza sin reintentar', async () => {
+    const tabla = tablaCodigosNuevos([
+      { error: { code: '42501', message: 'permission denied' } },
+    ]);
+    mockedAdmin.mockReturnValue({ from: vi.fn(() => tabla) });
+
+    await expect(
+      createLinkCode('user-1', { now, generateCode: () => '111111' }),
+    ).rejects.toThrow('No se pudo crear el código');
+    expect(tabla.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('si la limpieza falla igual crea el código y loguea solo el código de error', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const tabla = tablaCodigosNuevos([{ error: null }], {
+      error: { code: 'XX000', message: 'boom' },
+    });
+    mockedAdmin.mockReturnValue({ from: vi.fn(() => tabla) });
+
+    const code = await createLinkCode('user-1', {
+      now,
+      generateCode: () => '111111',
+    });
+
+    expect(code).toBe('111111');
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('createLinkCode'),
+      'XX000',
+    );
+    errorSpy.mockRestore();
   });
 });
 

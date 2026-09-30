@@ -9,25 +9,73 @@ import { createAdminClient } from '@/lib/supabase/server';
 
 const CODE_TTL_MINUTES = 10;
 
+/** Intentos de INSERT cuando el código choca con otro pendiente (23505). */
+export const MAX_CODE_ATTEMPTS = 5;
+
 /** Código aleatorio de 6 dígitos (con ceros a la izquierda). */
 export function generateSixDigitCode(): string {
   return randomInt(0, 1_000_000).toString().padStart(6, '0');
 }
 
-/** Crea un código de vinculación para el usuario y lo persiste. Devuelve el código. */
-export async function createLinkCode(userId: string): Promise<string> {
+export interface CreateLinkCodeOptions {
+  /** Reloj inyectable (tests). */
+  now?: () => Date;
+  /** Generador inyectable (tests). */
+  generateCode?: () => string;
+}
+
+/**
+ * Crea un código de vinculación para el usuario y lo persiste. Devuelve el código.
+ *
+ * Con varios usuarios, dos códigos pendientes iguales harían que `VINCULAR n`
+ * canjeara el de otra persona: el índice único parcial
+ * `whatsapp_link_codes_code_pending_uq` lo impide y aquí, si el INSERT choca
+ * (23505), se prueba con otro código (máximo MAX_CODE_ATTEMPTS). Antes se
+ * borran los códigos vencidos y sin usar del propio usuario: ya no sirven y
+ * ocupan lugar en el índice.
+ */
+export async function createLinkCode(
+  userId: string,
+  options: CreateLinkCodeOptions = {},
+): Promise<string> {
+  const now = options.now ?? (() => new Date());
+  const generateCode = options.generateCode ?? generateSixDigitCode;
   const supabase = createAdminClient();
-  const code = generateSixDigitCode();
-  const expiresAt = new Date(
-    Date.now() + CODE_TTL_MINUTES * 60_000,
-  ).toISOString();
-  const { error } = await supabase
+  const ahora = now();
+
+  const { error: limpiezaError } = await supabase
     .from('whatsapp_link_codes')
-    .insert({ code, user_id: userId, expires_at: expiresAt });
-  if (error) {
-    throw new Error(`No se pudo crear el código: ${error.message}`);
+    .delete()
+    .eq('user_id', userId)
+    .is('used_at', null)
+    .lte('expires_at', ahora.toISOString());
+  if (limpiezaError) {
+    // No bloquea: un código vencido de más no impide crear uno nuevo.
+    console.error(
+      'createLinkCode: no se pudieron limpiar códigos vencidos:',
+      limpiezaError.code,
+    );
   }
-  return code;
+
+  const expiresAt = new Date(
+    ahora.getTime() + CODE_TTL_MINUTES * 60_000,
+  ).toISOString();
+
+  for (let intento = 1; intento <= MAX_CODE_ATTEMPTS; intento++) {
+    const code = generateCode();
+    const { error } = await supabase
+      .from('whatsapp_link_codes')
+      .insert({ code, user_id: userId, expires_at: expiresAt });
+    if (!error) {
+      return code;
+    }
+    if (error.code !== '23505') {
+      throw new Error(`No se pudo crear el código: ${error.message}`);
+    }
+  }
+  throw new Error(
+    `No se pudo crear el código: ${MAX_CODE_ATTEMPTS} choques seguidos con otros códigos pendientes`,
+  );
 }
 
 export type RedeemResult =

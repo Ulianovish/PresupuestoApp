@@ -289,7 +289,7 @@ EOF
   - `export async function createLinkCode(userId: string, options?: CreateLinkCodeOptions): Promise<string>`
   - En el test: constantes `NOW`, `NOW_ISO`, `now`, `TEL` que usan las tareas 3 y 4.
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 En `src/lib/services/whatsapp-links.test.ts`:
 
@@ -440,12 +440,12 @@ describe('createLinkCode', () => {
 });
 ```
 
-- [ ] **Step 2: Correr los tests y verificar que fallan**
+- [x] **Step 2: Correr los tests y verificar que fallan**
 
 Run: `bun run test src/lib/services/whatsapp-links.test.ts`
 Expected: FAIL en `describe('createLinkCode')` (p. ej. `expected "spy" to be called at least once` para `tabla.delete`, y `expected undefined to be 5` para `MAX_CODE_ATTEMPTS`). Los tests de `redeemLinkCode`, `getLinkByPhone` y `listarDocumentosDeUsuario` siguen pasando.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/services/whatsapp-links.ts`, reemplazar desde `const CODE_TTL_MINUTES = 10;` (línea 10) hasta el cierre de `createLinkCode` (línea 31) por:
 
@@ -522,7 +522,7 @@ export async function createLinkCode(
 }
 ```
 
-- [ ] **Step 4: Correr los tests y verificar que pasan**
+- [x] **Step 4: Correr los tests y verificar que pasan**
 
 Run: `bun run test src/lib/services/whatsapp-links.test.ts`
 Expected: PASS (todos, incluidos los 6 nuevos de `createLinkCode`).
@@ -530,7 +530,7 @@ Expected: PASS (todos, incluidos los 6 nuevos de `createLinkCode`).
 Run: `bun run type-check`
 Expected: sin errores (`src/lib/actions/whatsapp.ts` sigue llamando `createLinkCode(user.id)`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/services/whatsapp-links.ts src/lib/services/whatsapp-links.test.ts
