@@ -72,7 +72,7 @@
 - Consumes: nada.
 - Produces: `export function buildWhatsAppLinkUrl(botNumber: string | undefined, code: string): string | null` (la usan la Task 4 y, después en el flujo APP, `OnboardingWizard` de S11, que la importa sin volver a crearla).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/whatsapp/link-url.test.ts`:
 
@@ -115,12 +115,12 @@ describe('buildWhatsAppLinkUrl', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/whatsapp/link-url.test.ts`
 Expected: FAIL — `Failed to resolve import "./link-url"` (el archivo no existe).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/whatsapp/link-url.ts`:
 
@@ -145,12 +145,12 @@ export function buildWhatsAppLinkUrl(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/whatsapp/link-url.test.ts`
 Expected: PASS (5 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/whatsapp/link-url.ts src/lib/whatsapp/link-url.test.ts && git commit -m "$(cat <<'EOF'
