@@ -279,3 +279,67 @@ describe('migración 20260930130000: ensure_starter_kit', () => {
     expect(grants).toEqual(['authenticated']);
   });
 });
+
+describe('migración 20260930130000: handle_new_user', () => {
+  const handle = () => squash(functionBlock('handle_new_user'));
+
+  const PROFILE_INSERT =
+    "INSERT INTO public.profiles (id, email, full_name, avatar_url) VALUES ( NEW.id, NEW.email, NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'avatar_url' );";
+  const SEED_BLOCK =
+    "BEGIN PERFORM public._seed_starter_kit(NEW.id, to_char(now() AT TIME ZONE 'America/Bogota', 'YYYY-MM')); EXCEPTION WHEN OTHERS THEN RAISE WARNING 'seed_starter_kit falló para %: %', NEW.id, SQLERRM; END;";
+
+  it('conserva la firma de trigger, SECURITY DEFINER y search_path fijo', () => {
+    expect(handle()).toMatch(
+      /^CREATE OR REPLACE FUNCTION public\.handle_new_user\(\) RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS \$function\$/,
+    );
+  });
+
+  it('conserva idéntico el insert de profiles', () => {
+    expect(handle()).toContain(PROFILE_INSERT);
+  });
+
+  it('siembra el kit DESPUÉS del perfil, dentro de BEGIN … EXCEPTION WHEN OTHERS', () => {
+    const body = handle();
+    const profile = body.indexOf(PROFILE_INSERT);
+    const seed = body.indexOf(SEED_BLOCK);
+    const ret = body.indexOf('RETURN NEW;');
+    expect(profile).toBeGreaterThan(-1);
+    expect(seed).toBeGreaterThan(profile);
+    expect(ret).toBeGreaterThan(seed);
+  });
+
+  it('el WARNING no incluye el correo del usuario', () => {
+    expect(handle()).not.toMatch(/RAISE WARNING[^;]*NEW\.email/);
+  });
+
+  it('no toca el trigger on_auth_user_created y mantiene los grants de la función', () => {
+    expect(code).not.toMatch(/DROP TRIGGER/);
+    const flat = squash(code);
+    expect(flat).toContain(
+      'REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;',
+    );
+    expect(flat).toContain(
+      'GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin, service_role;',
+    );
+  });
+});
+
+describe('migración 20260930130000: verificación manual', () => {
+  it('termina con un bloque de verificación totalmente comentado', () => {
+    const marker = rawSql.indexOf('-- VERIFICACIÓN');
+    expect(marker).toBeGreaterThan(-1);
+    const tail = rawSql
+      .slice(marker)
+      .split('\n')
+      .filter(line => line.trim() !== '');
+    expect(tail.every(line => line.trimStart().startsWith('--'))).toBe(true);
+  });
+
+  it('simula jwt claims y deshace todo con ROLLBACK', () => {
+    const tail = rawSql.slice(rawSql.indexOf('-- VERIFICACIÓN'));
+    expect(tail).toContain('request.jwt.claims');
+    expect(tail).toContain('ensure_starter_kit()');
+    expect(tail).toContain('ROLLBACK;');
+    expect(tail).toContain('usuario@ejemplo.com');
+  });
+});

@@ -211,3 +211,131 @@ $function$;
 -- se revoca también porque los default privileges de Supabase se lo dan.
 REVOKE EXECUTE ON FUNCTION public.ensure_starter_kit() FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.ensure_starter_kit() TO authenticated;
+
+
+-- ============================================================================
+-- 4. handle_new_user: perfil (idéntico a producción) + kit inicial
+--    El cuerpo del perfil es el de pg_get_functiondef leído el 2026-09-30.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path = public, pg_temp
+AS $function$
+BEGIN
+    INSERT INTO public.profiles (id, email, full_name, avatar_url)
+    VALUES (
+        NEW.id,
+        NEW.email,
+        NEW.raw_user_meta_data->>'full_name',
+        NEW.raw_user_meta_data->>'avatar_url'
+    );
+
+    -- Kit inicial (ADR-001). Un error aquí NUNCA bloquea el registro: el
+    -- subbloque deshace solo la siembra y ensure_starter_kit la repara después.
+    BEGIN
+        PERFORM public._seed_starter_kit(NEW.id, to_char(now() AT TIME ZONE 'America/Bogota', 'YYYY-MM'));
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'seed_starter_kit falló para %: %', NEW.id, SQLERRM;
+    END;
+
+    RETURN NEW;
+END;
+$function$;
+
+-- Mismos grants que dejó 20260929000000 (CREATE OR REPLACE los conserva;
+-- se repiten para que esta migración sea autosuficiente).
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin, service_role;
+
+
+-- ============================================================================
+-- VERIFICACIÓN (correr a mano DESPUÉS de aplicar — tarea H8; todo va con ROLLBACK)
+-- ============================================================================
+--
+-- 1) Columnas y backfill (esperado: 0 y 0):
+-- SELECT count(*) FILTER (WHERE onboarding_completed_at IS NULL) AS sin_completed,
+--        count(*) FILTER (WHERE onboarding_dismissed_at IS NULL) AS sin_dismissed
+-- FROM public.profiles;
+--
+-- 2) Grants y search_path (esperado: _seed_starter_kit = solo postgres;
+--    ensure_starter_kit = postgres,authenticated; handle_new_user =
+--    postgres,supabase_auth_admin,service_role; las tres con search_path=public, pg_temp):
+-- SELECT p.oid::regprocedure AS fn, p.proconfig,
+--        (SELECT string_agg(CASE WHEN g.grantee = 0 THEN 'PUBLIC' ELSE g.grantee::regrole::text END, ',')
+--           FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) g
+--          WHERE g.privilege_type = 'EXECUTE') AS execute_para
+-- FROM pg_proc p
+-- WHERE p.pronamespace = 'public'::regnamespace
+--   AND p.proname IN ('_seed_starter_kit', 'ensure_starter_kit', 'handle_new_user')
+-- ORDER BY 1;
+--
+-- 3) anon no puede ejecutar ninguna (esperado: ERROR 42501 permission denied):
+-- BEGIN;
+--   SET LOCAL ROLE anon;
+--   SET LOCAL request.jwt.claims = '{"role":"anon"}';
+--   SELECT public.ensure_starter_kit();
+-- ROLLBACK;
+-- BEGIN;
+--   SET LOCAL ROLE authenticated;
+--   SET LOCAL request.jwt.claims = '{"role":"authenticated","sub":"11111111-1111-1111-1111-111111111111"}';
+--   SELECT public._seed_starter_kit('11111111-1111-1111-1111-111111111111', '2026-09');
+-- ROLLBACK;   -- esperado: ERROR 42501 permission denied for function _seed_starter_kit
+--
+-- 4) authenticated sin sub (esperado: ERROR 42501 'no autorizado'):
+-- BEGIN;
+--   SET LOCAL ROLE authenticated;
+--   SET LOCAL request.jwt.claims = '{"role":"authenticated"}';
+--   SELECT public.ensure_starter_kit();
+-- ROLLBACK;
+--
+-- 5) Alta de un usuario de prueba: el trigger crea perfil + kit; ensure es
+--    idempotente y repara a quien no tiene categorías. Todo se deshace.
+--    Si S03 ya está aplicada, antes del INSERT en auth.users agregar:
+--    INSERT INTO public.signup_allowlist(email) VALUES ('usuario@ejemplo.com');
+-- BEGIN;
+--   INSERT INTO auth.users (id, email, raw_user_meta_data, aud, role)
+--   VALUES ('22222222-2222-2222-2222-222222222222', 'usuario@ejemplo.com', '{}'::jsonb, 'authenticated', 'authenticated');
+--   SELECT count(*) FROM public.categories   WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- 6
+--   SELECT count(*) FROM public.budget_items WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- 12
+--   SELECT count(*) FROM public.accounts     WHERE user_id = '22222222-2222-2222-2222-222222222222' AND name = 'Efectivo';  -- 1
+--   SELECT name, month_year FROM public.budget_templates WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- 'Presupuesto <mes>', mes de Bogotá
+--   SELECT c.name, bi.name, cl.name, co.name, bi.alerts_enabled, bi.budgeted_amount
+--   FROM public.budget_items bi
+--   JOIN public.categories c ON c.id = bi.category_id
+--   JOIN public.classifications cl ON cl.id = bi.classification_id
+--   JOIN public.controls co ON co.id = bi.control_id
+--   WHERE bi.user_id = '22222222-2222-2222-2222-222222222222'
+--   ORDER BY 1, 2;                                                   -- tabla de contratos §1.3
+--   SELECT onboarding_completed_at IS NULL, onboarding_dismissed_at IS NULL
+--   FROM public.profiles WHERE id = '22222222-2222-2222-2222-222222222222';  -- true, true
+--
+--   SELECT set_config('request.jwt.claims', '{"role":"authenticated","sub":"22222222-2222-2222-2222-222222222222"}', true);
+--   SET LOCAL ROLE authenticated;
+--   SELECT public.ensure_starter_kit();                               -- false (ya tiene kit)
+--   RESET ROLE;
+--   SELECT count(*) FROM public.categories WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- sigue en 6
+--
+--   -- Desactivó todas sus categorías: puede recargar el kit sin duplicar rubros.
+--   UPDATE public.categories SET is_active = false WHERE user_id = '22222222-2222-2222-2222-222222222222';
+--   SET LOCAL ROLE authenticated;
+--   SELECT public.ensure_starter_kit();                               -- true (reactivó)
+--   RESET ROLE;
+--   SELECT count(*) FROM public.categories   WHERE user_id = '22222222-2222-2222-2222-222222222222' AND is_active;  -- 6
+--   SELECT count(*) FROM public.budget_items WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- sigue en 12 (NOT EXISTS)
+--
+--   -- Sin categorías ni rubros: el kit se siembra completo otra vez.
+--   DELETE FROM public.budget_items WHERE user_id = '22222222-2222-2222-2222-222222222222';
+--   DELETE FROM public.categories   WHERE user_id = '22222222-2222-2222-2222-222222222222';
+--   SET LOCAL ROLE authenticated;
+--   SELECT public.ensure_starter_kit();                               -- true (reparó)
+--   RESET ROLE;
+--   SELECT count(*) FROM public.budget_items WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- 12
+--   SELECT count(*) FROM public.accounts     WHERE user_id = '22222222-2222-2222-2222-222222222222';  -- 1 (no duplicó Efectivo)
+-- ROLLBACK;
+--
+-- 6) Advisors: get_advisors(security) no debe listar function_search_path_mutable
+--    ni anon_security_definer_function_executable para estas tres funciones
+--    (authenticated_security_definer_function_executable para ensure_starter_kit
+--    es esperado: la protección es que no recibe usuario y usa auth.uid()).

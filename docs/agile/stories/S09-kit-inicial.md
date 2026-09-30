@@ -47,16 +47,16 @@ Lo que el plan asume y por qué el SQL se ve como se ve:
 
 ## Criterios de aceptación
 
-- [ ] Migración `20260930130000_kit_inicial_y_onboarding.sql`: columnas `onboarding_completed_at` y `onboarding_dismissed_at` (`timestamptz`) en `profiles` con `ADD COLUMN IF NOT EXISTS`; los usuarios existentes quedan con ambas en `now()`; volver a correr la migración no marca a usuarios nuevos.
-- [ ] `_seed_starter_kit(p_user_id uuid, p_month_year text) RETURNS boolean`: SECURITY DEFINER, `search_path` fijo, sin EXECUTE para nadie salvo el dueño (`REVOKE … FROM PUBLIC, anon, authenticated, service_role`, sin `GRANT`).
-- [ ] Idempotente: si el usuario ya tiene alguna categoría **activa** (`is_active = true`) devuelve `false` sin insertar nada; quien las desactivó todas puede recargar el kit; siembras concurrentes del mismo usuario se serializan (`pg_advisory_xact_lock`).
-- [ ] Kit exacto de contratos §1.3: 6 categorías en MAYÚSCULAS activas (`ON CONFLICT (name, user_id) DO UPDATE SET is_active = true`: reactiva las que existían inactivas con el mismo nombre), 12 rubros con su clasificación, control y `alerts_enabled`, `budgeted_amount = 0`, estado `Activo`, plantilla del mes, insertados con `NOT EXISTS` sobre `(template_id, category_id, lower(name))` (recargar el kit no duplica rubros); cuenta `Efectivo` (`type='cash'`) solo si no existe; plantilla `'Presupuesto ' || mes` con `ON CONFLICT (user_id, month_year) DO NOTHING`.
-- [ ] Antes del primer `INSERT` se verifica que exista el estado `Activo` y que los 12 rubros resuelvan clasificación y control por nombre; si falta alguno, excepción y nada a medias (no se usa `ROW_COUNT <> 12`).
-- [ ] `ensure_starter_kit()` sin parámetro de usuario: SECURITY DEFINER, `search_path` fijo, `auth.uid()` NULL → `42501`; devuelve `_seed_starter_kit(auth.uid(), <mes Bogotá>)`; EXECUTE solo `authenticated`.
-- [ ] `handle_new_user()` conserva idéntico el insert de `profiles` y **después** llama la siembra dentro de `BEGIN … EXCEPTION WHEN OTHERS THEN RAISE WARNING … END;`; mantiene sus grants.
-- [ ] Nada en la migración llama `upsert_monthly_budget`.
-- [ ] Bloque comentado de verificación manual al final (simulando `request.jwt.claims` como en `20260929000000`), todo con `ROLLBACK`.
-- [ ] `bun run test && bun run type-check` en verde.
+- [x] Migración `20260930130000_kit_inicial_y_onboarding.sql`: columnas `onboarding_completed_at` y `onboarding_dismissed_at` (`timestamptz`) en `profiles` con `ADD COLUMN IF NOT EXISTS`; los usuarios existentes quedan con ambas en `now()`; volver a correr la migración no marca a usuarios nuevos.
+- [x] `_seed_starter_kit(p_user_id uuid, p_month_year text) RETURNS boolean`: SECURITY DEFINER, `search_path` fijo, sin EXECUTE para nadie salvo el dueño (`REVOKE … FROM PUBLIC, anon, authenticated, service_role`, sin `GRANT`).
+- [x] Idempotente: si el usuario ya tiene alguna categoría **activa** (`is_active = true`) devuelve `false` sin insertar nada; quien las desactivó todas puede recargar el kit; siembras concurrentes del mismo usuario se serializan (`pg_advisory_xact_lock`).
+- [x] Kit exacto de contratos §1.3: 6 categorías en MAYÚSCULAS activas (`ON CONFLICT (name, user_id) DO UPDATE SET is_active = true`: reactiva las que existían inactivas con el mismo nombre), 12 rubros con su clasificación, control y `alerts_enabled`, `budgeted_amount = 0`, estado `Activo`, plantilla del mes, insertados con `NOT EXISTS` sobre `(template_id, category_id, lower(name))` (recargar el kit no duplica rubros); cuenta `Efectivo` (`type='cash'`) solo si no existe; plantilla `'Presupuesto ' || mes` con `ON CONFLICT (user_id, month_year) DO NOTHING`.
+- [x] Antes del primer `INSERT` se verifica que exista el estado `Activo` y que los 12 rubros resuelvan clasificación y control por nombre; si falta alguno, excepción y nada a medias (no se usa `ROW_COUNT <> 12`).
+- [x] `ensure_starter_kit()` sin parámetro de usuario: SECURITY DEFINER, `search_path` fijo, `auth.uid()` NULL → `42501`; devuelve `_seed_starter_kit(auth.uid(), <mes Bogotá>)`; EXECUTE solo `authenticated`.
+- [x] `handle_new_user()` conserva idéntico el insert de `profiles` y **después** llama la siembra dentro de `BEGIN … EXCEPTION WHEN OTHERS THEN RAISE WARNING … END;`; mantiene sus grants.
+- [x] Nada en la migración llama `upsert_monthly_budget`.
+- [x] Bloque comentado de verificación manual al final (simulando `request.jwt.claims` como en `20260929000000`), todo con `ROLLBACK`.
+- [x] `bun run test && bun run type-check` en verde.
 
 ---
 
@@ -713,7 +713,7 @@ EOF
 - Consumes: `public._seed_starter_kit(uuid, text)` (Task 2); columnas de onboarding (Task 1) — un usuario nuevo queda con ambas en NULL (pendiente), que es lo que leen `getPostLoginPath` (S04) y la checklist (S12).
 - Produces: `public.handle_new_user() RETURNS trigger` con la misma firma (el trigger `on_auth_user_created` no se toca).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Agregar al final de `src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`:
 
@@ -783,12 +783,12 @@ describe('migración 20260930130000: verificación manual', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: FAIL — los 7 tests nuevos fallan (`Error: No está la función handle_new_user`, `expected -1 to be greater than -1` en el marcador de verificación, `toContain` sin match en los grants); los 22 anteriores en PASS.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Agregar al final de `supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql`:
 
@@ -923,17 +923,17 @@ GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin, servi
 --    es esperado: la protección es que no recibe usuario y usa auth.uid()).
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts`
 Expected: PASS — 29 tests.
 
-- [ ] **Step 5: Verificación completa del proyecto**
+- [x] **Step 5: Verificación completa del proyecto**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: toda la suite en PASS (incluidos los 29 de este archivo) y `tsc --noEmit` sin errores. Si `type-check` se queja de `node:fs`/`node:path`, confirmar que `@types/node` está en `devDependencies` (lo está: `"@types/node": "^20"`) y no cambiar imports a `require`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add supabase/migrations/20260930130000_kit_inicial_y_onboarding.sql src/lib/supabase/migrations/20260930130000_kit_inicial_y_onboarding.test.ts && git commit -m "$(cat <<'EOF'
