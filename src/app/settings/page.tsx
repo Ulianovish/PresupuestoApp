@@ -4,6 +4,7 @@ import AccountsPanel from '@/components/organisms/AccountsPanel/AccountsPanel';
 import CategoriesPanel from '@/components/organisms/CategoriesPanel/CategoriesPanel';
 import DocumentosDianPanel from '@/components/organisms/DocumentosDianPanel/DocumentosDianPanel';
 import WhatsAppLinkPanel from '@/components/organisms/WhatsAppLinkPanel/WhatsAppLinkPanel';
+import { loginUrl } from '@/lib/auth/login-url';
 import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,7 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect('/auth/login');
+    redirect(loginUrl('/settings'));
   }
 
   const { data: links } = await supabase

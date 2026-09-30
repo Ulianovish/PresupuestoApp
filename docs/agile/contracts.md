@@ -190,7 +190,7 @@ Se compara primero `code`, luego `message` (sin distinguir mayúsculas). Nunca s
 - `loginAction`: respeta `redirectTo` vía `safeRedirectPath`; sin `redirectTo`, usa `getPostLoginPath`.
 - `src/app/auth/forgot-password/page.tsx` + `forgotPasswordAction(formData)`: `resetPasswordForEmail(email, { redirectTo: ${getSiteUrl()}/auth/confirm?type=recovery&next=/auth/reset-password })`. Responde siempre el mismo mensaje exista o no el correo: "Si el correo está registrado, te enviamos un enlace."
 - `src/app/auth/reset-password/page.tsx` + `resetPasswordAction(formData)`: requiere sesión (la deja `/auth/confirm`); `updateUser({ password })`; luego `/dashboard`.
-- `middleware.ts`: `/auth/confirm` y `/auth/reset-password` accesibles; `/bienvenida` protegida; `/terms` y `/privacy` públicas.
+- `src/middleware.ts` (ADR-004): `/auth/confirm` y `/auth/reset-password` accesibles; `/bienvenida` protegida; `/terms` y `/privacy` públicas.
 
 ```ts
 // src/lib/onboarding/post-login.ts
@@ -288,7 +288,7 @@ NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+573000000000
 | Flujo | Historias | Archivos principales |
 |---|---|---|
 | SEG | S01, S02, S03 | `supabase/migrations/2026093010*…12*`, `src/lib/services/whatsapp-links.ts`, `src/lib/whatsapp/handle-linking.ts` (solo S02) |
-| AUTH | S04, S05, S06 | `src/app/auth/**`, `src/lib/actions/auth.ts`, `src/lib/auth/**`, `src/lib/site-url.ts`, `src/lib/onboarding/post-login.ts`, `src/lib/validations/schemas.ts`, `middleware.ts`, `src/app/terms`, `src/app/privacy` |
+| AUTH | S04, S05, S06 | `src/app/auth/**`, `src/lib/actions/auth.ts`, `src/lib/auth/**`, `src/lib/site-url.ts`, `src/lib/onboarding/post-login.ts`, `src/lib/validations/schemas.ts`, `src/middleware.ts`, `src/app/terms`, `src/app/privacy` |
 | LIMPIEZA | S07, S08 | `src/lib/services/ingresos-deudas.ts`, `src/hooks/useIngresosDeudas.ts`, `src/hooks/useBudgetData.ts`, `Sidebar.tsx`, `src/app/gastos/page.tsx`, `expense-categories.ts`, `src/lib/actions/categories.ts`, `src/lib/actions/deudas-budget.ts`, `budget-defaults.ts` |
 | ONB | S09, S10, S11, S12, S13 | `supabase/migrations/20260930130000_*`, `src/lib/onboarding/**` (salvo post-login), `src/lib/actions/onboarding.ts`, `src/app/bienvenida/**`, `OnboardingWizard`, `OnboardingChecklist`, `MobileSidebar.tsx`, `DashboardQuickActions.tsx`, `BudgetStatusPanels.tsx`, `WhatsAppLinkPanel.tsx`, `src/lib/whatsapp/link-url.ts` |
 
@@ -326,15 +326,17 @@ Resuelven los huecos que reportaron los 13 planificadores. Donde choquen con el 
   |---|---|
   | `enlace_invalido` | El enlace no es válido o ya venció. Si ya confirmaste tu correo, inicia sesión. |
   | `same_password` | La contraseña nueva debe ser distinta de la anterior. |
+  | `reauthentication_needed` | Por seguridad, pide un enlace nuevo para cambiar la contraseña. |
 
   Exporta `INVALID_LINK_ERROR_CODE`, `INVALID_LINK_LOGIN_PATH`, `GENERIC_AUTH_ERROR`. Implementación con `Map` (sin lookups en el prototipo).
 - **§2.3 auth**:
   - `/auth/confirm` acepta también `?code=` (`exchangeCodeForSession`) por si la plantilla usa `{{ .ConfirmationURL }}`.
   - Sin `next` válido, `/auth/confirm` decide con `getPostLoginPath` (recovery → `/auth/reset-password`). Las plantillas de H4 no llevan `next` salvo recovery.
   - `forgotPasswordAction` **se traga todo error** de `resetPasswordForEmail` (incluido el límite de envíos: revelaría que el correo existe) y solo registra el `code`.
-  - `registerAction` muestra el primer mensaje de Zod, no "Datos inválidos".
+  - `registerAction` manda en `?error=` un código por campo y la página lo traduce con `resolveRegisterError` desde una lista cerrada.
   - La plantilla "Invite user" lleva `next=/auth/reset-password` (excepción a "sin next"): no invitar antes de desplegar S05, y el correo debe estar en la allowlist.
   - `resetPasswordAction`, tras `updateUser` exitoso, redirige con `getPostLoginPath` (no fijo a `/dashboard`): así el invitado que fija su contraseña ve `/bienvenida`.
+  - `resetPasswordAction` y `/auth/reset-password` aceptan **cualquier** sesión, no solo una de recuperación: es intencional, porque las usan tanto el enlace de recuperación como la invitación, y no se distingue el tipo de sesión. Un usuario con sesión normal puede cambiar su contraseña sin dar la actual; si en Supabase se activa "Secure password change", `updateUser` devuelve `reauthentication_needed` y la página muestra el texto de esa fila (pedir un enlace nuevo).
   - Lógica de rutas del middleware en `src/lib/auth/route-access.ts` (S04).
 - **§2.6 limpieza (S07)**: además borra `src/scripts/migrate-july-data.ts`, `src/scripts/migrate-july-expenses.ts`, los paneles sin uso `ExpenseMigrationPanel` y `BudgetMigrationPanel`, y el botón ligado a `'2025-07'` de `ExpenseHeader.tsx` (verificar con grep que nada los importe). "Primero crea una categoría" es la etiqueta del botón deshabilitado, más un aviso con enlace a `/settings`.
 - **§2.7 onboarding**:
@@ -356,12 +358,16 @@ Tres flujos en worktrees separados; dentro de cada uno, en serie:
 | AUTH | S04 → S06 → S05 | `src/lib/auth/route-access.ts`, `src/app/auth/login/page.tsx`, `src/app/auth/reset-password/ResetPasswordForm.tsx`, `src/lib/constants/legal.ts` y contenidos legales |
 | APP | S07 → S08 → S10 → S13 → S11 → S12 | `ExpenseModal.tsx`, `services/expenses.ts`, `src/lib/expense-form-defaults.ts`, `src/lib/budget/**`, `src/app/presupuesto/page.tsx`, `DashboardContent.tsx`, `UnlinkPhoneButton` (molecules), `settings/page.tsx`, `src/lib/actions/whatsapp.ts` |
 
-Choques al integrar: `handle-linking.ts` (S02 en SEG, S13 en APP: líneas distintas), `.env.example` (S04 y S13: conservar ambos lados), `middleware.ts` (solo S04). S05 depende de `passwordSchema` de S06 (mismo flujo, va después).
+Choques al integrar: `handle-linking.ts` (S02 en SEG, S13 en APP: líneas distintas), `.env.example` (S04 y S13: conservar ambos lados), `src/middleware.ts` (S04 y S15, flujo AUTH). S05 depende de `passwordSchema` de S06 (mismo flujo, va después).
 
 ### 5.4 Tareas humanas nuevas
 - **H9**: cambiar `CONTACT_EMAIL` (`src/lib/constants/legal.ts`) por un buzón real antes de abrir el registro.
+- **H10** (ADR-004) — **resuelta** el 2026-09-30: el middleware de la raíz no corría; S15 lo movió a `src/middleware.ts` (ver ADR-004 y `docs/agile/stories/S15-activar-middleware.md`). Texto original: en un preview de Vercel, abrir `/gastos` y `/bienvenida` en ventana privada sin sesión y revisar si el build muestra "ƒ Middleware". Si no redirigen al login, abrir la historia de bug de S04 que mueve `middleware.ts` a `src/middleware.ts`; si redirigen, anotarlo en ADR-004. Hasta entonces ninguna historia declara protección por middleware en sus criterios.
 
 ## Registro de cambios
 
+- v2.3 (2026-09-30): H10 resuelta; el middleware vive en `src/middleware.ts` (§2.3, §4, §5.3) según [ADR-004](decisions/ADR-004-middleware-en-src.md) y [S15](stories/S15-activar-middleware.md). Las guardias de página redirigen a `/auth/login?redirectTo=<ruta>` para no formar bucle con el middleware.
+- v2.2 (2026-09-30): fila `reauthentication_needed` en §2.2 y regla de sesión de `resetPasswordAction` (cualquier sesión, intencional) en §5.2 (S05).
+- v2.1 (2026-09-30): tarea humana H10 y regla de no declarar protección por middleware hasta resolverla (ADR-004).
 - v2 (2026-09-30): enmiendas §5 tras la planificación (13 planes, huecos consolidados).
 - v1 (2026-09-30): versión inicial.

@@ -46,15 +46,15 @@
 
 ## Criterios de aceptación
 
-- [ ] `passwordSchema` exportado desde `src/lib/validations/schemas.ts`: rechaza 7 caracteres con "Usa al menos 8 caracteres", acepta 8 y 72, rechaza 73 con "Usa como máximo 72 caracteres", y no exige mayúsculas, números ni símbolos.
-- [ ] `registerSchema.password` usa `passwordSchema`; `confirmPassword` solo exige no estar vacío ("Confirma tu contraseña") y debe coincidir ("Las contraseñas no coinciden").
-- [ ] El registro muestra "Mínimo 8 caracteres." como único texto de ayuda de la contraseña; ya no menciona mayúsculas, minúsculas ni números. Los inputs tienen `minLength={8}` y `maxLength={72}`.
-- [ ] `/privacy` existe, es pública (ya lo es por middleware) y dice, de forma breve: quién la administra (sin nombre), qué se guarda (cuenta, presupuesto, gastos, facturas con CUFE, números de WhatsApp, cédula/NIT, últimos mensajes con el bot), qué no se guarda (fotos, números de tarjeta, cookies de publicidad), para qué se usa, con quién se comparte (Supabase, Vercel, Twilio y Meta, Vercel AI Gateway y MiniMax, Resend, DIAN vía servicio propio), cuánto tiempo y cómo pedir copia, corrección o borrado escribiendo a `CONTACT_EMAIL`.
-- [ ] `/terms` existe y dice: acceso por invitación, responsabilidades de la cuenta, que los números vinculados ven y registran en el presupuesto, que la IA se equivoca, que la app solo maneja COP, que no es asesoría financiera, uso aceptable, cómo cerrar la cuenta, enlace a privacidad.
-- [ ] Ningún texto legal contiene correos distintos de `CONTACT_EMAIL`, números de teléfono ni secuencias de 7+ dígitos, ni voseo.
-- [ ] `middleware.ts`, `src/lib/auth/route-access.ts` y `vitest.config.ts` sin cambios de esta historia.
-- [ ] La tarea humana H9 (cambiar `CONTACT_EMAIL` por un buzón real antes de abrir el registro) queda anotada en el comentario de `legal.ts` y en la sección de tareas humanas.
-- [ ] `bun run test && bun run type-check` en verde.
+- [x] `passwordSchema` exportado desde `src/lib/validations/schemas.ts`: rechaza 7 caracteres con "Usa al menos 8 caracteres", acepta 8 y 72, rechaza 73 con "Usa como máximo 72 caracteres", y no exige mayúsculas, números ni símbolos.
+- [x] `registerSchema.password` usa `passwordSchema`; `confirmPassword` solo exige no estar vacío ("Confirma tu contraseña") y debe coincidir ("Las contraseñas no coinciden").
+- [x] El registro muestra "Mínimo 8 caracteres." como único texto de ayuda de la contraseña; ya no menciona mayúsculas, minúsculas ni números. Los inputs tienen `minLength={8}` y `maxLength={72}` (desde la ronda 1 salen de `PASSWORD_MIN_LENGTH`, `PASSWORD_MAX_LENGTH` y `PASSWORD_HINT` en `src/lib/validations/password-rules.ts`, que también usa `passwordSchema`).
+- [x] `/privacy` existe, es una página pública sin sesión (está en `PUBLIC_ROUTES`; no se afirma protección por middleware, ver Riesgos y ADR-004) y dice, de forma breve: quién la administra (sin nombre), qué se guarda (cuenta, presupuesto, gastos, facturas con CUFE, números de WhatsApp, cédula/NIT, últimos mensajes con el bot), qué no se guarda (fotos, números de tarjeta, cookies de publicidad), para qué se usa, con quién se comparte (Supabase, Vercel, Twilio y Meta, Vercel AI Gateway y MiniMax, Resend, DIAN vía servicio propio), cuánto tiempo y cómo pedir copia, corrección o borrado escribiendo a `CONTACT_EMAIL`.
+- [x] `/terms` existe y dice: acceso por invitación, responsabilidades de la cuenta, que los números vinculados ven y registran en el presupuesto, que la IA se equivoca, que la app solo maneja COP, que no es asesoría financiera, uso aceptable, cómo cerrar la cuenta, enlace a privacidad.
+- [x] Ningún texto legal contiene correos distintos de `CONTACT_EMAIL`, números de teléfono ni secuencias de 7+ dígitos, ni voseo.
+- [x] `middleware.ts`, `src/lib/auth/route-access.ts` y `vitest.config.ts` sin cambios de esta historia.
+- [x] La tarea humana H9 (cambiar `CONTACT_EMAIL` por un buzón real antes de abrir el registro) queda anotada en el comentario de `legal.ts` y en la sección de tareas humanas.
+- [x] `bun run test && bun run type-check` en verde.
 
 ---
 
@@ -68,7 +68,7 @@
 - Consumes: nada.
 - Produces: `export const passwordSchema` (tipo inferido `z.ZodString`) en `src/lib/validations/schemas.ts`. S05 lo importa para el reset: `import { passwordSchema } from '@/lib/validations/schemas'`. `registerSchema` conserva su nombre, sus campos (`email`, `password`, `confirmPassword`, `fullName`) y el tipo `RegisterFormData`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/validations/schemas.test.ts`:
 
@@ -181,12 +181,12 @@ describe('registerSchema', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/validations/schemas.test.ts`
 Expected: FAIL. Los tests de `passwordSchema` fallan con `Cannot read properties of undefined (reading 'safeParse')` (no existe el export) y "rechaza 6 y 7 caracteres" falla porque hoy el mínimo es 6 con otro mensaje.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/lib/validations/schemas.ts`, justo debajo del comentario de bloque `// ESQUEMAS DE AUTENTICACIÓN` (antes de `// Esquema para login`), agregar:
 
@@ -228,12 +228,12 @@ export const registerSchema = z
 
 `loginSchema` queda igual.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/lib/validations/schemas.test.ts && bun run type-check`
 Expected: PASS (10 tests) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/validations/schemas.ts src/lib/validations/schemas.test.ts && git commit -m "$(cat <<'EOF'
@@ -259,7 +259,7 @@ EOF
 - Consumes: la regla de Task 1 (8–72); no importa código de ella.
 - Produces: nada que otras tareas usen.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/app/auth/register/register-page.test.ts`:
 
@@ -297,12 +297,12 @@ describe('formulario de registro', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/auth/register/register-page.test.ts`
 Expected: FAIL en los 4 tests (el archivo dice "Mínimo 6 caracteres, incluye mayúscula, minúscula y número" y no tiene `minLength`, `maxLength` ni `autoComplete`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `src/app/auth/register/page.tsx`, reemplazar el bloque del input de contraseña y su ayuda (líneas 118-130):
 
@@ -375,12 +375,12 @@ por:
 
 `Input` extiende `React.InputHTMLAttributes<HTMLInputElement>` y reenvía `...props` (`src/components/atoms/Input/Input.tsx:6,31`), así que no hay que tocarlo. Nada más cambia en la página (el checkbox de términos ya enlaza a `/terms` y `/privacy`).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/auth/register/register-page.test.ts && bun run type-check`
 Expected: PASS (4 tests) y `tsc` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/app/auth/register/page.tsx src/app/auth/register/register-page.test.ts && git commit -m "$(cat <<'EOF'
@@ -413,7 +413,7 @@ EOF
   - `src/app/privacy/content.ts`: `export const PRIVACY_SECTIONS: LegalSection[]`
   - `src/app/privacy/page.tsx`: `export const metadata: Metadata`, `export default function PrivacyPage()`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/app/privacy/privacy.test.ts`:
 
@@ -521,12 +521,12 @@ describe('página /privacy', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/privacy/privacy.test.ts`
 Expected: FAIL con `Failed to resolve import "@/lib/constants/legal"` (ni las constantes ni el contenido existen).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/constants/legal.ts`:
 
@@ -701,12 +701,12 @@ export default function PrivacyPage() {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/privacy/privacy.test.ts && bun run type-check`
 Expected: PASS (10 tests) y `tsc` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/lib/constants/legal.ts src/app/privacy/content.ts src/app/privacy/page.tsx src/app/privacy/privacy.test.ts && git commit -m "$(cat <<'EOF'
@@ -733,7 +733,7 @@ EOF
 - Consumes (de Task 3): `CONTACT_EMAIL`, `LEGAL_UPDATED_AT`, `type LegalSection` de `@/lib/constants/legal`.
 - Produces: `src/app/terms/content.ts` → `export const TERMS_SECTIONS: LegalSection[]`; `src/app/terms/page.tsx` → `export const metadata: Metadata`, `export default function TermsPage()`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/app/terms/terms.test.ts`:
 
@@ -814,12 +814,12 @@ describe('página /terms', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/terms/terms.test.ts`
 Expected: FAIL con `Failed to resolve import "./content"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/app/terms/content.ts`:
 
@@ -963,12 +963,12 @@ export default function TermsPage() {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test src/app/terms/terms.test.ts && bun run type-check`
 Expected: PASS (7 tests) y `tsc` sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 builtin cd /Users/migue/Repos/personal/PresupuestoApp && git add src/app/terms/content.ts src/app/terms/page.tsx src/app/terms/terms.test.ts && git commit -m "$(cat <<'EOF'
@@ -990,17 +990,17 @@ EOF
 
 **Interfaces:** ninguna.
 
-- [ ] **Step 1: Confirmar que las páginas son públicas y que no se tocaron archivos ajenos**
+- [x] **Step 1: Confirmar que las páginas son públicas y que no se tocaron archivos ajenos**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -n "'/terms'\|'/privacy'" src/lib/auth/route-access.ts middleware.ts; git status --short -- middleware.ts src/lib/auth/route-access.ts vitest.config.ts; git log --oneline main..HEAD -- vitest.config.ts`
 Expected: `/terms` y `/privacy` dentro de `PUBLIC_ROUTES` de `src/lib/auth/route-access.ts` (lo dejó S04; si S04 aún no está en la rama, en `publicRoutes` de `middleware.ts`), y **ninguna** salida de `git status` ni de `git log` para `vitest.config.ts` (contratos §5.0). Los commits de esta historia no tocan `middleware.ts` ni `route-access.ts`. Si alguna ruta faltara, **no** edites esos archivos: repórtalo a S04, que es su dueña.
 
-- [ ] **Step 2: Suite completa y tipos**
+- [x] **Step 2: Suite completa y tipos**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && bun run test && bun run type-check`
 Expected: todos los tests en verde (incluidos los 31 nuevos: 10 + 4 + 10 + 7) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 3: Confirmar que no quedaron datos personales ni marcadores**
+- [x] **Step 3: Confirmar que no quedaron datos personales ni marcadores**
 
 Run: `builtin cd /Users/migue/Repos/personal/PresupuestoApp && grep -rnE "TODO|TBD|@(gmail|hotmail|outlook)\.|\+57[0-9]" src/lib/constants/legal.ts src/app/terms src/app/privacy src/lib/validations/schemas.test.ts src/app/auth/register/register-page.test.ts; echo "salida: $?"`
 Expected: sin coincidencias (`salida: 1`).
@@ -1009,11 +1009,34 @@ Sin revisión visual con `bun run dev`: contratos §5.0 lo prohíben (`.env.loca
 
 No hay commit en esta tarea.
 
+### Alcance adicional: deuda de S04 (orquestador)
+
+Tareas TDD aparte, una por commit, pedidas por el orquestador en la misma zona (flujo AUTH).
+
+- [x] **A1:** `loginAction`: un `redirectTo` presente pero inseguro cuenta como ausente y decide `getPostLoginPath`.
+- [x] **A2:** login: `?error=` y `?message=` llevan códigos; la página los resuelve con una función pura (lista cerrada) y nunca muestra texto libre de la URL.
+- [x] **A3:** `translateAuthError`: subcadena solo para `signup_not_allowed`; lo demás, coincidencia exacta.
+- [x] **A4:** `/auth/callback` redirige a `/auth/confirm` con los mismos parámetros (`code`, `type`; `redirectTo` → `next`).
+- [x] **A5:** `getSiteUrl`: en `VERCEL_ENV=production` sin `NEXT_PUBLIC_SITE_URL`, usa `VERCEL_PROJECT_PRODUCTION_URL` antes que `VERCEL_URL`.
+- [x] **A6:** `middleware.test.ts` con `createServerClient` simulado.
+
+Ronda de corrección 1 (revisores):
+
+- [x] **R1:** registro: `?error=` lleva códigos (`authErrorCode` para Supabase; `email_invalido`, `password_corta`, `password_larga`, `no_coinciden`, `nombre_invalido`, `datos_invalidos` para Zod). La página los resuelve con `resolveRegisterError` (`src/lib/auth/register-feedback.ts`, lista cerrada; lo desconocido cae en el genérico). El texto que ve la persona es el del campo que falló primero, no "Datos inválidos" (espíritu de §5.2), pero ya no es el literal de Zod.
+- [x] **R2:** `assertContactEmailReady` en `legal.ts`: con `VERCEL_ENV=production` y `CONTACT_EMAIL` de un dominio de ejemplo, el módulo lanza y el build de producción falla hasta resolver H9. Preview y local lo toleran. Un test (`describe.skipIf`) se activa solo cuando H9 esté resuelta.
+- [x] **R3:** `/auth/callback` registra `error_code` (sin datos personales) y reenvía `type` solo si está en `EMAIL_OTP_TYPES` (`src/lib/auth/email-otp-types.ts`, compartida con `/auth/confirm`). Decisión explícita: sin `code` termina en `?error=enlace_invalido` (antes iba al login sin error).
+- [x] **R4:** `login-page.test.ts` exige además que `setError`/`setMessage` reciban `feedback.error`/`feedback.message`; `middleware.test.ts` remite a ADR-004/H10.
+
 ---
+
+## Riesgos
+
+- **Middleware posiblemente inactivo (depende de S04, no bloquea S06; ADR-004).** El proyecto usa `src/app/` y el único middleware es `middleware.ts` en la raíz; Next.js lo busca en `src/`, así que muy probablemente no corre. Esta historia no declara ninguna protección por middleware: `/terms` y `/privacy` son páginas públicas que funcionan igual con o sin él. `src/middleware.test.ts` (A6) prueba la función aislada y no demuestra que Next.js la cargue. Se resuelve con la tarea humana H10 y, si hace falta, con la historia de bug de S04 que mueve el archivo.
 
 ## Tareas humanas
 
-- **H9** (contratos §5.4): antes de abrir el registro (junto con H1/H6), cambiar `CONTACT_EMAIL` en `src/lib/constants/legal.ts` por un buzón real que alguien lea. Ningún agente la hace: el valor de ejemplo `contacto@ejemplo.com` se queda en el código hasta entonces.
+- **H9** (contratos §5.4): antes de abrir el registro (junto con H1/H6), cambiar `CONTACT_EMAIL` en `src/lib/constants/legal.ts` por un buzón real que alguien lea. Ningún agente la hace: el valor de ejemplo `contacto@ejemplo.com` se queda en el código hasta entonces. **Ojo:** mientras siga el marcador, el build de producción de Vercel falla a propósito (R2); los previews no.
+- **H10** (contratos §5.4, ADR-004): verificar en un preview de Vercel si `/gastos` y `/bienvenida` redirigen al login sin sesión y si el build muestra "ƒ Middleware". No la hace ningún agente.
 - Si el proveedor de correo final no es Resend (decisión D2), actualizar el ítem "Resend" en `src/app/privacy/content.ts`, su test y `LEGAL_UPDATED_AT`.
 
 ## Autorrevisión

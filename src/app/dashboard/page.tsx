@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import DashboardContent from '@/components/pages/DashboardContent';
 import { getCurrentUser } from '@/lib/actions/auth';
+import { loginUrl } from '@/lib/auth/login-url';
 
 /**
  * DashboardPage - Página principal del dashboard
@@ -13,7 +14,7 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect(loginUrl('/dashboard'));
   }
 
   // Pasar datos del usuario al componente cliente

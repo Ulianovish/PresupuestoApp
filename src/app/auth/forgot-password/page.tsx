@@ -12,25 +12,23 @@ import Card, {
   CardTitle,
 } from '@/components/atoms/Card/Card';
 import Input from '@/components/atoms/Input/Input';
-import { loginAction } from '@/lib/actions/auth';
-import { resolveLoginFeedback } from '@/lib/auth/login-feedback';
+import { forgotPasswordAction } from '@/lib/actions/auth';
+import { resolveForgotPasswordFeedback } from '@/lib/auth/password-reset-feedback';
 
 import AuthLoadingFallback from '../AuthLoadingFallback';
 
 /**
- * LoginForm - Formulario de inicio de sesión que usa useSearchParams
+ * ForgotPasswordForm - Pide el correo para enviar el enlace de recuperación
  */
-function LoginForm() {
+function ForgotPasswordForm() {
   const searchParams = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  // Lo pone el middleware al mandar aquí desde una ruta protegida.
-  const redirectTo = searchParams.get('redirectTo');
 
   // `?error=` y `?message=` traen códigos: nunca se pinta texto de la URL.
   useEffect(() => {
-    const feedback = resolveLoginFeedback({
+    const feedback = resolveForgotPasswordFeedback({
       error: searchParams.get('error'),
       message: searchParams.get('message'),
     });
@@ -38,17 +36,16 @@ function LoginForm() {
     setMessage(feedback.message);
   }, [searchParams]);
 
-  // Función para manejar el envío del formulario
   async function handleSubmit(formData: FormData) {
     setIsSubmitting(true);
     setError(null);
     setMessage(null);
 
     try {
-      await loginAction(formData);
-      // Si llegamos aquí sin error, el Server Action manejó la redirección
+      await forgotPasswordAction(formData);
+      // La Server Action termina siempre con una redirección
     } catch (error) {
-      console.error('Error en login:', error);
+      console.error('Error pidiendo el enlace de recuperación:', error);
       setError('Error de conexión. Intenta nuevamente.');
     } finally {
       setIsSubmitting(false);
@@ -64,53 +61,30 @@ function LoginForm() {
         <Card variant="glass" className="p-8">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-white mb-2">
-              Iniciar Sesión
+              Recupera tu contraseña
             </CardTitle>
             <p className="text-gray-300 text-sm">
-              Accede a tu cuenta de presupuesto
+              Escribe tu correo y te enviamos un enlace para crear una nueva.
             </p>
           </CardHeader>
 
           <CardContent>
             <form action={handleSubmit} className="space-y-6">
-              {redirectTo && (
-                <input type="hidden" name="redirectTo" value={redirectTo} />
-              )}
-
-              {/* Campo Email */}
+              {/* Campo Correo */}
               <div className="space-y-2">
                 <label
                   htmlFor="email"
                   className="block text-sm font-medium text-white"
                 >
-                  Email
+                  Correo
                 </label>
                 <Input
                   id="email"
                   name="email"
                   type="email"
+                  autoComplete="email"
                   variant="glass"
-                  placeholder="tu@email.com"
-                  required
-                  disabled={isSubmitting}
-                  className="w-full"
-                />
-              </div>
-
-              {/* Campo Contraseña */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-white"
-                >
-                  Contraseña
-                </label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  variant="glass"
-                  placeholder="••••••••"
+                  placeholder="tu@correo.com"
                   required
                   disabled={isSubmitting}
                   className="w-full"
@@ -140,25 +114,18 @@ function LoginForm() {
                 loading={isSubmitting}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+                {isSubmitting ? 'Enviando...' : 'Enviar enlace'}
               </Button>
 
               {/* Enlaces adicionales */}
-              <div className="space-y-3 text-center">
-                <Link
-                  href="/auth/forgot-password"
-                  className="text-sm text-blue-400 hover:text-blue-300 hover:underline transition-colors"
-                >
-                  ¿Olvidaste tu contraseña?
-                </Link>
-
+              <div className="text-center">
                 <div className="flex items-center justify-center space-x-1 text-sm">
-                  <span className="text-gray-300">¿No tienes cuenta?</span>
+                  <span className="text-gray-300">¿Ya la recordaste?</span>
                   <Link
-                    href="/auth/register"
+                    href="/auth/login"
                     className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors"
                   >
-                    Regístrate
+                    Inicia sesión
                   </Link>
                 </div>
               </div>
@@ -181,13 +148,13 @@ function LoginForm() {
 }
 
 /**
- * LoginPage - Página de inicio de sesión
+ * ForgotPasswordPage - Página para pedir el enlace de recuperación
  * Componente de página (Pages level en Atomic Design) con Suspense boundary
  */
-export default function LoginPage() {
+export default function ForgotPasswordPage() {
   return (
     <Suspense fallback={<AuthLoadingFallback />}>
-      <LoginForm />
+      <ForgotPasswordForm />
     </Suspense>
   );
 }

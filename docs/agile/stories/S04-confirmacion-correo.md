@@ -78,7 +78,7 @@ Todos están en el flujo AUTH (contratos §4). `.env.example` también lo toca S
 - Consumes: nada.
 - Produces: `export function getSiteUrl(env?: Record<string, string | undefined>): string` — `NEXT_PUBLIC_SITE_URL` → `https://${VERCEL_URL}` → `'http://localhost:3001'`, sin barra final, vacío = ausente. Por defecto lee `process.env` en el momento de la llamada (solo servidor).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/site-url.test.ts`:
 
@@ -128,12 +128,12 @@ describe('getSiteUrl', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/site-url.test.ts`
 Expected: FAIL con `Failed to resolve import "./site-url"` (el archivo no existe).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/site-url.ts`:
 
@@ -171,12 +171,12 @@ Agregar **al final** de `.env.example` (después de `TWILIO_CONTENT_SID_CUENTAS=
 NEXT_PUBLIC_SITE_URL=http://localhost:3001
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/site-url.test.ts`
 Expected: PASS (6 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/site-url.ts src/lib/site-url.test.ts .env.example
@@ -195,7 +195,7 @@ git commit -m "feat(auth): getSiteUrl para los enlaces de los correos" -m "Co-Au
 - Consumes: nada.
 - Produces: `export function safeRedirectPath(input: string | null | undefined, fallback?: string): string` — fallback por defecto `'/dashboard'`. Devuelve la ruta normalizada (`pathname + search + hash`) o `fallback`. Con `fallback = ''` sirve para preguntar "¿es segura?" (lo usa Task 7).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/auth/safe-redirect.test.ts`:
 
@@ -250,12 +250,12 @@ describe('safeRedirectPath', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/auth/safe-redirect.test.ts`
 Expected: FAIL con `Failed to resolve import "./safe-redirect"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/auth/safe-redirect.ts`:
 
@@ -306,12 +306,12 @@ export function safeRedirectPath(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/auth/safe-redirect.test.ts`
 Expected: PASS (todos los casos de `it.each`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/auth/safe-redirect.ts src/lib/auth/safe-redirect.test.ts
@@ -334,7 +334,7 @@ git commit -m "feat(auth): safeRedirectPath solo deja redirigir a rutas internas
   - `export const INVALID_LINK_ERROR_CODE = 'enlace_invalido'`
   - `export const INVALID_LINK_LOGIN_PATH = '/auth/login?error=enlace_invalido'` (lo usan Task 5, Task 6 y la página de login en Task 7).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/auth/error-messages.test.ts`:
 
@@ -473,12 +473,12 @@ describe('translateAuthError', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/auth/error-messages.test.ts`
 Expected: FAIL con `Failed to resolve import "./error-messages"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/auth/error-messages.ts`:
 
@@ -567,12 +567,12 @@ export function translateAuthError(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/auth/error-messages.test.ts`
 Expected: PASS (todos los casos, incluidos hook, trigger, `enlace_invalido` y `same_password`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/auth/error-messages.ts src/lib/auth/error-messages.test.ts
@@ -591,7 +591,7 @@ git commit -m "feat(auth): translateAuthError con los textos en español del con
 - Consumes: `SupabaseClient` de `@supabase/supabase-js` (se le pasa el cliente de cookie de `createClient()`; el tipo `SupabaseClient<Database>` es asignable, verificado con `tsc`).
 - Produces: `export async function getPostLoginPath(supabase: SupabaseClient, userId: string): Promise<'/bienvenida' | '/dashboard'>`. Consulta `from('profiles').select('onboarding_completed_at').eq('id', userId).maybeSingle()`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/onboarding/post-login.test.ts`:
 
@@ -664,12 +664,12 @@ describe('getPostLoginPath', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/onboarding/post-login.test.ts`
 Expected: FAIL con `Failed to resolve import "./post-login"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/onboarding/post-login.ts`:
 
@@ -701,12 +701,12 @@ export async function getPostLoginPath(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/onboarding/post-login.test.ts`
 Expected: PASS (5 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/onboarding/post-login.ts src/lib/onboarding/post-login.test.ts
@@ -727,7 +727,7 @@ git commit -m "feat(onboarding): getPostLoginPath decide entre bienvenida y dash
 
 Nota: se usa `redirect()` de `next/navigation` (como pide contratos §2.3). En un route handler Next responde 307 y copia a esa respuesta las cookies que escribió `createClient()` vía `cookies()`, así que la sesión queda guardada. Es el mismo efecto que `NextResponse.redirect` del ejemplo oficial de Supabase (`app/auth/confirm/route.ts`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/app/auth/confirm/route.test.ts`:
 
@@ -929,12 +929,12 @@ describe('GET /auth/confirm', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/app/auth/confirm/route.test.ts`
 Expected: FAIL con `Failed to resolve import "./route"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/app/auth/confirm/route.ts`:
 
@@ -1032,12 +1032,12 @@ export async function GET(request: Request) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/app/auth/confirm/route.test.ts`
 Expected: PASS (15 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/auth/confirm/route.ts src/app/auth/confirm/route.test.ts
@@ -1059,7 +1059,7 @@ git commit -m "feat(auth): /auth/confirm verifica el token_hash (o canjea el cod
 
 Un segmento de App Router no puede tener `page.tsx` y `route.ts` a la vez: la página se borra en el mismo paso en que se crea el route handler.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/app/auth/callback/route.test.ts`:
 
@@ -1176,12 +1176,12 @@ describe('GET /auth/callback', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/app/auth/callback/route.test.ts`
 Expected: FAIL con `Failed to resolve import "./route"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Borrar la página vieja:
 
@@ -1236,7 +1236,7 @@ export async function GET(request: Request) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/app/auth/callback/route.test.ts`
 Expected: PASS (7 tests).
@@ -1244,7 +1244,7 @@ Expected: PASS (7 tests).
 Run: `ls src/app/auth/callback`
 Expected: `route.test.ts  route.ts` (sin `page.tsx`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/auth/callback/route.ts src/app/auth/callback/route.test.ts
@@ -1264,7 +1264,7 @@ git commit -m "fix(auth): /auth/callback pasa a route handler para que guarde la
 - Consumes: `getSiteUrl` (Task 1), `safeRedirectPath` (Task 2), `translateAuthError`, `INVALID_LINK_ERROR_CODE` (Task 3), `getPostLoginPath` (Task 4), `loginSchema`/`registerSchema` de `@/lib/validations/schemas` (S06 cambia su regla de contraseña; los tests usan claves de 19 caracteres para no depender de eso).
 - Produces (sin cambio de firma): `loginAction(formData: FormData)`, `registerAction(formData: FormData)`. `loginAction` lee el campo opcional `redirectTo`. Los errores llegan a la página como `?error=<texto traducido>`; si había `redirectTo` seguro, se conserva en la URL de error. Los errores de validación muestran el **primer mensaje de Zod** (`parsed.error.issues[0].message`), nunca "Datos inválidos" (§5.2).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/actions/auth.test.ts`:
 
@@ -1551,12 +1551,12 @@ describe('registerAction', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/actions/auth.test.ts`
 Expected: FAIL en varios tests; por ejemplo `sin redirectTo usa getPostLoginPath` recibe `'/dashboard'` en vez de `'/bienvenida'`, `credenciales malas` recibe `'Email o contraseña incorrectos'`, `manda emailRedirectTo…` falla porque `signUp` se llama sin `emailRedirectTo`, y `contraseñas distintas` / `correo inválido → primer mensaje de Zod` reciben `'Datos inválidos'` (el `catch` actual de `registerAction`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Reemplazar el contenido completo de `src/lib/actions/auth.ts` por:
 
@@ -1810,7 +1810,7 @@ por:
 
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/actions/auth.test.ts`
 Expected: PASS (14 tests).
@@ -1818,7 +1818,7 @@ Expected: PASS (14 tests).
 Run: `bun run type-check`
 Expected: sin errores (valida también `page.tsx`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/actions/auth.ts src/lib/actions/auth.test.ts src/app/auth/login/page.tsx
@@ -1844,7 +1844,7 @@ git commit -m "feat(auth): registro con emailRedirectTo a /auth/confirm y login 
 
 `auth` y `protected` conservan `startsWith` como el middleware actual: `/ingresos-deudas` hoy está protegida por el prefijo `/ingresos` y debe seguir así (test incluido).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `src/lib/auth/route-access.test.ts`:
 
@@ -1899,12 +1899,12 @@ describe('redirectsSignedInUser', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test src/lib/auth/route-access.test.ts`
 Expected: FAIL con `Failed to resolve import "./route-access"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `src/lib/auth/route-access.ts`:
 
@@ -2048,7 +2048,7 @@ export const config = {
 
 Cambios respecto al anterior: `/auth/confirm` en rutas de auth; `/bienvenida` protegida; `redirectTo` incluye la query (`/gastos?nuevo=1` vuelve completo); el log de desarrollo dice "con sesión"/"sin sesión" en vez del correo.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bun run test src/lib/auth/route-access.test.ts`
 Expected: PASS.
@@ -2056,7 +2056,7 @@ Expected: PASS.
 Run: `bun run type-check`
 Expected: sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/auth/route-access.ts src/lib/auth/route-access.test.ts middleware.ts
@@ -2069,19 +2069,19 @@ git commit -m "feat(auth): middleware deja pasar /auth/confirm, protege /bienven
 
 **Files:** ninguno nuevo.
 
-- [ ] **Step 1: Suite completa y tipos**
+- [x] **Step 1: Suite completa y tipos**
 
 Run: `bun run test && bun run type-check`
 Expected: todos los archivos de test en verde (los 7 nuevos de esta historia más los existentes) y `tsc --noEmit` sin errores.
 
-- [ ] **Step 2: Build con variables de ejemplo (solo sin `.env.local`)**
+- [x] **Step 2: Build con variables de ejemplo (solo sin `.env.local`)**
 
 Valida que `/auth/callback` ya no tiene `page.tsx` y `route.ts` a la vez y que los route handlers compilan. Contratos §5.0 prohíben `next build` contra `.env.local` (apunta a producción) y Next lo carga solo aunque se pasen variables: este paso **solo** corre en un worktree sin `.env.local`.
 
 Run: `test -e .env.local && echo "hay .env.local: se salta el build" || NEXT_PUBLIC_SUPABASE_URL=https://ejemplo.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=clave-de-ejemplo SUPABASE_SERVICE_ROLE_KEY=clave-de-ejemplo bun run build`
 Expected: o el aviso de que se salta, o build exitoso con `ƒ /auth/callback` y `ƒ /auth/confirm` en la tabla de rutas. Si falla por una variable de otro módulo que no es de auth, anotarlo en el reporte sin tocar ese módulo. Si se salta, el Step 1 (`tsc`) sigue siendo la verificación obligatoria.
 
-- [ ] **Step 3: Revisión de datos personales**
+- [x] **Step 3: Revisión de datos personales**
 
 Run: `git diff main --stat && git diff main -- src middleware.ts | grep -nE "@(gmail|hotmail|outlook|yahoo)\.|\+57[0-9]{10}" || echo "sin datos personales"`
 Expected: `sin datos personales` (los tests solo usan `usuario@ejemplo.com`).
