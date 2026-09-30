@@ -43,8 +43,10 @@ describe('BudgetStatusPanels (S10)', () => {
 
 describe('/presupuesto cablea el panel vacío (S10)', () => {
   it('llama ensureStarterKitAction y abre el CategoryModal existente', () => {
-    expect(page).toContain('ensureStarterKitAction()');
-    expect(page).toContain('starterKitToast(');
+    // La secuencia (acción → aviso → recarga) vive en loadStarterKitAndNotify
+    // (budget-empty-state.ts, con sus ramas probadas); la página la cablea.
+    expect(page).toContain('loadStarterKitAndNotify({');
+    expect(page).toContain('ensureStarterKit: ensureStarterKitAction,');
     expect(page).toContain(
       'onCreateCategory={() => setShowCategoryModal(true)}',
     );

@@ -2174,17 +2174,17 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Files:** ninguno nuevo.
 
-- [ ] **Step 1: Suite completa y typecheck**
+- [x] **Step 1: Suite completa y typecheck**
 
 Run: `bun run test && bun run type-check`
 Expected: todo en verde; los tests nuevos aparecen en `budget-503020.test.ts` (12), `wizard-data.test.ts` (4) y `onboarding.test.ts` (31: los 7 de S10 + 24 de S11).
 
-- [ ] **Step 2: Lint de los archivos de la historia**
+- [x] **Step 2: Lint de los archivos de la historia**
 
 Run: `bunx eslint src/lib/onboarding src/lib/actions/onboarding.ts src/lib/actions/onboarding.test.ts src/components/organisms/OnboardingWizard src/app/bienvenida`
 Expected: sin errores.
 
-- [ ] **Step 3: Revisión contra los criterios de aceptación**
+- [x] **Step 3: Revisión contra los criterios de aceptación**
 
 Recorre los 9 criterios de arriba y confirma en el código:
 1. `page.tsx`: `redirect('/auth/login')`, `redirect('/dashboard')` si `onboarding_completed_at`, `ensureStarterKitAction()` (sin try/catch) antes de `loadWizardData`.
