@@ -48,6 +48,7 @@ interface IngresoFormData {
   fuente: string;
   monto: number;
   fecha: string;
+  es_residual: boolean;
 }
 
 export default function IngresosPage({ user: _user }: IngresosPageProps) {
@@ -74,6 +75,7 @@ export default function IngresosPage({ user: _user }: IngresosPageProps) {
     fuente: '',
     monto: 0,
     fecha: fechaPorDefectoDelMes(selectedMonth),
+    es_residual: false,
   });
 
   const resetForm = () => {
@@ -82,6 +84,7 @@ export default function IngresosPage({ user: _user }: IngresosPageProps) {
       fuente: '',
       monto: 0,
       fecha: fechaPorDefectoDelMes(selectedMonth),
+      es_residual: false,
     });
     setEditingId(null);
   };
@@ -97,6 +100,7 @@ export default function IngresosPage({ user: _user }: IngresosPageProps) {
     fuente: string;
     monto: number;
     fecha: string;
+    es_residual?: boolean;
   }) => {
     setEditingId(ingreso.id);
     setFormData({
@@ -104,6 +108,7 @@ export default function IngresosPage({ user: _user }: IngresosPageProps) {
       fuente: ingreso.fuente,
       monto: ingreso.monto,
       fecha: ingreso.fecha,
+      es_residual: ingreso.es_residual ?? false,
     });
     setModalOpen(true);
   };
@@ -322,6 +327,23 @@ export default function IngresosPage({ user: _user }: IngresosPageProps) {
                   required
                 />
               </FormField>
+              <FormField label="">
+                <label className="flex items-center gap-2 text-sm text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={formData.es_residual}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        es_residual: e.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-600 bg-slate-700"
+                  />
+                  Es ingreso residual (llega sin trabajarlo)
+                </label>
+              </FormField>
+
               <div className="flex gap-3 pt-4">
                 <Button
                   type="button"

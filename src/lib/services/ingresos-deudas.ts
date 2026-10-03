@@ -21,6 +21,8 @@ export interface Ingreso {
   monto: number;
   fecha: string;
   tipo: 'ingreso';
+  /** Llega sin trabajarlo (arriendos, dividendos, regalías). */
+  es_residual: boolean;
   es_activo: boolean;
   created_at: string;
   updated_at: string;
@@ -58,6 +60,9 @@ export interface NuevoIngreso {
   fuente: string;
   monto: number;
   fecha: string;
+  /** Llega sin trabajarlo: separa el ingreso residual del trabajado, que es
+   *  lo que miden el índice de dependencia y el progreso financiero. */
+  es_residual?: boolean;
 }
 
 export interface NuevaDeuda {

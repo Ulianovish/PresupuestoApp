@@ -20,6 +20,8 @@ import {
   Calendar,
   ChevronsLeft,
   CreditCard,
+  Gauge,
+  Landmark,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -43,6 +45,8 @@ const NAV_ITEMS = [
   { href: '/presupuesto', label: 'Presupuesto', icon: PieChart },
   { href: '/gastos', label: 'Gastos', icon: Wallet },
   { href: '/deudas', label: 'Deudas', icon: CreditCard },
+  { href: '/activos', label: 'Activos', icon: Landmark },
+  { href: '/indicadores', label: 'Indicadores', icon: Gauge },
 ];
 
 interface SidebarProps {
