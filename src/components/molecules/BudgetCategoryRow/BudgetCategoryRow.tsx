@@ -25,6 +25,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
+import {
+  COLOR_GASTO,
+  COLOR_PRESUPUESTADO,
+  estadoDeGasto,
+} from '@/lib/colores-dato';
 
 interface BudgetCategory {
   id: string;
@@ -171,13 +176,19 @@ export default function BudgetCategoryRow({
       {/* Control - vacío para categorías */}
       <td className={cellBase}></td>
 
-      {/* Total presupuestado */}
-      <td className={`${cellBase} font-semibold text-blue-300`}>
+      {/* Total presupuestado: azul, es el plan */}
+      <td className={`${cellBase} font-semibold ${COLOR_PRESUPUESTADO}`}>
         {formatCurrency(category.totalPresupuestado)}
       </td>
 
-      {/* Total real */}
-      <td className={`${cellBase} font-semibold text-emerald-300`}>
+      {/* Total gastado: el color dice cómo va la categoría */}
+      <td
+        className={`${cellBase} font-semibold ${
+          COLOR_GASTO[
+            estadoDeGasto(category.totalPresupuestado, category.totalReal)
+          ]
+        }`}
+      >
         {formatCurrency(category.totalReal)}
       </td>
 

@@ -29,6 +29,7 @@ import {
 } from '@/lib/budget/alerts';
 import { defaultItemFormNames } from '@/lib/budget/catalog-defaults';
 import { porItem } from '@/lib/budget-overspend';
+import { chip } from '@/lib/colores-dato';
 import { loadStarterKitAndNotify } from '@/lib/onboarding/budget-empty-state';
 import {
   formatCurrency,
@@ -614,24 +615,24 @@ export default function PresupuestoPage() {
     switch (clasificacion) {
       // Nuevas clasificaciones
       case 'Basico':
-        return 'bg-blue-900/30 text-blue-300';
+        return chip('blue');
       case 'Calidad de Vida':
-        return 'bg-emerald-900/30 text-emerald-300';
+        return chip('emerald');
       case 'Estilo de Vida':
-        return 'bg-purple-900/30 text-purple-300';
+        return chip('purple');
       case 'Caprichos':
-        return 'bg-pink-900/30 text-pink-300';
+        return chip('pink');
       case 'Impuestos':
-        return 'bg-amber-900/30 text-amber-300';
+        return chip('amber');
       // Legacy
       case 'Fijo':
-        return 'bg-blue-900/30 text-blue-300';
+        return chip('blue');
       case 'Variable':
-        return 'bg-purple-900/30 text-purple-300';
+        return chip('purple');
       case 'Discrecional':
-        return 'bg-pink-900/30 text-pink-300';
+        return chip('pink');
       default:
-        return 'bg-gray-900/30 text-gray-300';
+        return chip('gray');
     }
   };
 
@@ -639,18 +640,18 @@ export default function PresupuestoPage() {
     switch (control) {
       // Nuevos controles
       case 'Eliminar':
-        return 'bg-red-900/30 text-red-300';
+        return chip('red');
       case 'Reducir':
-        return 'bg-amber-900/30 text-amber-300';
+        return chip('amber');
       case 'Simplificar':
-        return 'bg-cyan-900/30 text-cyan-300';
+        return chip('cyan');
       // Legacy
       case 'Necesario':
-        return 'bg-emerald-900/30 text-emerald-300';
+        return chip('emerald');
       case 'Discrecional':
-        return 'bg-amber-900/30 text-amber-300';
+        return chip('amber');
       default:
-        return 'bg-gray-900/30 text-gray-300';
+        return chip('gray');
     }
   };
 

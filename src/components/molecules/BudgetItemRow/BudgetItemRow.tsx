@@ -16,6 +16,11 @@ import { AlertTriangle, Edit, Trash2 } from 'lucide-react';
 
 import Button from '@/components/atoms/Button/Button';
 import { mensajeSobregasto } from '@/lib/budget-overspend';
+import {
+  COLOR_GASTO,
+  COLOR_PRESUPUESTADO,
+  estadoDeGasto,
+} from '@/lib/colores-dato';
 
 interface BudgetItem {
   id: string;
@@ -203,13 +208,17 @@ export default function BudgetItemRow({
         )}
       </td>
 
-      {/* Valor presupuestado */}
-      <td className="px-4 py-3 text-blue-300">
+      {/* Valor presupuestado: azul, es el plan */}
+      <td className={`px-4 py-3 ${COLOR_PRESUPUESTADO}`}>
         {formatCurrency(item.presupuestado)}
       </td>
 
-      {/* Valor real */}
-      <td className="px-4 py-3 text-emerald-300">
+      {/* Gastado: el color dice cómo va contra su presupuesto */}
+      <td
+        className={`px-4 py-3 font-medium ${
+          COLOR_GASTO[estadoDeGasto(item.presupuestado, item.real)]
+        }`}
+      >
         {item.real > 0 ? formatCurrency(item.real) : '—'}
       </td>
 
