@@ -61,7 +61,7 @@ export default function BudgetStatusPanels({
           <AlertCircle className="w-5 h-5 text-red-400 mt-1" />
           <div>
             <h3 className="text-lg font-semibold text-red-400 mb-1">Error</h3>
-            <p className="text-gray-300">{error}</p>
+            <p className="text-slate-600 dark:text-gray-300">{error}</p>
           </div>
         </div>
       </Card>
@@ -73,7 +73,9 @@ export default function BudgetStatusPanels({
       <Card variant="glass" className="p-8">
         <div className="flex items-center justify-center gap-3">
           <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
-          <span className="text-gray-300 text-lg">Cargando presupuesto...</span>
+          <span className="text-slate-600 dark:text-gray-300 text-lg">
+            Cargando presupuesto...
+          </span>
         </div>
       </Card>
     );
@@ -82,7 +84,7 @@ export default function BudgetStatusPanels({
   if (state === 'sin-categorias') {
     return (
       <Card variant="glass" className="p-8 text-center">
-        <div className="text-gray-400 mb-4">
+        <div className="text-slate-500 dark:text-gray-400 mb-4">
           <FolderPlus className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <h3 className="text-lg font-semibold mb-2">
             Aún no tienes categorías

@@ -121,13 +121,13 @@ export default function BudgetCategoryRow({
   };
 
   const cellBase =
-    'px-4 py-4 bg-white/5 backdrop-blur-sm border-y border-white/10';
+    'px-4 py-4 bg-slate-200/50 dark:bg-white/5 backdrop-blur-sm border-y border-slate-300 dark:border-white/10';
 
   return (
     <tr className="cursor-pointer transition-all" onClick={handleRowClick}>
       {/* Nombre de la categoría con icono de expansión */}
       <td className={`${cellBase} border-l rounded-l-xl`}>
-        <div className="flex items-center font-semibold text-white">
+        <div className="flex items-center font-semibold text-slate-900 dark:text-white">
           {category.expanded ? (
             <ChevronDown className="w-4 h-4 mr-2 flex-shrink-0" />
           ) : (
@@ -144,7 +144,7 @@ export default function BudgetCategoryRow({
               onChange={e => setDraftName(e.target.value)}
               onKeyDown={handleInputKeyDown}
               onBlur={() => void commitEditing()}
-              className="bg-slate-800 border border-blue-400/60 rounded px-2 py-1 text-white font-semibold outline-none focus:ring-2 focus:ring-blue-400/40 min-w-[160px]"
+              className="bg-white dark:bg-slate-800 border border-blue-400/60 rounded px-2 py-1 text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-blue-400/40 min-w-[160px]"
             />
           ) : (
             <span
@@ -152,7 +152,7 @@ export default function BudgetCategoryRow({
               title={canRename ? 'Doble clic para editar el nombre' : undefined}
               className={
                 canRename
-                  ? 'cursor-text rounded px-1 hover:bg-white/10'
+                  ? 'cursor-text rounded px-1 hover:bg-slate-200/70 dark:hover:bg-white/10'
                   : undefined
               }
             >

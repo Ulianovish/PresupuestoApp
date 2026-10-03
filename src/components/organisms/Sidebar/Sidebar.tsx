@@ -23,6 +23,8 @@ import {
   Gauge,
   Landmark,
   LayoutDashboard,
+  Moon,
+  Sun,
   LogOut,
   Menu,
   PieChart,
@@ -34,6 +36,7 @@ import {
 
 import MobileSidebar from '@/components/molecules/MobileSidebar/MobileSidebar';
 import { useMonth } from '@/contexts/MonthContext';
+import { useTema } from '@/contexts/ThemeContext';
 import { logoutAction } from '@/lib/actions/auth';
 import { supabase } from '@/lib/supabase/client';
 
@@ -67,6 +70,7 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
     getAvailableMonths,
   } = useMonth();
   const pathname = usePathname();
+  const { tema, alternarTema } = useTema();
 
   // Usuario autenticado (para mostrar su correo y el cierre de sesión)
   useEffect(() => {
@@ -101,7 +105,7 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
       <aside
         className={`${
           collapsed ? 'hidden' : 'hidden lg:flex'
-        } fixed left-0 top-0 z-40 h-screen w-64 flex-col border-r border-white/10 bg-slate-800/40 backdrop-blur-md`}
+        } fixed left-0 top-0 z-40 h-screen w-64 flex-col border-r border-slate-300 dark:border-white/10 bg-slate-800/40 backdrop-blur-md`}
       >
         {/* Logo + botón para ocultar */}
         <div className="flex items-center justify-between px-5 py-5">
@@ -114,7 +118,7 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
           {onToggle && (
             <button
               onClick={onToggle}
-              className="rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+              className="rounded-lg p-1.5 text-slate-600 dark:text-gray-300 transition-colors hover:bg-slate-200/70 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white"
               aria-label="Ocultar menú"
               title="Ocultar menú"
             >
@@ -125,15 +129,17 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
 
         {/* Usuario */}
         {user && (
-          <div className="mx-3 mb-4 flex items-center gap-3 rounded-lg bg-white/5 px-3 py-2">
+          <div className="mx-3 mb-4 flex items-center gap-3 rounded-lg bg-slate-200/50 dark:bg-white/5 px-3 py-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-600">
-              <User size={18} className="text-white" />
+              <User size={18} className="text-slate-900 dark:text-white" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-white">
+              <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
                 {user.email?.split('@')[0]}
               </p>
-              <p className="truncate text-xs text-gray-400">{user.email}</p>
+              <p className="truncate text-xs text-slate-500 dark:text-gray-400">
+                {user.email}
+              </p>
             </div>
           </div>
         )}
@@ -148,7 +154,7 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                   className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all ${
                     isActive(href)
                       ? 'bg-blue-500/20 text-blue-300 font-medium'
-                      : 'text-gray-200 hover:bg-white/10 hover:text-white'
+                      : 'text-slate-700 dark:text-gray-200 hover:bg-slate-200/70 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   <Icon size={18} />
@@ -161,14 +167,14 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
 
         {/* Mes */}
         <div className="mx-3 mb-3">
-          <label className="mb-1 flex items-center gap-2 text-xs text-gray-300">
+          <label className="mb-1 flex items-center gap-2 text-xs text-slate-600 dark:text-gray-300">
             <Calendar size={14} className="text-blue-400" />
             <span>Mes</span>
           </label>
           <select
             value={selectedMonth}
             onChange={e => setSelectedMonth(e.target.value)}
-            className="w-full rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-200/60 dark:bg-slate-700/50 px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {getAvailableMonths().map(m => (
               <option key={m.value} value={m.value}>
@@ -181,14 +187,14 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
 
         {/* Año */}
         <div className="mx-3 mb-3">
-          <label className="mb-1 flex items-center gap-2 text-xs text-gray-300">
+          <label className="mb-1 flex items-center gap-2 text-xs text-slate-600 dark:text-gray-300">
             <Calendar size={14} className="text-blue-400" />
             <span>Año</span>
           </label>
           <select
             value={selectedYear}
             onChange={e => setSelectedYear(parseInt(e.target.value, 10))}
-            className="w-full rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-200/60 dark:bg-slate-700/50 px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {getAvailableYears().map(year => (
               <option key={year} value={year}>
@@ -199,13 +205,43 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
         </div>
 
         {/* Ajustes y cerrar sesión */}
-        <div className="border-t border-white/10 p-3">
+        <div className="border-t border-slate-300 dark:border-white/10 p-3">
+          {/* Interruptor de tema */}
+          <button
+            type="button"
+            onClick={alternarTema}
+            role="switch"
+            aria-checked={tema === 'oscuro'}
+            className="mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-gray-200 transition-colors hover:bg-slate-200/70 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white"
+            title={
+              tema === 'oscuro'
+                ? 'Cambiar a tema claro'
+                : 'Cambiar a tema oscuro'
+            }
+          >
+            {tema === 'oscuro' ? <Moon size={18} /> : <Sun size={18} />}
+            <span className="flex-1 text-left">
+              {tema === 'oscuro' ? 'Tema oscuro' : 'Tema claro'}
+            </span>
+            <span
+              className={`relative h-5 w-9 flex-shrink-0 rounded-full transition-colors ${
+                tema === 'oscuro' ? 'bg-blue-500' : 'bg-slate-500'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+                  tema === 'oscuro' ? 'left-4.5' : 'left-0.5'
+                }`}
+              />
+            </span>
+          </button>
+
           <Link
             href="/settings"
             className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
               isActive('/settings')
                 ? 'bg-blue-500/20 text-blue-300'
-                : 'text-gray-200 hover:bg-white/10 hover:text-white'
+                : 'text-slate-700 dark:text-gray-200 hover:bg-slate-200/70 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Settings size={18} />
@@ -215,7 +251,7 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
             <form action={logoutAction}>
               <button
                 type="submit"
-                className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-200 transition-colors hover:bg-white/10 hover:text-white"
+                className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-gray-200 transition-colors hover:bg-slate-200/70 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white"
               >
                 <LogOut size={18} />
                 <span>Cerrar sesión</span>
@@ -229,7 +265,7 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
       {collapsed && onToggle && (
         <button
           onClick={onToggle}
-          className="hidden lg:flex fixed left-3 top-3 z-40 items-center gap-2 rounded-lg border border-white/20 bg-slate-800/80 px-3 py-2 text-white backdrop-blur-md transition-colors hover:bg-white/10"
+          className="hidden lg:flex fixed left-3 top-3 z-40 items-center gap-2 rounded-lg border border-slate-300 dark:border-white/20 bg-slate-800/80 px-3 py-2 text-slate-900 dark:text-white backdrop-blur-md transition-colors hover:bg-slate-200/70 dark:hover:bg-white/10"
           aria-label="Mostrar menú"
           title="Mostrar menú"
         >
@@ -238,11 +274,11 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
       )}
 
       {/* Barra superior (móvil) */}
-      <header className="lg:hidden fixed left-0 right-0 top-0 z-40 border-b border-white/20 bg-slate-800/60 backdrop-blur-md">
+      <header className="lg:hidden fixed left-0 right-0 top-0 z-40 border-b border-slate-300 dark:border-white/20 bg-slate-800/60 backdrop-blur-md">
         <div className="flex items-center justify-between px-4 py-3">
           <button
             onClick={() => setIsMobileMenuOpen(true)}
-            className="rounded-lg p-2 text-white transition-colors hover:bg-white/10"
+            className="rounded-lg p-2 text-slate-900 dark:text-white transition-colors hover:bg-slate-200/70 dark:hover:bg-white/10"
             aria-label="Abrir menú"
           >
             <Menu size={22} />

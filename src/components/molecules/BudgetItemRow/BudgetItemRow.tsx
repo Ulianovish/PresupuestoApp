@@ -86,7 +86,7 @@ function InlineDropdown({
         {value}
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 min-w-[140px] bg-slate-800 border border-white/20 rounded-lg shadow-xl overflow-hidden">
+        <div className="absolute z-50 mt-1 min-w-[140px] bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/20 rounded-lg shadow-xl overflow-hidden">
           {options.map(opt => (
             <button
               key={opt.id}
@@ -97,8 +97,8 @@ function InlineDropdown({
               }}
               className={`w-full text-left px-3 py-2 text-xs transition-colors ${
                 opt.name === value
-                  ? 'bg-white/10 font-semibold'
-                  : 'hover:bg-white/5'
+                  ? 'bg-slate-200/70 dark:bg-white/10 font-semibold'
+                  : 'hover:bg-slate-200/50 dark:hover:bg-white/5'
               }`}
             >
               <span
@@ -134,9 +134,9 @@ export default function BudgetItemRow({
   const canInlineEdit = !!onInlineUpdate;
 
   return (
-    <tr className="hover:bg-white/5 transition-colors bg-slate-900/30">
+    <tr className="hover:bg-slate-200/50 dark:hover:bg-white/5 transition-colors bg-slate-50 dark:bg-slate-900/30">
       {/* Descripción del item, con la alerta histórica si el mes anterior se pasó */}
-      <td className="px-4 py-3 pl-12 text-gray-200">
+      <td className="px-4 py-3 pl-12 text-slate-700 dark:text-gray-200">
         <span className="inline-flex items-center gap-1.5">
           {item.descripcion}
           {overspend && (
@@ -159,7 +159,9 @@ export default function BudgetItemRow({
       </td>
 
       {/* Fecha */}
-      <td className="px-4 py-3 text-gray-300">{item.fecha}</td>
+      <td className="px-4 py-3 text-slate-600 dark:text-gray-300">
+        {item.fecha}
+      </td>
 
       {/* Clasificación con color - editable inline */}
       <td className="px-4 py-3">

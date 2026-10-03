@@ -123,7 +123,7 @@ export default function BudgetTable({
               <AddCategoryButton onClick={onAddCategory} loading={isLoading} />
             )}
           </div>
-          <div className="text-sm text-gray-400">
+          <div className="text-sm text-slate-500 dark:text-gray-400">
             Total: {formatCurrency(budgetData?.total_presupuestado || 0)} /{' '}
             {formatCurrency(budgetData?.total_real || 0)}
           </div>
@@ -135,33 +135,33 @@ export default function BudgetTable({
           <table className="min-w-full border-separate border-spacing-y-1">
             {/* Cabecera de la tabla */}
             <thead>
-              <tr className="border-b border-white/10">
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <tr className="border-b border-slate-300 dark:border-white/10">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-gray-300 uppercase tracking-wider">
                   Descripción
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-gray-300 uppercase tracking-wider">
                   Fecha
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-gray-300 uppercase tracking-wider">
                   Clasificación
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-gray-300 uppercase tracking-wider">
                   Control
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-gray-300 uppercase tracking-wider">
                   Presupuestado
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-gray-300 uppercase tracking-wider">
                   Gastado
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-gray-300 uppercase tracking-wider">
                   Acción
                 </th>
               </tr>
             </thead>
 
             {/* Cuerpo de la tabla */}
-            <tbody className="divide-y divide-white/10">
+            <tbody className="divide-y divide-slate-300 dark:divide-white/10">
               {categories.map(categoria => (
                 <React.Fragment key={categoria.id}>
                   {/* Fila de categoría */}

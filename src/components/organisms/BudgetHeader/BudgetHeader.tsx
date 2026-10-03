@@ -60,7 +60,9 @@ export default function BudgetHeader({
         <h1 className="text-3xl font-bold text-blue-400 mb-2">
           Presupuesto Mensual {selectedMonthLabel}
         </h1>
-        <p className="text-gray-300">Presupuestado vs Real</p>
+        <p className="text-slate-600 dark:text-gray-300">
+          Presupuestado vs Real
+        </p>
       </div>
 
       {/* Controles */}

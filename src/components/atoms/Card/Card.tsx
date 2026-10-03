@@ -50,11 +50,12 @@ function Card({
 }: CardProps) {
   // Custom variants for SIRME design system
   const variants = {
-    default: 'bg-slate-800 border-slate-700 text-white',
+    default:
+      'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white',
     glass:
-      'bg-white/10 dark:bg-slate-700/20 backdrop-blur-sm border border-white/20 dark:border-slate-700/20',
+      'bg-white/80 dark:bg-slate-700/20 backdrop-blur-sm border border-slate-300 dark:border-slate-700/20',
     'gradient-border':
-      'bg-white/5 dark:bg-slate-800/20 backdrop-blur-sm border-2 border-transparent bg-gradient-to-r from-blue-500/20 to-purple-500/20 bg-clip-padding',
+      'bg-white/70 dark:bg-slate-800/20 backdrop-blur-sm border-2 border-transparent bg-gradient-to-r from-blue-500/20 to-purple-500/20 bg-clip-padding',
   };
 
   return (
