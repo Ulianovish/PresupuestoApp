@@ -3,14 +3,15 @@
 import React, { useEffect, useState } from 'react';
 
 import Button from '@/components/atoms/Button/Button';
+import ItemNameAutocomplete from '@/components/molecules/ItemNameAutocomplete/ItemNameAutocomplete';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getItemNameSuggestions } from '@/lib/services/budget';
 
 interface CategoryRef {
   id: string;
@@ -40,6 +41,20 @@ export default function CreateBudgetItemModal({
   const [categoryId, setCategoryId] = useState('');
   const [name, setName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [sugerencias, setSugerencias] = useState<string[]>([]);
+
+  // Los nombres ya usados en otros meses, para no inventar uno nuevo cuando ya
+  // existe (es así como acaban conviviendo "Embutidos" y "Embutido").
+  useEffect(() => {
+    if (!isOpen || sugerencias.length > 0) return;
+    let vigente = true;
+    void getItemNameSuggestions().then(nombres => {
+      if (vigente) setSugerencias(nombres);
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [isOpen, sugerencias.length]);
 
   // Reiniciar los campos con los valores por defecto cada vez que se abre
   useEffect(() => {
@@ -93,18 +108,12 @@ export default function CreateBudgetItemModal({
             <Label htmlFor="nuevo-item" className="text-white">
               Nombre del ítem
             </Label>
-            <Input
+            <ItemNameAutocomplete
               id="nuevo-item"
               value={name}
-              onChange={e => setName(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  void handleCreate();
-                }
-              }}
-              className="bg-slate-700/50 border-slate-600 text-white"
-              placeholder="Nombre del ítem"
+              onChange={setName}
+              suggestions={sugerencias}
+              onEnter={() => void handleCreate()}
             />
           </div>
 

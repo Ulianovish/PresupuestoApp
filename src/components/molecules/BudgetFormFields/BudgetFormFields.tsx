@@ -5,9 +5,10 @@
  * Carga clasificaciones y controles dinámicamente desde la BD.
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React from 'react';
 
 import CurrencyInput from '@/components/atoms/CurrencyInput/CurrencyInput';
+import ItemNameAutocomplete from '@/components/molecules/ItemNameAutocomplete/ItemNameAutocomplete';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -51,131 +52,6 @@ interface BudgetFormFieldsProps {
   descriptionSuggestions?: string[];
 }
 
-/** Normaliza texto para comparar sin acentos ni mayúsculas */
-function normalizeText(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase();
-}
-
-/**
- * Input de descripción con autocompletado a partir de items ya existentes.
- * - Mientras se escribe, muestra coincidencias de la base.
- * - Flechas ↑/↓ para navegar, Enter para aceptar la resaltada.
- * - Si no hay nada resaltado, Enter se deja pasar (el modal guarda).
- */
-function DescriptionAutocomplete({
-  value,
-  onChange,
-  suggestions,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  suggestions: string[];
-}) {
-  const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(-1);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const filtered = useMemo(() => {
-    const q = normalizeText(value.trim());
-    if (!q) return [];
-    return suggestions
-      .filter(s => {
-        const n = normalizeText(s);
-        return n.includes(q) && n !== q;
-      })
-      .slice(0, 8);
-  }, [value, suggestions]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const showList = open && filtered.length > 0;
-
-  const select = (name: string) => {
-    onChange(name);
-    setOpen(false);
-    setHighlight(-1);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showList) return; // sin lista: dejar pasar Enter al modal (guardar)
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlight(h => (h + 1) % filtered.length);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlight(h => (h <= 0 ? filtered.length - 1 : h - 1));
-    } else if (e.key === 'Enter') {
-      if (highlight >= 0 && highlight < filtered.length) {
-        e.preventDefault();
-        e.stopPropagation(); // evitar que el modal guarde
-        select(filtered[highlight]);
-      }
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation(); // cerrar la lista sin cerrar el modal
-      setOpen(false);
-    }
-  };
-
-  return (
-    <div ref={containerRef} className="relative">
-      <Input
-        id="descripcion"
-        autoComplete="off"
-        value={value}
-        onChange={e => {
-          onChange(e.target.value);
-          setOpen(true);
-          setHighlight(-1);
-        }}
-        onFocus={() => {
-          if (value.trim()) setOpen(true);
-        }}
-        onKeyDown={handleKeyDown}
-        className="bg-slate-700/50 border-slate-600 text-white"
-        placeholder="Nombre del item"
-      />
-      {showList && (
-        <div className="absolute z-50 mt-1 w-full max-h-56 overflow-auto bg-slate-800 border border-white/20 rounded-lg shadow-xl">
-          {filtered.map((s, i) => (
-            <button
-              key={s}
-              type="button"
-              onMouseDown={e => {
-                e.preventDefault();
-                select(s);
-              }}
-              onMouseEnter={() => setHighlight(i)}
-              className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                i === highlight
-                  ? 'bg-blue-500/30 text-white'
-                  : 'text-gray-200 hover:bg-white/5'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /** Extrae solo el día (número) de un valor de fecha guardado, p.ej. "05/04/2026" -> "5" */
 function extractDay(fecha: string): string {
   const match = fecha?.match(/^\d+/);
@@ -215,12 +91,14 @@ export default function BudgetFormFields({
         <Label htmlFor="descripcion" className="text-white">
           Descripción
         </Label>
-        <DescriptionAutocomplete
+        <ItemNameAutocomplete
+          id="descripcion"
           value={formData.descripcion}
           onChange={v =>
             onFormDataChange(prev => ({ ...prev, descripcion: v }))
           }
           suggestions={descriptionSuggestions}
+          placeholder="Nombre del item"
         />
       </div>
 
