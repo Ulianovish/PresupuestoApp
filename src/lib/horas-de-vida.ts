@@ -63,3 +63,26 @@ export function formatearTiempo(horas: number | null): string {
 export function montoEnTiempo(monto: number, valorHora: number | null): string {
   return formatearTiempo(horasDeVida(monto, valorHora));
 }
+
+/** Días laborales de una semana, para traducir horas semanales a mensuales. */
+const SEMANAS_POR_MES = 52 / 12;
+
+/**
+ * Aviso cuando las horas mensuales son tan pocas que lo más probable es que
+ * se hayan escrito las de una SEMANA.
+ *
+ * Importa porque este número divide todo: con 46 h/mes la hora sale a
+ * $364.130 y una deuda de 6,8 millones parece costar 2 días de trabajo.
+ * Devuelve null cuando el dato es plausible.
+ */
+export function avisoHorasSospechosas(
+  horasMes: number | null | undefined,
+): string | null {
+  if (!horasMes || horasMes <= 0) return null;
+  // Menos de 3 horas al día de trabajo es inusual como dedicación principal.
+  if (horasMes >= DIAS_POR_MES * 3) return null;
+
+  const porDia = horasMes / DIAS_POR_MES;
+  const siFueranSemanales = Math.round(horasMes * SEMANAS_POR_MES);
+  return `${horasMes} horas al mes son ${porDia.toFixed(1)} h al día. Si son semanales, al mes serían unas ${siFueranSemanales}.`;
+}

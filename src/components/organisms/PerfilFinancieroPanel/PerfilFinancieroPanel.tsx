@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 
 import Button from '@/components/atoms/Button/Button';
 import CurrencyInput from '@/components/atoms/CurrencyInput/CurrencyInput';
-import { precioHora } from '@/lib/horas-de-vida';
+import { avisoHorasSospechosas, precioHora } from '@/lib/horas-de-vida';
 import {
   getPerfilFinanciero,
   savePerfilFinanciero,
@@ -85,6 +85,7 @@ export default function PerfilFinancieroPanel({
     ingresoTrabajadoMes,
     perfil.horas_trabajadas_mes,
   );
+  const avisoHoras = avisoHorasSospechosas(perfil.horas_trabajadas_mes);
 
   const campo =
     'rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-2 text-sm text-white outline-none focus:border-blue-500';
@@ -138,6 +139,9 @@ export default function PerfilFinancieroPanel({
             />
             {/* El valor de la hora se recalcula mientras se escribe, para que
                 se vea de inmediato si el número de horas tiene sentido. */}
+            {avisoHoras && (
+              <span className="text-xs text-amber-400">⚠ {avisoHoras}</span>
+            )}
             {valorHora !== null ? (
               <>
                 <span className="text-sm font-medium text-emerald-400">
