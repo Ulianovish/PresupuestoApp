@@ -478,6 +478,47 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
               formatCurrency={formatCurrency}
             />
 
+            {/* Total de todo lo que se debe */}
+            <Card variant="glass">
+              <CardContent className="py-4">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <p className="text-sm text-gray-400">Deudas de consumo</p>
+                    <p className="text-xl font-bold text-orange-300">
+                      {formatCurrency(indicadores.saldoConsumo)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      cuota/mes {formatCurrency(indicadores.pagosConsumo)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Deudas de activos</p>
+                    <p className="text-xl font-bold text-blue-300">
+                      {formatCurrency(indicadores.saldoActivos)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      cuota/mes {formatCurrency(indicadores.pagosActivos)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Total que debes</p>
+                    <p className="text-2xl font-bold text-red-300">
+                      {formatCurrency(indicadores.saldoTotal)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      cuota/mes {formatCurrency(indicadores.pagosTotales)}
+                      {enTiempo(indicadores.saldoTotal) && (
+                        <span className="text-amber-300/80">
+                          {' '}
+                          · {enTiempo(indicadores.saldoTotal)}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Deudas de Activos */}
             <Card variant="glass">
               <CardHeader>
@@ -495,6 +536,10 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
                     Agregar
                   </Button>
                 </CardTitle>
+                <p className="text-sm text-gray-400">
+                  Saldo {formatCurrency(indicadores.saldoActivos)} · cuota/mes{' '}
+                  {formatCurrency(indicadores.pagosActivos)}
+                </p>
               </CardHeader>
               <CardContent>
                 {renderDeudaList(
@@ -521,6 +566,10 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
                     Agregar
                   </Button>
                 </CardTitle>
+                <p className="text-sm text-gray-400">
+                  Saldo {formatCurrency(indicadores.saldoConsumo)} · cuota/mes{' '}
+                  {formatCurrency(indicadores.pagosConsumo)}
+                </p>
               </CardHeader>
               <CardContent>
                 {renderDeudaList(

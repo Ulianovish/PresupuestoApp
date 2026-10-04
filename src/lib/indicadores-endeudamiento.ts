@@ -18,6 +18,8 @@ export interface DeudaParaIndicador {
   tipo_deuda?: string | null;
   /** Cuota mensual. Puede venir nula o en 0 si aún no se registra. */
   valor_cuota?: number | null;
+  /** Lo que falta por pagar. */
+  saldo_pendiente?: number | null;
   pagada?: boolean | null;
   es_activo?: boolean | null;
 }
@@ -32,6 +34,12 @@ export interface IndicadoresEndeudamiento {
   pagosActivos: number;
   /** Suma de cuotas mensuales de todas las deudas. */
   pagosTotales: number;
+  /** Saldo pendiente de las deudas de consumo. */
+  saldoConsumo: number;
+  /** Saldo pendiente de las deudas de activos. */
+  saldoActivos: number;
+  /** Saldo pendiente de todas las deudas: lo que se debe en total. */
+  saldoTotal: number;
   ingresoNeto: number;
   /** Porcentaje del ingreso destinado a deuda de consumo; null si no hay ingreso. */
   porcentajeConsumo: number | null;
@@ -89,6 +97,16 @@ export function calcularIndicadores(
   // siempre cuadra con el total.
   const pagosActivos = pagosTotales - pagosConsumo;
 
+  // Saldos: lo que falta por pagar, distinto de la cuota del mes.
+  const saldoTotal = vigentes.reduce(
+    (sum, d) => sum + (d.saldo_pendiente ?? 0),
+    0,
+  );
+  const saldoConsumo = vigentes
+    .filter(esDeudaDeConsumo)
+    .reduce((sum, d) => sum + (d.saldo_pendiente ?? 0), 0);
+  const saldoActivos = saldoTotal - saldoConsumo;
+
   const hayIngreso = ingresoNeto > 0;
   const porcentaje = (pago: number) =>
     hayIngreso ? (pago / ingresoNeto) * 100 : null;
@@ -97,6 +115,9 @@ export function calcularIndicadores(
     pagosConsumo,
     pagosActivos,
     pagosTotales,
+    saldoConsumo,
+    saldoActivos,
+    saldoTotal,
     ingresoNeto,
     porcentajeConsumo: porcentaje(pagosConsumo),
     porcentajeActivos: porcentaje(pagosActivos),

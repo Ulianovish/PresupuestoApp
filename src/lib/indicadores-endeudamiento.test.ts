@@ -12,17 +12,31 @@ import {
 
 /** Deudas equivalentes a las reales tras mover las tarjetas a consumo. */
 const DEUDAS: DeudaParaIndicador[] = [
-  { tipo: 'deuda', valor_cuota: 456500, pagada: false, es_activo: true },
-  { tipo: 'deuda', valor_cuota: 2920203, pagada: false, es_activo: true },
+  {
+    tipo: 'deuda',
+    valor_cuota: 456500,
+    saldo_pendiente: 11517214,
+    pagada: false,
+    es_activo: true,
+  },
+  {
+    tipo: 'deuda',
+    valor_cuota: 2920203,
+    saldo_pendiente: 238500000,
+    pagada: false,
+    es_activo: true,
+  },
   {
     tipo: 'tarjeta_credito',
     valor_cuota: 1648000,
+    saldo_pendiente: 3766430,
     pagada: false,
     es_activo: true,
   },
   {
     tipo: 'tarjeta_credito',
     valor_cuota: 2500000,
+    saldo_pendiente: 6510559,
     pagada: false,
     es_activo: true,
   },
@@ -141,6 +155,9 @@ describe('alertasEndeudamiento', () => {
     pagosConsumo: 0,
     pagosActivos: 0,
     pagosTotales: 0,
+    saldoConsumo: 0,
+    saldoActivos: 0,
+    saldoTotal: 0,
     ingresoNeto: porcentajeConsumo === null ? 0 : 100,
     porcentajeConsumo,
     porcentajeActivos: 0,
@@ -206,5 +223,49 @@ describe('mensajeFlujoDeuda', () => {
     expect(mensajeFlujoDeuda('atencion')).toContain('30');
     expect(mensajeFlujoDeuda('sano')).toContain('manejable');
     expect(mensajeFlujoDeuda('sin-dato')).toContain('Falta el ingreso');
+  });
+});
+
+describe('saldos: lo que se debe, no lo que se paga este mes', () => {
+  it('separa el saldo de consumo del de activos', () => {
+    const r = calcularIndicadores(DEUDAS, 17750000);
+    expect(r.saldoConsumo).toBe(10276989);
+    expect(r.saldoActivos).toBe(250017214);
+  });
+
+  it('consumo mas activos cuadra con el total', () => {
+    const r = calcularIndicadores(DEUDAS, 17750000);
+    expect(r.saldoConsumo + r.saldoActivos).toBe(r.saldoTotal);
+    expect(r.saldoTotal).toBe(260294203);
+  });
+
+  it('el saldo es distinto de la cuota del mes', () => {
+    const r = calcularIndicadores(DEUDAS, 17750000);
+    expect(r.saldoTotal).not.toBe(r.pagosTotales);
+  });
+
+  it('excluye las pagadas y las inactivas, igual que las cuotas', () => {
+    const r = calcularIndicadores(
+      [
+        ...DEUDAS,
+        { tipo: 'deuda', saldo_pendiente: 9e9, pagada: true, es_activo: true },
+        {
+          tipo: 'deuda',
+          saldo_pendiente: 9e9,
+          pagada: false,
+          es_activo: false,
+        },
+      ],
+      17750000,
+    );
+    expect(r.saldoTotal).toBe(260294203);
+  });
+
+  it('tolera saldos nulos', () => {
+    const r = calcularIndicadores(
+      [{ tipo: 'deuda', valor_cuota: 100, es_activo: true, pagada: false }],
+      1000,
+    );
+    expect(r.saldoTotal).toBe(0);
   });
 });
