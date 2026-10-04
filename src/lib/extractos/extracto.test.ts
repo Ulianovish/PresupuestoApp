@@ -3,8 +3,10 @@ import { describe, it, expect } from 'vitest';
 import {
   buildExtractoPrompt,
   filasATexto,
+  fusionarFila,
   numeroColombiano,
   parseExtractoResponse,
+  recortarTexto,
 } from './extracto';
 
 describe('buildExtractoPrompt', () => {
@@ -159,5 +161,77 @@ describe('numeroColombiano', () => {
 
   it('limpia el símbolo de moneda', () => {
     expect(numeroColombiano('$ 2.744.318')).toBe(2744318);
+  });
+});
+
+describe('fusionarFila', () => {
+  const fila = {
+    mes: '2026-10',
+    saldo: null,
+    cuota: null,
+    cuotasPagas: null,
+    cuotasFaltantes: null,
+  };
+
+  it('conserva lo guardado cuando el extracto no trae el dato', () => {
+    const actual = {
+      saldoPendiente: 500000,
+      valorCuota: 120000,
+      cuotasPagas: 3,
+      cuotasFaltantes: 9,
+    };
+    expect(fusionarFila(fila, actual)).toEqual(actual);
+  });
+
+  it('el dato del extracto manda sobre el guardado', () => {
+    expect(
+      fusionarFila(
+        { ...fila, saldo: 400000, cuotasPagas: 4 },
+        {
+          saldoPendiente: 500000,
+          valorCuota: 120000,
+          cuotasPagas: 3,
+          cuotasFaltantes: 9,
+        },
+      ),
+    ).toEqual({
+      saldoPendiente: 400000,
+      valorCuota: 120000,
+      cuotasPagas: 4,
+      cuotasFaltantes: 9,
+    });
+  });
+
+  it('sin nada guardado, lo que falta queda en cero', () => {
+    expect(fusionarFila({ ...fila, cuota: 90000 }, null)).toEqual({
+      saldoPendiente: 0,
+      valorCuota: 90000,
+      cuotasPagas: 0,
+      cuotasFaltantes: 0,
+    });
+  });
+
+  it('un cero del extracto no se confunde con un dato ausente', () => {
+    expect(
+      fusionarFila(
+        { ...fila, saldo: 0 },
+        {
+          saldoPendiente: 500000,
+          valorCuota: 0,
+          cuotasPagas: 0,
+          cuotasFaltantes: 0,
+        },
+      ).saldoPendiente,
+    ).toBe(0);
+  });
+});
+
+describe('recortarTexto', () => {
+  it('deja intacto el texto que cabe', () => {
+    expect(recortarTexto('hola', 10)).toBe('hola');
+  });
+
+  it('recorta y avisa cuando se pasa', () => {
+    expect(recortarTexto('abcdef', 3)).toBe('abc\n[...]');
   });
 });

@@ -12,6 +12,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "type-check": "tsc --noEmit",
     "prepare": "husky install",
+    "postinstall": "cp -f node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/pdf.worker.min.mjs 2>/dev/null || true",
     "db:types": "npx supabase gen types typescript --project-id $PROJECT_ID > src/types/database.ts",
     "db:reset": "supabase db reset",
     "db:migrate": "supabase db push",

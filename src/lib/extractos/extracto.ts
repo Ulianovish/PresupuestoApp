@@ -160,3 +160,40 @@ export function filasATexto(filas: unknown[][], maxFilas = 60): string {
     )
     .join('\n');
 }
+
+export interface ValoresMes {
+  saldoPendiente: number;
+  valorCuota: number;
+  cuotasPagas: number;
+  cuotasFaltantes: number;
+}
+
+/**
+ * Combina lo que el modelo leyó del extracto con lo que ya había guardado en
+ * ese mes. Un dato que el extracto no trae (null) conserva el valor actual en
+ * vez de caer a cero: el extracto aporta lo que sabe, no borra lo demás.
+ */
+export function fusionarFila(
+  fila: FilaExtracto,
+  actual: ValoresMes | null,
+): ValoresMes {
+  const base = actual ?? {
+    saldoPendiente: 0,
+    valorCuota: 0,
+    cuotasPagas: 0,
+    cuotasFaltantes: 0,
+  };
+  return {
+    saldoPendiente: fila.saldo ?? base.saldoPendiente,
+    valorCuota: fila.cuota ?? base.valorCuota,
+    cuotasPagas: fila.cuotasPagas ?? base.cuotasPagas,
+    cuotasFaltantes: fila.cuotasFaltantes ?? base.cuotasFaltantes,
+  };
+}
+
+/** Tope de texto que se le manda al modelo, para no reventar el contexto. */
+export const MAX_TEXTO_EXTRACTO = 20000;
+
+export function recortarTexto(texto: string, max = MAX_TEXTO_EXTRACTO): string {
+  return texto.length <= max ? texto : `${texto.slice(0, max)}\n[...]`;
+}

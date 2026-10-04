@@ -8,6 +8,7 @@ import {
   CreditCard,
   Landmark,
   Edit,
+  FileUp,
   Trash2,
   AlertCircle,
   ChevronDown,
@@ -25,6 +26,7 @@ import ConfirmModal from '@/components/atoms/ConfirmModal/ConfirmModal';
 import CurrencyInput from '@/components/atoms/CurrencyInput/CurrencyInput';
 import Input from '@/components/atoms/Input/Input';
 import FormField from '@/components/molecules/FormField/FormField';
+import ExtractoModal from '@/components/organisms/ExtractoModal/ExtractoModal';
 import IndicadoresEndeudamiento from '@/components/organisms/IndicadoresEndeudamiento/IndicadoresEndeudamiento';
 import {
   Dialog,
@@ -167,6 +169,7 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
   const indicadores = calcularIndicadores(deudasDelMes, ingresoNeto);
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [extractoDeuda, setExtractoDeuda] = useState<Deuda | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showDetalles, setShowDetalles] = useState(false);
@@ -385,6 +388,14 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
                 <Button
                   size="sm"
                   variant="ghost"
+                  onClick={() => setExtractoDeuda(deuda)}
+                  title="Cargar extracto (Excel o PDF)"
+                >
+                  <FileUp className="w-3 h-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
                   onClick={() => openEditModal(deuda)}
                   title="Editar"
                 >
@@ -588,6 +599,12 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
           onConfirm={executeDelete}
           title="Eliminar deuda"
           message={`¿Estás seguro de que deseas eliminar "${confirmDelete.name}"? Esta acción no se puede deshacer.`}
+        />
+
+        <ExtractoModal
+          deuda={extractoDeuda}
+          onClose={() => setExtractoDeuda(null)}
+          onGuardado={cargarValoresMes}
         />
 
         {/* Modal agregar/editar */}
