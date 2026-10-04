@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import {
   Plus,
@@ -42,6 +42,11 @@ import {
   ingresoNetoDelMes,
 } from '@/lib/indicadores-endeudamiento';
 import { getPerfilFinanciero } from '@/lib/services/activos';
+import {
+  getDeudasMes,
+  saveDeudaMes,
+  type DeudaMes,
+} from '@/lib/services/deudas-mes';
 import { formatMonthName } from '@/lib/services/expenses';
 import {
   actualizarDeuda,
@@ -128,7 +133,38 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
   const valorHora = precioHora(ingresoTrabajado, horasMes);
   const enTiempo = (monto: number) =>
     valorHora ? montoEnTiempo(monto, valorHora) : null;
-  const indicadores = calcularIndicadores(deudas, ingresoNeto);
+  // Estado de cada deuda EN EL MES elegido. La deuda es una sola; su saldo,
+  // cuota y cuotas pagadas se guardan por mes, así corregir octubre no toca
+  // noviembre. Un mes sin foto propia hereda la del mes anterior.
+  const [valoresMes, setValoresMes] = useState<Record<string, DeudaMes>>({});
+  const cargarValoresMes = useCallback(async () => {
+    try {
+      const filas = await getDeudasMes(selectedMonth);
+      setValoresMes(Object.fromEntries(filas.map(f => [f.deudaId, f])));
+    } catch {
+      setValoresMes({});
+    }
+  }, [selectedMonth]);
+  useEffect(() => {
+    cargarValoresMes();
+  }, [cargarValoresMes]);
+
+  // La lista y los indicadores trabajan con los valores del mes, no con los
+  // de la deuda base.
+  const deudasDelMes = deudas.map(d => {
+    const m = valoresMes[d.id];
+    return m
+      ? {
+          ...d,
+          saldo_pendiente: m.saldoPendiente,
+          valor_cuota: m.valorCuota,
+          cuotas_pagas: m.cuotasPagas,
+          cuotas_faltantes: m.cuotasFaltantes,
+        }
+      : d;
+  });
+
+  const indicadores = calcularIndicadores(deudasDelMes, ingresoNeto);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -152,8 +188,8 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
   };
 
   // Separar deudas por tipo
-  const deudasTarjeta = deudas.filter(esTarjetaCredito);
-  const deudasBanco = deudas.filter(d => !esTarjetaCredito(d));
+  const deudasTarjeta = deudasDelMes.filter(esTarjetaCredito);
+  const deudasBanco = deudasDelMes.filter(d => !esTarjetaCredito(d));
 
   const resetForm = () => {
     setFormData({ ...EMPTY_FORM });
@@ -219,6 +255,15 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
 
       if (editingId) {
         await actualizarDeuda(editingId, deudaData);
+        // Saldo, cuota y cuotas son del MES: se guardan como foto del mes
+        // elegido para no arrastrar el cambio a los demás.
+        await saveDeudaMes(editingId, selectedMonth, {
+          saldoPendiente: formData.saldo_pendiente,
+          valorCuota: formData.valor_cuota,
+          cuotasPagas: formData.cuotas_pagas,
+          cuotasFaltantes: formData.cuotas_faltantes,
+        });
+        await cargarValoresMes();
         toast.success('Deuda actualizada');
       } else {
         const nuevaDeuda = await agregarDeuda(deudaData);
@@ -304,6 +349,14 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
                   Vence:{' '}
                   {new Date(deuda.fecha_vencimiento).toLocaleDateString(
                     'es-CO',
+                  )}
+                  {valoresMes[deuda.id] && !valoresMes[deuda.id].tieneFoto && (
+                    <span
+                      className="ml-2 rounded-full bg-slate-700/60 px-2 py-0.5 text-[10px] text-slate-400"
+                      title={`Estos valores vienen del mes anterior. Al editarlos se guardarán solo en ${formatMonthName(selectedMonth)}.`}
+                    >
+                      heredado
+                    </span>
                   )}
                 </p>
               </div>
