@@ -237,12 +237,12 @@ export default function ExpenseTable({
           </div>
         ) : (
           /* Tabla de transacciones */
-          <div className="overflow-x-auto">
+          <div className="max-h-[70vh] overflow-auto">
             <table className="min-w-full divide-y divide-white/10">
               {/* Cabecera de la tabla */}
               <thead className="bg-white/5">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
+                  <th className="sticky top-0 z-20 bg-slate-800/95 backdrop-blur-sm px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
                     <ColumnFilter
                       label="Descripción"
                       values={valuesFor('description')}
@@ -253,7 +253,7 @@ export default function ExpenseTable({
                       alignRight={false}
                     />
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
+                  <th className="sticky top-0 z-20 bg-slate-800/95 backdrop-blur-sm px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
                     <ColumnFilter
                       label="Día"
                       values={valuesFor('date')}
@@ -264,7 +264,7 @@ export default function ExpenseTable({
                       alignRight={false}
                     />
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
+                  <th className="sticky top-0 z-20 bg-slate-800/95 backdrop-blur-sm px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
                     <ColumnFilter
                       label="Categoría"
                       values={valuesFor('category')}
@@ -275,7 +275,7 @@ export default function ExpenseTable({
                       alignRight={false}
                     />
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
+                  <th className="sticky top-0 z-20 bg-slate-800/95 backdrop-blur-sm px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
                     <ColumnFilter
                       label="Ítem"
                       values={valuesFor('item')}
@@ -286,7 +286,7 @@ export default function ExpenseTable({
                       alignRight={false}
                     />
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
+                  <th className="sticky top-0 z-20 bg-slate-800/95 backdrop-blur-sm px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
                     <ColumnFilter
                       label="Cuenta"
                       values={valuesFor('account')}
@@ -297,7 +297,7 @@ export default function ExpenseTable({
                       alignRight={false}
                     />
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
+                  <th className="sticky top-0 z-20 bg-slate-800/95 backdrop-blur-sm px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
                     <ColumnFilter
                       label="Lugar"
                       values={valuesFor('place')}
@@ -308,7 +308,7 @@ export default function ExpenseTable({
                       alignRight={true}
                     />
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
+                  <th className="sticky top-0 z-20 bg-slate-800/95 backdrop-blur-sm px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">
                     <ColumnFilter
                       label="Valor"
                       values={valuesFor('amount')}
@@ -319,7 +319,7 @@ export default function ExpenseTable({
                       alignRight={true}
                     />
                   </th>
-                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-300 uppercase">
+                  <th className="sticky top-0 z-20 bg-slate-800/95 backdrop-blur-sm px-4 py-2 text-center text-xs font-medium text-gray-300 uppercase">
                     Acciones
                   </th>
                 </tr>
