@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import {
   Plus,
@@ -36,10 +36,12 @@ import { useMonth } from '@/contexts/MonthContext';
 import { useIngresosDeudas } from '@/hooks/useIngresosDeudas';
 import { ensureAccountForCreditCard } from '@/lib/actions/accounts';
 import { createBudgetItemsForDeuda } from '@/lib/actions/deudas-budget';
+import { montoEnTiempo, precioHora } from '@/lib/horas-de-vida';
 import {
   calcularIndicadores,
   ingresoNetoDelMes,
 } from '@/lib/indicadores-endeudamiento';
+import { getPerfilFinanciero } from '@/lib/services/activos';
 import { formatMonthName } from '@/lib/services/expenses';
 import {
   actualizarDeuda,
@@ -106,6 +108,26 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
 
   // Indicadores de endeudamiento sobre el ingreso neto del mes seleccionado
   const ingresoNeto = ingresoNetoDelMes(ingresos, selectedMonth);
+
+  // Precio de una hora de trabajo, para expresar las deudas en tiempo de vida.
+  // Solo cuenta el ingreso TRABAJADO: el residual no cuesta horas.
+  const [horasMes, setHorasMes] = useState<number | null>(null);
+  useEffect(() => {
+    getPerfilFinanciero()
+      .then(p => setHorasMes(p.horas_trabajadas_mes))
+      .catch(() => setHorasMes(null));
+  }, []);
+
+  const ingresoTrabajado = ingresos
+    .filter(
+      i =>
+        (i.fecha ?? '').slice(0, 7) === selectedMonth &&
+        (i as { es_residual?: boolean }).es_residual !== true,
+    )
+    .reduce((t, i) => t + (i.monto ?? 0), 0);
+  const valorHora = precioHora(ingresoTrabajado, horasMes);
+  const enTiempo = (monto: number) =>
+    valorHora ? montoEnTiempo(monto, valorHora) : null;
   const indicadores = calcularIndicadores(deudas, ingresoNeto);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -297,6 +319,15 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
                   {deuda.valor_cuota > 0 && (
                     <p className="text-xs text-gray-500">cuota/mes</p>
                   )}
+                  {enTiempo(
+                    deuda.valor_cuota > 0 ? deuda.valor_cuota : deuda.monto,
+                  ) && (
+                    <p className="text-xs text-amber-300/80">
+                      {enTiempo(
+                        deuda.valor_cuota > 0 ? deuda.valor_cuota : deuda.monto,
+                      )}
+                    </p>
+                  )}
                 </div>
                 <Button
                   size="sm"
@@ -324,7 +355,15 @@ export default function DeudasPage({ user: _user }: DeudasPageProps) {
                   Cuotas: {deuda.cuotas_pagas}/{deuda.plazo_meses}
                 </span>
                 {deuda.saldo_pendiente > 0 && (
-                  <span>Saldo: {formatCurrency(deuda.saldo_pendiente)}</span>
+                  <span>
+                    Saldo: {formatCurrency(deuda.saldo_pendiente)}
+                    {enTiempo(deuda.saldo_pendiente) && (
+                      <span className="text-amber-300/80">
+                        {' '}
+                        · {enTiempo(deuda.saldo_pendiente)}
+                      </span>
+                    )}
+                  </span>
                 )}
                 {deuda.tasa_interes > 0 && (
                   <span>Tasa: {deuda.tasa_interes}%</span>
