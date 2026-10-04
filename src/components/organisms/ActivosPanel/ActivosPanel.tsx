@@ -10,7 +10,7 @@
  * puede convertir en dinero rápido.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -58,6 +58,7 @@ const formatCOP = (n: number) =>
 
 export default function ActivosPanel() {
   const [activos, setActivos] = useState<Activo[]>([]);
+  const formRef = useRef<HTMLDivElement>(null);
   const [deudas, setDeudas] = useState<Deuda[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -124,6 +125,9 @@ export default function ActivosPanel() {
       nota: a.nota ?? '',
       deuda_id: a.deuda_id,
     });
+    // El formulario quedó debajo del listado: sin esto, editar un activo de
+    // arriba no muestra ningún cambio en pantalla.
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   const eliminar = async () => {
@@ -165,8 +169,69 @@ export default function ActivosPanel() {
         </div>
       </div>
 
+      {/* Listado */}
+      {isLoading ? (
+        <p className="text-sm text-slate-400">Cargando activos...</p>
+      ) : activos.length === 0 ? (
+        <p className="text-sm text-slate-400">
+          Aún no tienes activos registrados. Agrega el primero abajo.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {activos.map(a => (
+            <li
+              key={a.id}
+              className="flex flex-wrap items-center gap-2 rounded-lg bg-white/5 px-3 py-2"
+            >
+              <div className="min-w-[160px] flex-1">
+                <p className="text-sm text-white">
+                  {a.nombre}
+                  {a.es_liquido && (
+                    <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-300">
+                      líquido
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {a.tipo}
+                  {a.fecha_valoracion
+                    ? ` · valorado ${a.fecha_valoracion}`
+                    : ''}
+                  {nombreDeuda(a.deuda_id)
+                    ? ` · financia ${nombreDeuda(a.deuda_id)}`
+                    : ''}
+                </p>
+              </div>
+              <span className="text-sm font-semibold text-emerald-300">
+                {formatCOP(a.valor)}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => editar(a)}
+                title="Editar"
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setConfirm(a)}
+                className="text-red-400 hover:text-red-300"
+                title="Eliminar"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+
       {/* Alta y edición */}
-      <div className="mb-4 grid gap-2 rounded-lg bg-white/5 p-3 sm:grid-cols-2">
+      <div
+        ref={formRef}
+        className="mt-4 grid gap-2 rounded-lg bg-white/5 p-3 sm:grid-cols-2"
+      >
         <input
           type="text"
           value={form.nombre}
@@ -269,64 +334,6 @@ export default function ActivosPanel() {
           )}
         </div>
       </div>
-
-      {/* Listado */}
-      {isLoading ? (
-        <p className="text-sm text-slate-400">Cargando activos...</p>
-      ) : activos.length === 0 ? (
-        <p className="text-sm text-slate-400">
-          Aún no tienes activos registrados. Agrega el primero arriba.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {activos.map(a => (
-            <li
-              key={a.id}
-              className="flex flex-wrap items-center gap-2 rounded-lg bg-white/5 px-3 py-2"
-            >
-              <div className="min-w-[160px] flex-1">
-                <p className="text-sm text-white">
-                  {a.nombre}
-                  {a.es_liquido && (
-                    <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-300">
-                      líquido
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {a.tipo}
-                  {a.fecha_valoracion
-                    ? ` · valorado ${a.fecha_valoracion}`
-                    : ''}
-                  {nombreDeuda(a.deuda_id)
-                    ? ` · financia ${nombreDeuda(a.deuda_id)}`
-                    : ''}
-                </p>
-              </div>
-              <span className="text-sm font-semibold text-emerald-300">
-                {formatCOP(a.valor)}
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => editar(a)}
-                title="Editar"
-              >
-                <Pencil className="h-3 w-3" />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirm(a)}
-                className="text-red-400 hover:text-red-300"
-                title="Eliminar"
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
 
       <ConfirmModal
         isOpen={!!confirm}
