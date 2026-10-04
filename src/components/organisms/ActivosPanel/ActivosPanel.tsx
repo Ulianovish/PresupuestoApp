@@ -232,6 +232,36 @@ export default function ActivosPanel() {
         ref={formRef}
         className="mt-4 grid gap-2 rounded-lg bg-white/5 p-3 sm:grid-cols-2"
       >
+        <div className="flex gap-2 sm:col-span-2">
+          <Button
+            size="sm"
+            variant="gradient"
+            onClick={guardar}
+            disabled={isSaving || !form.nombre.trim()}
+            className="flex items-center gap-1"
+          >
+            {editingId ? (
+              <Check className="h-3 w-3" />
+            ) : (
+              <Plus className="h-3 w-3" />
+            )}
+            {editingId ? 'Guardar cambios' : 'Agregar activo'}
+          </Button>
+          {editingId && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEditingId(null);
+                setForm({ ...VACIO });
+              }}
+            >
+              <X className="mr-1 h-3 w-3" />
+              Cancelar
+            </Button>
+          )}
+        </div>
+
         <input
           type="text"
           value={form.nombre}
@@ -303,36 +333,6 @@ export default function ActivosPanel() {
           placeholder="Nota (opcional)"
           className="rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-2 text-sm text-white outline-none focus:border-blue-500 sm:col-span-2"
         />
-
-        <div className="flex gap-2 sm:col-span-2">
-          <Button
-            size="sm"
-            variant="gradient"
-            onClick={guardar}
-            disabled={isSaving || !form.nombre.trim()}
-            className="flex items-center gap-1"
-          >
-            {editingId ? (
-              <Check className="h-3 w-3" />
-            ) : (
-              <Plus className="h-3 w-3" />
-            )}
-            {editingId ? 'Guardar cambios' : 'Agregar activo'}
-          </Button>
-          {editingId && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setEditingId(null);
-                setForm({ ...VACIO });
-              }}
-            >
-              <X className="mr-1 h-3 w-3" />
-              Cancelar
-            </Button>
-          )}
-        </div>
       </div>
 
       <ConfirmModal
