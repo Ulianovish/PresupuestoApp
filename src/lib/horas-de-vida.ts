@@ -10,9 +10,7 @@
  * Módulo puro (sin Supabase ni React).
  */
 
-/** Jornada de referencia para expresar las horas en días. */
-export const HORAS_POR_DIA = 8;
-/** Días laborales de referencia al mes. */
+/** Días laborales de referencia al mes, para juzgar si las horas son creíbles. */
 export const DIAS_POR_MES = 20;
 
 export function precioHora(
@@ -34,29 +32,20 @@ export function horasDeVida(
 }
 
 /**
- * Expresa las horas en la unidad que mejor se entiende: minutos para lo
- * pequeño, horas, días de jornada, y meses cuando la cifra se vuelve enorme.
- * Un saldo de 2.260 horas no dice nada; "14 meses de trabajo" sí.
+ * Expresa el tiempo SIEMPRE en horas. Días y meses obligan a traducir mentalmente
+ * ("¿2,4 días son 19 horas?") y además dependen de una jornada supuesta; la hora
+ * es la unidad en la que se mide el dato de origen.
+ *
+ * Por debajo de 10 horas se muestra un decimal, porque ahí media hora importa;
+ * de ahí para arriba se redondea y se separan los miles.
  */
 export function formatearTiempo(horas: number | null): string {
   if (horas === null) return '—';
   if (horas < 0) return '—';
 
-  if (horas < 1) {
-    const minutos = Math.round(horas * 60);
-    return `${minutos} min de trabajo`;
-  }
-  if (horas < HORAS_POR_DIA) {
-    return `${horas.toFixed(1)} h de trabajo`;
-  }
-
-  const dias = horas / HORAS_POR_DIA;
-  if (dias < DIAS_POR_MES) {
-    return `${dias.toFixed(1)} días de trabajo`;
-  }
-
-  const meses = dias / DIAS_POR_MES;
-  return `${meses.toFixed(1)} meses de trabajo`;
+  const texto =
+    horas < 10 ? horas.toFixed(1) : Math.round(horas).toLocaleString('es-CO');
+  return `${texto} h de trabajo`;
 }
 
 /** Atajo: monto a texto de tiempo. */

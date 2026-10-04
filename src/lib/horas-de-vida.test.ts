@@ -34,21 +34,24 @@ describe('horasDeVida', () => {
 });
 
 describe('formatearTiempo', () => {
-  it('usa minutos para lo pequeño', () => {
-    expect(formatearTiempo(0.5)).toBe('30 min de trabajo');
+  it('siempre habla en horas, nunca en días ni meses', () => {
+    expect(formatearTiempo(16)).toBe('16 h de trabajo');
+    expect(formatearTiempo(2260)).toContain('h de trabajo');
+    expect(formatearTiempo(2260)).not.toMatch(/día|mes/);
   });
 
-  it('usa horas por debajo de una jornada', () => {
+  it('con un decimal por debajo de 10 horas', () => {
+    expect(formatearTiempo(0.5)).toBe('0.5 h de trabajo');
     expect(formatearTiempo(3)).toBe('3.0 h de trabajo');
+    expect(formatearTiempo(2.4)).toBe('2.4 h de trabajo');
   });
 
-  it('usa días de jornada', () => {
-    expect(formatearTiempo(16)).toBe('2.0 días de trabajo');
-  });
-
-  it('usa meses cuando la cifra se vuelve enorme', () => {
-    // 2.260 horas: un saldo así en horas no dice nada.
-    expect(formatearTiempo(2260)).toBe('14.1 meses de trabajo');
+  it('redondeado y con separador de miles por encima', () => {
+    expect(formatearTiempo(18.83)).toBe('19 h de trabajo');
+    // El separador de miles del es-CO es un punto.
+    expect(formatearTiempo(2260).replace(/\u00a0/g, ' ')).toBe(
+      '2.260 h de trabajo',
+    );
   });
 
   it('sin dato no inventa', () => {
@@ -58,7 +61,9 @@ describe('formatearTiempo', () => {
 
 describe('montoEnTiempo', () => {
   it('el caso real: el leasing del FNA a $100.000 la hora', () => {
-    expect(montoEnTiempo(236_646_966, 100_000)).toBe('14.8 meses de trabajo');
+    expect(montoEnTiempo(236_646_966, 100_000).replace(/\u00a0/g, ' ')).toBe(
+      '2.366 h de trabajo',
+    );
   });
 
   it('un mercado de $200.000', () => {
