@@ -1,6 +1,7 @@
 // Creación de gastos directos desde WhatsApp (texto libre). Usa service-role
 // (sin sesión) con el userId ya resuelto por el vínculo del número.
 
+import { resolverPorReglas } from '@/lib/clasificacion/reglas-casa';
 import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
 import {
   cargarHistorialManual,
@@ -101,7 +102,7 @@ export async function createDirectExpense(
     categoryNames,
     historial,
   );
-  const finalCategory = category ?? 'OTROS';
+  let finalCategory = category ?? 'OTROS';
 
   const { data, error } = await supabase.rpc('upsert_monthly_expense', {
     p_user_id: userId,
@@ -157,19 +158,45 @@ export async function createDirectExpense(
           category_name: r.category_name,
         }),
       );
-      const desdeHistorial = itemDesdeHistorial(
-        input.description,
-        finalCategory,
-        indexarHistorial(historial),
-        items,
+      // Regla de la casa primero: gana sobre el historial y sobre la IA.
+      const [nombreRegla] = resolverPorReglas(
+        [input.description],
+        items.map(i => i.name),
       );
+      const itemRegla = nombreRegla
+        ? items.find(i => i.name === nombreRegla)
+        : undefined;
+
+      // El ítem vive en una categoría: dejar el gasto en otra deja un ítem de
+      // MERCADO colgando de un gasto OTROS.
+      if (itemRegla && itemRegla.category_name !== finalCategory) {
+        const { error: catError } = await supabase
+          .from('transactions')
+          .update({ category_name: itemRegla.category_name })
+          .eq('user_id', userId)
+          .eq('id', transactionId);
+        if (!catError) finalCategory = itemRegla.category_name;
+      }
+
+      const desdeHistorial = itemRegla
+        ? null
+        : itemDesdeHistorial(
+            input.description,
+            finalCategory,
+            indexarHistorial(historial),
+            items,
+          );
       // Solo si no cambia la categoría: la categoría ya salió del historial
       // arriba, así que un cambio acá sería un gasto OTROS que el historial no
       // pudo categorizar (categoría que ya no existe) — mejor la IA.
-      const source: 'historial' | 'ai' =
-        desdeHistorial && !desdeHistorial.cambiaCategoria ? 'historial' : 'ai';
-      budgetItemId =
-        source === 'historial' && desdeHistorial
+      const source: 'regla' | 'historial' | 'ai' = itemRegla
+        ? 'regla'
+        : desdeHistorial && !desdeHistorial.cambiaCategoria
+          ? 'historial'
+          : 'ai';
+      budgetItemId = itemRegla
+        ? itemRegla.id
+        : source === 'historial' && desdeHistorial
           ? desdeHistorial.itemId
           : await pickBudgetItemId(input.description, finalCategory, items);
       if (budgetItemId) {

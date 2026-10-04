@@ -5,6 +5,7 @@
 // AI_GATEWAY_API_KEY / MINIMAX_API_KEY y el clasificador devolvía null para
 // todo mientras la UI reportaba cada fila como "hecha".
 
+import { resolverPorReglas } from '@/lib/clasificacion/reglas-casa';
 import { classifyExpensesToItems } from '@/lib/dian/expense-item-classifier';
 import {
   cargarHistorialManual,
@@ -147,11 +148,51 @@ export async function clasificarGastos(
         continue;
       }
 
+      // 0. Reglas de la casa: palabras que siempre mandan al mismo ítem.
+      //    Van ANTES del historial porque el historial reproduce lo que se
+      //    asignó antes de que la regla existiera (el pan en "Lacena").
+      const porRegla = resolverPorReglas(
+        delMes.map(g => g.description),
+        items.map(i => i.name),
+      );
+      const trasReglas: GastoAClasificar[] = [];
+      for (let i = 0; i < delMes.length; i++) {
+        const gasto = delMes[i];
+        const item = porRegla[i]
+          ? items.find(it => it.name === porRegla[i])
+          : undefined;
+        if (!item) {
+          trasReglas.push(gasto);
+          continue;
+        }
+        // El ítem vive en una categoría; dejar el gasto en otra es el mismo
+        // desajuste que ya mordió antes (un ítem de MERCADO en un gasto OTROS).
+        if (
+          normalizarNombre(item.category_name) !==
+          normalizarNombre(gasto.categoryName)
+        ) {
+          // Cast: `transactions` en database.ts no tiene category_name.
+          const { error } = await (supabase as unknown as SupabaseClient)
+            .from('transactions')
+            .update({ category_name: item.category_name })
+            .eq('id', gasto.id)
+            .eq('user_id', userId);
+          if (error) {
+            trasReglas.push(gasto);
+            continue;
+          }
+          categoriasCambiadas++;
+        }
+        const antesDeRegla = asignados.length;
+        await asignar(gasto, item.id, 'regla');
+        if (asignados.length === antesDeRegla) trasReglas.push(gasto);
+      }
+
       // 1. Historial del usuario: lo que ya asignó a mano a un gasto con la
       //    misma descripción. Gana sobre la IA.
       const idx = await obtenerIndice();
       const paraIA: GastoAClasificar[] = [];
-      for (const gasto of delMes) {
+      for (const gasto of trasReglas) {
         const hit = itemDesdeHistorial(
           gasto.description,
           gasto.categoryName,

@@ -16,8 +16,10 @@ export interface BudgetItemRef {
  * - 'ai': lo eligió el clasificador por IA.
  * - 'historial': se reutilizó lo que el usuario asignó antes a un gasto con la
  *   misma descripción (ver `historial-clasificacion.ts`).
+ * - 'regla': lo impuso una regla de la casa por palabra clave (ver
+ *   `clasificacion/reglas-casa.ts`). Gana sobre el historial y sobre la IA.
  */
-export type BudgetItemSource = 'ai' | 'manual' | 'historial';
+export type BudgetItemSource = 'ai' | 'manual' | 'historial' | 'regla';
 
 export interface UnclassifiedExpense {
   id: string;

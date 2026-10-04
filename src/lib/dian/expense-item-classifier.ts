@@ -1,3 +1,4 @@
+import { resolverPorReglas } from '@/lib/clasificacion/reglas-casa';
 import { normalizarNombre } from '@/lib/services/expenses-rollup';
 
 import { extractJsonObject } from './categorizer';
@@ -60,6 +61,9 @@ export function parseExpenseItemResponse(
 /**
  * Clasifica gastos en nombres de ítems usando el AI Gateway (mismo patrón que
  * categorizeInvoiceItems). Ante error o falta de API key devuelve todo null.
+ *
+ * Las reglas de la casa se resuelven antes: lo que ya está decidido no se le
+ * pregunta al modelo (y si todo el lote está cubierto, no se llama).
  */
 export async function classifyExpensesToItems(
   items: Array<{ description: string }>,
@@ -69,10 +73,19 @@ export async function classifyExpensesToItems(
     return new Array(items.length).fill(null);
   }
 
+  const resultado = resolverPorReglas(
+    items.map(i => i.description),
+    itemNames,
+  );
+  const pendientes = items
+    .map((item, i) => ({ item, i }))
+    .filter(({ i }) => resultado[i] === null);
+  if (pendientes.length === 0) return resultado;
+
   const apiKey = process.env.AI_GATEWAY_API_KEY || process.env.MINIMAX_API_KEY;
   if (!apiKey) {
     console.error('classifyExpensesToItems: falta AI_GATEWAY_API_KEY');
-    return new Array(items.length).fill(null);
+    return resultado;
   }
 
   const baseUrl =
@@ -93,7 +106,13 @@ export async function classifyExpensesToItems(
         model,
         max_tokens: 8192,
         messages: [
-          { role: 'user', content: buildExpenseItemPrompt(items, itemNames) },
+          {
+            role: 'user',
+            content: buildExpenseItemPrompt(
+              pendientes.map(p => p.item),
+              itemNames,
+            ),
+          },
         ],
       }),
     });
@@ -102,9 +121,18 @@ export async function classifyExpensesToItems(
     const content = Array.isArray(data.content)
       ? data.content.map(c => c?.text ?? '').join('')
       : null;
-    return parseExpenseItemResponse(content, items.length, itemNames);
+
+    const delModelo = parseExpenseItemResponse(
+      content,
+      pendientes.length,
+      itemNames,
+    );
+    pendientes.forEach(({ i }, n) => {
+      resultado[i] = delModelo[n];
+    });
+    return resultado;
   } catch (error) {
     console.error('Error clasificando gastos a ítems:', error);
-    return new Array(items.length).fill(null);
+    return resultado;
   }
 }
