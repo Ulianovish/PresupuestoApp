@@ -12,19 +12,26 @@ import React, { useCallback, useEffect, useState } from 'react';
 import IndicesPanel from '@/components/organisms/IndicesPanel/IndicesPanel';
 import PerfilFinancieroPanel from '@/components/organisms/PerfilFinancieroPanel/PerfilFinancieroPanel';
 import { useMonth } from '@/contexts/MonthContext';
-import { calcularIndices, type Indice } from '@/lib/indices-financieros';
+import {
+  calcularIndices,
+  type DatosFinancieros,
+  type Indice,
+} from '@/lib/indices-financieros';
 import { formatMonthName } from '@/lib/services/expenses';
 import { getDatosFinancieros } from '@/lib/services/indices';
 
 export default function IndicadoresPage() {
   const { selectedMonth } = useMonth();
   const [indices, setIndices] = useState<Indice[]>([]);
+  const [datos, setDatos] = useState<DatosFinancieros | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const cargar = useCallback(async () => {
     setIsLoading(true);
     try {
-      setIndices(calcularIndices(await getDatosFinancieros(selectedMonth)));
+      const d = await getDatosFinancieros(selectedMonth);
+      setDatos(d);
+      setIndices(calcularIndices(d));
     } finally {
       setIsLoading(false);
     }
@@ -52,7 +59,13 @@ export default function IndicadoresPage() {
         />
       )}
 
-      <PerfilFinancieroPanel onSaved={cargar} />
+      <PerfilFinancieroPanel
+        onSaved={cargar}
+        ingresoTrabajadoMes={
+          datos ? datos.ingresosMes - datos.ingresoResidualMes : 0
+        }
+        nombreMes={formatMonthName(selectedMonth)}
+      />
     </main>
   );
 }

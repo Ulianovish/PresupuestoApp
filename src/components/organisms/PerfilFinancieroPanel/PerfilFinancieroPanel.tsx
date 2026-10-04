@@ -14,11 +14,19 @@ import { toast } from 'sonner';
 
 import Button from '@/components/atoms/Button/Button';
 import CurrencyInput from '@/components/atoms/CurrencyInput/CurrencyInput';
+import { precioHora } from '@/lib/horas-de-vida';
 import {
   getPerfilFinanciero,
   savePerfilFinanciero,
   type PerfilFinanciero,
 } from '@/lib/services/activos';
+
+const COP = new Intl.NumberFormat('es-CO', {
+  style: 'currency',
+  currency: 'COP',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
 
 const VACIO: PerfilFinanciero = {
   fecha_nacimiento: null,
@@ -31,8 +39,13 @@ const VACIO: PerfilFinanciero = {
 
 export default function PerfilFinancieroPanel({
   onSaved,
+  ingresoTrabajadoMes = 0,
+  nombreMes = '',
 }: {
   onSaved?: () => void;
+  /** Ingreso del mes que sí se trabajó: el residual no cuesta horas. */
+  ingresoTrabajadoMes?: number;
+  nombreMes?: string;
 }) {
   const [perfil, setPerfil] = useState<PerfilFinanciero>(VACIO);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,6 +80,11 @@ export default function PerfilFinancieroPanel({
   };
 
   const num = (v: string): number | null => (v === '' ? null : Number(v));
+
+  const valorHora = precioHora(
+    ingresoTrabajadoMes,
+    perfil.horas_trabajadas_mes,
+  );
 
   const campo =
     'rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-2 text-sm text-white outline-none focus:border-blue-500';
@@ -118,9 +136,23 @@ export default function PerfilFinancieroPanel({
               placeholder="Ej: 160"
               className={campo}
             />
-            <span className="text-xs text-slate-500">
-              Para el Precio Hora de Vida.
-            </span>
+            {/* El valor de la hora se recalcula mientras se escribe, para que
+                se vea de inmediato si el número de horas tiene sentido. */}
+            {valorHora !== null ? (
+              <>
+                <span className="text-sm font-medium text-emerald-400">
+                  Tu hora de trabajo vale {COP.format(valorHora)}
+                </span>
+                <span className="text-xs text-slate-500">
+                  {COP.format(ingresoTrabajadoMes)} trabajados en {nombreMes} ÷{' '}
+                  {perfil.horas_trabajadas_mes} horas
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-slate-500">
+                Para el Precio Hora de Vida.
+              </span>
+            )}
           </label>
 
           <label className="flex flex-col gap-1 text-sm text-slate-300">
