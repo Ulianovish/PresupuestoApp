@@ -47,7 +47,11 @@ import {
   stripNewExpenseParam,
   wantsNewExpenseForm,
 } from '@/lib/onboarding/nuevo-gasto';
-import { updateBudgetItem, deleteBudgetItem } from '@/lib/services/budget';
+import {
+  updateBudgetItem,
+  deleteBudgetItem,
+  getBudgetByMonth,
+} from '@/lib/services/budget';
 import {
   createExpenseTransaction,
   classifyExpensesOnServer,
@@ -60,6 +64,7 @@ import {
   getUserAccounts,
   type BudgetItemRef,
 } from '@/lib/services/expenses';
+import { normalizarNombre } from '@/lib/services/expenses-rollup';
 
 // Mapa de palabras clave para auto-categorizar gastos por descripción
 const KEYWORD_MAP: Record<string, string[]> = {
@@ -228,6 +233,31 @@ export default function GastosPage() {
   useEffect(() => {
     loadBudgetItems();
   }, [loadBudgetItems]);
+
+  // Presupuesto del mes por categoría: es el 100% contra el que el anillo de
+  // cada tarjeta mide el gasto. Si falla, las tarjetas quedan como antes.
+  const [presupuestoPorCategoria, setPresupuestoPorCategoria] = useState<
+    Record<string, number>
+  >({});
+  useEffect(() => {
+    let vigente = true;
+    void getBudgetByMonth(selectedMonth)
+      .then(presupuesto => {
+        if (!vigente) return;
+        const porCategoria: Record<string, number> = {};
+        for (const categoria of presupuesto?.categories ?? []) {
+          porCategoria[normalizarNombre(categoria.nombre)] =
+            categoria.totalPresupuestado;
+        }
+        setPresupuestoPorCategoria(porCategoria);
+      })
+      .catch(() => {
+        if (vigente) setPresupuestoPorCategoria({});
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [selectedMonth]);
 
   const handleAssignItem = async (transactionId: string, itemId: string) => {
     try {
@@ -830,6 +860,7 @@ export default function GastosPage() {
           <ExpenseSummary
             expenseData={expenseData}
             formatCurrency={formatCurrency}
+            presupuestoPorCategoria={presupuestoPorCategoria}
           />
         ) : undefined
       }
